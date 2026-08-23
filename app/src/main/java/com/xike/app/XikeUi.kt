@@ -54,6 +54,8 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -62,6 +64,8 @@ import androidx.compose.material.icons.outlined.SentimentNeutral
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
 import androidx.compose.material.icons.outlined.SentimentVerySatisfied
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ColorScheme
@@ -72,7 +76,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -272,6 +278,96 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                     ),
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun AppLockDialog(
+    authenticationAvailable: Boolean,
+    onUnlock: () -> Unit,
+    onOpenSecuritySettings: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        AppLockScreen(
+            authenticationAvailable = authenticationAvailable,
+            onUnlock = onUnlock,
+            onOpenSecuritySettings = onOpenSecuritySettings,
+        )
+    }
+}
+
+@Composable
+fun AppLockScreen(
+    authenticationAvailable: Boolean,
+    onUnlock: () -> Unit,
+    onOpenSecuritySettings: () -> Unit,
+) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 32.dp, vertical = 28.dp),
+        ) {
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Surface(
+                    modifier = Modifier.size(86.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(38.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                Text("息刻已锁定", style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (authenticationAvailable) {
+                        "验证身份后，回到只属于你的留白。"
+                    } else {
+                        "需要先在系统中设置屏幕锁，才能继续验证身份。"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(28.dp))
+                Button(
+                    onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
+                    shape = XikeShapes.button,
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+                ) {
+                    Icon(
+                        if (authenticationAvailable) Icons.Outlined.LockOpen else Icons.Outlined.Shield,
+                        contentDescription = null,
+                        modifier = Modifier.size(19.dp),
+                    )
+                    Spacer(Modifier.width(9.dp))
+                    Text(if (authenticationAvailable) "解锁息刻" else "设置设备锁屏")
+                }
+            }
+
+            Text(
+                "身份信息仅由 Android 系统验证，息刻不会读取或保存。",
+                modifier = Modifier.align(Alignment.BottomCenter),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -1236,10 +1332,18 @@ private fun PhotoGalleryDialog(
 fun ProfileSettingsScreen(
     padding: PaddingValues,
     selectedTheme: AppTheme,
+    appLockEnabled: Boolean,
+    appLockTimeout: AppLockTimeout,
+    authenticationAvailable: Boolean,
     onThemeChange: (AppTheme) -> Unit,
+    onAppLockChange: (Boolean) -> Unit,
+    onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
+    onLockNow: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
 ) {
+    var showTimeoutDialog by rememberSaveable { mutableStateOf(false) }
+
     ScreenColumn(padding) {
         ScreenHeader(
             eyebrow = "偏好与数据",
@@ -1257,6 +1361,35 @@ fun ProfileSettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("离线且加密", style = MaterialTheme.typography.titleSmall)
                     Text("无需账号，数据仅保存在这台设备上", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(index = "隐私", title = "应用锁")
+            Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    AppLockToggleRow(
+                        enabled = appLockEnabled,
+                        authenticationAvailable = authenticationAvailable,
+                        onEnabledChange = onAppLockChange,
+                    )
+                    if (appLockEnabled) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsAction(
+                            icon = Icons.Outlined.Timer,
+                            title = "自动锁定",
+                            subtitle = appLockTimeout.label,
+                            onClick = { showTimeoutDialog = true },
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsAction(
+                            icon = Icons.Outlined.Lock,
+                            title = "立即锁定",
+                            subtitle = "隐藏当前内容并返回锁定页",
+                            onClick = onLockNow,
+                        )
+                    }
                 }
             }
         }
@@ -1305,6 +1438,94 @@ fun ProfileSettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+
+    if (showTimeoutDialog) {
+        AppLockTimeoutDialog(
+            selected = appLockTimeout,
+            onSelected = {
+                onAppLockTimeoutChange(it)
+                showTimeoutDialog = false
+            },
+            onDismiss = { showTimeoutDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun AppLockToggleRow(
+    enabled: Boolean,
+    authenticationAvailable: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("应用锁", style = MaterialTheme.typography.titleSmall)
+            Text(
+                when {
+                    enabled && authenticationAvailable -> "离开后使用系统身份验证解锁"
+                    enabled -> "设备验证不可用，请恢复系统屏幕锁"
+                    authenticationAvailable -> "使用面容、指纹或设备密码保护"
+                    else -> "开启时需要先设置设备屏幕锁"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun AppLockTimeoutDialog(
+    selected: AppLockTimeout,
+    onSelected: (AppLockTimeout) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("自动锁定") },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                AppLockTimeout.entries.forEach { timeout ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = selected == timeout,
+                                role = Role.RadioButton,
+                                onClick = { onSelected(timeout) },
+                            )
+                            .padding(vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected == timeout, onClick = null)
+                        Spacer(Modifier.width(10.dp))
+                        Text(timeout.label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { Button(onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 @Composable

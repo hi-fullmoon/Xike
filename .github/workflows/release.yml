@@ -1,0 +1,260 @@
+name: Release Android app
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  metadata:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version_name: ${{ steps.metadata.outputs.version_name }}
+      version_code: ${{ steps.metadata.outputs.version_code }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate tag and derive Android version
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tags must use the vMAJOR.MINOR.PATCH format (for example, v0.1.0)." >&2
+            exit 1
+          fi
+
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+
+          if (( major > 2099 || minor > 999 || patch > 999 )); then
+            echo "Version components are too large to produce a valid Android versionCode." >&2
+            exit 1
+          fi
+
+          version_name="${RELEASE_TAG#v}"
+          version_code=$((major * 1000000 + minor * 1000 + patch + 1))
+
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "Building Xike $version_name (versionCode $version_code)"
+
+  verify:
+    name: Test and lint
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XIKE_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      XIKE_VERSION_CODE: ${{ needs.metadata.outputs.version_code }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Run unit tests and lint
+        run: ./gradlew test lint --stacktrace
+
+  build:
+    name: Build signed release assets
+    needs:
+      - metadata
+      - verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XIKE_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      XIKE_VERSION_CODE: ${{ needs.metadata.outputs.version_code }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Restore release signing key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          XIKE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          XIKE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          XIKE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -n "$ANDROID_KEYSTORE_BASE64" ]] || missing+=(ANDROID_KEYSTORE_BASE64)
+          [[ -n "$XIKE_KEYSTORE_PASSWORD" ]] || missing+=(ANDROID_KEYSTORE_PASSWORD)
+          [[ -n "$XIKE_KEY_ALIAS" ]] || missing+=(ANDROID_KEY_ALIAS)
+          [[ -n "$XIKE_KEY_PASSWORD" ]] || missing+=(ANDROID_KEY_PASSWORD)
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+          export XIKE_KEYSTORE_FILE="$RUNNER_TEMP/xike-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$XIKE_KEYSTORE_FILE"
+          chmod 600 "$XIKE_KEYSTORE_FILE"
+          keytool -list \
+            -keystore "$XIKE_KEYSTORE_FILE" \
+            -storepass "$XIKE_KEYSTORE_PASSWORD" \
+            -alias "$XIKE_KEY_ALIAS" >/dev/null
+          echo "XIKE_KEYSTORE_FILE=$XIKE_KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      - name: Build signed APK and App Bundle
+        env:
+          XIKE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          XIKE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          XIKE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace
+
+      - name: Verify and package release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source_apk="app/build/outputs/apk/release/app-release.apk"
+          source_aab="app/build/outputs/bundle/release/app-release.aab"
+          apk_name="Xike-${XIKE_VERSION_NAME}.apk"
+          aab_name="Xike-${XIKE_VERSION_NAME}.aab"
+
+          [[ -f "$source_apk" ]] || {
+            echo "Expected APK was not produced at $source_apk" >&2
+            exit 1
+          }
+          [[ -f "$source_aab" ]] || {
+            echo "Expected App Bundle was not produced at $source_aab" >&2
+            exit 1
+          }
+
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          [[ -n "$apksigner" ]] || {
+            echo "Unable to find apksigner in the Android SDK." >&2
+            exit 1
+          }
+          "$apksigner" verify --verbose --print-certs "$source_apk"
+          jarsigner -verify "$source_aab" >/dev/null
+
+          mkdir -p dist
+          cp "$source_apk" "dist/$apk_name"
+          cp "$source_aab" "dist/$aab_name"
+          {
+            echo "tag=$RELEASE_TAG"
+            echo "versionName=$XIKE_VERSION_NAME"
+            echo "versionCode=$XIKE_VERSION_CODE"
+            echo "commit=$GITHUB_SHA"
+            echo "repository=$GITHUB_REPOSITORY"
+          } > dist/build-info.txt
+          (
+            cd dist
+            sha256sum "$apk_name" "$aab_name" build-info.txt > SHA256SUMS.txt
+          )
+
+      - name: Upload verified release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: xike-release-${{ needs.metadata.outputs.version_name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Remove temporary signing key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/xike-release.jks"
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      XIKE_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: xike-release-${{ needs.metadata.outputs.version_name }}
+          path: dist/
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          assets=(
+            "$GITHUB_WORKSPACE/dist/Xike-${XIKE_VERSION_NAME}.apk#Android APK"
+            "$GITHUB_WORKSPACE/dist/Xike-${XIKE_VERSION_NAME}.aab#Android App Bundle"
+            "$GITHUB_WORKSPACE/dist/SHA256SUMS.txt#SHA-256 checksums"
+            "$GITHUB_WORKSPACE/dist/build-info.txt#Build metadata"
+          )
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --verify-tag \
+              --generate-notes \
+              --title "息刻 $XIKE_VERSION_NAME" \
+              --repo "$GITHUB_REPOSITORY"
+          fi

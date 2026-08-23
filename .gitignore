@@ -1,9 +1,11 @@
 .gradle/
+.kotlin/
 build/
 local.properties
 *.iml
+*.jks
+*.keystore
 .idea/
-app/build/
 build*.log
 /*.png
 /*.xml
