@@ -1,0 +1,97 @@
+package com.xike.app
+
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class JournalDaoTest {
+    private lateinit var database: JournalDatabase
+    private lateinit var dao: JournalDao
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, JournalDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        dao = database.journalDao()
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
+    }
+
+    @Test
+    fun entryRelationsRoundTripInOriginalOrder() {
+        val older = entry("older", 100L, listOf("生活"), listOf("old.xike-image"))
+        val newer = entry(
+            "newer",
+            200L,
+            listOf("工作", "运动", "阅读"),
+            listOf("first.xike-image", "second.xike-image"),
+        )
+
+        dao.insertJournal(older.toBundle())
+        dao.insertJournal(newer.toBundle())
+
+        val stored = dao.records().map(JournalEntryRecord::toJournalEntry)
+        assertEquals(listOf("newer", "older"), stored.map { it.id })
+        assertEquals(newer.tags, stored.first().tags)
+        assertEquals(newer.imageFileNames, stored.first().imageFileNames)
+    }
+
+    @Test
+    fun replaceIsCompleteAndKeepsSettings() {
+        dao.insertJournal(entry("old", 100L).toBundle())
+        dao.putSetting(AppSettingEntity(THEME_SETTING, "FOREST"))
+
+        val replacement = entry("replacement", 300L, listOf("新的"), listOf("new.xike-image"))
+        dao.replaceJournals(listOf(replacement.toBundle()))
+
+        assertEquals(listOf("replacement"), dao.records().map { it.entry.id })
+        assertEquals(listOf("new.xike-image"), dao.imageFileNames())
+        assertEquals("FOREST", dao.settingValue(THEME_SETTING))
+    }
+
+    @Test
+    fun legacyImportRunsOnlyOnce() {
+        dao.importLegacyIfNeeded(listOf(entry("legacy", 100L).toBundle()), "SUNSET")
+        dao.importLegacyIfNeeded(listOf(entry("ignored", 200L).toBundle()), "FOREST")
+
+        assertEquals(listOf("legacy"), dao.records().map { it.entry.id })
+        assertEquals("SUNSET", dao.settingValue(THEME_SETTING))
+        assertEquals("1", dao.settingValue(LEGACY_MIGRATION_SETTING))
+    }
+
+    @Test
+    fun legacyImportNeverOverwritesExistingDatabaseEntries() {
+        dao.insertJournal(entry("existing", 300L).toBundle())
+
+        dao.importLegacyIfNeeded(listOf(entry("legacy", 100L).toBundle()), null)
+
+        assertEquals(listOf("existing"), dao.records().map { it.entry.id })
+        assertEquals("1", dao.settingValue(LEGACY_MIGRATION_SETTING))
+    }
+
+    private fun entry(
+        id: String,
+        createdAt: Long,
+        tags: List<String> = emptyList(),
+        images: List<String> = emptyList(),
+    ) = JournalEntry(
+        id = id,
+        createdAt = createdAt,
+        mood = Mood.GOOD,
+        tags = tags,
+        note = "note-$id",
+        imageFileNames = images,
+    )
+}
