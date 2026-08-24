@@ -2,10 +2,13 @@ package com.xike.app
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Rule
@@ -28,7 +31,8 @@ class JournalInsightsUiTest {
         }
 
         composeRule.onNodeWithText("暂无样本").assertIsDisplayed()
-        composeRule.onNodeWithText("有记录后可生成").performScrollTo().assertIsDisplayed()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("有记录后可生成"))
+        composeRule.onNodeWithText("有记录后可生成").assertIsDisplayed()
     }
 
     @Test
@@ -67,7 +71,8 @@ class JournalInsightsUiTest {
             }
         }
 
-        composeRule.onNodeWithText("查看本地回顾").performScrollTo().performClick()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("查看本地回顾"))
+        composeRule.onNodeWithText("查看本地回顾").performClick()
         composeRule.onNodeWithText("本地回顾").assertIsDisplayed()
         composeRule.onNodeWithText("不代表原因、诊断或建议", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("息刻不会自动上传", substring = true).assertIsDisplayed()

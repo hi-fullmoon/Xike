@@ -561,7 +561,12 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onOpen, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onOpen,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            elevation = xikeButtonElevation(),
+        ) {
             Text(if (enabled) "查看本地回顾" else "有记录后可生成")
         }
     }
@@ -688,6 +693,7 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                         .putExtra(Intent.EXTRA_TEXT, reviewText)
                     context.startActivity(Intent.createChooser(shareIntent, "分享息刻回顾"))
                 },
+                elevation = xikeButtonElevation(),
             ) {
                 Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(7.dp))

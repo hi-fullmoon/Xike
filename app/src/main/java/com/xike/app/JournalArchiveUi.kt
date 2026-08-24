@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -97,6 +99,7 @@ fun JournalArchiveScreen(
 ) {
     val today = LocalDate.now()
     val scope = rememberCoroutineScope()
+    val archiveListState = rememberLazyListState()
     var queryText by rememberSaveable { mutableStateOf("") }
     var selectedMoodNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedTags by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -115,6 +118,7 @@ fun JournalArchiveScreen(
     var galleryImages by remember { mutableStateOf<List<String>?>(null) }
     var galleryInitialPage by remember { mutableIntStateOf(0) }
     var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
+    var pendingScrollPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val selectedMoods = remember(selectedMoodNames) {
         selectedMoodNames.mapNotNull { name -> Mood.entries.firstOrNull { it.name == name } }.toSet()
@@ -162,6 +166,11 @@ fun JournalArchiveScreen(
                 searchError = error.message ?: "搜索暂时不可用"
             }
         isSearching = false
+        pendingScrollPosition?.let { (index, offset) ->
+            withFrameNanos { }
+            archiveListState.scrollToItem(index, offset)
+            pendingScrollPosition = null
+        }
     }
 
     val groupedResults = remember(resultEntries) {
@@ -188,6 +197,7 @@ fun JournalArchiveScreen(
     val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
 
     LazyColumn(
+        state = archiveListState,
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -262,6 +272,8 @@ fun JournalArchiveScreen(
                     onPreviousMonth = { visibleMonthValue = visibleMonth.minusMonths(1).toString() },
                     onNextMonth = { visibleMonthValue = visibleMonth.plusMonths(1).toString() },
                     onSelectDate = { date ->
+                        pendingScrollPosition = archiveListState.firstVisibleItemIndex to
+                            archiveListState.firstVisibleItemScrollOffset
                         selectedDateValue = if (selectedDate == date) null else date.toString()
                         datePresetName = ArchiveDatePreset.ALL.name
                     },
@@ -582,6 +594,7 @@ private fun JournalMonthCalendar(
                                 count = dayEntries.size,
                                 isToday = date == today,
                                 isSelected = date == selectedDate,
+                                enabled = dayEntries.isNotEmpty(),
                                 modifier = Modifier.weight(1f),
                                 onClick = { onSelectDate(date) },
                             )
@@ -599,6 +612,7 @@ private fun CalendarDay(
     count: Int,
     isToday: Boolean,
     isSelected: Boolean,
+    enabled: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
@@ -611,7 +625,7 @@ private fun CalendarDay(
                 contentDescription = "$spokenDate，${if (count == 0) "没有记录" else "$count 条记录"}"
                 selected = isSelected
             }
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         shape = XikeShapes.inner,
         color = when {
             isSelected -> MaterialTheme.colorScheme.primary
@@ -627,7 +641,11 @@ private fun CalendarDay(
                 date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.56f)
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
             Text(
                 count.takeIf { it > 0 }?.let { "$it 条" }.orEmpty(),
@@ -764,7 +782,11 @@ internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("关闭") }
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = xikeButtonElevation(),
+                ) { Text("关闭") }
             }
         }
     }

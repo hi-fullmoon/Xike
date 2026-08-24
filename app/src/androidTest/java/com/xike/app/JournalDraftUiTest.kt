@@ -95,6 +95,33 @@ class JournalDraftUiTest {
     }
 
     @Test
+    fun restoredDraftDetailsCanBeCollapsedAndExpandedAgain() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(note = "可以收起的草稿内容"),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
+        composeRule.onNodeWithText("多留一点").performClick()
+        check(composeRule.onAllNodesWithText("可以收起的草稿内容").fetchSemanticsNodes().isEmpty())
+        composeRule.onNodeWithText("多留一点").performClick()
+        composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
+    }
+
+    @Test
     fun unreadableSelectedPhotoDoesNotCrashTheScreen() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {

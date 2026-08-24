@@ -3,8 +3,10 @@ package com.xike.app
 import android.app.TimePickerDialog
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -69,6 +71,7 @@ import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonElevation
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -248,6 +251,15 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
 }
 
 @Composable
+internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonElevation(
+    defaultElevation = 0.dp,
+    pressedElevation = 0.dp,
+    focusedElevation = 0.dp,
+    hoveredElevation = 0.dp,
+    disabledElevation = 0.dp,
+)
+
+@Composable
 fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
     Surface(shadowElevation = 2.dp, tonalElevation = 0.dp) {
         NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
@@ -356,6 +368,7 @@ fun AppLockScreen(
                     onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
                     shape = XikeShapes.button,
                     contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+                    elevation = xikeButtonElevation(),
                 ) {
                     Icon(
                         if (authenticationAvailable) Icons.Outlined.LockOpen else Icons.Outlined.Shield,
@@ -403,12 +416,22 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
-    val photoDocumentPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
+    val draftHasDetails = draft.note.isNotBlank() || draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()
+    LaunchedEffect(draftHasDetails) {
+        if (draftHasDetails) showDetails = true
+    }
+    val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         onDraftImagesAdded(uris)
         if (uris.isNotEmpty()) showDetails = true
     }
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
+        onImagesPicked,
+    )
+    val photoDocumentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+        onImagesPicked,
+    )
 
     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         Column(
@@ -462,7 +485,7 @@ fun MomentScreen(
                 }
             }
 
-            if (showDetails || draft.note.isNotBlank() || draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()) {
+            if (showDetails) {
                 PaperCard {
                     Text("补充一点细节", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(12.dp))
@@ -535,9 +558,35 @@ fun MomentScreen(
                         onPick = {
                             if (!isSaving) {
                                 dismissKeyboard()
-                                runCatching {
-                                    photoDocumentPicker.launch(arrayOf("image/*"))
-                                }.onFailure {
+                                val openDocuments = {
+                                    val contract = ActivityResultContracts.OpenMultipleDocuments()
+                                    val input = arrayOf("image/*")
+                                    val canOpen = contract.createIntent(context, input)
+                                        .resolveActivity(context.packageManager) != null
+                                    if (canOpen) photoDocumentPicker.launch(input)
+                                    canOpen
+                                }
+                                val opened = if (
+                                    ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)
+                                ) {
+                                    runCatching {
+                                        photoPicker.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                        )
+                                        true
+                                    }.onFailure { error ->
+                                        Log.w("XikePhotoPicker", "Photo picker launch failed", error)
+                                    }.getOrElse {
+                                        runCatching(openDocuments).onFailure { error ->
+                                            Log.w("XikePhotoPicker", "Document picker launch failed", error)
+                                        }.getOrDefault(false)
+                                    }
+                                } else {
+                                    runCatching(openDocuments).onFailure { error ->
+                                        Log.w("XikePhotoPicker", "Document picker launch failed", error)
+                                    }.getOrDefault(false)
+                                }
+                                if (!opened) {
                                     Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
                                 }
                             }
@@ -579,6 +628,7 @@ fun MomentScreen(
                 enabled = draft.mood != null && !isSaving,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp).height(52.dp),
                 shape = XikeShapes.button,
+                elevation = xikeButtonElevation(),
                 colors = ButtonDefaults.buttonColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
@@ -842,7 +892,7 @@ private fun SelectedPhotoTile(
             modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-            shadowElevation = 2.dp,
+            shadowElevation = 0.dp,
         ) {
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Outlined.Close, contentDescription = "移除第 $order 张照片", modifier = Modifier.size(16.dp))
@@ -1676,6 +1726,7 @@ private fun ReminderScheduleDialog(
                     )
                 },
                 enabled = selectedDays.isNotEmpty(),
+                elevation = xikeButtonElevation(),
             ) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
@@ -1794,7 +1845,9 @@ private fun AppLockTimeoutDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { Button(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            Button(onClick = onDismiss, elevation = xikeButtonElevation()) { Text("取消") }
+        },
     )
 }
 
