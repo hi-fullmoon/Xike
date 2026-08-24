@@ -17,11 +17,17 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 自检通过后执行 PR 使用的同一组验证任务：
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
 Windows 可在 JDK 17 已加入环境变量后执行：
 
 ```powershell
-gradlew.bat testDebugUnitTest lintDebug assembleDebug
+gradlew.bat testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+```
+
+连接 API 26 以上的真机或模拟器后，运行备份恢复等设备端测试：
+
+```bash
+./gradlew connectedDebugAndroidTest
 ```

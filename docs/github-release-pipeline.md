@@ -67,7 +67,7 @@ $keystoreBase64 | Set-Clipboard
 
 ## 日常发布
 
-确认 `main` 上的版本已经可以发布，然后创建带注释标签：
+先完成[最小发布检查清单](release-checklist.md)，确认 `main` 上的版本已经可以发布，然后创建带注释标签：
 
 ```powershell
 git switch main

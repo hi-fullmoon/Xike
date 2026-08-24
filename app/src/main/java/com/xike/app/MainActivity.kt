@@ -377,6 +377,7 @@ private fun XikeApp(
     val snackbarHostState = remember { SnackbarHostState() }
 
     suspend fun runUndoRestore() {
+        snackbarHostState.currentSnackbarData?.dismiss()
         busyMessage = "正在撤销上次恢复…"
         onUndoRestore()
             .onSuccess { count ->
@@ -532,13 +533,19 @@ private fun RestoreConfirmationDialog(
     onConfirm: () -> Unit,
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy年M月d日") }
-    val dateRange = if (summary.oldestCreatedAt == null || summary.newestCreatedAt == null) {
+    val oldestCreatedAt = summary.oldestCreatedAt
+    val newestCreatedAt = summary.newestCreatedAt
+    val dateRange = if (oldestCreatedAt == null || newestCreatedAt == null) {
         "无记录日期"
     } else {
         val zone = java.time.ZoneId.systemDefault()
-        val oldest = java.time.Instant.ofEpochMilli(summary.oldestCreatedAt).atZone(zone).toLocalDate()
-        val newest = java.time.Instant.ofEpochMilli(summary.newestCreatedAt).atZone(zone).toLocalDate()
-        if (oldest == newest) formatter.format(oldest) else "${formatter.format(oldest)} – ${formatter.format(newest)}"
+        val oldest = java.time.Instant.ofEpochMilli(oldestCreatedAt).atZone(zone).toLocalDate()
+        val newest = java.time.Instant.ofEpochMilli(newestCreatedAt).atZone(zone).toLocalDate()
+        if (oldest == newest) {
+            formatter.format(oldest)
+        } else {
+            "${formatter.format(oldest)} – ${formatter.format(newest)}"
+        }
     }
 
     AlertDialog(

@@ -16,6 +16,7 @@ class JournalStoreMigrationTest {
     @Test
     fun encryptedSharedPreferencesAreMigratedWithoutBeingDeleted() {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = JournalDatabase.get(context)
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
         val legacyPreferences = EncryptedSharedPreferences.create(
             context,
@@ -24,6 +25,8 @@ class JournalStoreMigrationTest {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
+        database.clearAllTables()
+        legacyPreferences.edit().clear().commit()
         val legacyEntry = JournalEntry(
             id = "legacy-four-images",
             createdAt = 1_777_777L,
@@ -39,14 +42,19 @@ class JournalStoreMigrationTest {
                 .commit(),
         )
 
-        val firstSnapshot = JournalStore(context).initialize()
-        val secondSnapshot = JournalStore(context).initialize()
+        try {
+            val firstSnapshot = JournalStore(context).initialize()
+            val secondSnapshot = JournalStore(context).initialize()
 
-        assertEquals(listOf(legacyEntry), firstSnapshot.entries)
-        assertEquals(firstSnapshot, secondSnapshot)
-        assertEquals("SUNSET", firstSnapshot.themeName)
-        assertEquals(4, firstSnapshot.entries.single().imageFileNames.size)
-        assertTrue(legacyPreferences.contains("entries"))
-        assertTrue(legacyPreferences.contains("theme"))
+            assertEquals(listOf(legacyEntry), firstSnapshot.entries)
+            assertEquals(firstSnapshot, secondSnapshot)
+            assertEquals("SUNSET", firstSnapshot.themeName)
+            assertEquals(4, firstSnapshot.entries.single().imageFileNames.size)
+            assertTrue(legacyPreferences.contains("entries"))
+            assertTrue(legacyPreferences.contains("theme"))
+        } finally {
+            database.clearAllTables()
+            legacyPreferences.edit().clear().commit()
+        }
     }
 }
