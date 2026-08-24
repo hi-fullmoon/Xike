@@ -1432,7 +1432,7 @@ fun ProfileSettingsScreen(
         }
 
         Text(
-            "息刻 · 0.1.0",
+            "息刻 · ${BuildConfig.VERSION_NAME}",
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
