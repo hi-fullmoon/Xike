@@ -29,6 +29,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -104,7 +108,10 @@ class MainActivity : FragmentActivity() {
                         onLockNow = ::lockNow,
                         onSave = journalViewModel::save,
                         onExportBackup = journalViewModel::exportBackup,
+                        onInspectBackup = journalViewModel::inspectBackup,
                         onRestoreBackup = journalViewModel::restoreBackup,
+                        canUndoRestore = journalViewModel.canUndoRestore,
+                        onUndoRestore = journalViewModel::undoRestore,
                         openImage = journalViewModel::openImage,
                     )
 
@@ -334,6 +341,12 @@ class AppLockSessionState : ViewModel() {
 
 private enum class BackupAction { EXPORT, IMPORT }
 
+private data class PendingRestore(
+    val uri: Uri,
+    val password: String,
+    val summary: BackupSummary,
+)
+
 @Composable
 private fun XikeApp(
     entries: List<JournalEntry>,
@@ -347,7 +360,10 @@ private fun XikeApp(
     onLockNow: () -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     onExportBackup: suspend (Uri, String) -> Result<Unit>,
+    onInspectBackup: suspend (Uri, String) -> Result<BackupSummary>,
     onRestoreBackup: suspend (Uri, String) -> Result<Int>,
+    canUndoRestore: Boolean,
+    onUndoRestore: suspend () -> Result<Int>,
     openImage: (String) -> InputStream?,
 ) {
     val context = LocalContext.current
@@ -356,7 +372,21 @@ private fun XikeApp(
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
     var pendingExportPassword by remember { mutableStateOf<String?>(null) }
     var pendingImportUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    suspend fun runUndoRestore() {
+        busyMessage = "正在撤销上次恢复…"
+        onUndoRestore()
+            .onSuccess { count ->
+                Toast.makeText(context, "已撤销恢复，找回 $count 条日记", Toast.LENGTH_SHORT).show()
+            }
+            .onFailure {
+                Toast.makeText(context, it.message ?: "撤销恢复失败", Toast.LENGTH_LONG).show()
+            }
+        busyMessage = null
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -387,6 +417,7 @@ private fun XikeApp(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             XikeNavigationBar(
                 selected = screen,
@@ -410,6 +441,8 @@ private fun XikeApp(
                 onLockNow = onLockNow,
                 onExport = { backupAction = BackupAction.EXPORT },
                 onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json")) },
+                canUndoRestore = canUndoRestore,
+                onUndoRestore = { scope.launch { runUndoRestore() } },
             )
         }
     }
@@ -431,9 +464,9 @@ private fun XikeApp(
 
     if (backupAction == BackupAction.IMPORT) {
         BackupPasswordDialog(
-            title = "恢复加密备份",
-            confirm = "验证并恢复",
-            description = "应用会先完整验证备份，确认无误后才替换此设备上的内容。",
+            title = "验证加密备份",
+            confirm = "查看备份摘要",
+            description = "应用会先完整验证密码、日记和图片，此步骤不会修改设备上的内容。",
             onDismiss = {
                 backupAction = null
                 pendingImportUri = null
@@ -444,13 +477,13 @@ private fun XikeApp(
                 backupAction = null
                 if (uri != null) {
                     scope.launch {
-                        busyMessage = "正在验证并恢复备份…"
-                        onRestoreBackup(uri, password)
-                            .onSuccess { count ->
-                                Toast.makeText(context, "已恢复 $count 条日记", Toast.LENGTH_SHORT).show()
+                        busyMessage = "正在验证备份…"
+                        onInspectBackup(uri, password)
+                            .onSuccess { summary ->
+                                pendingRestore = PendingRestore(uri, password, summary)
                             }
                             .onFailure {
-                                Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, it.message ?: "备份验证失败", Toast.LENGTH_LONG).show()
                             }
                         busyMessage = null
                     }
@@ -459,7 +492,76 @@ private fun XikeApp(
         )
     }
 
+    pendingRestore?.let { request ->
+        RestoreConfirmationDialog(
+            summary = request.summary,
+            localEntryCount = entries.size,
+            onDismiss = { pendingRestore = null },
+            onConfirm = {
+                pendingRestore = null
+                scope.launch {
+                    busyMessage = "正在创建安全快照并恢复…"
+                    onRestoreBackup(request.uri, request.password)
+                        .onSuccess { count ->
+                            busyMessage = null
+                            val result = snackbarHostState.showSnackbar(
+                                message = "已恢复 $count 条日记",
+                                actionLabel = "撤销",
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Long,
+                            )
+                            if (result == SnackbarResult.ActionPerformed) runUndoRestore()
+                        }
+                        .onFailure {
+                            Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_LONG).show()
+                            busyMessage = null
+                        }
+                }
+            },
+        )
+    }
+
     busyMessage?.let { message -> ProcessingDialog(message) }
+}
+
+@Composable
+private fun RestoreConfirmationDialog(
+    summary: BackupSummary,
+    localEntryCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年M月d日") }
+    val dateRange = if (summary.oldestCreatedAt == null || summary.newestCreatedAt == null) {
+        "无记录日期"
+    } else {
+        val zone = java.time.ZoneId.systemDefault()
+        val oldest = java.time.Instant.ofEpochMilli(summary.oldestCreatedAt).atZone(zone).toLocalDate()
+        val newest = java.time.Instant.ofEpochMilli(summary.newestCreatedAt).atZone(zone).toLocalDate()
+        if (oldest == newest) formatter.format(oldest) else "${formatter.format(oldest)} – ${formatter.format(newest)}"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("确认替换设备内容？") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片。")
+                Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("替换并恢复") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable
@@ -470,7 +572,7 @@ private fun BackupPasswordDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,

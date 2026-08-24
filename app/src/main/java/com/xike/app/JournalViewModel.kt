@@ -28,12 +28,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     var isLoading by mutableStateOf(true)
         private set
 
+    var canUndoRestore by mutableStateOf(false)
+        private set
+
     init {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
             result.onSuccess { snapshot ->
                 entries = snapshot.entries
                 selectedTheme = AppTheme.entries.firstOrNull { it.name == snapshot.themeName } ?: AppTheme.OCEAN
+                canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
                 dataError = null
                 viewModelScope.launch(Dispatchers.IO) {
                     runCatching(store::removeOrphanedImages)
@@ -78,6 +82,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }.await()
 
+    suspend fun inspectBackup(uri: Uri, password: String): Result<BackupSummary> = viewModelScope.async(Dispatchers.IO) {
+        runCatching {
+            getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
+                store.inspectEncryptedBackup(input, password)
+            } ?: error("无法读取备份文件")
+        }
+    }.await()
+
     suspend fun restoreBackup(uri: Uri, password: String): Result<Int> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
             runCatching {
@@ -88,6 +100,17 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
         result.onSuccess {
             entries = it
+            canUndoRestore = true
+            dataError = null
+        }
+        result.map { it.size }
+    }.await()
+
+    suspend fun undoRestore(): Result<Int> = viewModelScope.async {
+        val result = withContext(Dispatchers.IO) { runCatching(store::undoLastRestore) }
+        result.onSuccess {
+            entries = it
+            canUndoRestore = false
             dataError = null
         }
         result.map { it.size }

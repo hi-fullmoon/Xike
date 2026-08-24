@@ -97,6 +97,28 @@ data class JournalSnapshot(
     val themeName: String?,
 )
 
+data class BackupSummary(
+    val entryCount: Int,
+    val imageCount: Int,
+    val oldestCreatedAt: Long?,
+    val newestCreatedAt: Long?,
+)
+
+private data class PreparedBackup(
+    val stagingDirectory: File,
+    val entries: List<JournalEntry>,
+)
+
+private data class UndoSnapshot(
+    val file: File,
+    val password: String,
+)
+
+private data class UndoSnapshotSwap(
+    val previous: UndoSnapshot?,
+    val current: UndoSnapshot,
+)
+
 class JournalStore(context: Context) {
     private val appContext = context.applicationContext
     private val imagesDirectory = File(appContext.filesDir, IMAGES_DIRECTORY)
@@ -107,6 +129,15 @@ class JournalStore(context: Context) {
         EncryptedSharedPreferences.create(
             appContext,
             LEGACY_PREFERENCES_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
+    private val restorePreferences by lazy {
+        EncryptedSharedPreferences.create(
+            appContext,
+            RESTORE_PREFERENCES_NAME,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
@@ -196,12 +227,20 @@ class JournalStore(context: Context) {
     @Synchronized
     fun removeOrphanedImages() {
         val referencedImages = dao.imageFileNames().toSet()
+        val activeUndoFileName = currentUndoSnapshot()?.file?.name
         imagesDirectory.listFiles()
             ?.filter { it.name !in referencedImages }
             ?.forEach(File::delete)
         appContext.filesDir.listFiles()
             ?.filter { it.isDirectory && it.name.startsWith(RESTORE_STAGING_PREFIX) }
             ?.forEach(File::deleteRecursively)
+        appContext.filesDir.listFiles()
+            ?.filter {
+                it.isFile &&
+                    it.name.startsWith(RESTORE_UNDO_PREFIX) &&
+                    it.name != activeUndoFileName
+            }
+            ?.forEach(File::delete)
     }
 
     @Synchronized
@@ -232,21 +271,72 @@ class JournalStore(context: Context) {
     }
 
     @Synchronized
+    fun inspectEncryptedBackup(input: InputStream, password: String): BackupSummary {
+        val prepared = readEncryptedBackup(input, password)
+        return try {
+            val createdAtValues = prepared.entries.map { it.createdAt }
+            BackupSummary(
+                entryCount = prepared.entries.size,
+                imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
+                oldestCreatedAt = createdAtValues.minOrNull(),
+                newestCreatedAt = createdAtValues.maxOrNull(),
+            )
+        } finally {
+            prepared.stagingDirectory.deleteRecursively()
+        }
+    }
+
+    @Synchronized
     fun restoreEncryptedBackup(input: InputStream, password: String): List<JournalEntry> {
+        val prepared = readEncryptedBackup(input, password)
+        return try {
+            val snapshotSwap = createUndoSnapshot()
+            try {
+                installRestoredData(prepared.stagingDirectory, prepared.entries).also {
+                    commitUndoSnapshot(snapshotSwap)
+                }
+            } catch (error: Throwable) {
+                rollbackUndoSnapshot(snapshotSwap)
+                throw error
+            }
+        } finally {
+            prepared.stagingDirectory.deleteRecursively()
+        }
+    }
+
+    @Synchronized
+    fun canUndoLastRestore(): Boolean = currentUndoSnapshot() != null
+
+    @Synchronized
+    fun undoLastRestore(): List<JournalEntry> {
+        val snapshot = currentUndoSnapshot() ?: error("没有可撤销的恢复操作。")
+        val prepared = snapshot.file.inputStream().use { input ->
+            readEncryptedBackup(input, snapshot.password)
+        }
+        return try {
+            installRestoredData(prepared.stagingDirectory, prepared.entries).also {
+                clearUndoSnapshot(snapshot)
+            }
+        } finally {
+            prepared.stagingDirectory.deleteRecursively()
+        }
+    }
+
+    private fun readEncryptedBackup(input: InputStream, password: String): PreparedBackup {
         require(password.length >= 8) { "备份密码至少需要 8 位。" }
         val source = PushbackInputStream(BufferedInputStream(input), BackupCipher.magicSize)
         val prefix = ByteArray(BackupCipher.magicSize)
         val prefixSize = source.readAvailable(prefix)
 
         return if (prefixSize == BackupCipher.magicSize && BackupCipher.hasStreamingMagic(prefix)) {
-            restoreStreamingBackup(source, password)
+            readStreamingBackup(source, password)
         } else {
             if (prefixSize > 0) source.unread(prefix, 0, prefixSize)
-            restoreLegacyBackup(source.readUtf8Limited(MAX_LEGACY_BACKUP_BYTES), password)
+            readLegacyBackup(source.readUtf8Limited(MAX_LEGACY_BACKUP_BYTES), password)
         }
     }
 
-    private fun restoreStreamingBackup(source: InputStream, password: String): List<JournalEntry> {
+    private fun readStreamingBackup(source: InputStream, password: String): PreparedBackup {
         val stagingDirectory = createStagingDirectory()
         return try {
             var parsedEntries: List<JournalEntry>? = null
@@ -287,18 +377,14 @@ class JournalStore(context: Context) {
                 requireNotNull(parsedEntries) { "备份清单缺失。" },
                 restoredImages,
             )
-            installRestoredData(stagingDirectory, restored)
+            PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
-            throw when (error) {
-                is BackupValidationException -> IllegalArgumentException(error.message, error)
-                is JournalDataException -> error
-                else -> IllegalArgumentException("密码错误或备份文件已损坏。", error)
-            }
+            throw normalizedBackupError(error)
         }
     }
 
-    private fun restoreLegacyBackup(payload: String, password: String): List<JournalEntry> {
+    private fun readLegacyBackup(payload: String, password: String): PreparedBackup {
         val stagingDirectory = createStagingDirectory()
         return try {
             val backup = JSONObject(BackupCipher.decryptLegacy(payload, password))
@@ -334,15 +420,17 @@ class JournalStore(context: Context) {
             }
 
             val restored = normalizeRestoredEntries(parsedEntries, restoredImages)
-            installRestoredData(stagingDirectory, restored)
+            PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
-            throw when (error) {
-                is BackupValidationException -> IllegalArgumentException(error.message, error)
-                is JournalDataException -> error
-                else -> IllegalArgumentException("密码错误或备份文件已损坏。", error)
-            }
+            throw normalizedBackupError(error)
         }
+    }
+
+    private fun normalizedBackupError(error: Throwable): Throwable = when (error) {
+        is BackupValidationException -> IllegalArgumentException(error.message, error)
+        is JournalDataException -> error
+        else -> IllegalArgumentException("密码错误或备份文件已损坏。", error)
     }
 
     private fun parseEntries(values: JSONArray): List<JournalEntry> {
@@ -391,6 +479,67 @@ class JournalStore(context: Context) {
         "$RESTORE_STAGING_PREFIX${UUID.randomUUID()}",
     ).also { directory ->
         check(directory.mkdir()) { "无法创建恢复临时目录。" }
+    }
+
+    private fun createUndoSnapshot(): UndoSnapshotSwap {
+        val previous = currentUndoSnapshot()
+        val passwordBytes = ByteArray(32).also(SecureRandom()::nextBytes)
+        val snapshot = UndoSnapshot(
+            file = File(appContext.filesDir, "$RESTORE_UNDO_PREFIX${UUID.randomUUID()}.xike"),
+            password = Base64.getUrlEncoder().withoutPadding().encodeToString(passwordBytes),
+        )
+
+        try {
+            snapshot.file.outputStream().use { output ->
+                writeEncryptedBackup(output, snapshot.password)
+            }
+            val saved = restorePreferences.edit()
+                .putString(RESTORE_UNDO_FILE_KEY, snapshot.file.name)
+                .putString(RESTORE_UNDO_PASSWORD_KEY, snapshot.password)
+                .commit()
+            if (!saved) error("无法保存撤销快照信息。")
+            return UndoSnapshotSwap(previous, snapshot)
+        } catch (error: Throwable) {
+            snapshot.file.delete()
+            throw JournalDataException("无法创建恢复撤销快照，设备内容未被替换。", error)
+        }
+    }
+
+    private fun commitUndoSnapshot(swap: UndoSnapshotSwap) {
+        swap.previous?.file
+            ?.takeIf { it != swap.current.file }
+            ?.delete()
+    }
+
+    private fun rollbackUndoSnapshot(swap: UndoSnapshotSwap) {
+        val editor = restorePreferences.edit()
+        if (swap.previous == null) {
+            editor.remove(RESTORE_UNDO_FILE_KEY).remove(RESTORE_UNDO_PASSWORD_KEY)
+        } else {
+            editor
+                .putString(RESTORE_UNDO_FILE_KEY, swap.previous.file.name)
+                .putString(RESTORE_UNDO_PASSWORD_KEY, swap.previous.password)
+        }
+        if (editor.commit()) swap.current.file.delete()
+    }
+
+    private fun clearUndoSnapshot(snapshot: UndoSnapshot) {
+        val cleared = restorePreferences.edit()
+            .remove(RESTORE_UNDO_FILE_KEY)
+            .remove(RESTORE_UNDO_PASSWORD_KEY)
+            .commit()
+        if (cleared) snapshot.file.delete()
+    }
+
+    private fun currentUndoSnapshot(): UndoSnapshot? {
+        val fileName = restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null)
+            ?.takeIf { it.startsWith(RESTORE_UNDO_PREFIX) && File(it).name == it }
+            ?: return null
+        val password = restorePreferences.getString(RESTORE_UNDO_PASSWORD_KEY, null)
+            ?.takeIf { it.length >= 8 }
+            ?: return null
+        val file = File(appContext.filesDir, fileName).takeIf(File::isFile) ?: return null
+        return UndoSnapshot(file, password)
     }
 
     private fun installRestoredData(
@@ -477,10 +626,14 @@ class JournalStore(context: Context) {
 
     private companion object {
         const val LEGACY_PREFERENCES_NAME = "xike-journal"
+        const val RESTORE_PREFERENCES_NAME = "xike-restore"
         const val ENTRIES_KEY = "entries"
         const val THEME_KEY = "theme"
+        const val RESTORE_UNDO_FILE_KEY = "undo-file"
+        const val RESTORE_UNDO_PASSWORD_KEY = "undo-password"
         const val IMAGES_DIRECTORY = "journal-images"
         const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
+        const val RESTORE_UNDO_PREFIX = "journal-restore-undo-"
         const val MANIFEST_ENTRY = "manifest.json"
         const val IMAGES_PREFIX = "images/"
         const val STREAMING_BACKUP_VERSION = 4

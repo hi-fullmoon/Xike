@@ -1341,6 +1341,8 @@ fun ProfileSettingsScreen(
     onLockNow: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    canUndoRestore: Boolean,
+    onUndoRestore: () -> Unit,
 ) {
     var showTimeoutDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -1427,6 +1429,15 @@ fun ProfileSettingsScreen(
                         subtitle = "使用密码恢复已有记录",
                         onClick = onImport,
                     )
+                    if (canUndoRestore) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsAction(
+                            icon = Icons.Outlined.Restore,
+                            title = "撤销上次恢复",
+                            subtitle = "找回恢复前的设备内容，仅可撤销一次",
+                            onClick = onUndoRestore,
+                        )
+                    }
                 }
             }
         }
