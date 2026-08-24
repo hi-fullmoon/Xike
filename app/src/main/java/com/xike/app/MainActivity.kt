@@ -319,16 +319,17 @@ class MainActivity : FragmentActivity() {
         }
 }
 
-private enum class LockAuthentication { UNLOCK, ENABLE, DISABLE }
+internal enum class LockAuthentication { UNLOCK, ENABLE, DISABLE }
 
-private class AppLockSessionState : ViewModel() {
+/** Public because ViewModelProvider creates this type reflectively from another package. */
+class AppLockSessionState : ViewModel() {
     var initialized = false
     var isAppLocked by mutableStateOf(true)
     var journalSessionOpened by mutableStateOf(false)
     var backgroundedAtMillis: Long? = null
     var authenticationInProgress = false
-    var authenticationAction: LockAuthentication? = null
-    var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
+    internal var authenticationAction: LockAuthentication? = null
+    internal var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
 }
 
 private enum class BackupAction { EXPORT, IMPORT }
