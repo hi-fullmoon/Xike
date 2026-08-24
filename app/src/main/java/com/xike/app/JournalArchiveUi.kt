@@ -700,7 +700,7 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
 }
 
 @Composable
-private fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit) {
+internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -758,7 +758,7 @@ private fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit)
                         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Outlined.Image, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(12.dp))
-                            Text("包含 ${entry.imageFileNames.size} 张照片，可在时间流中点按查看。")
+                            Text("包含 ${entry.imageFileNames.size} 张照片，可在记录卡片中点按查看。")
                         }
                     }
                 }

@@ -1,6 +1,6 @@
 # 息刻产品 Roadmap
 
-> - 基线：`v0.1.1`（2026-08-24）
+> - 当前版本：`v0.5.0`（2026-08-24）
 > - 适用范围：Android 离线优先个人情绪日记
 > - 排期假设：1 名 Android 开发，设计与测试按需参与。时间是相对估算，版本顺序比日期更重要。
 
@@ -24,7 +24,7 @@
 | 快速记录 | 5 档心情、8 个预设主题、280 字笔记、可选本地每日问题、加密持久草稿 | 已可用；缺少编辑、删除、补记时间和自定义主题 |
 | 图片附件 | 系统照片选择器、每条最多 9 张、单张最多 20 MB、私有目录独立加密、画廊浏览 | 已可用；缺少记录编辑时的附件增删和完整生命周期测试 |
 | 回顾 | 月历/时间流、只读详情、本地全文搜索、组合筛选、分页、图片拼图与全屏浏览 | 找回链路已可用；编辑/删除仍属于 v0.2 数据所有权范围 |
-| 洞察 | 本周、近 30 天、近 90 天、今年；记录次数、记录天数、情绪均值、趋势和高频主题 | 基础可用；缺少分布、环比、主题关联、数据覆盖度解释和可访问图表 |
+| 洞察 | 本周/30/90 天/今年、心情分布、覆盖度、前周期对比、主题趋势、工作日/周末、原始记录下钻、本地回顾 | 深度回顾链路已可用；仍需真机验证动态字体和图表 TalkBack 体验 |
 | 本机隐私 | SQLCipher 整库加密、Keystore 封装数据库口令、附件独立加密、禁止系统自动备份 | 较强；需要继续覆盖密钥异常、升级和设备生命周期测试 |
 | 应用锁 | 系统面容/指纹/设备凭据、立即/1/5/30 分钟锁定、后台缩略图保护 | 已可用；需要增加生命周期与 UI 自动化回归 |
 | 备份迁移 | 密码派生密钥、AES-GCM 流式加密、包含全部附件、兼容旧格式、恢复前完整校验 | 核心链路已实现；恢复会替换现有内容，缺少内容预览、撤销、合并和定期备份 |
@@ -32,7 +32,7 @@
 | 个性化 | 4 套主题、跟随系统深浅色 | 已可用；版本号从 `BuildConfig` 读取 |
 | 工程发布 | Room schema 导出、单元/数据库迁移/Compose UI 测试、PR CI、标签触发签名/APK/AAB/GitHub Release | 发布链路已具备；缺少真机性能基线和完整 API 26–36 设备矩阵 |
 
-代码依据主要来自 [记录与存储](../app/src/main/java/com/xike/app/JournalStore.kt)、[数据库](../app/src/main/java/com/xike/app/JournalDatabase.kt)、[洞察计算](../app/src/main/java/com/xike/app/JournalAnalytics.kt)、[主界面](../app/src/main/java/com/xike/app/XikeUi.kt)、[应用锁与备份入口](../app/src/main/java/com/xike/app/MainActivity.kt) 和 [发布流水线](../.github/workflows/release.yml)。
+代码依据主要来自 [记录与存储](../app/src/main/java/com/xike/app/JournalStore.kt)、[数据库](../app/src/main/java/com/xike/app/JournalDatabase.kt)、[洞察计算](../app/src/main/java/com/xike/app/JournalAnalytics.kt)、[洞察界面](../app/src/main/java/com/xike/app/JournalInsightsUi.kt)、[主界面](../app/src/main/java/com/xike/app/XikeUi.kt)、[应用锁与备份入口](../app/src/main/java/com/xike/app/MainActivity.kt) 和 [发布流水线](../.github/workflows/release.yml)。
 
 ## 3. 版本路线图
 
@@ -133,6 +133,8 @@ v1.0   稳定发布
 ### v0.5 — 提供可信的深度洞察（4–6 周，P1）
 
 目标：让长期记录产生价值，同时避免把相关性描述成原因或健康诊断。
+
+> 实施进度（2026-08-24）：心情分布、记录频率与覆盖度、前一等长周期、主题次数变化、工作日/周末对照、样本分级、原始记录下钻和设备内回顾文字均已完成；图表包含文本数值和 TalkBack 描述，不以颜色作为唯一信息。已覆盖时区、跨年、闰年、夏令时、空数据、单条记录和 1 万条记录基线；Compose 测试已编译，真机动态字体、TalkBack 与分享选择器仍需发布前烟测。
 
 交付：
 

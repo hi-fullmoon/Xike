@@ -551,7 +551,7 @@ private fun XikeApp(
                 onDraftImageRemoved = onDraftImageRemoved,
                 onSave = onSave,
             )
-            AppScreen.INSIGHTS -> WeeklyInsightsScreen(innerPadding, entries)
+            AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage)
             AppScreen.ARCHIVE -> JournalArchiveScreen(
                 padding = innerPadding,
                 entries = entries,
