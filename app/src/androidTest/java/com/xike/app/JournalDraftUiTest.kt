@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
@@ -66,5 +68,53 @@ class JournalDraftUiTest {
 
         composeRule.onNodeWithText("今日一刻").assertIsDisplayed()
         composeRule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    @Test
+    fun expandedNoteFieldOffersAnExplicitKeyboardDismissAction() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("多留一点").performClick()
+        composeRule.onNodeWithContentDescription("收起键盘").assertIsDisplayed()
+    }
+
+    @Test
+    fun unreadableSelectedPhotoDoesNotCrashTheScreen() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(
+                        imageUriStrings = listOf("content://com.xike.app.missing/not-found"),
+                    ),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("移除第 1 张照片").assertExists()
     }
 }

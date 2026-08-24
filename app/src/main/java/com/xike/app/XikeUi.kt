@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.KeyboardHide
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -104,6 +105,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -390,7 +393,13 @@ fun MomentScreen(
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val dismissKeyboard: () -> Unit = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
     val photoPicker = rememberLauncherForActivityResult(
@@ -432,7 +441,10 @@ fun MomentScreen(
             }
 
             Surface(
-                modifier = Modifier.fillMaxWidth().clickable { showDetails = !showDetails },
+                modifier = Modifier.fillMaxWidth().clickable {
+                    if (showDetails) dismissKeyboard()
+                    showDetails = !showDetails
+                },
                 shape = XikeShapes.inner,
                 color = MaterialTheme.colorScheme.surface,
             ) {
@@ -460,6 +472,11 @@ fun MomentScreen(
                         minLines = 3,
                         maxLines = 5,
                         placeholder = { Text("发生了什么？也可以只留下一句话……") },
+                        trailingIcon = {
+                            IconButton(onClick = dismissKeyboard) {
+                                Icon(Icons.Outlined.KeyboardHide, contentDescription = "收起键盘")
+                            }
+                        },
                         shape = XikeShapes.inner,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
@@ -509,7 +526,12 @@ fun MomentScreen(
                         selectedUris = draft.imageUriStrings,
                         onPick = {
                             if (!isSaving) {
-                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                dismissKeyboard()
+                                runCatching {
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                }.onFailure {
+                                    Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
+                                }
                             }
                         },
                         onRemove = { if (!isSaving) onDraftImageRemoved(it) },
@@ -531,6 +553,7 @@ fun MomentScreen(
                 onClick = {
                     val mood = draft.mood ?: return@Button
                     if (isSaving) return@Button
+                    dismissKeyboard()
                     isSaving = true
                     scope.launch {
                         onSave(
@@ -1869,16 +1892,22 @@ private fun rememberPreviewBitmap(
 }
 
 private fun decodeScaledPreview(openStream: () -> InputStream?, maxDimension: Int): ImageBitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-    var sampleSize = 1
-    while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
-        sampleSize *= 2
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        openStream()?.use { BitmapFactory.decodeStream(it, null, options)?.asImageBitmap() }
+    } catch (_: Exception) {
+        null
+    } catch (_: OutOfMemoryError) {
+        null
     }
-    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-    return openStream()?.use { BitmapFactory.decodeStream(it, null, options)?.asImageBitmap() }
 }
 
 private fun moodBandLabel(average: Double): String = when {
