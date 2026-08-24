@@ -90,7 +90,8 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("多留一点").performClick()
-        composeRule.onNodeWithContentDescription("收起键盘").assertIsDisplayed()
+        composeRule.onNodeWithText("发生了什么？也可以只留下一句话……").performClick()
+        composeRule.onNodeWithText("完成").assertIsDisplayed()
     }
 
     @Test

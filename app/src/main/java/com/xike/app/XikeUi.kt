@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -99,6 +98,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -392,6 +392,7 @@ fun MomentScreen(
 ) {
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var isNoteFocused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -402,8 +403,8 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
+    val photoDocumentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         onDraftImagesAdded(uris)
         if (uris.isNotEmpty()) showDetails = true
@@ -468,15 +469,12 @@ fun MomentScreen(
                     TextField(
                         value = draft.note,
                         onValueChange = { if (!isSaving) onDraftNoteChange(it) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { isNoteFocused = it.isFocused },
                         minLines = 3,
                         maxLines = 5,
                         placeholder = { Text("发生了什么？也可以只留下一句话……") },
-                        trailingIcon = {
-                            IconButton(onClick = dismissKeyboard) {
-                                Icon(Icons.Outlined.KeyboardHide, contentDescription = "收起键盘")
-                            }
-                        },
                         shape = XikeShapes.inner,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
@@ -486,15 +484,25 @@ fun MomentScreen(
                             disabledIndicatorColor = Color.Transparent,
                         ),
                     )
-                    if (draft.note.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (isNoteFocused) {
+                            TextButton(onClick = dismissKeyboard) {
+                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("完成")
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("这份感受与什么有关？", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.weight(1f))
@@ -528,7 +536,7 @@ fun MomentScreen(
                             if (!isSaving) {
                                 dismissKeyboard()
                                 runCatching {
-                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    photoDocumentPicker.launch(arrayOf("image/*"))
                                 }.onFailure {
                                     Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
                                 }
