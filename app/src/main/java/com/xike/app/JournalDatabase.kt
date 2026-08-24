@@ -7,6 +7,8 @@ import androidx.room.Database
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Fts4
+import androidx.room.FtsOptions
 import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -16,10 +18,15 @@ import androidx.room.Relation
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.flow.Flow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 internal const val THEME_SETTING = "theme"
 internal const val LEGACY_MIGRATION_SETTING = "legacy-shared-preferences-migrated-v1"
+internal const val SEARCH_INDEX_SETTING = "journal-search-index-version"
+internal const val SEARCH_INDEX_VERSION = "1"
 
 @Entity(
     tableName = "journal_entries",
@@ -76,6 +83,13 @@ internal data class AppSettingEntity(
     val value: String,
 )
 
+@Fts4(tokenizer = FtsOptions.TOKENIZER_UNICODE61)
+@Entity(tableName = "journal_entries_fts")
+internal data class JournalSearchEntity(
+    @ColumnInfo(name = "entry_id") val entryId: String,
+    @ColumnInfo(name = "searchable_text") val searchableText: String,
+)
+
 internal data class JournalEntryRecord(
     @Embedded val entry: JournalEntryEntity,
     @Relation(parentColumn = "id", entityColumn = "entry_id")
@@ -88,6 +102,11 @@ internal data class JournalBundle(
     val entry: JournalEntryEntity,
     val tags: List<JournalTagEntity>,
     val images: List<JournalImageEntity>,
+)
+
+internal fun JournalBundle.toSearchEntity(): JournalSearchEntity = JournalSearchEntity(
+    entryId = entry.id,
+    searchableText = journalSearchDocument(entry.note, tags.sortedBy { it.position }.map { it.tag }),
 )
 
 internal fun JournalEntry.toBundle(): JournalBundle = JournalBundle(
@@ -111,6 +130,10 @@ internal abstract class JournalDao {
     @Query("SELECT * FROM journal_entries ORDER BY created_at DESC")
     abstract fun records(): List<JournalEntryRecord>
 
+    @Transaction
+    @Query("SELECT * FROM journal_entries ORDER BY created_at DESC")
+    abstract fun observeRecords(): Flow<List<JournalEntryRecord>>
+
     @Query("SELECT COUNT(*) FROM journal_entries")
     abstract fun entryCount(): Int
 
@@ -120,6 +143,85 @@ internal abstract class JournalDao {
     @Query("SELECT file_name FROM journal_images")
     abstract fun imageFileNames(): List<String>
 
+    @Transaction
+    @Query(
+        """
+        SELECT e.* FROM journal_entries AS e
+        WHERE (:hasText = 0 OR e.id IN (
+            SELECT entry_id FROM journal_entries_fts
+            WHERE journal_entries_fts MATCH :ftsQuery
+        ))
+        AND e.created_at >= :startInclusive
+        AND e.created_at < :endExclusive
+        AND (:filterMoods = 0 OR e.mood IN (:moods))
+        AND (:filterTags = 0 OR EXISTS (
+            SELECT 1 FROM journal_tags AS selected_tags
+            WHERE selected_tags.entry_id = e.id AND selected_tags.tag IN (:tags)
+        ))
+        AND (
+            :imageFilter = 'ANY'
+            OR (:imageFilter = 'WITH_IMAGES' AND EXISTS (
+                SELECT 1 FROM journal_images AS selected_images WHERE selected_images.entry_id = e.id
+            ))
+            OR (:imageFilter = 'WITHOUT_IMAGES' AND NOT EXISTS (
+                SELECT 1 FROM journal_images AS selected_images WHERE selected_images.entry_id = e.id
+            ))
+        )
+        ORDER BY e.created_at DESC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    abstract fun searchRecords(
+        hasText: Int,
+        ftsQuery: String,
+        startInclusive: Long,
+        endExclusive: Long,
+        filterMoods: Int,
+        moods: List<String>,
+        filterTags: Int,
+        tags: List<String>,
+        imageFilter: String,
+        limit: Int,
+        offset: Int,
+    ): List<JournalEntryRecord>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM journal_entries AS e
+        WHERE (:hasText = 0 OR e.id IN (
+            SELECT entry_id FROM journal_entries_fts
+            WHERE journal_entries_fts MATCH :ftsQuery
+        ))
+        AND e.created_at >= :startInclusive
+        AND e.created_at < :endExclusive
+        AND (:filterMoods = 0 OR e.mood IN (:moods))
+        AND (:filterTags = 0 OR EXISTS (
+            SELECT 1 FROM journal_tags AS selected_tags
+            WHERE selected_tags.entry_id = e.id AND selected_tags.tag IN (:tags)
+        ))
+        AND (
+            :imageFilter = 'ANY'
+            OR (:imageFilter = 'WITH_IMAGES' AND EXISTS (
+                SELECT 1 FROM journal_images AS selected_images WHERE selected_images.entry_id = e.id
+            ))
+            OR (:imageFilter = 'WITHOUT_IMAGES' AND NOT EXISTS (
+                SELECT 1 FROM journal_images AS selected_images WHERE selected_images.entry_id = e.id
+            ))
+        )
+        """,
+    )
+    abstract fun searchRecordCount(
+        hasText: Int,
+        ftsQuery: String,
+        startInclusive: Long,
+        endExclusive: Long,
+        filterMoods: Int,
+        moods: List<String>,
+        filterTags: Int,
+        tags: List<String>,
+        imageFilter: String,
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract fun insertEntry(entry: JournalEntryEntity)
 
@@ -128,6 +230,9 @@ internal abstract class JournalDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract fun insertImages(images: List<JournalImageEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    protected abstract fun insertSearchEntry(search: JournalSearchEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun putSetting(setting: AppSettingEntity)
@@ -141,19 +246,31 @@ internal abstract class JournalDao {
     @Query("DELETE FROM journal_entries")
     protected abstract fun deleteEntries()
 
+    @Query("DELETE FROM journal_entries_fts")
+    protected abstract fun deleteSearchEntries()
+
     @Transaction
     open fun insertJournal(bundle: JournalBundle) {
         insertEntry(bundle.entry)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
+        insertSearchEntry(bundle.toSearchEntity())
     }
 
     @Transaction
     open fun replaceJournals(bundles: List<JournalBundle>) {
+        deleteSearchEntries()
         deleteTags()
         deleteImages()
         deleteEntries()
         bundles.forEach(::insertJournal)
+    }
+
+    @Transaction
+    open fun rebuildSearchIndex(bundles: List<JournalBundle>) {
+        deleteSearchEntries()
+        bundles.forEach { insertSearchEntry(it.toSearchEntity()) }
+        putSetting(AppSettingEntity(SEARCH_INDEX_SETTING, SEARCH_INDEX_VERSION))
     }
 
     @Transaction
@@ -173,8 +290,9 @@ internal abstract class JournalDao {
         JournalTagEntity::class,
         JournalImageEntity::class,
         AppSettingEntity::class,
+        JournalSearchEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -195,7 +313,19 @@ internal abstract class JournalDatabase : RoomDatabase() {
             val factory = SupportOpenHelperFactory(DatabaseKeyManager(context).getOrCreatePassphrase())
             return Room.databaseBuilder(context, JournalDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(factory)
+                .addMigrations(MIGRATION_1_2)
                 .build()
+        }
+
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS `journal_entries_fts`
+                    USING FTS4(`entry_id` TEXT NOT NULL, `searchable_text` TEXT NOT NULL, tokenize=unicode61)
+                    """.trimIndent(),
+                )
+            }
         }
     }
 }

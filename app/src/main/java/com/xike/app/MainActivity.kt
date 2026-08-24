@@ -1,6 +1,8 @@
 package com.xike.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
@@ -36,6 +38,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,15 +63,26 @@ class MainActivity : FragmentActivity() {
     private val lockSession: AppLockSessionState by viewModels()
     private lateinit var lockPreferences: AppLockPreferences
     private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var habitPreferences: HabitPreferences
     private var appLockEnabled by mutableStateOf(false)
     private var appLockTimeout by mutableStateOf(AppLockTimeout.IMMEDIATELY)
     private var authenticationAvailable by mutableStateOf(false)
+    private var reminderSettings by mutableStateOf(ReminderSettings())
+    private var dailyPromptSettings by mutableStateOf(DailyPromptSettings())
+    private var notificationPermissionGranted by mutableStateOf(false)
+    private var quickRecordRequest by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lockPreferences = AppLockPreferences(this)
+        habitPreferences = HabitPreferences(this)
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
+        reminderSettings = habitPreferences.reminder
+        dailyPromptSettings = habitPreferences.dailyPrompt
+        notificationPermissionGranted = hasNotificationPermission()
+        handleQuickRecordIntent(intent)
+        ReminderScheduler.reconcile(this, reminderSettings)
         if (!lockSession.initialized) {
             lockSession.isAppLocked = appLockEnabled
             lockSession.journalSessionOpened = !appLockEnabled
@@ -82,6 +96,16 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
         )
         setContent {
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted ->
+                notificationPermissionGranted = granted
+                if (granted) {
+                    persistReminderSettings(reminderSettings.copy(enabled = true))
+                } else {
+                    Toast.makeText(this, "没有开启通知，记录功能仍可正常使用", Toast.LENGTH_LONG).show()
+                }
+            }
             if (!lockSession.journalSessionOpened) {
                 XikeTheme(AppTheme.OCEAN) {
                     AppLockScreen(
@@ -98,15 +122,33 @@ class MainActivity : FragmentActivity() {
                 XikeTheme(journalViewModel.selectedTheme) {
                     XikeApp(
                         entries = journalViewModel.entries,
+                        draft = journalViewModel.draft,
                         selectedTheme = journalViewModel.selectedTheme,
                         appLockEnabled = appLockEnabled,
                         appLockTimeout = appLockTimeout,
                         authenticationAvailable = authenticationAvailable,
+                        reminderSettings = reminderSettings,
+                        dailyPromptSettings = dailyPromptSettings,
+                        notificationPermissionGranted = notificationPermissionGranted,
+                        quickRecordRequest = quickRecordRequest,
                         onThemeChange = journalViewModel::selectTheme,
                         onAppLockChange = ::changeAppLock,
                         onAppLockTimeoutChange = ::changeAppLockTimeout,
                         onLockNow = ::lockNow,
+                        onDraftMoodChange = journalViewModel::selectDraftMood,
+                        onDraftNoteChange = journalViewModel::updateDraftNote,
+                        onDraftTagToggle = journalViewModel::toggleDraftTag,
+                        onDraftImagesAdded = journalViewModel::addDraftImages,
+                        onDraftImageRemoved = journalViewModel::removeDraftImage,
+                        onReminderEnabledChange = { enabled ->
+                            changeReminderEnabled(enabled) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                        onReminderSettingsChange = ::persistReminderSettings,
+                        onDailyPromptSettingsChange = ::persistDailyPromptSettings,
                         onSave = journalViewModel::save,
+                        onSearch = journalViewModel::search,
                         onExportBackup = journalViewModel::exportBackup,
                         onInspectBackup = journalViewModel::inspectBackup,
                         onRestoreBackup = journalViewModel::restoreBackup,
@@ -159,6 +201,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         refreshAuthenticationAvailability()
+        notificationPermissionGranted = hasNotificationPermission()
 
         val pendingAction = lockSession.pendingAuthenticationAfterEnrollment
         lockSession.pendingAuthenticationAfterEnrollment = null
@@ -185,6 +228,12 @@ class MainActivity : FragmentActivity() {
             lockSession.backgroundedAtMillis = SystemClock.elapsedRealtime()
         }
         super.onStop()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleQuickRecordIntent(intent)
     }
 
     private fun createBiometricPrompt() {
@@ -294,6 +343,51 @@ class MainActivity : FragmentActivity() {
         window.decorView.post { requestAuthentication(LockAuthentication.UNLOCK) }
     }
 
+    private fun changeReminderEnabled(enabled: Boolean, requestPermission: () -> Unit) {
+        if (!enabled) {
+            persistReminderSettings(reminderSettings.copy(enabled = false))
+            return
+        }
+        notificationPermissionGranted = hasNotificationPermission()
+        if (notificationPermissionGranted) {
+            persistReminderSettings(reminderSettings.copy(enabled = true))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermission()
+        } else {
+            persistReminderSettings(reminderSettings.copy(enabled = true))
+        }
+    }
+
+    private fun persistReminderSettings(settings: ReminderSettings) {
+        runCatching { habitPreferences.reminder = settings }
+            .onSuccess {
+                reminderSettings = settings
+                ReminderScheduler.reconcile(this, settings)
+            }
+            .onFailure { error ->
+                Toast.makeText(this, error.message ?: "提醒设置保存失败", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun persistDailyPromptSettings(settings: DailyPromptSettings) {
+        runCatching { habitPreferences.dailyPrompt = settings }
+            .onSuccess { dailyPromptSettings = settings }
+            .onFailure { error ->
+                Toast.makeText(this, error.message ?: "每日一问设置保存失败", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun hasNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+
+    private fun handleQuickRecordIntent(intent: Intent?) {
+        if (intent?.action == ACTION_QUICK_RECORD) quickRecordRequest += 1
+    }
+
     private fun refreshAuthenticationAvailability() {
         authenticationAvailable = BiometricManager.from(this)
             .canAuthenticate(allowedAuthenticators) == BiometricManager.BIOMETRIC_SUCCESS
@@ -350,15 +444,29 @@ private data class PendingRestore(
 @Composable
 private fun XikeApp(
     entries: List<JournalEntry>,
+    draft: JournalDraft,
     selectedTheme: AppTheme,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
+    reminderSettings: ReminderSettings,
+    dailyPromptSettings: DailyPromptSettings,
+    notificationPermissionGranted: Boolean,
+    quickRecordRequest: Int,
     onThemeChange: (AppTheme) -> Unit,
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
+    onDraftMoodChange: (Mood?) -> Unit,
+    onDraftNoteChange: (String) -> Unit,
+    onDraftTagToggle: (String) -> Unit,
+    onDraftImagesAdded: (List<Uri>) -> Unit,
+    onDraftImageRemoved: (String) -> Unit,
+    onReminderEnabledChange: (Boolean) -> Unit,
+    onReminderSettingsChange: (ReminderSettings) -> Unit,
+    onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
     onExportBackup: suspend (Uri, String) -> Result<Unit>,
     onInspectBackup: suspend (Uri, String) -> Result<BackupSummary>,
     onRestoreBackup: suspend (Uri, String) -> Result<Int>,
@@ -375,6 +483,10 @@ private fun XikeApp(
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(quickRecordRequest) {
+        if (quickRecordRequest > 0) screen = AppScreen.HOME
+    }
 
     suspend fun runUndoRestore() {
         snackbarHostState.currentSnackbarData?.dismiss()
@@ -427,19 +539,41 @@ private fun XikeApp(
         },
     ) { innerPadding ->
         when (screen) {
-            AppScreen.HOME -> MomentScreen(innerPadding, entries, onSave)
+            AppScreen.HOME -> MomentScreen(
+                padding = innerPadding,
+                entries = entries,
+                draft = draft,
+                dailyPromptSettings = dailyPromptSettings,
+                onDraftMoodChange = onDraftMoodChange,
+                onDraftNoteChange = onDraftNoteChange,
+                onDraftTagToggle = onDraftTagToggle,
+                onDraftImagesAdded = onDraftImagesAdded,
+                onDraftImageRemoved = onDraftImageRemoved,
+                onSave = onSave,
+            )
             AppScreen.INSIGHTS -> WeeklyInsightsScreen(innerPadding, entries)
-            AppScreen.ARCHIVE -> JournalArchiveScreen(innerPadding, entries, openImage)
+            AppScreen.ARCHIVE -> JournalArchiveScreen(
+                padding = innerPadding,
+                entries = entries,
+                onSearch = onSearch,
+                openImage = openImage,
+            )
             AppScreen.SETTINGS -> ProfileSettingsScreen(
                 padding = innerPadding,
                 selectedTheme = selectedTheme,
                 appLockEnabled = appLockEnabled,
                 appLockTimeout = appLockTimeout,
                 authenticationAvailable = authenticationAvailable,
+                reminderSettings = reminderSettings,
+                dailyPromptSettings = dailyPromptSettings,
+                notificationPermissionGranted = notificationPermissionGranted,
                 onThemeChange = onThemeChange,
                 onAppLockChange = onAppLockChange,
                 onAppLockTimeoutChange = onAppLockTimeoutChange,
                 onLockNow = onLockNow,
+                onReminderEnabledChange = onReminderEnabledChange,
+                onReminderSettingsChange = onReminderSettingsChange,
+                onDailyPromptSettingsChange = onDailyPromptSettingsChange,
                 onExport = { backupAction = BackupAction.EXPORT },
                 onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json")) },
                 canUndoRestore = canUndoRestore,

@@ -1,5 +1,6 @@
 package com.xike.app
 
+import android.app.TimePickerDialog
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
@@ -31,8 +32,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -56,6 +55,8 @@ import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -80,6 +81,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Typography
@@ -88,7 +90,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -114,6 +115,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.io.InputStream
 import java.time.Instant
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -376,12 +378,15 @@ fun AppLockScreen(
 fun MomentScreen(
     padding: PaddingValues,
     entries: List<JournalEntry>,
+    draft: JournalDraft,
+    dailyPromptSettings: DailyPromptSettings,
+    onDraftMoodChange: (Mood?) -> Unit,
+    onDraftNoteChange: (String) -> Unit,
+    onDraftTagToggle: (String) -> Unit,
+    onDraftImagesAdded: (List<Uri>) -> Unit,
+    onDraftImageRemoved: (String) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
 ) {
-    var selectedMood by rememberSaveable { mutableStateOf<Mood?>(null) }
-    var note by rememberSaveable { mutableStateOf("") }
-    var tags by remember { mutableStateOf(setOf<String>()) }
-    var selectedImageUris by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -391,9 +396,7 @@ fun MomentScreen(
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
     ) { uris ->
-        selectedImageUris = (selectedImageUris + uris.map(Uri::toString))
-            .distinct()
-            .take(MAX_IMAGES_PER_ENTRY)
+        onDraftImagesAdded(uris)
         if (uris.isNotEmpty()) showDetails = true
     }
 
@@ -419,7 +422,11 @@ fun MomentScreen(
                 Text("选择一种心情", style = MaterialTheme.typography.titleMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Mood.entries.forEach { mood ->
-                        MoodChoice(mood = mood, selected = selectedMood == mood, onClick = { selectedMood = mood })
+                        MoodChoice(
+                            mood = mood,
+                            selected = draft.mood == mood,
+                            onClick = { if (!isSaving) onDraftMoodChange(mood) },
+                        )
                     }
                 }
             }
@@ -442,13 +449,13 @@ fun MomentScreen(
                 }
             }
 
-            if (showDetails || note.isNotBlank() || tags.isNotEmpty() || selectedImageUris.isNotEmpty()) {
+            if (showDetails || draft.note.isNotBlank() || draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()) {
                 PaperCard {
                     Text("补充一点细节", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(12.dp))
                     TextField(
-                        value = note,
-                        onValueChange = { note = it.take(280) },
+                        value = draft.note,
+                        onValueChange = { if (!isSaving) onDraftNoteChange(it) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
                         maxLines = 5,
@@ -462,9 +469,9 @@ fun MomentScreen(
                             disabledIndicatorColor = Color.Transparent,
                         ),
                     )
-                    if (note.isNotEmpty()) {
+                    if (draft.note.isNotEmpty()) {
                         Text(
-                            "${note.length} / 280",
+                            "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -475,9 +482,9 @@ fun MomentScreen(
                         Text("这份感受与什么有关？", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.weight(1f))
                         Text(
-                            if (tags.isEmpty()) "可多选" else "已选 ${tags.size}",
+                            if (draft.tags.isEmpty()) "可多选" else "已选 ${draft.tags.size}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                            color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                         )
                     }
                     Spacer(Modifier.height(7.dp))
@@ -487,10 +494,8 @@ fun MomentScreen(
                                 rowTopics.forEach { topic ->
                                     TopicChip(
                                         topic = topic,
-                                        selected = topic.label in tags,
-                                        onClick = {
-                                            tags = if (topic.label in tags) tags - topic.label else tags + topic.label
-                                        },
+                                        selected = topic.label in draft.tags,
+                                        onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
                                         modifier = Modifier.weight(1f),
                                     )
                                 }
@@ -501,14 +506,20 @@ fun MomentScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(Modifier.height(10.dp))
                     MultiImagePicker(
-                        selectedUris = selectedImageUris,
-                        onPick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        onRemove = { uri -> selectedImageUris = selectedImageUris - uri },
+                        selectedUris = draft.imageUriStrings,
+                        onPick = {
+                            if (!isSaving) {
+                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+                        },
+                        onRemove = { if (!isSaving) onDraftImageRemoved(it) },
                     )
                 }
             }
 
-            DailyQuestion(today)
+            if (dailyPromptSettings.enabled) {
+                DailyQuestion(today, dailyPromptSettings.style)
+            }
         }
 
         Surface(
@@ -518,18 +529,14 @@ fun MomentScreen(
         ) {
             Button(
                 onClick = {
-                    val mood = selectedMood ?: return@Button
+                    val mood = draft.mood ?: return@Button
                     if (isSaving) return@Button
                     isSaving = true
                     scope.launch {
                         onSave(
-                            JournalEntry(mood = mood, tags = tags.toList(), note = note.trim()),
-                            selectedImageUris.map(Uri::parse),
+                            JournalEntry(mood = mood, tags = draft.tags.toList(), note = draft.note.trim()),
+                            draft.imageUriStrings.map(Uri::parse),
                         ).onSuccess {
-                            selectedMood = null
-                            note = ""
-                            tags = emptySet()
-                            selectedImageUris = emptyList()
                             showDetails = false
                             Toast.makeText(context, "这一刻，已经好好收下了", Toast.LENGTH_SHORT).show()
                         }.onFailure { error ->
@@ -538,7 +545,7 @@ fun MomentScreen(
                         isSaving = false
                     }
                 },
-                enabled = selectedMood != null && !isSaving,
+                enabled = draft.mood != null && !isSaving,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp).height(52.dp),
                 shape = XikeShapes.button,
                 colors = ButtonDefaults.buttonColors(
@@ -549,12 +556,12 @@ fun MomentScreen(
                 Text(
                     when {
                         isSaving -> "正在收下…"
-                        selectedMood == null -> "先选择一种心情"
+                        draft.mood == null -> "先选择一种心情"
                         else -> "收下这一刻"
                     },
                     style = MaterialTheme.typography.labelLarge,
                 )
-                if (selectedMood != null && !isSaving) {
+                if (draft.mood != null && !isSaving) {
                     Spacer(Modifier.width(8.dp))
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(19.dp))
                 }
@@ -814,14 +821,7 @@ private fun SelectedPhotoTile(
 }
 
 @Composable
-private fun DailyQuestion(today: LocalDate) {
-    val questions = listOf(
-        "有什么事，让你感到被好好对待？",
-        "今天的哪一刻，让你想慢下来？",
-        "如果不需要逞强，你最想说什么？",
-        "此刻，有什么值得轻轻感谢？",
-        "今天的你，最需要怎样的陪伴？",
-    )
+private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
@@ -829,7 +829,7 @@ private fun DailyQuestion(today: LocalDate) {
             Column {
                 Text("今日一刻", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
-                Text(questions[today.dayOfYear % questions.size], style = MaterialTheme.typography.bodyMedium)
+                Text(dailyQuestion(today, style), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -1046,79 +1046,7 @@ private fun InsightCard(icon: ImageVector, label: String, content: String) {
 }
 
 @Composable
-fun JournalArchiveScreen(
-    padding: PaddingValues,
-    entries: List<JournalEntry>,
-    openImage: (String) -> InputStream?,
-) {
-    val grouped = remember(entries) {
-        entries
-            .groupBy { Instant.ofEpochMilli(it.createdAt).atZone(ZoneId.systemDefault()).toLocalDate() }
-            .toList()
-            .sortedByDescending { it.first }
-    }
-    var galleryImages by remember { mutableStateOf<List<String>?>(null) }
-    var galleryInitialPage by remember { mutableIntStateOf(0) }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(key = "archive-header") {
-            ScreenHeader(
-                eyebrow = "${entries.size} 条记录",
-                title = "回顾",
-            )
-        }
-
-        if (entries.isEmpty()) {
-            item(key = "archive-empty") {
-                Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-                    Column(Modifier.padding(horizontal = 26.dp, vertical = 38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(modifier = Modifier.size(58.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        Spacer(Modifier.height(18.dp))
-                        Text("这里还很安静", style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(8.dp))
-                        Text("第一条不必完整，记录一种感受就够了。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        } else {
-            grouped.forEach { (date, dayEntries) ->
-                item(key = "date-$date") {
-                    DateSectionHeader(date, dayEntries.size)
-                }
-                items(dayEntries, key = { entry -> "entry-${entry.id}" }) { entry ->
-                    JournalEntryCard(
-                        entry = entry,
-                        openImage = openImage,
-                        onImageClick = { index ->
-                            galleryImages = entry.imageFileNames
-                            galleryInitialPage = index
-                        },
-                    )
-                }
-            }
-        }
-    }
-
-    galleryImages?.let { images ->
-        PhotoGalleryDialog(
-            fileNames = images,
-            initialPage = galleryInitialPage,
-            openImage = openImage,
-            onDismiss = { galleryImages = null },
-        )
-    }
-}
-
-@Composable
-private fun DateSectionHeader(date: LocalDate, count: Int) {
+internal fun DateSectionHeader(date: LocalDate, count: Int) {
     Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.width(8.dp))
@@ -1131,12 +1059,17 @@ private fun DateSectionHeader(date: LocalDate, count: Int) {
 }
 
 @Composable
-private fun JournalEntryCard(
+internal fun JournalEntryCard(
     entry: JournalEntry,
     openImage: (String) -> InputStream?,
     onImageClick: (Int) -> Unit,
+    onClick: () -> Unit = {},
 ) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
         Column {
             if (entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
@@ -1269,7 +1202,7 @@ private fun SavedJournalImage(
 }
 
 @Composable
-private fun PhotoGalleryDialog(
+internal fun PhotoGalleryDialog(
     fileNames: List<String>,
     initialPage: Int,
     openImage: (String) -> InputStream?,
@@ -1335,16 +1268,24 @@ fun ProfileSettingsScreen(
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
+    reminderSettings: ReminderSettings,
+    dailyPromptSettings: DailyPromptSettings,
+    notificationPermissionGranted: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
+    onReminderEnabledChange: (Boolean) -> Unit,
+    onReminderSettingsChange: (ReminderSettings) -> Unit,
+    onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     canUndoRestore: Boolean,
     onUndoRestore: () -> Unit,
 ) {
     var showTimeoutDialog by rememberSaveable { mutableStateOf(false) }
+    var showReminderDialog by rememberSaveable { mutableStateOf(false) }
+    var showPromptStyleDialog by rememberSaveable { mutableStateOf(false) }
 
     ScreenColumn(padding) {
         ScreenHeader(
@@ -1390,6 +1331,75 @@ fun ProfileSettingsScreen(
                             title = "立即锁定",
                             subtitle = "隐藏当前内容并返回锁定页",
                             onClick = onLockNow,
+                        )
+                    }
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(index = "节奏", title = "温和陪伴")
+            Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    SettingsToggleRow(
+                        icon = Icons.Outlined.NotificationsNone,
+                        title = "记录提醒",
+                        subtitle = when {
+                            reminderSettings.enabled && !notificationPermissionGranted -> "系统通知已关闭；记录功能不受影响"
+                            reminderSettings.enabled -> reminderSettings.pauseLabel() ?: reminderSettings.summary()
+                            else -> "默认关闭，仅在选定的本地时间提醒"
+                        },
+                        enabled = reminderSettings.enabled,
+                        onEnabledChange = onReminderEnabledChange,
+                    )
+                    if (reminderSettings.enabled) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsAction(
+                            icon = Icons.Outlined.Timer,
+                            title = "提醒时间",
+                            subtitle = reminderSettings.summary(),
+                            onClick = { showReminderDialog = true },
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        val pauseLabel = reminderSettings.pauseLabel()
+                        SettingsAction(
+                            icon = Icons.Outlined.PauseCircle,
+                            title = if (pauseLabel == null) "暂停一周" else "继续提醒",
+                            subtitle = pauseLabel ?: "临时安静下来，不改变原来的时间",
+                            onClick = {
+                                onReminderSettingsChange(
+                                    reminderSettings.copy(
+                                        pausedUntilEpochDay = if (pauseLabel == null) {
+                                            LocalDate.now().plusDays(7).toEpochDay()
+                                        } else {
+                                            null
+                                        },
+                                    ),
+                                )
+                            },
+                        )
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsToggleRow(
+                        icon = Icons.Outlined.AutoAwesome,
+                        title = "每日一问",
+                        subtitle = if (dailyPromptSettings.enabled) {
+                            dailyPromptSettings.style.label
+                        } else {
+                            "默认关闭，问题全部来自本地题库"
+                        },
+                        enabled = dailyPromptSettings.enabled,
+                        onEnabledChange = { enabled ->
+                            onDailyPromptSettingsChange(dailyPromptSettings.copy(enabled = enabled))
+                        },
+                    )
+                    if (dailyPromptSettings.enabled) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsAction(
+                            icon = Icons.Outlined.AutoAwesome,
+                            title = "本地问题库",
+                            subtitle = dailyPromptSettings.style.description,
+                            onClick = { showPromptStyleDialog = true },
                         )
                     }
                 }
@@ -1460,6 +1470,224 @@ fun ProfileSettingsScreen(
             onDismiss = { showTimeoutDialog = false },
         )
     }
+
+    if (showReminderDialog) {
+        ReminderScheduleDialog(
+            settings = reminderSettings,
+            onConfirm = {
+                onReminderSettingsChange(it)
+                showReminderDialog = false
+            },
+            onDismiss = { showReminderDialog = false },
+        )
+    }
+
+    if (showPromptStyleDialog) {
+        DailyPromptStyleDialog(
+            selected = dailyPromptSettings.style,
+            onSelected = {
+                onDailyPromptSettingsChange(dailyPromptSettings.copy(style = it))
+                showPromptStyleDialog = false
+            },
+            onDismiss = { showPromptStyleDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun ReminderScheduleDialog(
+    settings: ReminderSettings,
+    onConfirm: (ReminderSettings) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var selectedHour by rememberSaveable(settings.hour) { mutableStateOf(settings.hour) }
+    var selectedMinute by rememberSaveable(settings.minute) { mutableStateOf(settings.minute) }
+    var selectedDays by remember(settings.weekdays) { mutableStateOf(settings.weekdays) }
+    var quietHoursEnabled by rememberSaveable(settings.quietHoursEnabled) {
+        mutableStateOf(settings.quietHoursEnabled)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("提醒时间") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        TimePickerDialog(
+                            context,
+                            { _, hour, minute ->
+                                selectedHour = hour
+                                selectedMinute = minute
+                            },
+                            selectedHour,
+                            selectedMinute,
+                            true,
+                        ).show()
+                    },
+                    shape = XikeShapes.inner,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "%02d:%02d".format(Locale.ROOT, selectedHour, selectedMinute),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text("修改", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Text(
+                    "为减少耗电，系统可能稍后送达，但不会早于所选时间。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("提醒星期", style = MaterialTheme.typography.titleSmall)
+                    DayOfWeek.entries.chunked(4).forEach { days ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            days.forEach { day ->
+                                val selected = day in selectedDays
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            selectedDays = if (selected) selectedDays - day else selectedDays + day
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    },
+                                ) {
+                                    Text(
+                                        day.getDisplayName(DateTextStyle.NARROW, Locale.CHINA),
+                                        modifier = Modifier.padding(vertical = 10.dp),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            repeat(4 - days.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                    if (selectedDays.isEmpty()) {
+                        Text("至少选择一天", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Switch) { quietHoursEnabled = !quietHoursEnabled },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("夜间勿扰", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "%02d:00–%02d:00 内的提醒会延后".format(
+                                Locale.ROOT,
+                                settings.quietHoursStart,
+                                settings.quietHoursEnd,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = quietHoursEnabled, onCheckedChange = null)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        settings.copy(
+                            hour = selectedHour,
+                            minute = selectedMinute,
+                            weekdays = selectedDays,
+                            quietHoursEnabled = quietHoursEnabled,
+                        ),
+                    )
+                },
+                enabled = selectedDays.isNotEmpty(),
+            ) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun DailyPromptStyleDialog(
+    selected: DailyPromptStyle,
+    onSelected: (DailyPromptStyle) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("本地问题库") },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                DailyPromptStyle.entries.forEach { style ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = style == selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelected(style) },
+                            )
+                            .padding(vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = style == selected, onClick = null)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(style.label, style = MaterialTheme.typography.titleSmall)
+                            Text(style.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 @Composable
@@ -1593,7 +1821,7 @@ private fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScop
 }
 
 @Composable
-private fun ScreenHeader(eyebrow: String? = null, title: String, supporting: String? = null) {
+internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: String? = null) {
     Column {
         if (eyebrow != null) {
             Text(eyebrow, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)

@@ -15,6 +15,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
 import java.security.SecureRandom
+import java.time.ZoneId
 import java.util.Base64
 import java.util.UUID
 import java.util.zip.Deflater
@@ -28,6 +29,8 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 enum class Mood(val label: String, val emoji: String, val score: Int) {
     LOW("低落", "😞", 1),
@@ -157,9 +160,10 @@ class JournalStore(context: Context) {
             val legacyTheme = runCatching { legacyPreferences.getString(THEME_KEY, null) }
                 .getOrElse { error ->
                     throw JournalDataException("旧版外观设置暂时无法读取，原数据未被覆盖。", error)
-                }
+            }
             dao.importLegacyIfNeeded(legacyEntries.map(JournalEntry::toBundle), legacyTheme)
         }
+        ensureSearchIndex()
         JournalSnapshot(readEntries(), dao.settingValue(THEME_SETTING))
     } catch (error: JournalDataException) {
         throw error
@@ -168,6 +172,54 @@ class JournalStore(context: Context) {
     }
 
     fun entries(): List<JournalEntry> = readEntries()
+
+    fun observeEntries(): Flow<List<JournalEntry>> =
+        dao.observeRecords().map { records -> records.map(JournalEntryRecord::toJournalEntry) }
+
+    fun search(
+        query: JournalSearchQuery,
+        offset: Int = 0,
+        limit: Int = 60,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): JournalSearchPage = try {
+        require(offset >= 0) { "搜索偏移量不能小于 0。" }
+        require(limit in 1..200) { "每页搜索结果需要在 1 到 200 条之间。" }
+        val range = query.epochRange(zoneId)
+        val hasText = if (query.normalizedText.isEmpty()) 0 else 1
+        val ftsQuery = query.normalizedText.takeIf(String::isNotEmpty)?.let(::journalFtsQuery) ?: "\"\""
+        val filterMoods = if (query.moods.isEmpty()) 0 else 1
+        val moods = query.moods.map(Mood::name).ifEmpty { listOf(Mood.CALM.name) }
+        val filterTags = if (query.tags.isEmpty()) 0 else 1
+        val tags = query.tags.toList().ifEmpty { listOf("") }
+        val imageFilter = query.imageFilter.name
+        val records = dao.searchRecords(
+            hasText = hasText,
+            ftsQuery = ftsQuery,
+            startInclusive = range.startInclusive,
+            endExclusive = range.endExclusive,
+            filterMoods = filterMoods,
+            moods = moods,
+            filterTags = filterTags,
+            tags = tags,
+            imageFilter = imageFilter,
+            limit = limit,
+            offset = offset,
+        ).map(JournalEntryRecord::toJournalEntry)
+        val totalCount = dao.searchRecordCount(
+            hasText = hasText,
+            ftsQuery = ftsQuery,
+            startInclusive = range.startInclusive,
+            endExclusive = range.endExclusive,
+            filterMoods = filterMoods,
+            moods = moods,
+            filterTags = filterTags,
+            tags = tags,
+            imageFilter = imageFilter,
+        )
+        JournalSearchPage(records, totalCount, offset)
+    } catch (error: Throwable) {
+        throw JournalDataException("日记搜索暂时不可用，请重试。", error)
+    }
 
     @Synchronized
     fun add(entry: JournalEntry, imageUris: List<Uri> = emptyList()): List<JournalEntry> {
@@ -603,6 +655,12 @@ class JournalStore(context: Context) {
         throw error
     } catch (error: Throwable) {
         throw JournalDataException("日记数据库暂时无法读取，原数据未被覆盖。", error)
+    }
+
+    private fun ensureSearchIndex() {
+        if (dao.settingValue(SEARCH_INDEX_SETTING) == SEARCH_INDEX_VERSION) return
+        val bundles = dao.records().map { it.toJournalEntry().toBundle() }
+        dao.rebuildSearchIndex(bundles)
     }
 
     private fun readLegacyEntries(): List<JournalEntry> {

@@ -9,6 +9,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 @RunWith(AndroidJUnit4::class)
 class JournalDaoTest {
@@ -79,6 +81,54 @@ class JournalDaoTest {
 
         assertEquals(listOf("existing"), dao.records().map { it.entry.id })
         assertEquals("1", dao.settingValue(LEGACY_MIGRATION_SETTING))
+    }
+
+    @Test
+    fun searchCombinesFtsMoodTagDateAndImageFilters() {
+        val matching = entry("matching", 300L, listOf("工作"), listOf("photo.xike-image"))
+            .copy(note = "今天工作顺利", mood = Mood.GOOD)
+        dao.insertJournal(matching.toBundle())
+        dao.insertJournal(entry("other", 200L, listOf("睡眠")).copy(note = "早点休息").toBundle())
+
+        val results = dao.searchRecords(
+            hasText = 1,
+            ftsQuery = journalFtsQuery("工作"),
+            startInclusive = 250L,
+            endExclusive = 400L,
+            filterMoods = 1,
+            moods = listOf(Mood.GOOD.name),
+            filterTags = 1,
+            tags = listOf("工作"),
+            imageFilter = JournalImageFilter.WITH_IMAGES.name,
+            limit = 20,
+            offset = 0,
+        ).map(JournalEntryRecord::toJournalEntry)
+
+        assertEquals(listOf("matching"), results.map { it.id })
+        assertEquals(
+            1,
+            dao.searchRecordCount(
+                hasText = 1,
+                ftsQuery = journalFtsQuery("工作"),
+                startInclusive = 250L,
+                endExclusive = 400L,
+                filterMoods = 1,
+                moods = listOf(Mood.GOOD.name),
+                filterTags = 1,
+                tags = listOf("工作"),
+                imageFilter = JournalImageFilter.WITH_IMAGES.name,
+            ),
+        )
+    }
+
+    @Test
+    fun observedRecordsEmitDatabaseChangesInDisplayOrder() = runBlocking {
+        dao.insertJournal(entry("older", 100L).toBundle())
+        dao.insertJournal(entry("newer", 200L).toBundle())
+
+        val observed = dao.observeRecords().first().map(JournalEntryRecord::toJournalEntry)
+
+        assertEquals(listOf("newer", "older"), observed.map { it.id })
     }
 
     private fun entry(

@@ -1,0 +1,40 @@
+package com.xike.app
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class JournalDraftTest {
+    @Test
+    fun `draft round trip preserves mood note tags images and update time`() {
+        val draft = JournalDraft(
+            mood = Mood.GOOD,
+            note = "今天完成了重要的事",
+            tags = linkedSetOf("工作", "学习"),
+            imageUriStrings = listOf("content://photo/1", "content://photo/2"),
+            updatedAt = 123_456L,
+        )
+
+        assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
+    }
+
+    @Test
+    fun `draft normalization limits note and removes duplicate images`() {
+        val normalized = JournalDraft(
+            note = "心".repeat(MAX_DRAFT_NOTE_LENGTH + 20),
+            imageUriStrings = List(MAX_IMAGES_PER_ENTRY + 3) { "content://photo/${it % 9}" },
+            updatedAt = 10L,
+        ).normalized()
+
+        assertEquals(MAX_DRAFT_NOTE_LENGTH, normalized.note.length)
+        assertEquals(MAX_IMAGES_PER_ENTRY, normalized.imageUriStrings.size)
+    }
+
+    @Test
+    fun `empty draft resets update time`() {
+        val draft = JournalDraft(updatedAt = 99L).normalized()
+
+        assertTrue(draft.isEmpty)
+        assertEquals(0L, draft.updatedAt)
+    }
+}
