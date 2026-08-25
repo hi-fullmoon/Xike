@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -28,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -250,10 +248,8 @@ fun JournalArchiveScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
         item(key = "archive-header") {
-            ScreenHeader(
-                eyebrow = if (searchQuery.isEmpty) "${entries.size} 条记录" else "找到 $totalResultCount 条",
-                title = "回望",
-                supporting = "沿着日期、内在天气和关键词，找回过去的自己。",
+            ArchiveHeader(
+                recordLabel = if (searchQuery.isEmpty) "${entries.size} 条记录" else "找到 $totalResultCount 条",
             )
         }
 
@@ -352,7 +348,7 @@ fun JournalArchiveScreen(
             }
         } else {
             groupedResults.forEach { (date, dayEntries) ->
-                item(key = "date-$date") { DateSectionHeader(date, dayEntries.size) }
+                item(key = "date-$date") { ArchiveDateHeader(date, dayEntries.size) }
                 items(dayEntries, key = { entry -> "entry-${entry.id}" }) { entry ->
                     ArchiveTimelineEntry(
                         entry = entry,
@@ -504,6 +500,44 @@ fun JournalArchiveScreen(
 }
 
 @Composable
+private fun ArchiveHeader(recordLabel: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                recordLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text("回望", style = MaterialTheme.typography.headlineLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "翻一翻走过的日子，看见当时的自己。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Surface(
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    modifier = Modifier.size(23.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ArchiveToolbox(
     queryText: String,
     viewMode: ArchiveViewMode,
@@ -518,9 +552,9 @@ private fun ArchiveToolbox(
         modifier = Modifier.fillMaxWidth(),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        shadowElevation = 1.dp,
     ) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ArchiveSearchBar(
                 value = queryText,
                 onValueChange = onQueryChange,
@@ -559,8 +593,8 @@ private fun ArchiveSearchBar(
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
@@ -703,7 +737,7 @@ private fun ArchiveFilters(
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        shadowElevation = 1.dp,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -824,45 +858,34 @@ private fun JournalMonthCalendar(
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        shadowElevation = 1.dp,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPreviousMonth) {
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "上个月")
+                Column(Modifier.weight(1f)) {
+                    Text(monthTitle, style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        if (monthEntryCount == 0) "这个月还没有留下记录" else "${monthEntries.size} 天 · $monthEntryCount 条记录",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Text(
-                    monthTitle,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                IconButton(onClick = onNextMonth) {
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = "下个月")
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+                ) {
+                    Row {
+                        IconButton(onClick = onPreviousMonth) {
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "上个月")
+                        }
+                        IconButton(onClick = onNextMonth) {
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = "下个月")
+                        }
+                    }
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f))
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    if (monthEntryCount == 0) "这个月还没有留下记录" else "${monthEntries.size} 天留下了痕迹",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "$monthEntryCount 条",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            Spacer(Modifier.height(14.dp))
 
             Row(Modifier.fillMaxWidth()) {
                 listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
@@ -980,52 +1003,71 @@ private fun ArchiveResultStatus(
     searchError: String?,
     selectedDate: LocalDate?,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        selectedDate?.let { "${it.asShortChineseDate()}的记录" } ?: "时间流",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        if (selectedDate == null) "从最近的一刻向前走" else "只看这一天留下的片段",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (isSearching) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(7.dp))
-                }
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.74f)) {
-                    Text(
-                        when {
-                            shownCount < matchingCount -> "$shownCount / $matchingCount 条"
-                            matchingCount == libraryCount -> "$matchingCount 条"
-                            else -> "$matchingCount / $libraryCount 条"
-                        },
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            if (searchError != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "$searchError，已使用当前页面内容继续筛选。",
+                    selectedDate?.let { "${it.asShortChineseDate()}的记录" } ?: "最近的片段",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    if (selectedDate == null) "按时间从近到远" else "只看这一天留下的片段",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (isSearching) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(9.dp))
+            }
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)) {
+                Text(
+                    when {
+                        shownCount < matchingCount -> "$shownCount / $matchingCount 条"
+                        matchingCount == libraryCount -> "$matchingCount 条"
+                        else -> "$matchingCount / $libraryCount 条"
+                    },
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
+        if (searchError != null) {
+            Text(
+                "$searchError，已使用当前页面内容继续筛选。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArchiveDateHeader(date: LocalDate, count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 11.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Spacer(Modifier.width(9.dp))
+        Text(
+            date.format(DateTimeFormatter.ofPattern("EEEE", Locale.CHINA)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            "$count 条",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1036,26 +1078,12 @@ private fun ArchiveTimelineEntry(
     onImageClick: (Int) -> Unit,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .padding(vertical = 12.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-        )
-        JournalEntryCard(
-            entry = entry,
-            modifier = Modifier.weight(1f),
-            openImage = openImage,
-            onImageClick = onImageClick,
-            onClick = onClick,
-        )
-    }
+    JournalEntryCard(
+        entry = entry,
+        openImage = openImage,
+        onImageClick = onImageClick,
+        onClick = onClick,
+    )
 }
 
 @Composable
