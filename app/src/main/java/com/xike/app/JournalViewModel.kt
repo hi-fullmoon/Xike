@@ -144,6 +144,17 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         result.map { }
     }.await()
 
+    suspend fun delete(entry: JournalEntry): Result<Unit> = viewModelScope.async {
+        val result = withContext(Dispatchers.IO) {
+            runCatching { store.delete(entry.id) }
+        }
+        result.onSuccess { remainingEntries ->
+            entries = remainingEntries
+            dataError = null
+        }
+        result.map { }
+    }.await()
+
     suspend fun search(
         query: JournalSearchQuery,
         offset: Int,

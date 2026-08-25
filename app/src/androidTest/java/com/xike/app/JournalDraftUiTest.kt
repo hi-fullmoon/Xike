@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
@@ -71,6 +72,31 @@ class JournalDraftUiTest {
     }
 
     @Test
+    fun weatherGuideExplainsTheMetaphorWithPlainEmotionWords() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("看看含义").performClick()
+        composeRule.onNodeWithText("五种天气，怎么选？").assertIsDisplayed()
+        composeRule.onNodeWithText("低落、难过，或有些不知所措").assertIsDisplayed()
+        composeRule.onNodeWithText("轻松、不错，或有一点期待").assertIsDisplayed()
+    }
+
+    @Test
     fun expandedNoteFieldOffersAnExplicitKeyboardDismissAction() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
@@ -89,7 +115,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("多留一点").performClick()
+        composeRule.onNodeWithText("再留下一点").performClick()
         composeRule.onNodeWithText("发生了什么？也可以只留下一句话……").performClick()
         composeRule.onNodeWithText("完成").assertIsDisplayed()
     }
@@ -115,10 +141,36 @@ class JournalDraftUiTest {
 
         composeRule.waitForIdle()
         composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
-        composeRule.onNodeWithText("多留一点").performClick()
+        composeRule.onNodeWithText("再留下一点").performClick()
         check(composeRule.onAllNodesWithText("可以收起的草稿内容").fetchSemanticsNodes().isEmpty())
-        composeRule.onNodeWithText("多留一点").performClick()
+        composeRule.onNodeWithText("再留下一点").performClick()
         composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
+    }
+
+    @Test
+    fun expandedKeywordListOffersAdditionalEverydayChoices() {
+        var selectedTag: String? = null
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = { selectedTag = it },
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("再留下一点").performClick()
+        composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.runOnIdle { check(selectedTag == "饮食") }
+        composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()
     }
 
     @Test

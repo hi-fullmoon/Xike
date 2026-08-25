@@ -29,8 +29,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -42,31 +42,38 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Brush
+import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Commute
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.HomeWork
+import androidx.compose.material.icons.outlined.Interests
 import androidx.compose.material.icons.outlined.KeyboardHide
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PauseCircle
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Restore
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.SentimentDissatisfied
-import androidx.compose.material.icons.outlined.SentimentNeutral
-import androidx.compose.material.icons.outlined.SentimentSatisfied
-import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
-import androidx.compose.material.icons.outlined.SentimentVerySatisfied
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -77,9 +84,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -135,8 +139,8 @@ private const val ADD_PHOTO_TILE = "__add_photo__"
 
 enum class AppScreen(val title: String) {
     HOME("此刻"),
-    INSIGHTS("洞察"),
-    ARCHIVE("回顾"),
+    INSIGHTS("轨迹"),
+    ARCHIVE("回望"),
     SETTINGS("设置"),
 }
 
@@ -147,29 +151,37 @@ enum class AppTheme(
     val accent: Color,
     val secondary: Color,
 ) {
-    PINE("雾松", "沉静的森林绿", Color(0xFF315C4B), Color(0xFFDCE8DF), Color(0xFFEDE4D3)),
-    VIOLET("夜紫", "柔和的暮色紫", Color(0xFF675586), Color(0xFFE8E0F0), Color(0xFFF0E2DC)),
-    OCEAN("海雾", "清醒的深海蓝", Color(0xFF2D6071), Color(0xFFDCEAF0), Color(0xFFEDE5D5)),
-    TERRA("陶土", "温暖的赤陶色", Color(0xFF965B47), Color(0xFFF1E0D9), Color(0xFFE5E9D8)),
+    PINE("雾松", "沉静的森林绿", Color(0xFF34584A), Color(0xFFDDEAE2), Color(0xFFF0E8D9)),
+    VIOLET("暮紫", "柔和的暮色紫", Color(0xFF66567E), Color(0xFFEAE3F0), Color(0xFFF1E4DC)),
+    OCEAN("潮汐", "克制的雾蓝绿", Color(0xFF355E5B), Color(0xFFDFECE8), Color(0xFFF0E5D6)),
+    TERRA("陶日", "温暖的赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
 }
 
-private data class JournalTopic(val label: String, val accent: Color)
+private data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
 
 private val journalTopics = listOf(
-    JournalTopic("工作", Color(0xFF5378A1)),
-    JournalTopic("学习", Color(0xFF7767A0)),
-    JournalTopic("关系", Color(0xFFA35F73)),
-    JournalTopic("家庭", Color(0xFF9A664D)),
-    JournalTopic("身体", Color(0xFF4F7C5A)),
-    JournalTopic("睡眠", Color(0xFF5F6F9C)),
-    JournalTopic("金钱", Color(0xFF9B762D)),
-    JournalTopic("自我", Color(0xFF397A76)),
+    JournalTopic("工作", Color(0xFF56758B), Icons.Outlined.BusinessCenter),
+    JournalTopic("学习", Color(0xFF766B98), Icons.AutoMirrored.Outlined.MenuBook),
+    JournalTopic("关系", Color(0xFF9A6173), Icons.Outlined.FavoriteBorder),
+    JournalTopic("家庭", Color(0xFF976A50), Icons.Outlined.Home),
+    JournalTopic("身体", Color(0xFF568063), Icons.Outlined.SelfImprovement),
+    JournalTopic("睡眠", Color(0xFF637197), Icons.Outlined.Bedtime),
+    JournalTopic("饮食", Color(0xFFA87548), Icons.Outlined.Restaurant),
+    JournalTopic("运动", Color(0xFF4F866B), Icons.AutoMirrored.Outlined.DirectionsRun),
+    JournalTopic("金钱", Color(0xFF987838), Icons.Outlined.AccountBalanceWallet),
+    JournalTopic("自我", Color(0xFF447E78), Icons.Outlined.PersonOutline),
+    JournalTopic("兴趣", Color(0xFF8A6190), Icons.Outlined.Interests),
+    JournalTopic("社交", Color(0xFF5E719A), Icons.Outlined.Groups),
+    JournalTopic("出行", Color(0xFF4C7F8C), Icons.Outlined.Commute),
+    JournalTopic("居住", Color(0xFF8B7057), Icons.Outlined.HomeWork),
+    JournalTopic("创作", Color(0xFF9A626C), Icons.Outlined.Brush),
+    JournalTopic("其他", Color(0xFF6F766F), Icons.Outlined.MoreHoriz),
 )
 
 object XikeShapes {
-    val card = RoundedCornerShape(24.dp)
-    val inner = RoundedCornerShape(18.dp)
-    val button = RoundedCornerShape(16.dp)
+    val card = RoundedCornerShape(28.dp)
+    val inner = RoundedCornerShape(20.dp)
+    val button = RoundedCornerShape(20.dp)
     val dialog = RoundedCornerShape(30.dp)
 }
 
@@ -220,9 +232,9 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onPrimaryContainer = Color(0xFFF4FAF5),
             secondaryContainer = theme.secondary.copy(alpha = 0.18f),
             onSecondaryContainer = Color(0xFFF2EEE6),
-            background = Color(0xFF121512),
+            background = Color(0xFF121614),
             onBackground = Color(0xFFE8E9E4),
-            surface = Color(0xFF1B1F1C),
+            surface = Color(0xFF1B211E),
             onSurface = Color(0xFFE8E9E4),
             surfaceVariant = Color(0xFF282D29),
             onSurfaceVariant = Color(0xFFB8BDB7),
@@ -237,9 +249,9 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onPrimaryContainer = Color(0xFF183229),
             secondaryContainer = theme.secondary,
             onSecondaryContainer = Color(0xFF3D372E),
-            background = Color(0xFFF5F3EE),
+            background = Color(0xFFF7F6F1),
             onBackground = Color(0xFF20231F),
-            surface = Color(0xFFFFFDF9),
+            surface = Color(0xFFFFFEFB),
             onSurface = Color(0xFF20231F),
             surfaceVariant = Color(0xFFEAE7E0),
             onSurfaceVariant = Color(0xFF626761),
@@ -261,39 +273,59 @@ internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonEleva
 
 @Composable
 fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
-    Surface(shadowElevation = 2.dp, tonalElevation = 0.dp) {
-        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-            AppScreen.entries.forEach { item ->
-                NavigationBarItem(
-                    selected = selected == item,
-                    onClick = { onSelected(item) },
-                    icon = {
+    Surface(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+        color = MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 5.dp,
+            tonalElevation = 0.dp,
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp).selectableGroup()) {
+                AppScreen.entries.forEach { item ->
+                    val isSelected = selected == item
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.86f)
+                                else Color.Transparent,
+                            )
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.Tab,
+                                onClick = { onSelected(item) },
+                            )
+                            .padding(vertical = 7.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Icon(
                             imageVector = when (item) {
-                                AppScreen.HOME -> Icons.Outlined.Home
-                                AppScreen.INSIGHTS -> Icons.Outlined.Insights
-                                AppScreen.ARCHIVE -> Icons.Outlined.CalendarMonth
-                                AppScreen.SETTINGS -> Icons.Outlined.Settings
+                                AppScreen.HOME -> XikeIcons.Moment
+                                AppScreen.INSIGHTS -> XikeIcons.Insights
+                                AppScreen.ARCHIVE -> XikeIcons.Archive
+                                AppScreen.SETTINGS -> XikeIcons.Settings
                             },
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(21.dp),
+                            tint = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    },
-                    label = {
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             item.title,
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected == item) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                )
+                    }
+                }
             }
         }
     }
@@ -442,27 +474,20 @@ fun MomentScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             BrandHeader(today)
-            Spacer(Modifier.height(2.dp))
-            Text("此刻感觉怎么样？", style = MaterialTheme.typography.headlineLarge)
+            Spacer(Modifier.height(6.dp))
+            Text("给此刻，一种天气", style = MaterialTheme.typography.headlineLarge)
             Text(
-                if (todayEntryCount == 0) "先选择一种感受，不需要急着解释。"
-                else "今天已经听见自己 $todayEntryCount 次。",
+                if (todayEntryCount == 0) "不用解释，先看看心里是什么天气。"
+                else "今天已经停下来听见自己 $todayEntryCount 次。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("选择一种心情", style = MaterialTheme.typography.titleMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Mood.entries.forEach { mood ->
-                        MoodChoice(
-                            mood = mood,
-                            selected = draft.mood == mood,
-                            onClick = { if (!isSaving) onDraftMoodChange(mood) },
-                        )
-                    }
-                }
-            }
+            WeatherPicker(
+                selectedMood = draft.mood,
+                enabled = !isSaving,
+                onSelected = onDraftMoodChange,
+            )
 
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable {
@@ -474,8 +499,8 @@ fun MomentScreen(
             ) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("多留一点", style = MaterialTheme.typography.titleSmall)
-                        Text("写一句、加主题或照片", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("再留下一点", style = MaterialTheme.typography.titleSmall)
+                        Text("写句话、选关键词或加照片", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Icon(
                         if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
@@ -487,7 +512,7 @@ fun MomentScreen(
 
             if (showDetails) {
                 PaperCard {
-                    Text("补充一点细节", style = MaterialTheme.typography.titleMedium)
+                    Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(12.dp))
                     TextField(
                         value = draft.note,
@@ -527,7 +552,14 @@ fun MomentScreen(
                     }
                     Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("这份感受与什么有关？", style = MaterialTheme.typography.titleSmall)
+                        Column {
+                            Text("此刻关键词", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "这一刻与什么有关？",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Spacer(Modifier.weight(1f))
                         Text(
                             if (draft.tags.isEmpty()) "可多选" else "已选 ${draft.tags.size}",
@@ -637,8 +669,8 @@ fun MomentScreen(
                 Text(
                     when {
                         isSaving -> "正在收下…"
-                        draft.mood == null -> "先选择一种心情"
-                        else -> "收下这一刻"
+                        draft.mood == null -> "先选择一种天气"
+                        else -> "记下此刻"
                     },
                     style = MaterialTheme.typography.labelLarge,
                 )
@@ -657,7 +689,7 @@ private fun BrandHeader(today: LocalDate) {
         Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    Icons.Outlined.AutoAwesome,
+                    XikeIcons.Mark,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onPrimary,
@@ -672,7 +704,135 @@ private fun BrandHeader(today: LocalDate) {
 }
 
 @Composable
-private fun MoodChoice(mood: Mood, selected: Boolean, onClick: () -> Unit) {
+private fun WeatherPicker(
+    selectedMood: Mood?,
+    enabled: Boolean,
+    onSelected: (Mood?) -> Unit,
+) {
+    var showGuide by rememberSaveable { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        tonalElevation = 0.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("内在天气", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "用天气比喻感受，没有标准答案",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = { showGuide = true },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) { Text("看看含义") }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Mood.entries.forEach { mood ->
+                    MoodChoice(
+                        mood = mood,
+                        selected = selectedMood == mood,
+                        enabled = enabled,
+                        onClick = { onSelected(mood) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            if (selectedMood != null) {
+                Spacer(Modifier.height(12.dp))
+                val visual = selectedMood.visualStyle()
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = visual.container.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.62f),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(visual.accent))
+                        Spacer(Modifier.width(9.dp))
+                        Text(
+                            "${selectedMood.label} · ${selectedMood.weatherDescription()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showGuide) {
+        WeatherGuideDialog(onDismiss = { showGuide = false })
+    }
+}
+
+@Composable
+private fun WeatherGuideDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("五种天气，怎么选？") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "选择最接近此刻的一种即可，同一种感受也可能有不同的天气。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Mood.entries.forEach { mood ->
+                    val visual = mood.visualStyle()
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = visual.container.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.58f),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                mood.weatherIcon(),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = visual.accent,
+                            )
+                            Spacer(Modifier.width(11.dp))
+                            Column {
+                                Text(mood.label, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    mood.weatherDescription(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+    )
+}
+
+@Composable
+private fun MoodChoice(
+    mood: Mood,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val visual = mood.visualStyle()
     val isDark = isSystemInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
@@ -684,20 +844,20 @@ private fun MoodChoice(mood: Mood, selected: Boolean, onClick: () -> Unit) {
     }
 
     Column(
-        modifier = Modifier
-            .widthIn(min = 52.dp)
+        modifier = modifier
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 role = Role.RadioButton,
                 onClick = onClick,
             )
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(54.dp),
-            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.size(50.dp),
+            shape = RoundedCornerShape(17.dp),
             color = containerColor,
             border = BorderStroke(
                 if (selected) 1.5.dp else 1.dp,
@@ -708,14 +868,14 @@ private fun MoodChoice(mood: Mood, selected: Boolean, onClick: () -> Unit) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    mood.icon(),
+                    mood.weatherIcon(),
                     contentDescription = mood.label,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(25.dp),
                     tint = visual.accent.copy(alpha = if (selected) 1f else 0.78f),
                 )
             }
         }
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             mood.label,
             style = MaterialTheme.typography.labelSmall,
@@ -749,13 +909,13 @@ private fun TopicChip(
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier
-                    .size(if (selected) 8.dp else 7.dp)
-                    .clip(CircleShape)
-                    .background(topic.accent.copy(alpha = if (selected) 1f else 0.62f)),
+            Icon(
+                imageVector = topic.icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(7.dp))
             Text(
                 topic.label,
                 maxLines = 1,
@@ -905,7 +1065,7 @@ private fun SelectedPhotoTile(
 private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(11.dp))
             Column {
                 Text("今日一刻", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -957,20 +1117,20 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    summary.averageScore?.let(::moodBandLabel) ?: "等待第一条记录",
+                    summary.averageScore?.let(::weatherBandLabel) ?: "等待第一条记录",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    summary.averageScore?.let(::moodSummary) ?: "记录第一刻，让趋势从这里开始。",
+                    summary.averageScore?.let(::weatherSummary) ?: "记录第一片天气，让趋势从这里开始。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
                 )
                 summary.averageScore?.let { average ->
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "情绪均值 ${String.format(Locale.CHINA, "%.1f", average)} / 5",
+                        "天气平均位置 ${String.format(Locale.CHINA, "%.1f", average)} / 5",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.68f),
                     )
@@ -992,7 +1152,7 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text("还需要一点时间", style = MaterialTheme.typography.titleSmall)
@@ -1053,9 +1213,9 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
         if (summary.entryCount > 0) {
             InsightCard(
                 icon = Icons.Outlined.LocalOffer,
-                label = summary.mostUsedTag ?: "还没有高频主题",
-                content = if (summary.mostUsedTag == null) "给记录加上主题后，这里会帮你发现反复出现的生活线索。"
-                else "“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的主题，或许值得多留意一点。",
+                label = summary.mostUsedTag ?: "还没有高频关键词",
+                content = if (summary.mostUsedTag == null) "添加此刻关键词后，这里会帮你发现反复出现的线索。"
+                else "“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的关键词，或许值得多留意一点。",
             )
         }
     }
@@ -1159,7 +1319,7 @@ internal fun JournalEntryCard(
                 Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f)) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            entry.mood.icon(),
+                            entry.mood.weatherIcon(),
                             contentDescription = entry.mood.label,
                             modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.primary,
@@ -1462,7 +1622,7 @@ fun ProfileSettingsScreen(
                     }
                     HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsToggleRow(
-                        icon = Icons.Outlined.AutoAwesome,
+                        icon = XikeIcons.Mark,
                         title = "每日一问",
                         subtitle = if (dailyPromptSettings.enabled) {
                             dailyPromptSettings.style.label
@@ -1477,7 +1637,7 @@ fun ProfileSettingsScreen(
                     if (dailyPromptSettings.enabled) {
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
-                            icon = Icons.Outlined.AutoAwesome,
+                            icon = XikeIcons.Mark,
                             title = "本地问题库",
                             subtitle = dailyPromptSettings.style.description,
                             onClick = { showPromptStyleDialog = true },
@@ -1488,7 +1648,7 @@ fun ProfileSettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "外观", title = "主题")
+            SectionTitle(index = "外观", title = "色调")
             AppTheme.entries.chunked(2).forEach { themes ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     themes.forEach { theme ->
@@ -1971,44 +2131,44 @@ private fun decodeScaledPreview(openStream: () -> InputStream?, maxDimension: In
     }
 }
 
-private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> "更接近愉悦"
-    average >= 3.5 -> "更接近不错"
-    average >= 2.5 -> "更接近平静"
-    average >= 1.5 -> "更接近疲惫"
-    else -> "更接近低落"
+private fun weatherBandLabel(average: Double): String = when {
+    average >= 4.5 -> "更多晴朗经过"
+    average >= 3.5 -> "更多晴间经过"
+    average >= 2.5 -> "大多停在微风附近"
+    average >= 1.5 -> "低云停留得更多"
+    else -> "风雨停留得更多"
 }
 
-private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> "这段时间里，有不少轻盈明亮的时刻。"
-    average >= 3.5 -> "整体温和向上，也允许偶尔停一停。"
-    average >= 2.5 -> "平静与起伏并存，慢慢看见就好。"
-    average >= 1.5 -> "这段时间有些辛苦，记得给自己留一点余地。"
-    else -> "你似乎经历了一段不容易的时间，请更温柔地照顾自己。"
+private fun weatherSummary(average: Double): String = when {
+    average >= 4.5 -> "这段时间里，有不少明亮舒展的时刻。"
+    average >= 3.5 -> "云正在散开，也允许自己偶尔停一停。"
+    average >= 2.5 -> "微风与起伏都曾经过，慢慢看见就好。"
+    average >= 1.5 -> "低云停留得更多，记得给自己留一点余地。"
+    else -> "风雨似乎停留了一阵，请更温柔地照顾自己。"
 }
 
 private data class MoodVisualStyle(val accent: Color, val container: Color)
 
 private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
     Mood.LOW -> MoodVisualStyle(
-        accent = Color(0xFF62799A),
-        container = Color(0xFFE2E8F1),
+        accent = Color(0xFF596779),
+        container = Color(0xFFE1E5EA),
     )
     Mood.TIRED -> MoodVisualStyle(
-        accent = Color(0xFF786B8F),
-        container = Color(0xFFE9E4F0),
+        accent = Color(0xFF627A8D),
+        container = Color(0xFFE0E8ED),
     )
     Mood.CALM -> MoodVisualStyle(
-        accent = Color(0xFF39756F),
-        container = Color(0xFFDCEBE8),
+        accent = Color(0xFF4F7D75),
+        container = Color(0xFFDDEAE5),
     )
     Mood.GOOD -> MoodVisualStyle(
-        accent = Color(0xFF4E7A5B),
-        container = Color(0xFFDDEBDD),
+        accent = Color(0xFFAF754D),
+        container = Color(0xFFF1E4D7),
     )
     Mood.JOYFUL -> MoodVisualStyle(
-        accent = Color(0xFFB27426),
-        container = Color(0xFFF5E6C8),
+        accent = Color(0xFFC18A31),
+        container = Color(0xFFF5E7C7),
     )
 }
 
@@ -2018,14 +2178,6 @@ private fun LocalDate.asDateRange(end: LocalDate): String = if (year == end.year
     "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日"
 } else {
     "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日"
-}
-
-private fun Mood.icon(): ImageVector = when (this) {
-    Mood.LOW -> Icons.Outlined.SentimentVeryDissatisfied
-    Mood.TIRED -> Icons.Outlined.SentimentDissatisfied
-    Mood.CALM -> Icons.Outlined.SentimentNeutral
-    Mood.GOOD -> Icons.Outlined.SentimentSatisfied
-    Mood.JOYFUL -> Icons.Outlined.SentimentVerySatisfied
 }
 
 private fun LocalDate.asWeekday(): String = when (dayOfWeek) {

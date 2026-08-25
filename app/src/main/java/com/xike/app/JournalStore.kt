@@ -33,11 +33,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 enum class Mood(val label: String, val emoji: String, val score: Int) {
-    LOW("低落", "😞", 1),
-    TIRED("疲惫", "😕", 2),
-    CALM("平静", "😌", 3),
-    GOOD("不错", "🙂", 4),
-    JOYFUL("愉悦", "😄", 5);
+    LOW("风雨", "☔", 1),
+    TIRED("低云", "☁", 2),
+    CALM("微风", "〰", 3),
+    GOOD("晴间", "⛅", 4),
+    JOYFUL("晴朗", "☀", 5);
 
     companion object {
         fun fromName(value: String): Mood = entries.firstOrNull { it.name == value } ?: CALM
@@ -234,6 +234,18 @@ class JournalStore(context: Context) {
             if (error is JournalDataException) throw error
             throw JournalDataException("日记保存失败，请重试。", error)
         }
+    }
+
+    @Synchronized
+    fun delete(entryId: String): List<JournalEntry> = runCatching {
+        require(entryId.isNotBlank()) { "记录标识不能为空。" }
+        val deletedImages = dao.deleteJournal(entryId)
+        val stillReferenced = dao.imageFileNames().toSet()
+        deletedImages.filterNot { it in stillReferenced }.forEach(::deleteImage)
+        readEntries()
+    }.getOrElse { error ->
+        if (error is JournalDataException) throw error
+        throw JournalDataException("记录删除失败，请重试。", error)
     }
 
     fun savedThemeName(): String? = dao.settingValue(THEME_SETTING)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="shortcut_quick_record_short">记录此刻</string>
-    <string name="shortcut_quick_record_long">快速记录此刻心情</string>
+    <string name="shortcut_quick_record_long">快速记录此刻的内在天气</string>
     <string name="shortcut_quick_record_disabled">快速记录暂时不可用</string>
 </resources>

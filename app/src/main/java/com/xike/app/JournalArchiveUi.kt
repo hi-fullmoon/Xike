@@ -1,6 +1,8 @@
 package com.xike.app
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,17 +24,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -56,6 +63,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -95,9 +103,11 @@ fun JournalArchiveScreen(
     padding: PaddingValues,
     entries: List<JournalEntry>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
+    onDelete: suspend (JournalEntry) -> Result<Unit>,
     openImage: (String) -> InputStream?,
 ) {
     val today = LocalDate.now()
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val archiveListState = rememberLazyListState()
     var queryText by rememberSaveable { mutableStateOf("") }
@@ -119,6 +129,9 @@ fun JournalArchiveScreen(
     var galleryInitialPage by remember { mutableIntStateOf(0) }
     var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
     var pendingScrollPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var deleteCandidate by remember { mutableStateOf<JournalEntry?>(null) }
+    var isDeleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     val selectedMoods = remember(selectedMoodNames) {
         selectedMoodNames.mapNotNull { name -> Mood.entries.firstOrNull { it.name == name } }.toSet()
@@ -205,8 +218,8 @@ fun JournalArchiveScreen(
         item(key = "archive-header") {
             ScreenHeader(
                 eyebrow = if (searchQuery.isEmpty) "${entries.size} 条记录" else "找到 $totalResultCount 条",
-                title = "回顾",
-                supporting = "按日期、文字和感受，找回过去的自己。",
+                title = "回望",
+                supporting = "沿着日期、内在天气和关键词，找回过去的自己。",
             )
         }
 
@@ -297,7 +310,7 @@ fun JournalArchiveScreen(
                 ArchiveEmptyState(
                     icon = Icons.Outlined.CalendarMonth,
                     title = "这里还很安静",
-                    description = "第一条不必完整，记录一种感受就够了。",
+                    description = "第一条不必完整，选一种内在天气就够了。",
                 )
             }
         } else if (resultEntries.isEmpty() && !isSearching) {
@@ -367,7 +380,46 @@ fun JournalArchiveScreen(
     }
 
     detailEntry?.let { entry ->
-        JournalEntryDetailDialog(entry = entry, onDismiss = { detailEntry = null })
+        JournalEntryDetailDialog(
+            entry = entry,
+            onDismiss = { detailEntry = null },
+            onRequestDelete = {
+                deleteError = null
+                deleteCandidate = entry
+            },
+        )
+    }
+
+    deleteCandidate?.let { entry ->
+        DeleteJournalDialog(
+            entry = entry,
+            isDeleting = isDeleting,
+            error = deleteError,
+            onDismiss = {
+                if (!isDeleting) {
+                    deleteCandidate = null
+                    deleteError = null
+                }
+            },
+            onConfirm = {
+                if (!isDeleting) {
+                    isDeleting = true
+                    deleteError = null
+                    scope.launch {
+                        onDelete(entry)
+                            .onSuccess {
+                                if (detailEntry?.id == entry.id) detailEntry = null
+                                deleteCandidate = null
+                                Toast.makeText(context, "记录已删除", Toast.LENGTH_SHORT).show()
+                            }
+                            .onFailure { error ->
+                                deleteError = error.message ?: "删除失败，请重试。"
+                            }
+                        isDeleting = false
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -383,7 +435,7 @@ private fun ArchiveSearchBar(
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         shape = XikeShapes.inner,
-        placeholder = { Text("搜索笔记或主题") },
+        placeholder = { Text("搜索注脚或关键词") },
         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         trailingIcon = {
             if (value.isNotEmpty()) {
@@ -456,7 +508,7 @@ private fun ArchiveFilters(
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            FilterTitle("心情")
+            FilterTitle("内在天气")
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -465,13 +517,16 @@ private fun ArchiveFilters(
                     FilterChip(
                         selected = mood.name in selectedMoodNames,
                         onClick = { onToggleMood(mood) },
-                        label = { Text("${mood.emoji} ${mood.label}") },
+                        label = { Text(mood.label) },
+                        leadingIcon = {
+                            Icon(mood.weatherIcon(), contentDescription = null, modifier = Modifier.size(17.dp))
+                        },
                     )
                 }
             }
 
             if (availableTags.isNotEmpty()) {
-                FilterTitle("主题")
+                FilterTitle("此刻关键词")
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -554,7 +609,7 @@ private fun JournalMonthCalendar(
     val monthTitle = month.format(DateTimeFormatter.ofPattern("yyyy年 M月", Locale.CHINA))
     val cells = remember(month) { monthCalendarCells(month) }
     Surface(shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPreviousMonth) {
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "上个月")
@@ -574,7 +629,7 @@ private fun JournalMonthCalendar(
                 listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
                     Text(
                         weekday,
-                        modifier = Modifier.weight(1f).padding(vertical = 7.dp),
+                        modifier = Modifier.weight(1f).padding(vertical = 5.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -586,7 +641,7 @@ private fun JournalMonthCalendar(
                 Row(Modifier.fillMaxWidth()) {
                     week.forEach { date ->
                         if (date == null) {
-                            Spacer(Modifier.weight(1f).height(58.dp))
+                            Spacer(Modifier.weight(1f).height(46.dp))
                         } else {
                             val dayEntries = entriesByDate[date].orEmpty()
                             CalendarDay(
@@ -619,40 +674,59 @@ private fun CalendarDay(
     val spokenDate = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
     Surface(
         modifier = modifier
-            .height(58.dp)
-            .padding(2.dp)
+            .height(46.dp)
+            .padding(horizontal = 2.dp)
             .semantics {
                 contentDescription = "$spokenDate，${if (count == 0) "没有记录" else "$count 条记录"}"
                 selected = isSelected
             }
             .clickable(enabled = enabled, onClick = onClick),
-        shape = XikeShapes.inner,
-        color = when {
-            isSelected -> MaterialTheme.colorScheme.primary
-            count > 0 -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
-            else -> Color.Transparent
-        },
+        color = Color.Transparent,
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 6.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
                 color = when {
-                    isSelected -> MaterialTheme.colorScheme.onPrimary
-                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.56f)
-                    else -> MaterialTheme.colorScheme.onSurface
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    isToday -> MaterialTheme.colorScheme.primaryContainer
+                    else -> Color.Transparent
                 },
-            )
-            Text(
-                count.takeIf { it > 0 }?.let { "$it 条" }.orEmpty(),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
-                else MaterialTheme.colorScheme.primary,
-            )
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        date.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.56f)
+                            isToday -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier.height(4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (count > 0) {
+                    Box(
+                        Modifier
+                            .size(width = if (count > 1) 10.dp else 4.dp, height = 4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.tertiary,
+                            ),
+                    )
+                }
+            }
         }
     }
 }
@@ -718,7 +792,11 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
 }
 
 @Composable
-internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit) {
+internal fun JournalEntryDetailDialog(
+    entry: JournalEntry,
+    onDismiss: () -> Unit,
+    onRequestDelete: (() -> Unit)? = null,
+) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -745,7 +823,20 @@ internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit
                         modifier = Modifier.fillMaxWidth().padding(20.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(entry.mood.emoji, style = MaterialTheme.typography.headlineLarge)
+                        Surface(
+                            modifier = Modifier.size(52.dp),
+                            shape = XikeShapes.inner,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    entry.mood.weatherIcon(),
+                                    contentDescription = entry.mood.label,
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                         Spacer(Modifier.width(14.dp))
                         Column {
                             Text(entry.mood.label, style = MaterialTheme.typography.titleLarge)
@@ -759,13 +850,13 @@ internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit
                 }
 
                 if (entry.tags.isNotEmpty()) {
-                    Text("主题", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("此刻关键词", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.bodyLarge)
                 }
 
                 Text("记录", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    entry.note.ifBlank { "这一刻只留下了心情。" },
+                    entry.note.ifBlank { "这一刻只留下了一种内在天气。" },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.onSurface,
@@ -782,14 +873,114 @@ internal fun JournalEntryDetailDialog(entry: JournalEntry, onDismiss: () -> Unit
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = xikeButtonElevation(),
-                ) { Text("关闭") }
+                if (onRequestDelete == null) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = xikeButtonElevation(),
+                    ) { Text("关闭") }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        TextButton(
+                            onClick = onRequestDelete,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) {
+                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("删除记录")
+                        }
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            elevation = xikeButtonElevation(),
+                        ) { Text("关闭") }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DeleteJournalDialog(
+    entry: JournalEntry,
+    isDeleting: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        icon = {
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.DeleteOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
+        },
+        title = { Text("删除这条记录？") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = XikeShapes.inner,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(entry.mood.label, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            entry.createdAt.asDetailChineseDateTime(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Text(
+                    if (entry.imageFileNames.isEmpty()) {
+                        "删除后无法恢复。请确认这不是误操作。"
+                    } else {
+                        "删除后无法恢复。记录和息刻内保存的 ${entry.imageFileNames.size} 张照片副本会一并删除；系统相册中的原图不会受影响。"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (error != null) {
+                    Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isDeleting, onClick = onDismiss) { Text("取消") }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isDeleting,
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(7.dp))
+                    Text("正在删除…")
+                } else {
+                    Text("确认删除")
+                }
+            }
+        },
+    )
 }
 
 private fun List<String>.toggle(value: String): List<String> = if (value in this) this - value else this + value

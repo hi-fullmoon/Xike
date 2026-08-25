@@ -143,6 +143,9 @@ internal abstract class JournalDao {
     @Query("SELECT file_name FROM journal_images")
     abstract fun imageFileNames(): List<String>
 
+    @Query("SELECT file_name FROM journal_images WHERE entry_id = :entryId ORDER BY position")
+    protected abstract fun imageFileNames(entryId: String): List<String>
+
     @Transaction
     @Query(
         """
@@ -249,12 +252,26 @@ internal abstract class JournalDao {
     @Query("DELETE FROM journal_entries_fts")
     protected abstract fun deleteSearchEntries()
 
+    @Query("DELETE FROM journal_entries_fts WHERE entry_id = :entryId")
+    protected abstract fun deleteSearchEntry(entryId: String)
+
+    @Query("DELETE FROM journal_entries WHERE id = :entryId")
+    protected abstract fun deleteEntry(entryId: String): Int
+
     @Transaction
     open fun insertJournal(bundle: JournalBundle) {
         insertEntry(bundle.entry)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
         insertSearchEntry(bundle.toSearchEntity())
+    }
+
+    @Transaction
+    open fun deleteJournal(entryId: String): List<String> {
+        val images = imageFileNames(entryId)
+        deleteSearchEntry(entryId)
+        check(deleteEntry(entryId) == 1) { "记录不存在或已经删除。" }
+        return images
     }
 
     @Transaction

@@ -18,6 +18,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -100,6 +101,25 @@ class JournalStoreBackupTest {
         val backup = backupWithOversizedImage()
 
         assertRestoreFailsWithoutChangingData(backup, PASSWORD)
+    }
+
+    @Test
+    fun deleteRemovesRecordSearchIndexAndPrivateImageCopy() {
+        val stored = store.add(
+            entry("delete-me", 300L, "待删除标记"),
+            imageUris(listOf("private image".toByteArray())),
+        ).single()
+        val imageFileName = stored.imageFileNames.single()
+
+        store.openImage(imageFileName).use { input -> assertNotNull(input) }
+        assertEquals(1, store.search(JournalSearchQuery(text = "待删除标记")).totalCount)
+
+        val remaining = store.delete(stored.id)
+
+        assertTrue(remaining.isEmpty())
+        assertTrue(store.entries().isEmpty())
+        assertEquals(0, store.search(JournalSearchQuery(text = "待删除标记")).totalCount)
+        assertNull(store.openImage(imageFileName))
     }
 
     private fun replaceWithLocalEntry() {

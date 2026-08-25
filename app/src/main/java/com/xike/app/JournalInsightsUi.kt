@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
@@ -98,8 +97,8 @@ fun JournalInsightsScreen(
         item(key = "insights-header") {
             ScreenHeader(
                 eyebrow = summary.dateRangeLabel(),
-                title = "洞察",
-                supporting = "只描述记录里的变化，不把相关性当作原因。",
+                title = "轨迹",
+                supporting = "看看内在天气怎样经过，不急着为变化寻找原因。",
             )
         }
         item(key = "insights-period") {
@@ -134,7 +133,7 @@ fun JournalInsightsScreen(
             MoodDistributionCard(summary.moodDistribution) { item ->
                 drilldown = InsightDrilldown(
                     title = "${item.mood.label} · ${item.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的心情分布",
+                    subtitle = "${selectedPeriod.contextName}的内在天气分布",
                     entryIds = item.entryIds,
                 )
             }
@@ -152,7 +151,7 @@ fun JournalInsightsScreen(
             TagTrendsCard(summary.topTags, summary.evidence) { tag ->
                 drilldown = InsightDrilldown(
                     title = "${tag.tag} · ${tag.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的主题记录",
+                    subtitle = "${selectedPeriod.contextName}的关键词",
                     entryIds = tag.entryIds,
                 )
             }
@@ -223,20 +222,20 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                summary.averageScore?.let(::moodBandLabel) ?: "等待第一条记录",
+                summary.averageScore?.let(::weatherBandLabel) ?: "等待第一条记录",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                summary.averageScore?.let(::moodSummary) ?: "记录第一刻，让分布从这里开始。",
+                summary.averageScore?.let(::weatherSummary) ?: "记录第一片天气，让轨迹从这里开始。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
             )
             if (summary.averageScore != null) {
                 Spacer(Modifier.height(9.dp))
                 Text(
-                    "均值 ${summary.averageScore.oneDecimal()} / 5 · 每个记录日 ${summary.averageEntriesPerRecordedDay?.oneDecimal()} 次",
+                    "平均位置 ${summary.averageScore.oneDecimal()} / 5 · 每个记录日 ${summary.averageEntriesPerRecordedDay?.oneDecimal()} 次",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                 )
@@ -308,7 +307,7 @@ private fun TrendCard(
                 val description = buildString {
                     append(point.dateRangeLabel())
                     append("，${point.entryCount} 条记录")
-                    point.averageScore?.let { append("，情绪均值 ${it.oneDecimal()}") }
+                    point.averageScore?.let { append("，天气平均位置 ${it.oneDecimal()}") }
                 }
                 Column(
                     modifier = Modifier
@@ -349,7 +348,7 @@ private fun TrendCard(
             }
         }
         Text(
-            "柱高表示该时间段的心情均值，数字表示记录条数；点按可查看原始记录。",
+            "柱高表示该时间段在五档天气中的平均位置，数字表示记录条数；点按可查看原始记录。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -364,7 +363,7 @@ private fun MoodDistributionCard(
     InsightSectionCard(
         icon = Icons.Outlined.DataUsage,
         index = "分布",
-        title = "心情出现次数",
+        title = "内在天气出现次数",
     ) {
         distribution.sortedByDescending { it.mood.score }.forEach { item ->
             Row(
@@ -374,7 +373,20 @@ private fun MoodDistributionCard(
                     .padding(vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(item.mood.emoji, style = MaterialTheme.typography.titleLarge)
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            item.mood.weatherIcon(),
+                            contentDescription = item.mood.label,
+                            modifier = Modifier.size(21.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
@@ -459,12 +471,12 @@ private fun TagTrendsCard(
     onClick: (TagTrendItem) -> Unit,
 ) {
     InsightSectionCard(
-        icon = Icons.Outlined.LocalOffer,
-        index = "主题",
-        title = "反复出现的线索",
+        icon = XikeIcons.Archive,
+        index = "关键词",
+        title = "反复出现的关键词",
     ) {
         if (tags.isEmpty()) {
-            InsufficientDataNote("给记录添加主题后，这里会显示实际出现次数。")
+            InsufficientDataNote("添加此刻关键词后，这里会显示实际出现次数。")
         } else {
             tags.forEach { tag ->
                 Row(
@@ -490,7 +502,7 @@ private fun TagTrendsCard(
             }
             if (!evidence.canDescribePatterns) {
                 Text(
-                    "样本较少，主题仅按次数排序，不解释其意义。",
+                    "样本较少，关键词仅按次数排序，不解释其意义。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -518,7 +530,7 @@ private fun DayTypeCard(
         val enough = weekday.entryCount >= 3 && weekend.entryCount >= 3
         Text(
             if (enough) {
-                "这里只呈现两类日期的记录均值差异，不说明工作日或周末造成了情绪变化。"
+                "这里只呈现两类日期的天气位置差异，不说明工作日或周末造成了变化。"
             } else {
                 "两类日期分别至少有 3 条记录后，才适合比较均值；目前只展示计数。"
             },
@@ -551,7 +563,7 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
 @Composable
 private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> Unit) {
     InsightSectionCard(
-        icon = Icons.Outlined.AutoAwesome,
+        icon = XikeIcons.Mark,
         index = "回顾",
         title = "完全在设备内生成",
     ) {
@@ -785,20 +797,20 @@ private fun LocalDate.asDateRange(end: LocalDate): String = if (this == end) {
     "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日"
 }
 
-private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> "更接近愉悦"
-    average >= 3.5 -> "更接近不错"
-    average >= 2.5 -> "更接近平静"
-    average >= 1.5 -> "更接近疲惫"
-    else -> "更接近低落"
+private fun weatherBandLabel(average: Double): String = when {
+    average >= 4.5 -> "更多晴朗经过"
+    average >= 3.5 -> "更多晴间经过"
+    average >= 2.5 -> "大多停在微风附近"
+    average >= 1.5 -> "低云停留得更多"
+    else -> "风雨停留得更多"
 }
 
-private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> "记录中较多是轻盈明亮的时刻。"
-    average >= 3.5 -> "记录中的心情整体偏向不错。"
-    average >= 2.5 -> "记录里平静与起伏并存。"
-    average >= 1.5 -> "记录中疲惫和低落出现得更多。"
-    else -> "记录中的低落时刻占得更多。"
+private fun weatherSummary(average: Double): String = when {
+    average >= 4.5 -> "记录里较多是明亮舒展的时刻。"
+    average >= 3.5 -> "记录里的云正在散开，轻盈时刻更多。"
+    average >= 2.5 -> "记录里微风与起伏都曾经过。"
+    average >= 1.5 -> "记录里低云与风雨停留得更多。"
+    else -> "记录里风雨时刻占得更多，记得照顾自己。"
 }
 
 private fun comparisonDescription(comparison: PeriodComparison): String = buildString {

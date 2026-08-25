@@ -148,6 +148,7 @@ class MainActivity : FragmentActivity() {
                         onReminderSettingsChange = ::persistReminderSettings,
                         onDailyPromptSettingsChange = ::persistDailyPromptSettings,
                         onSave = journalViewModel::save,
+                        onDelete = journalViewModel::delete,
                         onSearch = journalViewModel::search,
                         onExportBackup = journalViewModel::exportBackup,
                         onInspectBackup = journalViewModel::inspectBackup,
@@ -466,6 +467,7 @@ private fun XikeApp(
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    onDelete: suspend (JournalEntry) -> Result<Unit>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
     onExportBackup: suspend (Uri, String) -> Result<Unit>,
     onInspectBackup: suspend (Uri, String) -> Result<BackupSummary>,
@@ -556,6 +558,7 @@ private fun XikeApp(
                 padding = innerPadding,
                 entries = entries,
                 onSearch = onSearch,
+                onDelete = onDelete,
                 openImage = openImage,
             )
             AppScreen.SETTINGS -> ProfileSettingsScreen(

@@ -47,16 +47,16 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
         }
 
-        composeRule.onNodeWithText("搜索笔记或主题").performTextInput("工作")
+        composeRule.onNodeWithText("搜索注脚或关键词").performTextInput("工作")
         composeRule.waitUntil(timeoutMillis = 3_000) {
             composeRule.onAllNodesWithText("找到 1 条").fetchSemanticsNodes().isNotEmpty()
         }
-
         composeRule.onNodeWithText("找到 1 条").fetchSemanticsNode()
         composeRule.onNodeWithText("工作完成得很顺利").performScrollTo().assertIsDisplayed()
         check(composeRule.onAllNodesWithText("早点休息").fetchSemanticsNodes().isEmpty())
@@ -84,6 +84,7 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
@@ -130,6 +131,7 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
@@ -151,6 +153,39 @@ class JournalArchiveUiTest {
         val afterTop = sundayNode.fetchSemanticsNode().boundsInRoot.top
 
         assertTrue("calendar moved from $beforeTop to $afterTop", abs(afterTop - beforeTop) < 2f)
+    }
+
+    @Test
+    fun deletingARecordRequiresExplicitSecondConfirmation() {
+        val journal = entry("delete-me", LocalDate.now(), listOf("自我"), "准备删除的记录")
+        var deletedEntry: JournalEntry? = null
+
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                JournalArchiveScreen(
+                    padding = PaddingValues(),
+                    entries = listOf(journal),
+                    onSearch = { query, offset, limit ->
+                        val matches = filterJournalEntries(listOf(journal), query)
+                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                    },
+                    onDelete = {
+                        deletedEntry = it
+                        Result.success(Unit)
+                    },
+                    openImage = { null },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("准备删除的记录").performScrollTo().performClick()
+        composeRule.onNodeWithText("删除记录").performScrollTo().performClick()
+        composeRule.onNodeWithText("删除这条记录？").assertIsDisplayed()
+        composeRule.onNodeWithText("删除后无法恢复。请确认这不是误操作。").assertIsDisplayed()
+        composeRule.runOnIdle { check(deletedEntry == null) }
+
+        composeRule.onNodeWithText("确认删除").performClick()
+        composeRule.waitUntil(timeoutMillis = 3_000) { deletedEntry?.id == journal.id }
     }
 
     private fun entry(
