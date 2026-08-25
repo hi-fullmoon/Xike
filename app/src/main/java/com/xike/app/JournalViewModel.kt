@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
     private val draftStore = JournalDraftStore(application)
+    private val outdoorRepository = OutdoorContextRepository(application)
 
     var entries by mutableStateOf(emptyList<JournalEntry>())
         private set
@@ -92,26 +93,63 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateDraftRecordedAt(recordedAt: Long?) {
-        persistDraft(draft.copy(recordedAt = recordedAt))
+        persistDraft(
+            draft.copy(
+                recordedAt = recordedAt,
+                outdoor = if (recordedAt == null) draft.outdoor else null,
+            ),
+        )
     }
+
+    fun clearDraftOutdoor() {
+        persistDraft(draft.copy(outdoor = null))
+    }
+
+    suspend fun attachCurrentOutdoor(): Result<Unit> = viewModelScope.async {
+        runCatching { outdoorRepository.current() }.mapCatching { snapshot ->
+            check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
+            check(persistDraft(draft.copy(outdoor = snapshot))) {
+                "地点与天气已取得，但草稿保存失败。"
+            }
+        }
+    }.await()
+
+    suspend fun attachOutdoorForCity(city: String): Result<Unit> = viewModelScope.async {
+        runCatching { outdoorRepository.city(city) }.mapCatching { snapshot ->
+            check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
+            check(persistDraft(draft.copy(outdoor = snapshot))) {
+                "城市天气已取得，但草稿保存失败。"
+            }
+        }
+    }.await()
 
     fun addDraftImages(uris: List<Uri>) {
         val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
-        val newUris = uris
+        val candidates = uris
             .filterNot { it.toString() in draft.imageUriStrings }
-            .take(availableSlots)
+            .distinctBy(Uri::toString)
+        val newUris = candidates.take(availableSlots)
+        candidates.drop(newUris.size).forEach(::releaseDraftImageAccess)
         if (newUris.isEmpty()) return
 
-        val contentResolver = getApplication<Application>().contentResolver
+        val application = getApplication<Application>()
+        val contentResolver = application.contentResolver
         val grantedUris = mutableListOf<Uri>()
         newUris.forEach { uri ->
-            runCatching {
-                contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }.onSuccess {
-                grantedUris += uri
+            if (isCameraCaptureUri(application, uri)) {
+                val readable = runCatching {
+                    contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true
+                }.getOrDefault(false)
+                if (readable) grantedUris += uri else deleteCameraCapture(application, uri)
+            } else {
+                runCatching {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }.onSuccess {
+                    grantedUris += uri
+                }
             }
         }
         if (grantedUris.isEmpty()) {
@@ -123,7 +161,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             imageUriStrings = draft.imageUriStrings + grantedUris.map(Uri::toString),
         )
         if (!persistDraft(updated)) {
-            grantedUris.forEach(::releaseDraftImagePermission)
+            grantedUris.forEach(::releaseDraftImageAccess)
         } else if (grantedUris.size < newUris.size) {
             dataError = "部分照片无法长期读取，已保留可以恢复的照片。"
         }
@@ -132,7 +170,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     fun removeDraftImage(uriString: String) {
         if (uriString !in draft.imageUriStrings) return
         if (persistDraft(draft.copy(imageUriStrings = draft.imageUriStrings - uriString))) {
-            runCatching { Uri.parse(uriString) }.getOrNull()?.let(::releaseDraftImagePermission)
+            runCatching { Uri.parse(uriString) }.getOrNull()?.let(::releaseDraftImageAccess)
         }
     }
 
@@ -141,7 +179,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (persistDraft(JournalDraft())) {
             discardedDraft.imageUriStrings
                 .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
-                .forEach(::releaseDraftImagePermission)
+                .forEach(::releaseDraftImageAccess)
         }
     }
 
@@ -276,30 +314,40 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         savedDraft.imageUriStrings
             .filterNot { it in draft.imageUriStrings }
             .map(Uri::parse)
-            .forEach(::releaseDraftImagePermission)
+            .forEach(::releaseDraftImageAccess)
     }
 
-    private fun releaseDraftImagePermission(uri: Uri) {
-        runCatching {
-            getApplication<Application>().contentResolver.releasePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
+    private fun releaseDraftImageAccess(uri: Uri) {
+        val application = getApplication<Application>()
+        if (isCameraCaptureUri(application, uri)) {
+            return
+        } else {
+            runCatching {
+                application.contentResolver.releasePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
         }
     }
 
     private fun loadAccessibleDraft(): JournalDraft {
         val loaded = draftStore.load()
-        if (loaded.imageUriStrings.isEmpty()) return loaded
-        val contentResolver = getApplication<Application>().contentResolver
+        val application = getApplication<Application>()
+        if (loaded.imageUriStrings.isEmpty()) {
+            pruneCameraCaptures(application)
+            return loaded
+        }
+        val contentResolver = application.contentResolver
         val readableUris = contentResolver.persistedUriPermissions
             .filter { it.isReadPermission }
             .map { it.uri.toString() }
             .toSet()
         val accessible = loaded.copy(
             imageUriStrings = loaded.imageUriStrings.filter { uriString ->
-                uriString in readableUris && runCatching {
-                    contentResolver.openAssetFileDescriptor(Uri.parse(uriString), "r")?.use { true } == true
+                val uri = Uri.parse(uriString)
+                (isCameraCaptureUri(application, uri) || uriString in readableUris) && runCatching {
+                    contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true
                 }.getOrDefault(false)
             },
         )
@@ -308,8 +356,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             loaded.imageUriStrings
                 .filterNot { it in accessible.imageUriStrings }
                 .map(Uri::parse)
-                .forEach(::releaseDraftImagePermission)
+                .forEach(::releaseDraftImageAccess)
         }
+        pruneCameraCaptures(application)
         return accessible
     }
 }

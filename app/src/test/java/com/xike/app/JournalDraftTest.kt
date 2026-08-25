@@ -56,4 +56,27 @@ class JournalDraftTest {
         assertEquals(null, draft.recordedAt)
         assertEquals(0L, draft.updatedAt)
     }
+
+    @Test
+    fun `backdated draft removes current outdoor snapshot`() {
+        val draft = JournalDraft(
+            recordedAt = 123_456L,
+            outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
+            updatedAt = 99L,
+        ).normalized()
+
+        assertEquals(null, draft.outdoor)
+        assertEquals(123_456L, draft.recordedAt)
+    }
+
+    @Test
+    fun `draft round trip preserves outdoor snapshot`() {
+        val draft = JournalDraft(
+            mood = Mood.CALM,
+            outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 119_000L),
+            updatedAt = 123_456L,
+        )
+
+        assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
+    }
 }

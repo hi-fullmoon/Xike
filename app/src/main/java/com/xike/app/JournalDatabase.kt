@@ -38,6 +38,11 @@ internal data class JournalEntryEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     val mood: String,
     val note: String,
+    @ColumnInfo(name = "outdoor_place_name") val outdoorPlaceName: String? = null,
+    @ColumnInfo(name = "outdoor_temperature_celsius") val outdoorTemperatureCelsius: Double? = null,
+    @ColumnInfo(name = "outdoor_weather_code") val outdoorWeatherCode: Int? = null,
+    @ColumnInfo(name = "outdoor_captured_at") val outdoorCapturedAt: Long? = null,
+    @ColumnInfo(name = "outdoor_source") val outdoorSource: String? = null,
 )
 
 @Entity(
@@ -111,7 +116,17 @@ internal fun JournalBundle.toSearchEntity(): JournalSearchEntity = JournalSearch
 )
 
 internal fun JournalEntry.toBundle(): JournalBundle = JournalBundle(
-    entry = JournalEntryEntity(id, createdAt, mood.name, note),
+    entry = JournalEntryEntity(
+        id = id,
+        createdAt = createdAt,
+        mood = mood.name,
+        note = note,
+        outdoorPlaceName = outdoor?.placeName,
+        outdoorTemperatureCelsius = outdoor?.temperatureCelsius,
+        outdoorWeatherCode = outdoor?.weatherCode,
+        outdoorCapturedAt = outdoor?.capturedAt,
+        outdoorSource = outdoor?.source,
+    ),
     tags = tags.mapIndexed { position, tag -> JournalTagEntity(id, position, tag) },
     images = imageFileNames.mapIndexed { position, fileName -> JournalImageEntity(id, position, fileName) },
 )
@@ -123,6 +138,15 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry = JournalEntry(
     tags = tags.sortedBy { it.position }.map { it.tag },
     note = entry.note,
     imageFileNames = images.sortedBy { it.position }.map { it.fileName },
+    outdoor = entry.outdoorPlaceName?.let { placeName ->
+        OutdoorSnapshot(
+            placeName = placeName,
+            temperatureCelsius = entry.outdoorTemperatureCelsius ?: return@let null,
+            weatherCode = entry.outdoorWeatherCode ?: return@let null,
+            capturedAt = entry.outdoorCapturedAt ?: return@let null,
+            source = entry.outdoorSource ?: OPEN_METEO_SOURCE,
+        ).normalizedOrNull()
+    },
 )
 
 @Dao
@@ -336,7 +360,7 @@ internal abstract class JournalDao {
         AppSettingEntity::class,
         JournalSearchEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -357,7 +381,7 @@ internal abstract class JournalDatabase : RoomDatabase() {
             val factory = SupportOpenHelperFactory(DatabaseKeyManager(context).getOrCreatePassphrase())
             return Room.databaseBuilder(context, JournalDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
         }
 
@@ -369,6 +393,16 @@ internal abstract class JournalDatabase : RoomDatabase() {
                     USING FTS4(`entry_id` TEXT NOT NULL, `searchable_text` TEXT NOT NULL, tokenize=unicode61)
                     """.trimIndent(),
                 )
+            }
+        }
+
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_place_name TEXT")
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_temperature_celsius REAL")
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_weather_code INTEGER")
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_captured_at INTEGER")
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_source TEXT")
             }
         }
     }

@@ -14,6 +14,57 @@ import org.junit.Rule
 import org.junit.Test
 
 class JournalDraftUiTest {
+    @Test
+    fun outdoorEntryIsIntegratedAndExplainsPermissionBeforeRequest() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("窗外此刻").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("添加窗外此刻？").assertIsDisplayed()
+        composeRule.onNodeWithText("手动选城市").assertIsDisplayed()
+        composeRule.onNodeWithText("允许粗略定位").assertIsDisplayed()
+    }
+
+    @Test
+    fun capturedOutdoorSnapshotIsVisibleInDraft() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(
+                        outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 1_700_000_000_000L),
+                    ),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("窗外此刻 · 上海 · 浦东").assertIsDisplayed()
+        composeRule.onNodeWithText("27°").assertIsDisplayed()
+        composeRule.onNodeWithText("晴间多云").assertIsDisplayed()
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -173,6 +224,31 @@ class JournalDraftUiTest {
         composeRule.onNodeWithText("饮食").assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(selectedTag == "饮食") }
         composeRule.onNodeWithText("其他").assertIsDisplayed()
+    }
+
+    @Test
+    fun addPhotoOffersCameraAndGallerySources() {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("再留下一点").performClick()
+        composeRule.onNodeWithText("添加照片").performScrollTo().performClick()
+        composeRule.onNodeWithText("拍照").assertIsDisplayed()
+        composeRule.onNodeWithText("从相册选择").assertIsDisplayed()
     }
 
     @Test

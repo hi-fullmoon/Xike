@@ -1,5 +1,6 @@
 package com.xike.app
 
+import android.Manifest
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ViewAgenda
@@ -97,6 +99,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1175,6 +1178,30 @@ internal fun JournalEntryDetailDialog(
                     Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.bodyLarge)
                 }
 
+                entry.outdoor?.let { outdoor ->
+                    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("窗外此刻 · ${outdoor.placeName}", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Text("记录", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
                     entry.note.ifBlank { "这一刻只留下了一种内在天气。" },
@@ -1243,6 +1270,8 @@ private fun JournalEntryEditDialog(
     var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var showPhotoSourceDialog by rememberSaveable(entry.id) { mutableStateOf(false) }
+    var pendingCameraUriString by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     val selectedMood = Mood.entries.firstOrNull { it.name == selectedMoodName } ?: entry.mood
     val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
@@ -1263,6 +1292,17 @@ private fun JournalEntryEditDialog(
         ActivityResultContracts.OpenMultipleDocuments(),
         onImagesPicked,
     )
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        val captureUri = pendingCameraUriString?.let(Uri::parse)
+        pendingCameraUriString = null
+        if (captured && captureUri != null && finalizeCameraCapture(context, captureUri)) {
+            onImagesPicked(listOf(captureUri))
+            Toast.makeText(context, "照片已保存到系统相册", Toast.LENGTH_SHORT).show()
+        } else if (captureUri != null) {
+            deleteCameraCapture(context, captureUri)
+            if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
+        }
+    }
     val openPhotoPicker = {
         if (availableImageSlots > 0 && !isSaving) {
             val openDocuments = {
@@ -1290,9 +1330,49 @@ private fun JournalEntryEditDialog(
             if (!opened) Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
         }
     }
+    val launchSystemCamera = {
+        if (availableImageSlots > 0 && !isSaving) {
+            runCatching { createCameraCaptureUri(context) }
+                .onSuccess { captureUri ->
+                    pendingCameraUriString = captureUri.toString()
+                    runCatching { cameraLauncher.launch(captureUri) }
+                        .onFailure { error ->
+                            pendingCameraUriString = null
+                            deleteCameraCapture(context, captureUri)
+                            Log.w("XikeEditCamera", "Camera launch failed", error)
+                            Toast.makeText(context, "无法打开系统相机", Toast.LENGTH_LONG).show()
+                        }
+                }
+                .onFailure { error ->
+                    Log.w("XikeEditCamera", "Camera capture file creation failed", error)
+                    Toast.makeText(context, "无法准备拍照，请重试", Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+    val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            launchSystemCamera()
+        } else {
+            Toast.makeText(context, "需要存储权限才能把照片保存到系统相册", Toast.LENGTH_LONG).show()
+        }
+    }
+    val openCamera = {
+        if (hasGalleryWriteAccess(context)) {
+            launchSystemCamera()
+        } else {
+            galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
+    val dismissEditor = {
+        pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
+        pendingCameraUriString = null
+        onDismiss()
+    }
 
     Dialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!isSaving) dismissEditor() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -1305,7 +1385,7 @@ private fun JournalEntryEditDialog(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(enabled = !isSaving, onClick = onDismiss) {
+                    IconButton(enabled = !isSaving, onClick = dismissEditor) {
                         Icon(Icons.Outlined.Close, contentDescription = "取消编辑")
                     }
                     Spacer(Modifier.width(4.dp))
@@ -1495,9 +1575,11 @@ private fun JournalEntryEditDialog(
                         newImageUriStrings = newImageUriStrings,
                         canAdd = availableImageSlots > 0 && !isSaving,
                         openImage = openImage,
-                        onAdd = openPhotoPicker,
+                        onAdd = { showPhotoSourceDialog = true },
                         onRemoveRetained = { retainedImages = retainedImages - it },
-                        onRemoveNew = { newImageUriStrings = newImageUriStrings - it },
+                        onRemoveNew = { uriString ->
+                            newImageUriStrings = newImageUriStrings - uriString
+                        },
                     )
                 }
 
@@ -1518,6 +1600,21 @@ private fun JournalEntryEditDialog(
                 }
             }
         }
+    }
+
+    if (showPhotoSourceDialog) {
+        PhotoSourceDialog(
+            cameraAvailable = canTakePhoto(context),
+            onTakePhoto = {
+                showPhotoSourceDialog = false
+                openCamera()
+            },
+            onChoosePhotos = {
+                showPhotoSourceDialog = false
+                openPhotoPicker()
+            },
+            onDismiss = { showPhotoSourceDialog = false },
+        )
     }
 }
 

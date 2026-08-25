@@ -1,8 +1,10 @@
 package com.xike.app
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
@@ -54,6 +56,7 @@ import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Commute
@@ -63,9 +66,12 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.HomeWork
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Interests
 import androidx.compose.material.icons.outlined.KeyboardHide
 import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.LocationOff
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -74,6 +80,7 @@ import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Timer
@@ -81,6 +88,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -125,6 +133,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import java.io.InputStream
 import java.time.Instant
 import java.time.DayOfWeek
@@ -133,6 +142,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -437,16 +447,68 @@ fun MomentScreen(
     onDraftImageRemoved: (String) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
+    onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
+        Result.failure(IllegalStateException("窗外天气暂时不可用。"))
+    },
+    onAttachOutdoorForCity: suspend (String) -> Result<Unit> = {
+        Result.failure(IllegalStateException("城市天气暂时不可用。"))
+    },
+    onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
 ) {
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var isNoteFocused by remember { mutableStateOf(false) }
+    var isOutdoorLoading by remember { mutableStateOf(false) }
+    var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    var outdoorError by rememberSaveable { mutableStateOf<String?>(null) }
+    var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
+    var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val loadCurrentOutdoor: () -> Unit = {
+        if (!isOutdoorLoading && draft.recordedAt == null) {
+            isOutdoorLoading = true
+            outdoorError = null
+            scope.launch {
+                onAttachCurrentOutdoor()
+                    .onSuccess { outdoorPermissionDenied = false }
+                    .onFailure { error -> outdoorError = error.message ?: "暂时无法获取地点与天气。" }
+                isOutdoorLoading = false
+            }
+        }
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        outdoorPermissionDenied = !granted
+        if (granted) loadCurrentOutdoor()
+    }
+    val requestCurrentOutdoor: () -> Unit = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            loadCurrentOutdoor()
+        } else {
+            showOutdoorDisclosure = true
+        }
+    }
+    val loadCityOutdoor: (String) -> Unit = { city ->
+        if (!isOutdoorLoading && city.isNotBlank()) {
+            isOutdoorLoading = true
+            outdoorError = null
+            scope.launch {
+                onAttachOutdoorForCity(city)
+                    .onSuccess { outdoorPermissionDenied = false }
+                    .onFailure { error -> outdoorError = error.message ?: "暂时无法获取这个城市的天气。" }
+                isOutdoorLoading = false
+            }
+        }
+    }
     val dismissKeyboard: () -> Unit = {
         focusManager.clearFocus()
         keyboardController?.hide()
@@ -472,6 +534,83 @@ fun MomentScreen(
         ActivityResultContracts.OpenMultipleDocuments(),
         onImagesPicked,
     )
+    var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        val captureUri = pendingCameraUriString?.let(Uri::parse)
+        pendingCameraUriString = null
+        if (captured && captureUri != null && finalizeCameraCapture(context, captureUri)) {
+            onImagesPicked(listOf(captureUri))
+            Toast.makeText(context, "照片已保存到系统相册", Toast.LENGTH_SHORT).show()
+        } else if (captureUri != null) {
+            deleteCameraCapture(context, captureUri)
+            if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val openPhotoPicker = {
+        val openDocuments = {
+            val contract = ActivityResultContracts.OpenMultipleDocuments()
+            val input = arrayOf("image/*")
+            val canOpen = contract.createIntent(context, input)
+                .resolveActivity(context.packageManager) != null
+            if (canOpen) photoDocumentPicker.launch(input)
+            canOpen
+        }
+        val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
+            runCatching {
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+                true
+            }.onFailure { error ->
+                Log.w("XikePhotoPicker", "Photo picker launch failed", error)
+            }.getOrElse {
+                runCatching(openDocuments).onFailure { error ->
+                    Log.w("XikePhotoPicker", "Document picker launch failed", error)
+                }.getOrDefault(false)
+            }
+        } else {
+            runCatching(openDocuments).onFailure { error ->
+                Log.w("XikePhotoPicker", "Document picker launch failed", error)
+            }.getOrDefault(false)
+        }
+        if (!opened) {
+            Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
+        }
+    }
+    val launchSystemCamera = {
+        runCatching { createCameraCaptureUri(context) }
+            .onSuccess { captureUri ->
+                pendingCameraUriString = captureUri.toString()
+                runCatching { cameraLauncher.launch(captureUri) }
+                    .onFailure { error ->
+                        pendingCameraUriString = null
+                        deleteCameraCapture(context, captureUri)
+                        Log.w("XikeCamera", "Camera launch failed", error)
+                        Toast.makeText(context, "无法打开系统相机", Toast.LENGTH_LONG).show()
+                    }
+            }
+            .onFailure { error ->
+                Log.w("XikeCamera", "Camera capture file creation failed", error)
+                Toast.makeText(context, "无法准备拍照，请重试", Toast.LENGTH_LONG).show()
+            }
+    }
+    val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            launchSystemCamera()
+        } else {
+            Toast.makeText(context, "需要存储权限才能把照片保存到系统相册", Toast.LENGTH_LONG).show()
+        }
+    }
+    val openCamera = {
+        if (hasGalleryWriteAccess(context)) {
+            launchSystemCamera()
+        } else {
+            galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         Column(
@@ -495,6 +634,25 @@ fun MomentScreen(
                 selectedMood = draft.mood,
                 enabled = !isSaving,
                 onSelected = onDraftMoodChange,
+            )
+
+            OutdoorContextCard(
+                snapshot = draft.outdoor,
+                isBackdated = draft.recordedAt != null,
+                isLoading = isOutdoorLoading,
+                errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
+                    "没有位置权限，也可以只选择城市。"
+                } else {
+                    null
+                },
+                enabled = !isSaving,
+                onAdd = requestCurrentOutdoor,
+                onRefresh = requestCurrentOutdoor,
+                onChooseCity = { showOutdoorCityDialog = true },
+                onRemove = {
+                    outdoorError = null
+                    onClearDraftOutdoor()
+                },
             )
 
             Surface(
@@ -624,37 +782,7 @@ fun MomentScreen(
                         onPick = {
                             if (!isSaving) {
                                 dismissKeyboard()
-                                val openDocuments = {
-                                    val contract = ActivityResultContracts.OpenMultipleDocuments()
-                                    val input = arrayOf("image/*")
-                                    val canOpen = contract.createIntent(context, input)
-                                        .resolveActivity(context.packageManager) != null
-                                    if (canOpen) photoDocumentPicker.launch(input)
-                                    canOpen
-                                }
-                                val opened = if (
-                                    ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)
-                                ) {
-                                    runCatching {
-                                        photoPicker.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                        )
-                                        true
-                                    }.onFailure { error ->
-                                        Log.w("XikePhotoPicker", "Photo picker launch failed", error)
-                                    }.getOrElse {
-                                        runCatching(openDocuments).onFailure { error ->
-                                            Log.w("XikePhotoPicker", "Document picker launch failed", error)
-                                        }.getOrDefault(false)
-                                    }
-                                } else {
-                                    runCatching(openDocuments).onFailure { error ->
-                                        Log.w("XikePhotoPicker", "Document picker launch failed", error)
-                                    }.getOrDefault(false)
-                                }
-                                if (!opened) {
-                                    Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
-                                }
+                                showPhotoSourceDialog = true
                             }
                         },
                         onRemove = { if (!isSaving) onDraftImageRemoved(it) },
@@ -685,6 +813,7 @@ fun MomentScreen(
                                 mood = mood,
                                 tags = draft.tags.toList(),
                                 note = draft.note.trim(),
+                                outdoor = draft.outdoor,
                             ),
                             draft.imageUriStrings.map(Uri::parse),
                         ).onSuccess {
@@ -726,6 +855,21 @@ fun MomentScreen(
         }
     }
 
+    if (showPhotoSourceDialog) {
+        PhotoSourceDialog(
+            cameraAvailable = canTakePhoto(context),
+            onTakePhoto = {
+                showPhotoSourceDialog = false
+                openCamera()
+            },
+            onChoosePhotos = {
+                showPhotoSourceDialog = false
+                openPhotoPicker()
+            },
+            onDismiss = { showPhotoSourceDialog = false },
+        )
+    }
+
     if (showDiscardConfirmation) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirmation = false },
@@ -733,7 +877,7 @@ fun MomentScreen(
             title = { Text("放弃这份草稿？") },
             text = {
                 Text(
-                    "将清空尚未保存的内在天气、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
+                    "将清空尚未保存的内在天气、窗外此刻、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -751,7 +895,248 @@ fun MomentScreen(
             },
         )
     }
+
+    if (showOutdoorDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showOutdoorDisclosure = false },
+            shape = XikeShapes.dialog,
+            title = { Text("添加窗外此刻？") },
+            text = {
+                Text(
+                    "息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。" +
+                        "经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showOutdoorDisclosure = false
+                        showOutdoorCityDialog = true
+                    },
+                ) { Text("手动选城市") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOutdoorDisclosure = false
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    },
+                ) { Text("允许粗略定位") }
+            },
+        )
+    }
+
+    if (showOutdoorCityDialog) {
+        OutdoorCityDialog(
+            onDismiss = { showOutdoorCityDialog = false },
+            onConfirm = { city ->
+                showOutdoorCityDialog = false
+                loadCityOutdoor(city)
+            },
+        )
+    }
 }
+
+@Composable
+private fun OutdoorContextCard(
+    snapshot: OutdoorSnapshot?,
+    isBackdated: Boolean,
+    isLoading: Boolean,
+    errorMessage: String?,
+    enabled: Boolean,
+    onAdd: () -> Unit,
+    onRefresh: () -> Unit,
+    onChooseCity: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
+    val containerColor = when {
+        snapshot != null -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
+        isEmpty -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val cardModifier = if (isEmpty && enabled) {
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onAdd)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
+    Surface(
+        modifier = cardModifier,
+        shape = XikeShapes.inner,
+        color = containerColor,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = XikeShapes.inner,
+                    color = if (snapshot != null) {
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        when {
+                            isLoading -> CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            snapshot != null -> Icon(
+                                Icons.Outlined.Cloud,
+                                contentDescription = null,
+                                modifier = Modifier.size(21.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            isBackdated -> Icon(
+                                Icons.Outlined.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(21.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            errorMessage != null -> Icon(
+                                Icons.Outlined.LocationOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(21.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            else -> Icon(
+                                Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(21.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        when {
+                            snapshot != null -> "窗外此刻 · ${snapshot.placeName}"
+                            isLoading -> "正在寻找窗外此刻"
+                            isBackdated -> "补记不使用今天的天气"
+                            errorMessage != null -> "暂时没有添加窗外此刻"
+                            else -> "窗外此刻"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        when {
+                            snapshot != null -> "获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}"
+                            isLoading -> "只获取一次，不会在后台持续定位"
+                            isBackdated -> "避免把现在的环境误记到过去"
+                            errorMessage != null -> errorMessage
+                            else -> "地点与真实天气 · 可选"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = if (errorMessage == null) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (snapshot != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "${snapshot.temperatureCelsius.roundToInt()}°",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            weatherConditionLabel(snapshot.weatherCode),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (isEmpty) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "轻触添加",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            when {
+                snapshot != null -> {
+                    Spacer(Modifier.height(9.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = onRemove, enabled = enabled) { Text("移除") }
+                        TextButton(onClick = onRefresh, enabled = enabled && !isLoading) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("刷新")
+                        }
+                    }
+                }
+                errorMessage != null -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = onChooseCity, enabled = enabled) { Text("手动选城市") }
+                        TextButton(onClick = onAdd, enabled = enabled && !isLoading) { Text("重新尝试") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutdoorCityDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var city by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("选择城市") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "不用提供位置权限。城市名称会发送给 Open-Meteo，用于查找城市和天气。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextField(
+                    value = city,
+                    onValueChange = { city = it.take(40) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("例如：上海、杭州") },
+                    shape = XikeShapes.inner,
+                )
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(city.trim()) },
+                enabled = city.isNotBlank(),
+            ) { Text("获取天气") }
+        },
+    )
+}
+
+private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA)
+    .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))
 
 @Composable
 private fun DraftSecurityRow(
@@ -1562,6 +1947,25 @@ internal fun JournalEntryCard(
                         Spacer(Modifier.height(6.dp))
                         Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
+                    entry.outdoor?.let { outdoor ->
+                        Spacer(Modifier.height(7.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "${outdoor.placeName} · ${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (entry.note.isNotBlank()) {
                         Spacer(Modifier.height(9.dp))
                         Text(entry.note, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1768,8 +2172,8 @@ fun ProfileSettingsScreen(
                 Icon(Icons.Outlined.Shield, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("离线且加密", style = MaterialTheme.typography.titleSmall)
-                    Text("无需账号，数据仅保存在这台设备上", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("核心记录离线且加密", style = MaterialTheme.typography.titleSmall)
+                    Text("无需账号；窗外天气仅在主动添加时联网", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

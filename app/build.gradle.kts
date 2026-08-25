@@ -96,6 +96,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("androidx.core:core:1.17.0")
     implementation(platform("androidx.compose:compose-bom:2025.06.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.biometric:biometric:1.1.0")

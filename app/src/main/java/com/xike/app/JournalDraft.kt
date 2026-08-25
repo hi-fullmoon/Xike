@@ -12,6 +12,7 @@ data class JournalDraft(
     val tags: Set<String> = emptySet(),
     val imageUriStrings: List<String> = emptyList(),
     val recordedAt: Long? = null,
+    val outdoor: OutdoorSnapshot? = null,
     val updatedAt: Long = 0L,
 ) {
     val isEmpty: Boolean
@@ -19,7 +20,8 @@ data class JournalDraft(
             note.isBlank() &&
             tags.isEmpty() &&
             imageUriStrings.isEmpty() &&
-            recordedAt == null
+            recordedAt == null &&
+            outdoor == null
 
     fun normalized(): JournalDraft {
         val normalizedNote = note.take(MAX_DRAFT_NOTE_LENGTH)
@@ -29,16 +31,19 @@ data class JournalDraft(
             .distinct()
             .take(MAX_IMAGES_PER_ENTRY)
         val normalizedRecordedAt = recordedAt?.takeIf { it > 0L }
+        val normalizedOutdoor = outdoor?.normalizedOrNull()?.takeIf { normalizedRecordedAt == null }
         val normalizedIsEmpty = mood == null &&
             normalizedNote.isBlank() &&
             normalizedTags.isEmpty() &&
             normalizedImages.isEmpty() &&
-            normalizedRecordedAt == null
+            normalizedRecordedAt == null &&
+            normalizedOutdoor == null
         return copy(
             note = normalizedNote,
             tags = normalizedTags,
             imageUriStrings = normalizedImages,
             recordedAt = normalizedRecordedAt,
+            outdoor = normalizedOutdoor,
             updatedAt = if (normalizedIsEmpty) 0L else updatedAt,
         )
     }
@@ -50,6 +55,7 @@ data class JournalDraft(
         .put("tags", JSONArray(tags.toList()))
         .put("imageUriStrings", JSONArray(imageUriStrings))
         .put("recordedAt", recordedAt ?: JSONObject.NULL)
+        .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
         .put("updatedAt", updatedAt)
 
     companion object {
@@ -61,13 +67,14 @@ data class JournalDraft(
             tags = json.optJSONArray("tags")?.toStringSet().orEmpty(),
             imageUriStrings = json.optJSONArray("imageUriStrings")?.toStringList().orEmpty(),
             recordedAt = json.optLong("recordedAt").takeIf { it > 0L },
+            outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
             updatedAt = json.optLong("updatedAt"),
         ).normalized()
     }
 }
 
 internal const val MAX_DRAFT_NOTE_LENGTH = 280
-private const val DRAFT_FORMAT_VERSION = 2
+private const val DRAFT_FORMAT_VERSION = 3
 
 internal fun parseJournalDraft(serialized: String?): JournalDraft = serialized
     ?.takeIf(String::isNotBlank)

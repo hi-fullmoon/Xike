@@ -51,7 +51,14 @@ class JournalStoreBackupTest {
             ByteArray(32 * 1024) { index -> (index % 251).toByte() },
             "third image".toByteArray(),
         )
-        val source = entry("source", 1_700_000_000_000L, "含多图的备份")
+        val source = entry("source", 1_700_000_000_000L, "含多图的备份").copy(
+            outdoor = OutdoorSnapshot(
+                placeName = "上海 · 浦东",
+                temperatureCelsius = 27.2,
+                weatherCode = 2,
+                capturedAt = 1_700_000_000_000L,
+            ),
+        )
         val storedSource = store.add(source, imageUris(imageContents)).single()
         val backup = encryptedBackup()
 
@@ -67,6 +74,7 @@ class JournalStoreBackupTest {
         val restored = store.restoreEncryptedBackup(backup.inputStream(), PASSWORD)
         assertEquals(listOf(storedSource.id), restored.map { it.id })
         assertEquals(imageContents.size, restored.single().imageFileNames.size)
+        assertEquals(source.outdoor, restored.single().outdoor)
         assertImageContents(restored.single(), imageContents)
         assertTrue(store.canUndoLastRestore())
 
@@ -83,6 +91,26 @@ class JournalStoreBackupTest {
         replaceWithLocalEntry()
 
         assertRestoreFailsWithoutChangingData(backup, "wrong-password")
+    }
+
+    @Test
+    fun version4StreamingBackupRemainsRestorable() {
+        val manifest = JSONObject()
+            .put("format", "xike")
+            .put("version", 4)
+            .put("entries", JSONArray(listOf(entry("legacy-v4", 150L, "旧版流式备份").toJson())))
+            .toString()
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, PASSWORD))).use { archive ->
+            archive.putNextEntry(ZipEntry("manifest.json"))
+            archive.write(manifest.toByteArray())
+            archive.closeEntry()
+        }
+
+        val restored = store.restoreEncryptedBackup(output.toByteArray().inputStream(), PASSWORD)
+
+        assertEquals(listOf("legacy-v4"), restored.map(JournalEntry::id))
+        assertNull(restored.single().outdoor)
     }
 
     @Test

@@ -146,6 +146,7 @@ class JournalDaoTest {
             tags = listOf("工作", "创作"),
             note = "新的可搜索注脚",
             imageFileNames = listOf("new.xike-image"),
+            outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 450L),
         )
 
         val previousImages = dao.updateJournal(updated.toBundle())

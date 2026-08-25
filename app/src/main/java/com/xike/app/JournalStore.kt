@@ -53,6 +53,7 @@ data class JournalEntry(
     val tags: List<String>,
     val note: String,
     val imageFileNames: List<String> = emptyList(),
+    val outdoor: OutdoorSnapshot? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -61,6 +62,7 @@ data class JournalEntry(
         .put("tags", JSONArray(tags))
         .put("note", note)
         .put("imageFileNames", JSONArray(imageFileNames))
+        .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(json: JSONObject): JournalEntry = JournalEntry(
@@ -74,6 +76,7 @@ data class JournalEntry(
             imageFileNames = json.optJSONArray("imageFileNames")?.let { values ->
                 List(values.length()) { index -> values.getString(index) }
             } ?: listOfNotNull(json.optString("imageFileName").takeIf { it.isNotBlank() }),
+            outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
         )
     }
 }
@@ -469,7 +472,9 @@ class JournalStore(context: Context) {
                 val manifest = JSONObject(archive.readUtf8Limited(MAX_MANIFEST_BYTES))
                 archive.closeEntry()
                 validateBackup(manifest.optString("format") == "xike") { "这不是息刻备份文件。" }
-                validateBackup(manifest.optInt("version") == STREAMING_BACKUP_VERSION) { "暂不支持这个版本的息刻备份。" }
+                validateBackup(manifest.optInt("version") in MIN_STREAMING_BACKUP_VERSION..STREAMING_BACKUP_VERSION) {
+                    "暂不支持这个版本的息刻备份。"
+                }
 
                 parsedEntries = parseEntries(manifest.getJSONArray("entries"))
                 referencedImages = parsedEntries.orEmpty()
@@ -775,7 +780,8 @@ class JournalStore(context: Context) {
         const val RESTORE_UNDO_PREFIX = "journal-restore-undo-"
         const val MANIFEST_ENTRY = "manifest.json"
         const val IMAGES_PREFIX = "images/"
-        const val STREAMING_BACKUP_VERSION = 4
+        const val MIN_STREAMING_BACKUP_VERSION = 4
+        const val STREAMING_BACKUP_VERSION = 5
         const val MAX_FILE_NAME_LENGTH = 160
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
