@@ -126,12 +126,15 @@ internal class OutdoorContextRepository(context: Context) {
             throw OutdoorContextException("暂时找不到可用的定位服务，也可以手动选择城市。")
         }
 
-        providers.forEach { provider ->
-            val location = withTimeoutOrNull(LOCATION_TIMEOUT_MILLIS) {
-                requestCurrentLocation(provider)
+        val location = withTimeoutOrNull(LOCATION_TIMEOUT_MILLIS) {
+            var resolved: Location? = null
+            for (provider in providers) {
+                resolved = requestCurrentLocation(provider)
+                if (resolved != null) break
             }
-            if (location != null) return location
+            resolved
         }
+        if (location != null) return location
         throw OutdoorContextException("暂时无法取得当前位置，请稍后重试或手动选择城市。")
     }
 
@@ -196,7 +199,9 @@ internal class OutdoorContextRepository(context: Context) {
         longitude: Double,
         placeName: String,
     ): OutdoorSnapshot = withContext(Dispatchers.IO) {
-        val coordinateFormat = "%.5f"
+        // Weather models do not benefit from street-level coordinates. Rounding here keeps
+        // the outgoing request coarse even if a device provider supplies more precision.
+        val coordinateFormat = "%.3f"
         val url = buildString {
             append("https://api.open-meteo.com/v1/forecast?latitude=")
             append(coordinateFormat.format(Locale.US, latitude))
