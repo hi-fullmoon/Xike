@@ -138,8 +138,10 @@ class MainActivity : FragmentActivity() {
                         onDraftMoodChange = journalViewModel::selectDraftMood,
                         onDraftNoteChange = journalViewModel::updateDraftNote,
                         onDraftTagToggle = journalViewModel::toggleDraftTag,
+                        onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,
                         onDraftImagesAdded = journalViewModel::addDraftImages,
                         onDraftImageRemoved = journalViewModel::removeDraftImage,
+                        onDraftDiscard = journalViewModel::discardDraft,
                         onReminderEnabledChange = { enabled ->
                             changeReminderEnabled(enabled) {
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -148,7 +150,10 @@ class MainActivity : FragmentActivity() {
                         onReminderSettingsChange = ::persistReminderSettings,
                         onDailyPromptSettingsChange = ::persistDailyPromptSettings,
                         onSave = journalViewModel::save,
+                        onUpdate = journalViewModel::update,
                         onDelete = journalViewModel::delete,
+                        onUndoDelete = journalViewModel::undoDelete,
+                        onFinalizeDelete = journalViewModel::finalizeDelete,
                         onSearch = journalViewModel::search,
                         onExportBackup = journalViewModel::exportBackup,
                         onInspectBackup = journalViewModel::inspectBackup,
@@ -461,13 +466,18 @@ private fun XikeApp(
     onDraftMoodChange: (Mood?) -> Unit,
     onDraftNoteChange: (String) -> Unit,
     onDraftTagToggle: (String) -> Unit,
+    onDraftRecordedAtChange: (Long?) -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Unit,
     onDraftImageRemoved: (String) -> Unit,
+    onDraftDiscard: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    onUpdate: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
     onDelete: suspend (JournalEntry) -> Result<Unit>,
+    onUndoDelete: suspend (String) -> Result<Unit>,
+    onFinalizeDelete: suspend (String) -> Result<Unit>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
     onExportBackup: suspend (Uri, String) -> Result<Unit>,
     onInspectBackup: suspend (Uri, String) -> Result<BackupSummary>,
@@ -549,8 +559,10 @@ private fun XikeApp(
                 onDraftMoodChange = onDraftMoodChange,
                 onDraftNoteChange = onDraftNoteChange,
                 onDraftTagToggle = onDraftTagToggle,
+                onDraftRecordedAtChange = onDraftRecordedAtChange,
                 onDraftImagesAdded = onDraftImagesAdded,
                 onDraftImageRemoved = onDraftImageRemoved,
+                onDraftDiscard = onDraftDiscard,
                 onSave = onSave,
             )
             AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage)
@@ -558,7 +570,10 @@ private fun XikeApp(
                 padding = innerPadding,
                 entries = entries,
                 onSearch = onSearch,
+                onUpdate = onUpdate,
                 onDelete = onDelete,
+                onUndoDelete = onUndoDelete,
+                onFinalizeDelete = onFinalizeDelete,
                 openImage = openImage,
             )
             AppScreen.SETTINGS -> ProfileSettingsScreen(

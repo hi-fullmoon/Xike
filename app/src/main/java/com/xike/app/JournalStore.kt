@@ -146,6 +146,7 @@ class JournalStore(context: Context) {
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
+    private var pendingDeletedEntry: JournalEntry? = null
 
     init {
         check(imagesDirectory.isDirectory || imagesDirectory.mkdirs()) { "无法创建图片存储目录。" }
@@ -237,15 +238,69 @@ class JournalStore(context: Context) {
     }
 
     @Synchronized
+    fun update(
+        entry: JournalEntry,
+        retainedImageFileNames: List<String>,
+        newImageUris: List<Uri> = emptyList(),
+    ): List<JournalEntry> {
+        require(entry.id.isNotBlank()) { "记录标识不能为空。" }
+        val original = dao.record(entry.id)?.toJournalEntry()
+            ?: throw JournalDataException("记录不存在或已经删除。", NoSuchElementException(entry.id))
+        val retainedImages = retainedImageFileNames.distinct()
+        require(retainedImages.all { it in original.imageFileNames }) { "记录包含无效的照片引用。" }
+        require(retainedImages.size + newImageUris.size <= MAX_IMAGES_PER_ENTRY) {
+            "每条记录最多添加 9 张图片。"
+        }
+
+        val imported = importImages(newImageUris)
+        val storedEntry = entry.copy(imageFileNames = retainedImages + imported)
+        val previousImages = runCatching { dao.updateJournal(storedEntry.toBundle()) }
+            .onFailure { imported.forEach(::deleteImage) }
+            .getOrElse { error ->
+                if (error is JournalDataException) throw error
+                throw JournalDataException("记录修改失败，请重试。", error)
+            }
+        val referencedImages = referencedImageFileNames()
+        previousImages
+            .filterNot { it in storedEntry.imageFileNames || it in referencedImages }
+            .forEach(::deleteImage)
+        return readEntries()
+    }
+
+    @Synchronized
     fun delete(entryId: String): List<JournalEntry> = runCatching {
         require(entryId.isNotBlank()) { "记录标识不能为空。" }
-        val deletedImages = dao.deleteJournal(entryId)
-        val stillReferenced = dao.imageFileNames().toSet()
-        deletedImages.filterNot { it in stillReferenced }.forEach(::deleteImage)
+        finalizePendingDelete()
+        val deletedEntry = dao.record(entryId)?.toJournalEntry()
+            ?: error("记录不存在或已经删除。")
+        dao.deleteJournal(entryId)
+        pendingDeletedEntry = deletedEntry
         readEntries()
     }.getOrElse { error ->
         if (error is JournalDataException) throw error
         throw JournalDataException("记录删除失败，请重试。", error)
+    }
+
+    @Synchronized
+    fun undoDelete(entryId: String): List<JournalEntry> = runCatching {
+        val deletedEntry = pendingDeletedEntry
+            ?.takeIf { it.id == entryId }
+            ?: error("这条记录的撤销期限已经结束。")
+        val missingImage = deletedEntry.imageFileNames.firstOrNull { fileName ->
+            !File(imagesDirectory, fileName).isFile
+        }
+        check(missingImage == null) { "记录照片已经清理，无法撤销删除。" }
+        dao.insertJournal(deletedEntry.toBundle())
+        pendingDeletedEntry = null
+        readEntries()
+    }.getOrElse { error ->
+        if (error is JournalDataException) throw error
+        throw JournalDataException("撤销删除失败，请重试。", error)
+    }
+
+    @Synchronized
+    fun finalizeDelete(entryId: String) {
+        if (pendingDeletedEntry?.id == entryId) finalizePendingDelete()
     }
 
     fun savedThemeName(): String? = dao.settingValue(THEME_SETTING)
@@ -290,7 +345,7 @@ class JournalStore(context: Context) {
 
     @Synchronized
     fun removeOrphanedImages() {
-        val referencedImages = dao.imageFileNames().toSet()
+        val referencedImages = referencedImageFileNames()
         val activeUndoFileName = currentUndoSnapshot()?.file?.name
         imagesDirectory.listFiles()
             ?.filter { it.name !in referencedImages }
@@ -652,6 +707,20 @@ class JournalStore(context: Context) {
 
     private fun deleteImage(fileName: String) {
         if (isSafeImageFileName(fileName)) File(imagesDirectory, fileName).delete()
+    }
+
+    private fun referencedImageFileNames(): Set<String> = buildSet {
+        addAll(dao.imageFileNames())
+        pendingDeletedEntry?.imageFileNames?.let(::addAll)
+    }
+
+    private fun finalizePendingDelete() {
+        val deletedEntry = pendingDeletedEntry ?: return
+        pendingDeletedEntry = null
+        val referencedImages = dao.imageFileNames().toSet()
+        deletedEntry.imageFileNames
+            .filterNot { it in referencedImages }
+            .forEach(::deleteImage)
     }
 
     private fun isSafeImageFileName(fileName: String): Boolean =

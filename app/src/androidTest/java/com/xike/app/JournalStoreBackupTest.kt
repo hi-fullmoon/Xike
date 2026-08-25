@@ -104,7 +104,7 @@ class JournalStoreBackupTest {
     }
 
     @Test
-    fun deleteRemovesRecordSearchIndexAndPrivateImageCopy() {
+    fun finalizedDeleteRemovesRecordSearchIndexAndPrivateImageCopy() {
         val stored = store.add(
             entry("delete-me", 300L, "待删除标记"),
             imageUris(listOf("private image".toByteArray())),
@@ -119,6 +119,10 @@ class JournalStoreBackupTest {
         assertTrue(remaining.isEmpty())
         assertTrue(store.entries().isEmpty())
         assertEquals(0, store.search(JournalSearchQuery(text = "待删除标记")).totalCount)
+        store.openImage(imageFileName).use { input -> assertNotNull(input) }
+
+        store.finalizeDelete(stored.id)
+
         assertNull(store.openImage(imageFileName))
     }
 

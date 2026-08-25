@@ -3,6 +3,8 @@ package com.xike.app
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -47,14 +50,18 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onUpdate = { updated, _, _ -> Result.success(updated) },
                     onDelete = { Result.success(Unit) },
+                    onUndoDelete = { Result.success(Unit) },
+                    onFinalizeDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
         }
 
         composeRule.onNodeWithText("搜索注脚或关键词").performTextInput("工作")
-        composeRule.waitUntil(timeoutMillis = 3_000) {
+        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("找到 1 条").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("找到 1 条").fetchSemanticsNode()
@@ -84,7 +91,10 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onUpdate = { updated, _, _ -> Result.success(updated) },
                     onDelete = { Result.success(Unit) },
+                    onUndoDelete = { Result.success(Unit) },
+                    onFinalizeDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
@@ -131,7 +141,10 @@ class JournalArchiveUiTest {
                             ),
                         )
                     },
+                    onUpdate = { updated, _, _ -> Result.success(updated) },
                     onDelete = { Result.success(Unit) },
+                    onUndoDelete = { Result.success(Unit) },
+                    onFinalizeDelete = { Result.success(Unit) },
                     openImage = { null },
                 )
             }
@@ -159,6 +172,8 @@ class JournalArchiveUiTest {
     fun deletingARecordRequiresExplicitSecondConfirmation() {
         val journal = entry("delete-me", LocalDate.now(), listOf("自我"), "准备删除的记录")
         var deletedEntry: JournalEntry? = null
+        var restoredEntryId: String? = null
+        var finalizedEntryId: String? = null
 
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
@@ -169,8 +184,17 @@ class JournalArchiveUiTest {
                         val matches = filterJournalEntries(listOf(journal), query)
                         Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
                     },
+                    onUpdate = { updated, _, _ -> Result.success(updated) },
                     onDelete = {
                         deletedEntry = it
+                        Result.success(Unit)
+                    },
+                    onUndoDelete = {
+                        restoredEntryId = it
+                        Result.success(Unit)
+                    },
+                    onFinalizeDelete = {
+                        finalizedEntryId = it
                         Result.success(Unit)
                     },
                     openImage = { null },
@@ -181,11 +205,64 @@ class JournalArchiveUiTest {
         composeRule.onNodeWithText("准备删除的记录").performScrollTo().performClick()
         composeRule.onNodeWithText("删除记录").performScrollTo().performClick()
         composeRule.onNodeWithText("删除这条记录？").assertIsDisplayed()
-        composeRule.onNodeWithText("删除后无法恢复。请确认这不是误操作。").assertIsDisplayed()
+        composeRule.onNodeWithText("删除后可在底部提示消失前撤销。请确认这不是误操作。").assertIsDisplayed()
         composeRule.runOnIdle { check(deletedEntry == null) }
 
         composeRule.onNodeWithText("确认删除").performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) { deletedEntry?.id == journal.id }
+        composeRule.onNodeWithText("撤销").assertIsDisplayed().performClick()
+        composeRule.waitUntil(timeoutMillis = 3_000) { restoredEntryId == journal.id }
+        composeRule.runOnIdle { check(finalizedEntryId == null) }
+    }
+
+    @Test
+    fun editingARecordUpdatesWeatherNoteAndKeywords() {
+        val journal = entry("edit-me", LocalDate.now(), listOf("自我"), "准备编辑的记录")
+        var updatedEntry: JournalEntry? = null
+
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                JournalArchiveScreen(
+                    padding = PaddingValues(),
+                    entries = listOf(journal),
+                    onSearch = { query, offset, limit ->
+                        val matches = filterJournalEntries(listOf(journal), query)
+                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                    },
+                    onUpdate = { updated, retainedImages, newImages ->
+                        check(retainedImages.isEmpty())
+                        check(newImages.isEmpty())
+                        updatedEntry = updated
+                        Result.success(updated)
+                    },
+                    onDelete = { Result.success(Unit) },
+                    onUndoDelete = { Result.success(Unit) },
+                    onFinalizeDelete = { Result.success(Unit) },
+                    openImage = { null },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("准备编辑的记录").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("编辑记录").performClick()
+        composeRule.onNodeWithText("编辑这一刻").assertIsDisplayed()
+        composeRule.onNode(
+            hasSetTextAction() and hasText("准备编辑的记录"),
+        ).performTextReplacement("修改后的注脚")
+        composeRule.onNodeWithContentDescription("微风").performClick()
+        composeRule.onNodeWithText("工作").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("已选 2").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("保存").performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { updatedEntry != null }
+        composeRule.runOnIdle {
+            val saved = checkNotNull(updatedEntry)
+            check(saved.note == "修改后的注脚")
+            check(saved.mood == Mood.CALM)
+            check(saved.tags == listOf("自我", "工作"))
+        }
     }
 
     private fun entry(

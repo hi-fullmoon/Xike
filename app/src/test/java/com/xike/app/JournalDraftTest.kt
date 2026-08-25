@@ -12,6 +12,7 @@ class JournalDraftTest {
             note = "今天完成了重要的事",
             tags = linkedSetOf("工作", "学习"),
             imageUriStrings = listOf("content://photo/1", "content://photo/2"),
+            recordedAt = 120_000L,
             updatedAt = 123_456L,
         )
 
@@ -35,6 +36,24 @@ class JournalDraftTest {
         val draft = JournalDraft(updatedAt = 99L).normalized()
 
         assertTrue(draft.isEmpty)
+        assertEquals(0L, draft.updatedAt)
+    }
+
+    @Test
+    fun `recorded time keeps an otherwise empty draft recoverable`() {
+        val draft = JournalDraft(recordedAt = 123_456L, updatedAt = 99L).normalized()
+
+        assertTrue(!draft.isEmpty)
+        assertEquals(123_456L, draft.recordedAt)
+        assertEquals(99L, draft.updatedAt)
+    }
+
+    @Test
+    fun `invalid recorded time is removed during normalization`() {
+        val draft = JournalDraft(recordedAt = 0L, updatedAt = 99L).normalized()
+
+        assertTrue(draft.isEmpty)
+        assertEquals(null, draft.recordedAt)
         assertEquals(0L, draft.updatedAt)
     }
 }

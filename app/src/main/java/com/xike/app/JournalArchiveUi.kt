@@ -1,12 +1,19 @@
 package com.xike.app
 
+import android.net.Uri
+import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,8 +44,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
@@ -51,6 +60,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +82,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
@@ -85,8 +99,10 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val ARCHIVE_PAGE_SIZE = 60
 private enum class ArchiveViewMode { CALENDAR, TIMELINE }
@@ -110,12 +126,16 @@ fun JournalArchiveScreen(
     padding: PaddingValues,
     entries: List<JournalEntry>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
+    onUpdate: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
     onDelete: suspend (JournalEntry) -> Result<Unit>,
+    onUndoDelete: suspend (String) -> Result<Unit>,
+    onFinalizeDelete: suspend (String) -> Result<Unit>,
     openImage: (String) -> InputStream?,
 ) {
     val today = LocalDate.now()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val archiveListState = rememberLazyListState()
     var queryText by rememberSaveable { mutableStateOf("") }
     var selectedMoodNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -135,6 +155,7 @@ fun JournalArchiveScreen(
     var galleryImages by remember { mutableStateOf<List<String>?>(null) }
     var galleryInitialPage by remember { mutableIntStateOf(0) }
     var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
+    var editEntry by remember { mutableStateOf<JournalEntry?>(null) }
     var pendingScrollPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var deleteCandidate by remember { mutableStateOf<JournalEntry?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
@@ -216,12 +237,18 @@ fun JournalArchiveScreen(
     val visibleMonth = runCatching { YearMonth.parse(visibleMonthValue) }.getOrDefault(YearMonth.from(today))
     val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
 
-    LazyColumn(
-        state = archiveListState,
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    LaunchedEffect(entries, detailEntry?.id) {
+        val selectedId = detailEntry?.id ?: return@LaunchedEffect
+        detailEntry = entries.firstOrNull { it.id == selectedId }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = archiveListState,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
         item(key = "archive-header") {
             ScreenHeader(
                 eyebrow = if (searchQuery.isEmpty) "${entries.size} 条记录" else "找到 $totalResultCount 条",
@@ -370,6 +397,15 @@ fun JournalArchiveScreen(
                 }
             }
         }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(padding)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        )
     }
 
     galleryImages?.let { images ->
@@ -385,9 +421,24 @@ fun JournalArchiveScreen(
         JournalEntryDetailDialog(
             entry = entry,
             onDismiss = { detailEntry = null },
+            onRequestEdit = { editEntry = entry },
             onRequestDelete = {
                 deleteError = null
                 deleteCandidate = entry
+            },
+        )
+    }
+
+    editEntry?.let { entry ->
+        JournalEntryEditDialog(
+            entry = entry,
+            openImage = openImage,
+            onDismiss = { editEntry = null },
+            onSave = { updatedEntry, retainedImages, newImageUris ->
+                onUpdate(updatedEntry, retainedImages, newImageUris).onSuccess { savedEntry ->
+                    detailEntry = savedEntry
+                    editEntry = null
+                }
             },
         )
     }
@@ -408,16 +459,43 @@ fun JournalArchiveScreen(
                     isDeleting = true
                     deleteError = null
                     scope.launch {
-                        onDelete(entry)
-                            .onSuccess {
-                                if (detailEntry?.id == entry.id) detailEntry = null
-                                deleteCandidate = null
-                                Toast.makeText(context, "记录已删除", Toast.LENGTH_SHORT).show()
-                            }
-                            .onFailure { error ->
-                                deleteError = error.message ?: "删除失败，请重试。"
-                            }
+                        val result = onDelete(entry)
                         isDeleting = false
+                        result.onFailure { error ->
+                            deleteError = error.message ?: "删除失败，请重试。"
+                        }
+                        if (result.isSuccess) {
+                            if (detailEntry?.id == entry.id) detailEntry = null
+                            if (editEntry?.id == entry.id) editEntry = null
+                            deleteCandidate = null
+                            var deleteWasUndone = false
+                            try {
+                                val snackbarResult = snackbarHostState.showSnackbar(
+                                    message = "记录已删除",
+                                    actionLabel = "撤销",
+                                    withDismissAction = true,
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                                    onUndoDelete(entry.id)
+                                        .onSuccess {
+                                            deleteWasUndone = true
+                                            Toast.makeText(context, "记录已恢复", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .onFailure { error ->
+                                            Toast.makeText(
+                                                context,
+                                                error.message ?: "撤销删除失败",
+                                                Toast.LENGTH_LONG,
+                                            ).show()
+                                        }
+                                }
+                            } finally {
+                                if (!deleteWasUndone) {
+                                    withContext(NonCancellable) { onFinalizeDelete(entry.id) }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -1004,6 +1082,7 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
 internal fun JournalEntryDetailDialog(
     entry: JournalEntry,
     onDismiss: () -> Unit,
+    onRequestEdit: (() -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
 ) {
     Dialog(
@@ -1022,6 +1101,11 @@ internal fun JournalEntryDetailDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("这一刻", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.weight(1f))
+                    if (onRequestEdit != null) {
+                        IconButton(onClick = onRequestEdit) {
+                            Icon(Icons.Outlined.Edit, contentDescription = "编辑记录")
+                        }
+                    }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Outlined.Close, contentDescription = "关闭记录详情")
                     }
@@ -1115,6 +1199,430 @@ internal fun JournalEntryDetailDialog(
 }
 
 @Composable
+private fun JournalEntryEditDialog(
+    entry: JournalEntry,
+    openImage: (String) -> InputStream?,
+    onDismiss: () -> Unit,
+    onSave: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var selectedMoodName by rememberSaveable(entry.id) { mutableStateOf(entry.mood.name) }
+    var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
+    var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
+    var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
+    var retainedImages by rememberSaveable(entry.id) { mutableStateOf(entry.imageFileNames) }
+    var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    val selectedMood = Mood.entries.firstOrNull { it.name == selectedMoodName } ?: entry.mood
+    val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
+    val onImagesPicked: (List<Uri>) -> Unit = { uris ->
+        val additions = uris
+            .map(Uri::toString)
+            .filterNot { it in newImageUriStrings }
+            .take(availableImageSlots.coerceAtLeast(0))
+        newImageUriStrings = newImageUriStrings + additions
+        if (additions.size < uris.distinct().size) {
+            Toast.makeText(context, "每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
+        onImagesPicked,
+    )
+    val documentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+        onImagesPicked,
+    )
+    val openPhotoPicker = {
+        if (availableImageSlots > 0 && !isSaving) {
+            val openDocuments = {
+                val input = arrayOf("image/*")
+                val contract = ActivityResultContracts.OpenMultipleDocuments()
+                val canOpen = contract.createIntent(context, input)
+                    .resolveActivity(context.packageManager) != null
+                if (canOpen) documentPicker.launch(input)
+                canOpen
+            }
+            val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
+                runCatching {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                    true
+                }.onFailure { error ->
+                    Log.w("XikeEditPhotoPicker", "Photo picker launch failed", error)
+                }.getOrElse {
+                    runCatching(openDocuments).getOrDefault(false)
+                }
+            } else {
+                runCatching(openDocuments).getOrDefault(false)
+            }
+            if (!opened) Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(enabled = !isSaving, onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "取消编辑")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("编辑这一刻", style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            "修改会同步更新回望、搜索与轨迹",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Button(
+                        enabled = !isSaving,
+                        onClick = {
+                            if (isSaving) return@Button
+                            isSaving = true
+                            saveError = null
+                            val updatedEntry = entry.copy(
+                                createdAt = createdAt,
+                                mood = selectedMood,
+                                tags = selectedTags,
+                                note = note.trim(),
+                            )
+                            scope.launch {
+                                onSave(
+                                    updatedEntry,
+                                    retainedImages,
+                                    newImageUriStrings.map(Uri::parse),
+                                ).onSuccess {
+                                    Toast.makeText(context, "修改已保存", Toast.LENGTH_SHORT).show()
+                                }.onFailure { error ->
+                                    saveError = error.message ?: "修改保存失败，请重试。"
+                                }
+                                isSaving = false
+                            }
+                        },
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(7.dp))
+                        }
+                        Text(if (isSaving) "保存中" else "保存")
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 22.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                EditSectionCard(title = "内在天气", supporting = "重新选择最接近那一刻的天气") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Mood.entries.forEach { mood ->
+                            val selected = mood == selectedMood
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .selectable(
+                                        selected = selected,
+                                        enabled = !isSaving,
+                                        role = Role.RadioButton,
+                                        onClick = { selectedMoodName = mood.name },
+                                    ),
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    else Color.Transparent,
+                                ),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Icon(
+                                        mood.weatherIcon(),
+                                        contentDescription = mood.label,
+                                        modifier = Modifier.size(24.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Spacer(Modifier.height(5.dp))
+                                    Text(mood.label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                EditSectionCard(title = "记录时间", supporting = "可修正补记日期与具体时间") {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = !isSaving) {
+                            showRecordedAtPicker(context, createdAt) { createdAt = it }
+                        },
+                        shape = XikeShapes.inner,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Outlined.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(11.dp))
+                            Text(
+                                createdAt.asDetailChineseDateTime(),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                EditSectionCard(title = "此刻的注脚", supporting = "最多 $MAX_DRAFT_NOTE_LENGTH 字") {
+                    TextField(
+                        value = note,
+                        onValueChange = { note = it.take(MAX_DRAFT_NOTE_LENGTH) },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 4,
+                        maxLines = 8,
+                        placeholder = { Text("这一刻发生了什么？") },
+                        shape = XikeShapes.inner,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                    )
+                    Text(
+                        "${note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                        modifier = Modifier.align(Alignment.End),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                EditSectionCard(
+                    title = "此刻关键词",
+                    supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.size}",
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        journalTopics.chunked(4).forEach { rowTopics ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                rowTopics.forEach { topic ->
+                                    TopicChip(
+                                        topic = topic,
+                                        selected = topic.label in selectedTags,
+                                        onClick = {
+                                            if (!isSaving) selectedTags = selectedTags.toggle(topic.label)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                EditSectionCard(
+                    title = "照片",
+                    supporting = "${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · 移除只影响息刻副本",
+                ) {
+                    EditPhotoStrip(
+                        retainedImages = retainedImages,
+                        newImageUriStrings = newImageUriStrings,
+                        canAdd = availableImageSlots > 0 && !isSaving,
+                        openImage = openImage,
+                        onAdd = openPhotoPicker,
+                        onRemoveRetained = { retainedImages = retainedImages - it },
+                        onRemoveNew = { newImageUriStrings = newImageUriStrings - it },
+                    )
+                }
+
+                saveError?.let { error ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = XikeShapes.inner,
+                        color = MaterialTheme.colorScheme.errorContainer,
+                    ) {
+                        Text(
+                            error,
+                            modifier = Modifier.padding(14.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditSectionCard(
+    title: String,
+    supporting: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun EditPhotoStrip(
+    retainedImages: List<String>,
+    newImageUriStrings: List<String>,
+    canAdd: Boolean,
+    openImage: (String) -> InputStream?,
+    onAdd: () -> Unit,
+    onRemoveRetained: (String) -> Unit,
+    onRemoveNew: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        retainedImages.forEachIndexed { index, fileName ->
+            item(key = "existing-$fileName") {
+                EditPhotoTile(
+                    key = "existing-$fileName",
+                    contentDescription = "已有照片 ${index + 1}",
+                    openStream = { openImage(fileName) },
+                    onRemove = { onRemoveRetained(fileName) },
+                )
+            }
+        }
+        newImageUriStrings.forEachIndexed { index, uriString ->
+            item(key = "new-$uriString") {
+                EditPhotoTile(
+                    key = "new-$uriString",
+                    contentDescription = "新照片 ${index + 1}",
+                    openStream = { context.contentResolver.openInputStream(Uri.parse(uriString)) },
+                    onRemove = { onRemoveNew(uriString) },
+                )
+            }
+        }
+        if (canAdd) {
+            item(key = "add-photo") {
+                Surface(
+                    modifier = Modifier.size(92.dp).clickable(onClick = onAdd),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.AddPhotoAlternate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text("添加照片", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditPhotoTile(
+    key: String,
+    contentDescription: String,
+    openStream: () -> InputStream?,
+    onRemove: () -> Unit,
+) {
+    val bitmap = rememberPreviewBitmap(key = key, maxDimension = 360, openStream = openStream)
+    Box(
+        modifier = Modifier
+            .size(92.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                Icons.Outlined.Image,
+                contentDescription = contentDescription,
+                modifier = Modifier.align(Alignment.Center),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Surface(
+            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.66f),
+        ) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "移除$contentDescription",
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DeleteJournalDialog(
     entry: JournalEntry,
     isDeleting: Boolean,
@@ -1159,9 +1667,9 @@ private fun DeleteJournalDialog(
                 }
                 Text(
                     if (entry.imageFileNames.isEmpty()) {
-                        "删除后无法恢复。请确认这不是误操作。"
+                        "删除后可在底部提示消失前撤销。请确认这不是误操作。"
                     } else {
-                        "删除后无法恢复。记录和息刻内保存的 ${entry.imageFileNames.size} 张照片副本会一并删除；系统相册中的原图不会受影响。"
+                        "删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的 ${entry.imageFileNames.size} 张照片副本会一并清理；系统相册中的原图不会受影响。"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

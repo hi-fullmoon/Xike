@@ -131,6 +131,44 @@ class JournalDaoTest {
         assertEquals(listOf("newer", "older"), observed.map { it.id })
     }
 
+    @Test
+    fun updateReplacesRelationsAndRefreshesSearchIndexInOneTransaction() {
+        val original = entry(
+            id = "editable",
+            createdAt = 100L,
+            tags = listOf("旧关键词"),
+            images = listOf("old.xike-image"),
+        ).copy(note = "旧注脚", mood = Mood.TIRED)
+        dao.insertJournal(original.toBundle())
+        val updated = original.copy(
+            createdAt = 500L,
+            mood = Mood.JOYFUL,
+            tags = listOf("工作", "创作"),
+            note = "新的可搜索注脚",
+            imageFileNames = listOf("new.xike-image"),
+        )
+
+        val previousImages = dao.updateJournal(updated.toBundle())
+        val stored = dao.record(updated.id)?.toJournalEntry()
+        val searchResults = dao.searchRecords(
+            hasText = 1,
+            ftsQuery = journalFtsQuery("工作"),
+            startInclusive = 0L,
+            endExclusive = 1_000L,
+            filterMoods = 0,
+            moods = listOf(Mood.CALM.name),
+            filterTags = 0,
+            tags = listOf(""),
+            imageFilter = JournalImageFilter.ANY.name,
+            limit = 20,
+            offset = 0,
+        ).map(JournalEntryRecord::toJournalEntry)
+
+        assertEquals(listOf("old.xike-image"), previousImages)
+        assertEquals(updated, stored)
+        assertEquals(listOf(updated.id), searchResults.map(JournalEntry::id))
+    }
+
     private fun entry(
         id: String,
         createdAt: Long,

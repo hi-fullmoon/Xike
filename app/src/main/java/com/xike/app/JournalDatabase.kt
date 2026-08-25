@@ -18,6 +18,7 @@ import androidx.room.Relation
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
@@ -134,6 +135,10 @@ internal abstract class JournalDao {
     @Query("SELECT * FROM journal_entries ORDER BY created_at DESC")
     abstract fun observeRecords(): Flow<List<JournalEntryRecord>>
 
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id = :entryId LIMIT 1")
+    abstract fun record(entryId: String): JournalEntryRecord?
+
     @Query("SELECT COUNT(*) FROM journal_entries")
     abstract fun entryCount(): Int
 
@@ -237,6 +242,9 @@ internal abstract class JournalDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract fun insertSearchEntry(search: JournalSearchEntity)
 
+    @Update
+    protected abstract fun updateEntry(entry: JournalEntryEntity): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun putSetting(setting: AppSettingEntity)
 
@@ -255,6 +263,12 @@ internal abstract class JournalDao {
     @Query("DELETE FROM journal_entries_fts WHERE entry_id = :entryId")
     protected abstract fun deleteSearchEntry(entryId: String)
 
+    @Query("DELETE FROM journal_tags WHERE entry_id = :entryId")
+    protected abstract fun deleteEntryTags(entryId: String)
+
+    @Query("DELETE FROM journal_images WHERE entry_id = :entryId")
+    protected abstract fun deleteEntryImages(entryId: String)
+
     @Query("DELETE FROM journal_entries WHERE id = :entryId")
     protected abstract fun deleteEntry(entryId: String): Int
 
@@ -272,6 +286,19 @@ internal abstract class JournalDao {
         deleteSearchEntry(entryId)
         check(deleteEntry(entryId) == 1) { "记录不存在或已经删除。" }
         return images
+    }
+
+    @Transaction
+    open fun updateJournal(bundle: JournalBundle): List<String> {
+        val previousImages = imageFileNames(bundle.entry.id)
+        check(updateEntry(bundle.entry) == 1) { "记录不存在或已经删除。" }
+        deleteEntryTags(bundle.entry.id)
+        deleteEntryImages(bundle.entry.id)
+        deleteSearchEntry(bundle.entry.id)
+        if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
+        if (bundle.images.isNotEmpty()) insertImages(bundle.images)
+        insertSearchEntry(bundle.toSearchEntity())
+        return previousImages
     }
 
     @Transaction

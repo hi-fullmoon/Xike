@@ -91,6 +91,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         persistDraft(draft.copy(tags = updatedTags))
     }
 
+    fun updateDraftRecordedAt(recordedAt: Long?) {
+        persistDraft(draft.copy(recordedAt = recordedAt))
+    }
+
     fun addDraftImages(uris: List<Uri>) {
         val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
         val newUris = uris
@@ -132,6 +136,15 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun discardDraft() {
+        val discardedDraft = draft
+        if (persistDraft(JournalDraft())) {
+            discardedDraft.imageUriStrings
+                .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
+                .forEach(::releaseDraftImagePermission)
+        }
+    }
+
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = viewModelScope.async {
         val savedDraft = draft
         val result = withContext(Dispatchers.IO) {
@@ -144,6 +157,23 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         result.map { }
     }.await()
 
+    suspend fun update(
+        entry: JournalEntry,
+        retainedImageFileNames: List<String>,
+        newImageUris: List<Uri>,
+    ): Result<JournalEntry> = viewModelScope.async {
+        val result = withContext(Dispatchers.IO) {
+            runCatching { store.update(entry, retainedImageFileNames, newImageUris) }
+        }
+        result.onSuccess { updatedEntries ->
+            entries = updatedEntries
+            dataError = null
+        }
+        result.mapCatching { updatedEntries ->
+            updatedEntries.first { it.id == entry.id }
+        }
+    }.await()
+
     suspend fun delete(entry: JournalEntry): Result<Unit> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
             runCatching { store.delete(entry.id) }
@@ -154,6 +184,21 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
         result.map { }
     }.await()
+
+    suspend fun undoDelete(entryId: String): Result<Unit> = viewModelScope.async {
+        val result = withContext(Dispatchers.IO) {
+            runCatching { store.undoDelete(entryId) }
+        }
+        result.onSuccess { restoredEntries ->
+            entries = restoredEntries
+            dataError = null
+        }
+        result.map { }
+    }.await()
+
+    suspend fun finalizeDelete(entryId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { store.finalizeDelete(entryId) }
+    }
 
     suspend fun search(
         query: JournalSearchQuery,

@@ -1,6 +1,8 @@
 package com.xike.app
 
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
@@ -157,9 +159,9 @@ enum class AppTheme(
     TERRA("陶日", "温暖的赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
 }
 
-private data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
+internal data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
 
-private val journalTopics = listOf(
+internal val journalTopics = listOf(
     JournalTopic("工作", Color(0xFF56758B), Icons.Outlined.BusinessCenter),
     JournalTopic("学习", Color(0xFF766B98), Icons.AutoMirrored.Outlined.MenuBook),
     JournalTopic("关系", Color(0xFF9A6173), Icons.Outlined.FavoriteBorder),
@@ -434,8 +436,11 @@ fun MomentScreen(
     onDraftImagesAdded: (List<Uri>) -> Unit,
     onDraftImageRemoved: (String) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    onDraftRecordedAtChange: (Long?) -> Unit = {},
+    onDraftDiscard: () -> Unit = {},
 ) {
     var showDetails by rememberSaveable { mutableStateOf(false) }
+    var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var isNoteFocused by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -448,7 +453,10 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
-    val draftHasDetails = draft.note.isNotBlank() || draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()
+    val draftHasDetails = draft.note.isNotBlank() ||
+        draft.tags.isNotEmpty() ||
+        draft.imageUriStrings.isNotEmpty() ||
+        draft.recordedAt != null
     LaunchedEffect(draftHasDetails) {
         if (draftHasDetails) showDetails = true
     }
@@ -500,7 +508,12 @@ fun MomentScreen(
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("再留下一点", style = MaterialTheme.typography.titleSmall)
-                        Text("写句话、选关键词或加照片", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (draft.isEmpty) "写句话、选关键词、加照片或补记过去"
+                            else "草稿已加密保存在本机",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Icon(
                         if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
@@ -512,6 +525,24 @@ fun MomentScreen(
 
             if (showDetails) {
                 PaperCard {
+                    DraftSecurityRow(
+                        hasDraft = !draft.isEmpty,
+                        enabled = !isSaving,
+                        onDiscard = { showDiscardConfirmation = true },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(12.dp))
+                    RecordedAtSelector(
+                        recordedAt = draft.recordedAt,
+                        enabled = !isSaving,
+                        onChoose = {
+                            dismissKeyboard()
+                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                        },
+                        onReset = { onDraftRecordedAtChange(null) },
+                    )
+                    Spacer(Modifier.height(16.dp))
                     Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(12.dp))
                     TextField(
@@ -646,11 +677,20 @@ fun MomentScreen(
                     isSaving = true
                     scope.launch {
                         onSave(
-                            JournalEntry(mood = mood, tags = draft.tags.toList(), note = draft.note.trim()),
+                            JournalEntry(
+                                createdAt = draft.recordedAt ?: System.currentTimeMillis(),
+                                mood = mood,
+                                tags = draft.tags.toList(),
+                                note = draft.note.trim(),
+                            ),
                             draft.imageUriStrings.map(Uri::parse),
                         ).onSuccess {
                             showDetails = false
-                            Toast.makeText(context, "这一刻，已经好好收下了", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                if (draft.recordedAt == null) "这一刻，已经好好收下了" else "那一刻，已经好好收下了",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }.onFailure { error ->
                             Toast.makeText(context, error.message ?: "保存失败，请重试", Toast.LENGTH_LONG).show()
                         }
@@ -670,6 +710,7 @@ fun MomentScreen(
                     when {
                         isSaving -> "正在收下…"
                         draft.mood == null -> "先选择一种天气"
+                        draft.recordedAt != null -> "补记这一刻"
                         else -> "记下此刻"
                     },
                     style = MaterialTheme.typography.labelLarge,
@@ -681,6 +722,178 @@ fun MomentScreen(
             }
         }
     }
+
+    if (showDiscardConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirmation = false },
+            shape = XikeShapes.dialog,
+            title = { Text("放弃这份草稿？") },
+            text = {
+                Text(
+                    "将清空尚未保存的内在天气、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardConfirmation = false }) { Text("继续保留") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDraftDiscard()
+                        showDiscardConfirmation = false
+                        showDetails = false
+                    },
+                ) { Text("放弃草稿") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DraftSecurityRow(
+    hasDraft: Boolean,
+    enabled: Boolean,
+    onDiscard: () -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            modifier = Modifier.size(34.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.Shield,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("草稿自动保存在本机", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "未完成内容不会离开设备",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (hasDraft) {
+            TextButton(onClick = onDiscard, enabled = enabled) { Text("清空") }
+        }
+    }
+}
+
+@Composable
+private fun RecordedAtSelector(
+    recordedAt: Long?,
+    enabled: Boolean,
+    onChoose: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Text("记录时间", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onChoose),
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                modifier = Modifier.size(21.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    recordedAt?.asDraftMomentLabel() ?: "就在此刻",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    if (recordedAt == null) "保存时使用当前时间 · 点按可补记" else "将归入所选日期 · 点按可修改",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    if (recordedAt != null) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "补记也会参与对应日期的回望与轨迹",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onReset, enabled = enabled) { Text("改为现在") }
+        }
+    }
+}
+
+internal fun showRecordedAtPicker(
+    context: Context,
+    recordedAt: Long?,
+    onSelected: (Long) -> Unit,
+) {
+    val nowMillis = System.currentTimeMillis()
+    val zoneId = ZoneId.systemDefault()
+    val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
+    val initial = recordedAt
+        ?.coerceAtMost(nowMillis)
+        ?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
+        ?: now
+
+    DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            val date = LocalDate.of(year, month + 1, day)
+            TimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    val selected = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
+                    if (selected > System.currentTimeMillis()) {
+                        Toast.makeText(context, "记录时间不能晚于现在", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onSelected(selected)
+                    }
+                },
+                initial.hour,
+                initial.minute,
+                true,
+            ).show()
+        },
+        initial.year,
+        initial.monthValue - 1,
+        initial.dayOfMonth,
+    ).apply {
+        datePicker.maxDate = nowMillis
+    }.show()
+}
+
+private fun Long.asDraftMomentLabel(zoneId: ZoneId = ZoneId.systemDefault()): String {
+    val moment = Instant.ofEpochMilli(this).atZone(zoneId)
+    val today = LocalDate.now(zoneId)
+    val dateLabel = when (moment.toLocalDate()) {
+        today -> "今天"
+        today.minusDays(1) -> "昨天"
+        else -> DateTimeFormatter.ofPattern(
+            if (moment.year == today.year) "M月d日 EEEE" else "yyyy年M月d日 EEEE",
+            Locale.CHINA,
+        ).format(moment)
+    }
+    return "$dateLabel ${DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA).format(moment)}"
 }
 
 @Composable
@@ -886,7 +1099,7 @@ private fun MoodChoice(
 }
 
 @Composable
-private fun TopicChip(
+internal fun TopicChip(
     topic: JournalTopic,
     selected: Boolean,
     onClick: () -> Unit,
@@ -2109,7 +2322,7 @@ private fun SectionTitle(index: String, title: String, trailing: String? = null)
 }
 
 @Composable
-private fun rememberPreviewBitmap(
+internal fun rememberPreviewBitmap(
     key: String,
     maxDimension: Int = 720,
     openStream: () -> InputStream?,

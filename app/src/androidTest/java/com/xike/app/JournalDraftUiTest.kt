@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import java.time.LocalDate
+import java.time.ZoneId
 import org.junit.Rule
 import org.junit.Test
 
@@ -168,9 +169,10 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("再留下一点").performClick()
-        composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("添加照片").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("饮食").assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(selectedTag == "饮食") }
-        composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("其他").assertIsDisplayed()
     }
 
     @Test
@@ -196,5 +198,69 @@ class JournalDraftUiTest {
 
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription("移除第 1 张照片").assertExists()
+    }
+
+    @Test
+    fun restoredBackdatedDraftShowsItsTimeAndCanReturnToNow() {
+        val recordedAt = LocalDate.now()
+            .minusDays(1)
+            .atTime(20, 15)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        var resetValue: Long? = recordedAt
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(mood = Mood.CALM, recordedAt = recordedAt),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                    onDraftRecordedAtChange = { resetValue = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("昨天 20:15").assertIsDisplayed()
+        composeRule.onNodeWithText("补记这一刻").assertIsDisplayed()
+        composeRule.onNodeWithText("改为现在").performScrollTo().performClick()
+        composeRule.runOnIdle { check(resetValue == null) }
+    }
+
+    @Test
+    fun clearingAnEncryptedDraftRequiresConfirmation() {
+        var discarded = false
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(note = "还没保存的内容"),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                    onDraftDiscard = { discarded = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("清空").performScrollTo().performClick()
+        composeRule.onNodeWithText("放弃这份草稿？").assertIsDisplayed()
+        composeRule.onNodeWithText("继续保留").performClick()
+        composeRule.runOnIdle { check(!discarded) }
+
+        composeRule.onNodeWithText("清空").performScrollTo().performClick()
+        composeRule.onNodeWithText("放弃草稿").performClick()
+        composeRule.runOnIdle { check(discarded) }
     }
 }
