@@ -600,7 +600,7 @@ fun MomentScreen(
                     }
                     Spacer(Modifier.height(7.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        journalTopics.chunked(4).forEach { rowTopics ->
+                        journalTopics.chunked(3).forEach { rowTopics ->
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 rowTopics.forEach { topic ->
                                     TopicChip(
@@ -609,6 +609,9 @@ fun MomentScreen(
                                         onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
                                         modifier = Modifier.weight(1f),
                                     )
+                                }
+                                repeat(3 - rowTopics.size) {
+                                    Spacer(Modifier.weight(1f))
                                 }
                             }
                         }

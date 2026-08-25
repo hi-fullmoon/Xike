@@ -1463,7 +1463,7 @@ private fun JournalEntryEditDialog(
                     supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.size}",
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        journalTopics.chunked(4).forEach { rowTopics ->
+                        journalTopics.chunked(3).forEach { rowTopics ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -1477,6 +1477,9 @@ private fun JournalEntryEditDialog(
                                         },
                                         modifier = Modifier.weight(1f),
                                     )
+                                }
+                                repeat(3 - rowTopics.size) {
+                                    Spacer(Modifier.weight(1f))
                                 }
                             }
                         }
