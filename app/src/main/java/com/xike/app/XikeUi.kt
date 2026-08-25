@@ -1288,26 +1288,35 @@ private fun InsightCard(icon: ImageVector, label: String, content: String) {
 
 @Composable
 internal fun DateSectionHeader(date: LocalDate, count: Int) {
-    Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)), style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.width(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(shape = RoundedCornerShape(13.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Text(
+                date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
+                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
         Text(date.asFullWeekday(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.weight(1f))
-        if (count > 1) {
-            Text("$count 条", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Text("$count 条", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 internal fun JournalEntryCard(
     entry: JournalEntry,
+    modifier: Modifier = Modifier,
     openImage: (String) -> InputStream?,
     onImageClick: (Int) -> Unit,
     onClick: () -> Unit = {},
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surface,
     ) {

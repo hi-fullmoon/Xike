@@ -1,6 +1,7 @@
 package com.xike.app
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DataUsage
-import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -91,8 +91,8 @@ fun JournalInsightsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item(key = "insights-header") {
             ScreenHeader(
@@ -119,7 +119,12 @@ fun JournalInsightsScreen(
                 },
             )
         }
-        item(key = "insights-evidence") { EvidenceCard(summary.evidence) }
+        item(key = "insights-section-label") {
+            InsightsSectionLabel(
+                title = "细看这段时间",
+                supporting = "每一项都可以回到原始记录",
+            )
+        }
         item(key = "insights-trend") {
             TrendCard(summary = summary, today = today) { point ->
                 drilldown = InsightDrilldown(
@@ -201,46 +206,118 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
         shape = XikeShapes.card,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(22.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${summary.period.contextName}概览",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                )
-                Spacer(Modifier.weight(1f))
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.13f)) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "${summary.entryCount} 次 · ${summary.recordedDayCount} 天",
-                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        "${summary.period.contextName} · 内在天气",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        summary.averageScore?.let(::weatherBandLabel) ?: "等待第一片天气",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(19.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            summary.averageScore.averageWeatherIcon(),
+                            contentDescription = null,
+                            modifier = Modifier.size(29.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                summary.averageScore?.let(::weatherBandLabel) ?: "等待第一条记录",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
                 summary.averageScore?.let(::weatherSummary) ?: "记录第一片天气，让轨迹从这里开始。",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (summary.averageScore != null) {
-                Spacer(Modifier.height(9.dp))
-                Text(
-                    "平均位置 ${summary.averageScore.oneDecimal()} / 5 · 每个记录日 ${summary.averageEntriesPerRecordedDay?.oneDecimal()} 次",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+            Spacer(Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OverviewMetric("记录", "${summary.entryCount} 次", Modifier.weight(1f))
+                OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.weight(1f))
+                OverviewMetric(
+                    "日期覆盖",
+                    "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
+                    Modifier.weight(1f),
                 )
             }
+            Spacer(Modifier.height(14.dp))
+            RatioBar(
+                ratio = summary.evidence.coverageRatio,
+                description = "数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录",
+            )
+            Spacer(Modifier.height(9.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)) {
+                    Text(
+                        summary.evidence.level.label,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    summary.evidence.level.description,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (summary.entryCount > 0) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = "查看这段时间的记录",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+    ) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 10.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(2.dp))
+            Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
+private fun InsightsSectionLabel(title: String, supporting: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 2.dp, end = 2.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.weight(1f))
+        Text(
+            supporting,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -297,56 +374,62 @@ private fun TrendCard(
             InsufficientDataNote(summary.evidence.level.description)
             Spacer(Modifier.height(12.dp))
         }
-        Row(
-            modifier = Modifier.fillMaxWidth().height(132.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (summary.trendPoints.size > 9) 3.dp else 8.dp),
-            verticalAlignment = Alignment.Bottom,
+        Surface(
+            shape = XikeShapes.inner,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f),
         ) {
-            summary.trendPoints.forEach { point ->
-                val isCurrent = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
-                val description = buildString {
-                    append(point.dateRangeLabel())
-                    append("，${point.entryCount} 条记录")
-                    point.averageScore?.let { append("，天气平均位置 ${it.oneDecimal()}") }
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = description }
-                        .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Text(
-                        point.entryCount.takeIf { it > 0 }?.toString().orEmpty(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Surface(
+            Row(
+                modifier = Modifier.fillMaxWidth().height(154.dp).padding(horizontal = 10.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (summary.trendPoints.size > 9) 3.dp else 8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                summary.trendPoints.forEach { point ->
+                    val isCurrent = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                    val description = buildString {
+                        append(point.dateRangeLabel())
+                        append("，${point.entryCount} 条记录")
+                        point.averageScore?.let { append("，天气平均位置 ${it.oneDecimal()}") }
+                    }
+                    Column(
                         modifier = Modifier
-                            .width(if (summary.trendPoints.size > 9) 13.dp else 22.dp)
-                            .height(point.averageScore?.let { (14 + it * 9).dp } ?: 5.dp),
-                        shape = CircleShape,
-                        color = if (point.averageScore == null) {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.primary.copy(alpha = if (isCurrent) 1f else 0.48f)
-                        },
-                    ) {}
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        point.label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = if (summary.trendPoints.size > 9) 10.sp else 11.sp,
-                        ),
-                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                    )
+                            .weight(1f)
+                            .semantics { contentDescription = description }
+                            .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom,
+                    ) {
+                        Text(
+                            point.entryCount.takeIf { it > 0 }?.toString().orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Surface(
+                            modifier = Modifier
+                                .width(if (summary.trendPoints.size > 9) 13.dp else 22.dp)
+                                .height(point.averageScore?.let { (14 + it * 9).dp } ?: 5.dp),
+                            shape = CircleShape,
+                            color = if (point.averageScore == null) {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = if (isCurrent) 1f else 0.48f)
+                            },
+                        ) {}
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            point.label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = if (summary.trendPoints.size > 9) 10.sp else 11.sp,
+                            ),
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
+        Spacer(Modifier.height(10.dp))
         Text(
             "柱高表示该时间段在五档天气中的平均位置，数字表示记录条数；点按可查看原始记录。",
             style = MaterialTheme.typography.bodySmall,
@@ -370,24 +453,16 @@ private fun MoodDistributionCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = item.entryCount > 0) { onClick(item) }
-                    .padding(vertical = 7.dp),
+                    .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = RoundedCornerShape(13.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            item.mood.weatherIcon(),
-                            contentDescription = item.mood.label,
-                            modifier = Modifier.size(21.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
+                Icon(
+                    item.mood.weatherIcon(),
+                    contentDescription = item.mood.label,
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f + item.mood.score * 0.08f),
+                )
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
                         Text(item.mood.label, style = MaterialTheme.typography.labelLarge)
@@ -398,8 +473,17 @@ private fun MoodDistributionCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(Modifier.height(5.dp))
+                    Spacer(Modifier.height(7.dp))
                     RatioBar(item.ratio, "${item.mood.label}占 ${(item.ratio * 100).roundToInt()}%，共 ${item.entryCount} 条")
+                }
+                if (item.entryCount > 0) {
+                    Spacer(Modifier.width(7.dp))
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    )
                 }
             }
         }
@@ -562,24 +646,62 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
 
 @Composable
 private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> Unit) {
-    InsightSectionCard(
-        icon = XikeIcons.Mark,
-        index = "回顾",
-        title = "完全在设备内生成",
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.primary,
     ) {
-        Text(
-            "把${periodName}的计数、分布和样本限制整理成文字；只有点按分享后，内容才会交给你选择的应用。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = onOpen,
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
-            elevation = xikeButtonElevation(),
-        ) {
-            Text(if (enabled) "查看本地回顾" else "有记录后可生成")
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = RoundedCornerShape(15.dp),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            XikeIcons.Mark,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "在设备内，读一遍${periodName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Text(
+                        "不上传，不评判",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                    )
+                }
+            }
+            Spacer(Modifier.height(13.dp))
+            Text(
+                "把计数、分布和样本限制整理成一段克制的文字，留给你自己回看。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = onOpen,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.52f),
+                ),
+                elevation = xikeButtonElevation(),
+            ) {
+                Text(if (enabled) "查看本地回顾" else "有记录后可生成")
+            }
         }
     }
 }
@@ -592,25 +714,37 @@ private fun InsightSectionCard(
     trailing: String? = null,
     content: @Composable () -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(18.dp)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+    ) {
+        Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
-                Column {
+                Box(
+                    Modifier
+                        .size(width = 4.dp, height = 38.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Text(title, style = MaterialTheme.typography.titleMedium)
                 }
                 if (trailing != null) {
-                    Spacer(Modifier.weight(1f))
                     Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Spacer(Modifier.width(10.dp))
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                )
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             content()
         }
     }
@@ -650,21 +784,26 @@ private fun InsufficientDataNote(message: String) {
 
 @Composable
 private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (InsightsPeriod) -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+    ) {
         Row(modifier = Modifier.padding(4.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             InsightsPeriod.entries.forEach { period ->
                 val isSelected = selected == period
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                         .selectable(
                             selected = isSelected,
                             role = Role.RadioButton,
                             onClick = { onSelected(period) },
                         )
-                        .padding(vertical = 11.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -803,6 +942,15 @@ private fun weatherBandLabel(average: Double): String = when {
     average >= 2.5 -> "大多停在微风附近"
     average >= 1.5 -> "低云停留得更多"
     else -> "风雨停留得更多"
+}
+
+private fun Double?.averageWeatherIcon() = when {
+    this == null -> Mood.CALM.weatherIcon()
+    this >= 4.5 -> Mood.JOYFUL.weatherIcon()
+    this >= 3.5 -> Mood.GOOD.weatherIcon()
+    this >= 2.5 -> Mood.CALM.weatherIcon()
+    this >= 1.5 -> Mood.TIRED.weatherIcon()
+    else -> Mood.LOW.weatherIcon()
 }
 
 private fun weatherSummary(average: Double): String = when {
