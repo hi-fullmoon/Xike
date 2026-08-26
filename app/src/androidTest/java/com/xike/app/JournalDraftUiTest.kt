@@ -124,7 +124,7 @@ class JournalDraftUiTest {
     }
 
     @Test
-    fun weatherGuideExplainsTheMetaphorWithPlainEmotionWords() {
+    fun moodGuideOffersPlainEmotionReferences() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 MomentScreen(
@@ -142,10 +142,10 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("看看含义").performClick()
-        composeRule.onNodeWithText("五种天气，怎么选？").assertIsDisplayed()
-        composeRule.onNodeWithText("低落、难过，或有些不知所措").assertIsDisplayed()
-        composeRule.onNodeWithText("轻松、不错，或有一点期待").assertIsDisplayed()
+        composeRule.onNodeWithText("选择参考").performClick()
+        composeRule.onNodeWithText("五种心情，怎么选？").assertIsDisplayed()
+        composeRule.onNodeWithText("难过、无助，或有些不知所措").assertIsDisplayed()
+        composeRule.onNodeWithText("舒展、不错，或有一点期待").assertIsDisplayed()
     }
 
     @Test

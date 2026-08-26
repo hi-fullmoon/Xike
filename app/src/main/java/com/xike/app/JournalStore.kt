@@ -32,12 +32,12 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-enum class Mood(val label: String, val emoji: String, val score: Int) {
-    LOW("风雨", "☔", 1),
-    TIRED("低云", "☁", 2),
-    CALM("微风", "〰", 3),
-    GOOD("晴间", "⛅", 4),
-    JOYFUL("晴朗", "☀", 5);
+enum class Mood(val label: String, val score: Int) {
+    LOW("低落", 1),
+    TIRED("疲惫", 2),
+    CALM("平静", 3),
+    GOOD("轻松", 4),
+    JOYFUL("愉悦", 5);
 
     companion object {
         fun fromName(value: String): Mood = entries.firstOrNull { it.name == value } ?: CALM

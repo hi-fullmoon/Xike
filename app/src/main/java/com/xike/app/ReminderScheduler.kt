@@ -58,7 +58,7 @@ internal object ReminderScheduler {
         val notification = android.app.Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("给今天留一刻")
-            .setContentText("如果愿意，看看此刻的内在天气。没有连续打卡，也不会催促你。")
+            .setContentText("如果愿意，看看此刻的心情。没有连续打卡，也不会催促你。")
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .setCategory(android.app.Notification.CATEGORY_REMINDER)

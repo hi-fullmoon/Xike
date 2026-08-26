@@ -299,7 +299,7 @@ internal fun localReviewText(summary: JournalPeriodSummary): String {
         .filter { it.entryCount > 0 }
         .sortedByDescending(MoodDistributionItem::entryCount)
         .joinToString("、") { "${it.mood.label} ${it.entryCount} 次" }
-        .ifBlank { "暂无内在天气分布" }
+        .ifBlank { "暂无心情分布" }
     val tagLine = summary.topTags.take(3)
         .joinToString("、") { "${it.tag} ${it.entryCount} 次" }
         .ifBlank { "暂无关键词" }
@@ -312,7 +312,7 @@ internal fun localReviewText(summary: JournalPeriodSummary): String {
         appendLine("息刻 · ${summary.period.contextName}本地回顾")
         appendLine("${summary.startDate.format(dateFormatter)} — ${summary.endDate.format(dateFormatter)}")
         appendLine("记录 ${summary.entryCount} 次，分布在 ${summary.recordedDayCount} 天。")
-        appendLine("内在天气分布：$moodLine。")
+        appendLine("心情分布：$moodLine。")
         appendLine("常见关键词：$tagLine。")
         appendLine(comparisonLine)
         append("这些是本机记录的描述性统计，不代表原因、诊断或建议。")

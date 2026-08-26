@@ -338,7 +338,7 @@ fun JournalArchiveScreen(
                 ArchiveEmptyState(
                     icon = Icons.Outlined.CalendarMonth,
                     title = "这里还很安静",
-                    description = "第一条不必完整，选一种内在天气就够了。",
+                    description = "第一条不必完整，选一种心情就够了。",
                 )
             }
         } else if (resultEntries.isEmpty() && !isSearching) {
@@ -760,7 +760,7 @@ private fun ArchiveFilters(
                 }
                 TextButton(onClick = onClearAll) { Text("全部清除") }
             }
-            FilterTitle("内在天气")
+            FilterTitle("心情")
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -771,7 +771,7 @@ private fun ArchiveFilters(
                         onClick = { onToggleMood(mood) },
                         label = { Text(mood.label) },
                         leadingIcon = {
-                            Icon(mood.weatherIcon(), contentDescription = null, modifier = Modifier.size(17.dp))
+                            Icon(mood.moodIcon(), contentDescription = null, modifier = Modifier.size(17.dp))
                         },
                     )
                 }
@@ -1154,7 +1154,7 @@ internal fun JournalEntryDetailDialog(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    entry.mood.weatherIcon(),
+                                    entry.mood.moodIcon(),
                                     contentDescription = entry.mood.label,
                                     modifier = Modifier.size(28.dp),
                                     tint = MaterialTheme.colorScheme.primary,
@@ -1204,7 +1204,7 @@ internal fun JournalEntryDetailDialog(
 
                 Text("记录", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    entry.note.ifBlank { "这一刻只留下了一种内在天气。" },
+                    entry.note.ifBlank { "这一刻只留下了一种心情。" },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.onSurface,
@@ -1441,45 +1441,24 @@ private fun JournalEntryEditDialog(
                         .padding(horizontal = 22.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                EditSectionCard(title = "内在天气", supporting = "重新选择最接近那一刻的天气") {
+                EditSectionCard(
+                    title = "心情",
+                    supporting = "重新选择最接近那一刻的感受",
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 18.dp),
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().selectableGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Mood.entries.forEach { mood ->
                             val selected = mood == selectedMood
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .selectable(
-                                        selected = selected,
-                                        enabled = !isSaving,
-                                        role = Role.RadioButton,
-                                        onClick = { selectedMoodName = mood.name },
-                                    ),
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                    else Color.Transparent,
-                                ),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Icon(
-                                        mood.weatherIcon(),
-                                        contentDescription = mood.label,
-                                        modifier = Modifier.size(24.dp),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Spacer(Modifier.height(5.dp))
-                                    Text(mood.label, style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
+                            MoodChoice(
+                                mood = mood,
+                                selected = selected,
+                                enabled = !isSaving,
+                                onClick = { selectedMoodName = mood.name },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
@@ -1632,6 +1611,7 @@ private fun JournalEntryEditDialog(
 private fun EditSectionCard(
     title: String,
     supporting: String,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -1640,7 +1620,7 @@ private fun EditSectionCard(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             Column {

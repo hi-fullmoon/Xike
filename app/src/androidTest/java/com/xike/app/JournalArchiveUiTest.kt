@@ -249,7 +249,7 @@ class JournalArchiveUiTest {
         composeRule.onNode(
             hasSetTextAction() and hasText("准备编辑的记录"),
         ).performTextReplacement("修改后的注脚")
-        composeRule.onNodeWithContentDescription("微风").performClick()
+        composeRule.onNodeWithText("平静").performClick()
         composeRule.onNodeWithText("工作").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("已选 2").fetchSemanticsNodes().isNotEmpty()

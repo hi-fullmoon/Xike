@@ -17,7 +17,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -191,6 +190,7 @@ internal val journalTopics = listOf(
 )
 
 object XikeShapes {
+    // Standalone content cards share one radius; nested panels use inner.
     val card = RoundedCornerShape(28.dp)
     val inner = RoundedCornerShape(20.dp)
     val button = RoundedCornerShape(20.dp)
@@ -622,15 +622,15 @@ fun MomentScreen(
         ) {
             BrandHeader(today)
             Spacer(Modifier.height(6.dp))
-            Text("给此刻，一种天气", style = MaterialTheme.typography.headlineLarge)
+            Text("此刻，心情怎样？", style = MaterialTheme.typography.headlineLarge)
             Text(
-                if (todayEntryCount == 0) "不用解释，先看看心里是什么天气。"
+                if (todayEntryCount == 0) "不用解释，选一个最接近的感受。"
                 else "今天已经停下来听见自己 $todayEntryCount 次。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            WeatherPicker(
+            MoodPicker(
                 selectedMood = draft.mood,
                 enabled = !isSaving,
                 onSelected = onDraftMoodChange,
@@ -660,7 +660,7 @@ fun MomentScreen(
                     if (showDetails) dismissKeyboard()
                     showDetails = !showDetails
                 },
-                shape = XikeShapes.inner,
+                shape = XikeShapes.card,
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -841,7 +841,7 @@ fun MomentScreen(
                 Text(
                     when {
                         isSaving -> "正在收下…"
-                        draft.mood == null -> "先选择一种天气"
+                        draft.mood == null -> "先选择一种心情"
                         draft.recordedAt != null -> "补记这一刻"
                         else -> "记下此刻"
                     },
@@ -877,7 +877,7 @@ fun MomentScreen(
             title = { Text("放弃这份草稿？") },
             text = {
                 Text(
-                    "将清空尚未保存的内在天气、窗外此刻、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
+                    "将清空尚未保存的心情、窗外此刻、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -964,7 +964,7 @@ private fun OutdoorContextCard(
 
     Surface(
         modifier = cardModifier,
-        shape = XikeShapes.inner,
+        shape = XikeShapes.card,
         color = containerColor,
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -1076,12 +1076,18 @@ private fun OutdoorContextCard(
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(onClick = onRemove, enabled = enabled) { Text("移除") }
-                        TextButton(onClick = onRefresh, enabled = enabled && !isLoading) {
-                            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("刷新")
-                        }
+                        OutdoorCardAction(
+                            icon = Icons.Outlined.Close,
+                            label = "移除",
+                            enabled = enabled,
+                            onClick = onRemove,
+                        )
+                        OutdoorCardAction(
+                            icon = Icons.Outlined.Refresh,
+                            label = "刷新",
+                            enabled = enabled && !isLoading,
+                            onClick = onRefresh,
+                        )
                     }
                 }
                 errorMessage != null -> {
@@ -1095,6 +1101,20 @@ private fun OutdoorContextCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OutdoorCardAction(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp))
+        Spacer(Modifier.width(5.dp))
+        Text(label)
     }
 }
 
@@ -1305,7 +1325,7 @@ private fun BrandHeader(today: LocalDate) {
 }
 
 @Composable
-private fun WeatherPicker(
+private fun MoodPicker(
     selectedMood: Mood?,
     enabled: Boolean,
     onSelected: (Mood?) -> Unit,
@@ -1318,12 +1338,12 @@ private fun WeatherPicker(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 16.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("内在天气", style = MaterialTheme.typography.titleMedium)
+                    Text("此刻心情", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "用天气比喻感受，没有标准答案",
+                        "选择最接近当下的感受，没有标准答案",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1331,12 +1351,12 @@ private fun WeatherPicker(
                 TextButton(
                     onClick = { showGuide = true },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                ) { Text("看看含义") }
+                ) { Text("选择参考") }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Mood.entries.forEach { mood ->
                     MoodChoice(
@@ -1351,19 +1371,26 @@ private fun WeatherPicker(
             if (selectedMood != null) {
                 Spacer(Modifier.height(12.dp))
                 val visual = selectedMood.visualStyle()
+                val isDark = isSystemInDarkTheme()
+                val moodColor = if (isDark) visual.container else visual.accent
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = visual.container.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.62f),
+                    shape = XikeShapes.inner,
+                    color = visual.container.copy(alpha = if (isDark) 0.16f else 0.62f),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(visual.accent))
+                        Icon(
+                            selectedMood.moodIcon(),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = moodColor,
+                        )
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            "${selectedMood.label} · ${selectedMood.weatherDescription()}",
+                            "${selectedMood.label} · ${selectedMood.moodDescription()}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1374,45 +1401,47 @@ private fun WeatherPicker(
     }
 
     if (showGuide) {
-        WeatherGuideDialog(onDismiss = { showGuide = false })
+        MoodGuideDialog(onDismiss = { showGuide = false })
     }
 }
 
 @Composable
-private fun WeatherGuideDialog(onDismiss: () -> Unit) {
+private fun MoodGuideDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("五种天气，怎么选？") },
+        title = { Text("五种心情，怎么选？") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "选择最接近此刻的一种即可，同一种感受也可能有不同的天气。",
+                    "选择最接近此刻的一种即可，不必把复杂的感受说得很准确。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Mood.entries.forEach { mood ->
                     val visual = mood.visualStyle()
+                    val isDark = isSystemInDarkTheme()
+                    val moodColor = if (isDark) visual.container else visual.accent
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = visual.container.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.58f),
+                        shape = XikeShapes.inner,
+                        color = visual.container.copy(alpha = if (isDark) 0.16f else 0.58f),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                mood.weatherIcon(),
+                                mood.moodIcon(),
                                 contentDescription = null,
                                 modifier = Modifier.size(24.dp),
-                                tint = visual.accent,
+                                tint = moodColor,
                             )
                             Spacer(Modifier.width(11.dp))
                             Column {
                                 Text(mood.label, style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    mood.weatherDescription(),
+                                    mood.moodDescription(),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1427,7 +1456,7 @@ private fun WeatherGuideDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun MoodChoice(
+internal fun MoodChoice(
     mood: Mood,
     selected: Boolean,
     enabled: Boolean,
@@ -1436,7 +1465,7 @@ private fun MoodChoice(
 ) {
     val visual = mood.visualStyle()
     val isDark = isSystemInDarkTheme()
-    val interactionSource = remember { MutableInteractionSource() }
+    val moodColor = if (isDark) visual.container else visual.accent
     val containerColor = when {
         selected && isDark -> visual.accent.copy(alpha = 0.28f)
         selected -> visual.container
@@ -1446,9 +1475,8 @@ private fun MoodChoice(
 
     Column(
         modifier = modifier
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
+            .selectable(
+                selected = selected,
                 enabled = enabled,
                 role = Role.RadioButton,
                 onClick = onClick,
@@ -1457,22 +1485,22 @@ private fun MoodChoice(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(50.dp),
-            shape = RoundedCornerShape(17.dp),
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
             color = containerColor,
             border = BorderStroke(
-                if (selected) 1.5.dp else 1.dp,
-                if (selected) visual.accent else MaterialTheme.colorScheme.outlineVariant,
+                if (selected) 2.dp else 1.dp,
+                if (selected) moodColor else MaterialTheme.colorScheme.outlineVariant,
             ),
             tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
+            shadowElevation = if (selected) 2.dp else 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    mood.weatherIcon(),
-                    contentDescription = mood.label,
-                    modifier = Modifier.size(25.dp),
-                    tint = visual.accent.copy(alpha = if (selected) 1f else 0.78f),
+                    mood.moodIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(27.dp),
+                    tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
                 )
             }
         }
@@ -1481,7 +1509,7 @@ private fun MoodChoice(
             mood.label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) visual.accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) moodColor else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -1664,7 +1692,7 @@ private fun SelectedPhotoTile(
 
 @Composable
 private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(11.dp))
@@ -1718,20 +1746,20 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    summary.averageScore?.let(::weatherBandLabel) ?: "等待第一条记录",
+                    summary.averageScore?.let(::moodBandLabel) ?: "等待第一条记录",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    summary.averageScore?.let(::weatherSummary) ?: "记录第一片天气，让趋势从这里开始。",
+                    summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让趋势从这里开始。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
                 )
                 summary.averageScore?.let { average ->
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "天气平均位置 ${String.format(Locale.CHINA, "%.1f", average)} / 5",
+                        "心情平均位置 ${String.format(Locale.CHINA, "%.1f", average)} / 5",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.68f),
                     )
@@ -1918,7 +1946,7 @@ internal fun JournalEntryCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = XikeShapes.inner,
+        shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
@@ -1929,7 +1957,7 @@ internal fun JournalEntryCard(
                 Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f)) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            entry.mood.weatherIcon(),
+                            entry.mood.moodIcon(),
                             contentDescription = entry.mood.label,
                             modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.primary,
@@ -2165,7 +2193,7 @@ fun ProfileSettingsScreen(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = XikeShapes.inner,
+            shape = XikeShapes.card,
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
         ) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2644,7 +2672,7 @@ private fun AppLockTimeoutDialog(
 private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = XikeShapes.inner,
+        shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             if (selected) 1.5.dp else 1.dp,
@@ -2760,20 +2788,20 @@ private fun decodeScaledPreview(openStream: () -> InputStream?, maxDimension: In
     }
 }
 
-private fun weatherBandLabel(average: Double): String = when {
-    average >= 4.5 -> "更多晴朗经过"
-    average >= 3.5 -> "更多晴间经过"
-    average >= 2.5 -> "大多停在微风附近"
-    average >= 1.5 -> "低云停留得更多"
-    else -> "风雨停留得更多"
+private fun moodBandLabel(average: Double): String = when {
+    average >= 4.5 -> "愉悦时刻更多"
+    average >= 3.5 -> "整体更轻松"
+    average >= 2.5 -> "大多比较平静"
+    average >= 1.5 -> "疲惫感停留较多"
+    else -> "低落时刻较多"
 }
 
-private fun weatherSummary(average: Double): String = when {
-    average >= 4.5 -> "这段时间里，有不少明亮舒展的时刻。"
-    average >= 3.5 -> "云正在散开，也允许自己偶尔停一停。"
-    average >= 2.5 -> "微风与起伏都曾经过，慢慢看见就好。"
-    average >= 1.5 -> "低云停留得更多，记得给自己留一点余地。"
-    else -> "风雨似乎停留了一阵，请更温柔地照顾自己。"
+private fun moodSummary(average: Double): String = when {
+    average >= 4.5 -> "这段时间里，有不少开心而舒展的时刻。"
+    average >= 3.5 -> "轻松的时刻更多，也允许自己偶尔停一停。"
+    average >= 2.5 -> "平静与起伏都曾出现，慢慢看见就好。"
+    average >= 1.5 -> "疲惫和低落停留得更多，记得给自己留一点余地。"
+    else -> "低落似乎停留了一阵，请更温柔地照顾自己。"
 }
 
 private data class MoodVisualStyle(val accent: Color, val container: Color)
@@ -2784,7 +2812,7 @@ private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
         container = Color(0xFFE1E5EA),
     )
     Mood.TIRED -> MoodVisualStyle(
-        accent = Color(0xFF627A8D),
+        accent = Color(0xFF596F81),
         container = Color(0xFFE0E8ED),
     )
     Mood.CALM -> MoodVisualStyle(
@@ -2792,11 +2820,11 @@ private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
         container = Color(0xFFDDEAE5),
     )
     Mood.GOOD -> MoodVisualStyle(
-        accent = Color(0xFFAF754D),
+        accent = Color(0xFF8D5636),
         container = Color(0xFFF1E4D7),
     )
     Mood.JOYFUL -> MoodVisualStyle(
-        accent = Color(0xFFC18A31),
+        accent = Color(0xFF8A611B),
         container = Color(0xFFF5E7C7),
     )
 }

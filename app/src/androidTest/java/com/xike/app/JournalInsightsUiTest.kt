@@ -53,7 +53,7 @@ class JournalInsightsUiTest {
         }
 
         composeRule.onNodeWithText("2 次 · 67%").performScrollTo().performClick()
-        composeRule.onNodeWithText("晴间 · 2 条").assertIsDisplayed()
+        composeRule.onNodeWithText("轻松 · 2 条").assertIsDisplayed()
         composeRule.onNodeWithText("第一条可追溯记录").assertIsDisplayed()
         composeRule.onNodeWithText("第二条可追溯记录").assertIsDisplayed()
     }

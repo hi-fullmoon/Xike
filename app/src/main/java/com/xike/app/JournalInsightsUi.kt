@@ -98,7 +98,7 @@ fun JournalInsightsScreen(
             ScreenHeader(
                 eyebrow = summary.dateRangeLabel(),
                 title = "轨迹",
-                supporting = "看看内在天气怎样经过，不急着为变化寻找原因。",
+                supporting = "看看心情怎样变化，不急着为起伏寻找原因。",
             )
         }
         item(key = "insights-period") {
@@ -138,7 +138,7 @@ fun JournalInsightsScreen(
             MoodDistributionCard(summary.moodDistribution) { item ->
                 drilldown = InsightDrilldown(
                     title = "${item.mood.label} · ${item.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的内在天气分布",
+                    subtitle = "${selectedPeriod.contextName}的心情分布",
                     entryIds = item.entryIds,
                 )
             }
@@ -213,13 +213,13 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${summary.period.contextName} · 内在天气",
+                        "${summary.period.contextName} · 心情",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.height(7.dp))
                     Text(
-                        summary.averageScore?.let(::weatherBandLabel) ?: "等待第一片天气",
+                        summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -231,7 +231,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            summary.averageScore.averageWeatherIcon(),
+                            summary.averageScore.averageMoodIcon(),
                             contentDescription = null,
                             modifier = Modifier.size(29.dp),
                             tint = MaterialTheme.colorScheme.primary,
@@ -241,7 +241,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                summary.averageScore?.let(::weatherSummary) ?: "记录第一片天气，让轨迹从这里开始。",
+                summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让轨迹从这里开始。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -388,7 +388,7 @@ private fun TrendCard(
                     val description = buildString {
                         append(point.dateRangeLabel())
                         append("，${point.entryCount} 条记录")
-                        point.averageScore?.let { append("，天气平均位置 ${it.oneDecimal()}") }
+                        point.averageScore?.let { append("，心情平均位置 ${it.oneDecimal()}") }
                     }
                     Column(
                         modifier = Modifier
@@ -431,7 +431,7 @@ private fun TrendCard(
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            "柱高表示该时间段在五档天气中的平均位置，数字表示记录条数；点按可查看原始记录。",
+            "柱高表示该时间段在五档心情中的平均位置，数字表示记录条数；点按可查看原始记录。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -446,7 +446,7 @@ private fun MoodDistributionCard(
     InsightSectionCard(
         icon = Icons.Outlined.DataUsage,
         index = "分布",
-        title = "内在天气出现次数",
+        title = "心情出现次数",
     ) {
         distribution.sortedByDescending { it.mood.score }.forEach { item ->
             Row(
@@ -457,7 +457,7 @@ private fun MoodDistributionCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    item.mood.weatherIcon(),
+                    item.mood.moodIcon(),
                     contentDescription = item.mood.label,
                     modifier = Modifier.size(22.dp),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f + item.mood.score * 0.08f),
@@ -614,7 +614,7 @@ private fun DayTypeCard(
         val enough = weekday.entryCount >= 3 && weekend.entryCount >= 3
         Text(
             if (enough) {
-                "这里只呈现两类日期的天气位置差异，不说明工作日或周末造成了变化。"
+                "这里只呈现两类日期的心情位置差异，不说明工作日或周末造成了变化。"
             } else {
                 "两类日期分别至少有 3 条记录后，才适合比较均值；目前只展示计数。"
             },
@@ -936,29 +936,29 @@ private fun LocalDate.asDateRange(end: LocalDate): String = if (this == end) {
     "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日"
 }
 
-private fun weatherBandLabel(average: Double): String = when {
-    average >= 4.5 -> "更多晴朗经过"
-    average >= 3.5 -> "更多晴间经过"
-    average >= 2.5 -> "大多停在微风附近"
-    average >= 1.5 -> "低云停留得更多"
-    else -> "风雨停留得更多"
+private fun moodBandLabel(average: Double): String = when {
+    average >= 4.5 -> "愉悦时刻更多"
+    average >= 3.5 -> "整体更轻松"
+    average >= 2.5 -> "大多比较平静"
+    average >= 1.5 -> "疲惫感停留较多"
+    else -> "低落时刻较多"
 }
 
-private fun Double?.averageWeatherIcon() = when {
-    this == null -> Mood.CALM.weatherIcon()
-    this >= 4.5 -> Mood.JOYFUL.weatherIcon()
-    this >= 3.5 -> Mood.GOOD.weatherIcon()
-    this >= 2.5 -> Mood.CALM.weatherIcon()
-    this >= 1.5 -> Mood.TIRED.weatherIcon()
-    else -> Mood.LOW.weatherIcon()
+private fun Double?.averageMoodIcon() = when {
+    this == null -> Mood.CALM.moodIcon()
+    this >= 4.5 -> Mood.JOYFUL.moodIcon()
+    this >= 3.5 -> Mood.GOOD.moodIcon()
+    this >= 2.5 -> Mood.CALM.moodIcon()
+    this >= 1.5 -> Mood.TIRED.moodIcon()
+    else -> Mood.LOW.moodIcon()
 }
 
-private fun weatherSummary(average: Double): String = when {
-    average >= 4.5 -> "记录里较多是明亮舒展的时刻。"
-    average >= 3.5 -> "记录里的云正在散开，轻盈时刻更多。"
-    average >= 2.5 -> "记录里微风与起伏都曾经过。"
-    average >= 1.5 -> "记录里低云与风雨停留得更多。"
-    else -> "记录里风雨时刻占得更多，记得照顾自己。"
+private fun moodSummary(average: Double): String = when {
+    average >= 4.5 -> "记录里较多是开心而舒展的时刻。"
+    average >= 3.5 -> "记录里轻松的时刻更多。"
+    average >= 2.5 -> "记录里平静与起伏都曾出现。"
+    average >= 1.5 -> "记录里疲惫和低落停留得更多。"
+    else -> "记录里低落时刻较多，记得照顾自己。"
 }
 
 private fun comparisonDescription(comparison: PeriodComparison): String = buildString {
