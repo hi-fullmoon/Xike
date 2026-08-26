@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.InputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.catch
@@ -19,6 +20,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val store = JournalStore(application)
     private val draftStore = JournalDraftStore(application)
     private val outdoorRepository = OutdoorContextRepository(application)
+    private var draftGeneration = 0L
 
     var entries by mutableStateOf(emptyList<JournalEntry>())
         private set
@@ -105,23 +107,27 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         persistDraft(draft.copy(outdoor = null))
     }
 
-    suspend fun attachCurrentOutdoor(): Result<Unit> = viewModelScope.async {
-        runCatching { outdoorRepository.current() }.mapCatching { snapshot ->
+    suspend fun attachCurrentOutdoor(): Result<Unit> {
+        val requestGeneration = draftGeneration
+        return runOutdoorRequest(outdoorRepository::current).mapCatching { snapshot ->
+            if (requestGeneration != draftGeneration) return@mapCatching
             check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
             check(persistDraft(draft.copy(outdoor = snapshot))) {
                 "地点与天气已取得，但草稿保存失败。"
             }
         }
-    }.await()
+    }
 
-    suspend fun attachOutdoorForCity(city: String): Result<Unit> = viewModelScope.async {
-        runCatching { outdoorRepository.city(city) }.mapCatching { snapshot ->
+    suspend fun attachOutdoorForCity(city: String): Result<Unit> {
+        val requestGeneration = draftGeneration
+        return runOutdoorRequest { outdoorRepository.city(city) }.mapCatching { snapshot ->
+            if (requestGeneration != draftGeneration) return@mapCatching
             check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
             check(persistDraft(draft.copy(outdoor = snapshot))) {
                 "城市天气已取得，但草稿保存失败。"
             }
         }
-    }.await()
+    }
 
     fun addDraftImages(uris: List<Uri>) {
         val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
@@ -177,6 +183,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     fun discardDraft() {
         val discardedDraft = draft
         if (persistDraft(JournalDraft())) {
+            draftGeneration++
             discardedDraft.imageUriStrings
                 .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
                 .forEach(::releaseDraftImageAccess)
@@ -302,7 +309,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             .isSuccess
     }
 
+    private suspend fun <T> runOutdoorRequest(request: suspend () -> T): Result<T> = try {
+        Result.success(request())
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        Result.failure(error)
+    }
+
     private fun clearDraftAfterSave(savedDraft: JournalDraft) {
+        draftGeneration++
         val currentDraft = draft
         if (currentDraft == savedDraft) {
             draft = JournalDraft()

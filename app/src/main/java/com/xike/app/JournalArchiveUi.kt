@@ -1273,6 +1273,8 @@ private fun JournalEntryEditDialog(
     var showPhotoSourceDialog by rememberSaveable(entry.id) { mutableStateOf(false) }
     var pendingCameraUriString by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     val selectedMood = Mood.entries.firstOrNull { it.name == selectedMoodName } ?: entry.mood
+    val editedOutdoor = retainOutdoorForEditedTime(entry.outdoor, entry.createdAt, createdAt)
+    val removesOutdoor = entry.outdoor != null && editedOutdoor == null
     val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         val additions = uris
@@ -1408,6 +1410,7 @@ private fun JournalEntryEditDialog(
                                 mood = selectedMood,
                                 tags = selectedTags,
                                 note = note.trim(),
+                                outdoor = editedOutdoor,
                             )
                             scope.launch {
                                 onSave(
@@ -1510,6 +1513,13 @@ private fun JournalEntryEditDialog(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                    }
+                    if (removesOutdoor) {
+                        Text(
+                            "日期已经改变，保存时会移除原先的窗外天气，避免误记到另一天。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
                     }
                 }
 

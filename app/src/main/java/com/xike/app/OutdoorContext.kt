@@ -14,10 +14,18 @@ import androidx.core.location.LocationManagerCompat
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.time.ZoneId
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -87,6 +95,44 @@ internal fun weatherConditionLabel(code: Int): String = when (code) {
     else -> "天气未知"
 }
 
+internal fun retainOutdoorForEditedTime(
+    snapshot: OutdoorSnapshot?,
+    originalCreatedAt: Long,
+    editedCreatedAt: Long,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): OutdoorSnapshot? = snapshot?.takeIf {
+    Instant.ofEpochMilli(originalCreatedAt).atZone(zoneId).toLocalDate() ==
+        Instant.ofEpochMilli(editedCreatedAt).atZone(zoneId).toLocalDate()
+}
+
+internal suspend fun <Candidate, Value : Any> firstNonNullResult(
+    candidates: List<Candidate>,
+    request: suspend (Candidate) -> Value?,
+): Value? {
+    if (candidates.isEmpty()) return null
+    return supervisorScope {
+        val result = CompletableDeferred<Value?>()
+        val remaining = AtomicInteger(candidates.size)
+        candidates.forEach { candidate ->
+            launch {
+                try {
+                    val resolved = try {
+                        request(candidate)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (resolved != null) result.complete(resolved)
+                } finally {
+                    if (remaining.decrementAndGet() == 0) result.complete(null)
+                }
+            }
+        }
+        result.await().also { coroutineContext.cancelChildren() }
+    }
+}
+
 internal class OutdoorContextException(message: String, cause: Throwable? = null) :
     IllegalStateException(message, cause)
 
@@ -127,12 +173,7 @@ internal class OutdoorContextRepository(context: Context) {
         }
 
         val location = withTimeoutOrNull(LOCATION_TIMEOUT_MILLIS) {
-            var resolved: Location? = null
-            for (provider in providers) {
-                resolved = requestCurrentLocation(provider)
-                if (resolved != null) break
-            }
-            resolved
+            firstNonNullResult(providers, ::requestCurrentLocation)
         }
         if (location != null) return location
         throw OutdoorContextException("暂时无法取得当前位置，请稍后重试或手动选择城市。")
