@@ -10,3 +10,4 @@ build*.log
 /*.png
 /*.xml
 /*.liubai
+.DS_Store
