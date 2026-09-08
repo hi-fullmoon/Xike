@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -123,6 +126,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -191,34 +197,34 @@ internal val journalTopics = listOf(
 
 object XikeShapes {
     // Standalone content cards share one radius; nested panels use inner.
-    val card = RoundedCornerShape(28.dp)
-    val inner = RoundedCornerShape(20.dp)
-    val button = RoundedCornerShape(20.dp)
+    val card = RoundedCornerShape(24.dp)
+    val inner = RoundedCornerShape(16.dp)
+    val button = RoundedCornerShape(16.dp)
     val dialog = RoundedCornerShape(30.dp)
 }
 
 private val XikeTypography = Typography(
     displaySmall = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 42.sp,
         lineHeight = 52.sp,
         letterSpacing = (-0.5).sp,
     ),
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 34.sp,
-        lineHeight = 44.sp,
+        fontSize = 30.sp,
+        lineHeight = 40.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 28.sp,
         lineHeight = 36.sp,
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 23.sp,
         lineHeight = 30.sp,
@@ -261,11 +267,11 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onPrimaryContainer = Color(0xFF183229),
             secondaryContainer = theme.secondary,
             onSecondaryContainer = Color(0xFF3D372E),
-            background = Color(0xFFF7F6F1),
+            background = Color(0xFFF4F6F5),
             onBackground = Color(0xFF20231F),
-            surface = Color(0xFFFFFEFB),
+            surface = Color(0xFFFFFFFF),
             onSurface = Color(0xFF20231F),
-            surfaceVariant = Color(0xFFEAE7E0),
+            surfaceVariant = Color(0xFFEAF0ED),
             onSurfaceVariant = Color(0xFF626761),
             outline = Color(0xFF7C817B),
             outlineVariant = Color(0xFFDADDD6),
@@ -294,7 +300,7 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
             shape = RoundedCornerShape(26.dp),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 5.dp,
+            shadowElevation = 1.dp,
             tonalElevation = 0.dp,
         ) {
             Row(modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp).selectableGroup()) {
@@ -313,7 +319,7 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                                 role = Role.Tab,
                                 onClick = { onSelected(item) },
                             )
-                            .padding(vertical = 7.dp),
+                            .padding(vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
@@ -456,6 +462,7 @@ fun MomentScreen(
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
 ) {
+    var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -515,10 +522,7 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
-    val draftHasDetails = draft.note.isNotBlank() ||
-        draft.tags.isNotEmpty() ||
-        draft.imageUriStrings.isNotEmpty() ||
-        draft.recordedAt != null
+    val draftHasDetails = draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()
     LaunchedEffect(draftHasDetails) {
         if (draftHasDetails) showDetails = true
     }
@@ -612,12 +616,13 @@ fun MomentScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+    Column(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 92.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             BrandHeader(today)
@@ -635,6 +640,91 @@ fun MomentScreen(
                 enabled = !isSaving,
                 onSelected = onDraftMoodChange,
             )
+
+            PaperCard {
+                Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                TextField(
+                    value = draft.note,
+                    onValueChange = { if (!isSaving) onDraftNoteChange(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { isNoteFocused = it.isFocused },
+                    minLines = 2,
+                    maxLines = 5,
+                    placeholder = { Text("发生了什么？也可以只留下一句话……") },
+                    shape = XikeShapes.inner,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (isNoteFocused) {
+                        TextButton(onClick = dismissKeyboard) {
+                            Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("完成")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MomentQuickAction(
+                        icon = Icons.Outlined.AddPhotoAlternate,
+                        label = "照片",
+                        enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            dismissKeyboard()
+                            showPhotoSourceDialog = true
+                        },
+                    )
+                    MomentQuickAction(
+                        icon = Icons.Outlined.History,
+                        label = "补记",
+                        enabled = !isSaving,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            dismissKeyboard()
+                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                        },
+                    )
+                }
+                if (draft.recordedAt != null) {
+                    Spacer(Modifier.height(8.dp))
+                    RecordedAtSelector(
+                        recordedAt = draft.recordedAt,
+                        enabled = !isSaving,
+                        onChoose = {
+                            dismissKeyboard()
+                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                        },
+                        onReset = { onDraftRecordedAtChange(null) },
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
+                DraftSecurityRow(
+                    hasDraft = !draft.isEmpty,
+                    enabled = !isSaving,
+                    onDiscard = { showDiscardConfirmation = true },
+                )
+            }
 
             OutdoorContextCard(
                 snapshot = draft.outdoor,
@@ -656,7 +746,7 @@ fun MomentScreen(
             )
 
             Surface(
-                modifier = Modifier.fillMaxWidth().clickable {
+                modifier = Modifier.fillMaxWidth().clip(XikeShapes.card).clickable(enabled = !isSaving) {
                     if (showDetails) dismissKeyboard()
                     showDetails = !showDetails
                 },
@@ -667,8 +757,8 @@ fun MomentScreen(
                     Column(Modifier.weight(1f)) {
                         Text("再留下一点", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            if (draft.isEmpty) "写句话、选关键词、加照片或补记过去"
-                            else "草稿已加密保存在本机",
+                            if (draft.tags.isEmpty() && draft.imageUriStrings.isEmpty()) "选关键词、整理照片 · 可选"
+                            else "${draft.tags.size} 个关键词 · ${draft.imageUriStrings.size} 张照片",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -683,63 +773,6 @@ fun MomentScreen(
 
             if (showDetails) {
                 PaperCard {
-                    DraftSecurityRow(
-                        hasDraft = !draft.isEmpty,
-                        enabled = !isSaving,
-                        onDiscard = { showDiscardConfirmation = true },
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(Modifier.height(12.dp))
-                    RecordedAtSelector(
-                        recordedAt = draft.recordedAt,
-                        enabled = !isSaving,
-                        onChoose = {
-                            dismissKeyboard()
-                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
-                        },
-                        onReset = { onDraftRecordedAtChange(null) },
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(12.dp))
-                    TextField(
-                        value = draft.note,
-                        onValueChange = { if (!isSaving) onDraftNoteChange(it) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { isNoteFocused = it.isFocused },
-                        minLines = 3,
-                        maxLines = 5,
-                        placeholder = { Text("发生了什么？也可以只留下一句话……") },
-                        shape = XikeShapes.inner,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (isNoteFocused) {
-                            TextButton(onClick = dismissKeyboard) {
-                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("完成")
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("此刻关键词", style = MaterialTheme.typography.titleSmall)
@@ -779,6 +812,10 @@ fun MomentScreen(
                     Spacer(Modifier.height(10.dp))
                     MultiImagePicker(
                         selectedUris = draft.imageUriStrings,
+                        onPreview = {
+                            dismissKeyboard()
+                            previewUri = it
+                        },
                         onPick = {
                             if (!isSaving) {
                                 dismissKeyboard()
@@ -796,7 +833,7 @@ fun MomentScreen(
         }
 
         Surface(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.background,
             tonalElevation = 0.dp,
         ) {
@@ -852,6 +889,17 @@ fun MomentScreen(
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(19.dp))
                 }
             }
+        }
+    }
+
+    previewUri?.let { uri ->
+        if (uri in draft.imageUriStrings) {
+            PhotoGalleryDialog(
+                fileNames = draft.imageUriStrings,
+                initialPage = draft.imageUriStrings.indexOf(uri),
+                openImage = { context.contentResolver.openInputStream(Uri.parse(it)) },
+                onDismiss = { previewUri = null },
+            )
         }
     }
 
@@ -935,6 +983,27 @@ fun MomentScreen(
                 loadCityOutdoor(city)
             },
         )
+    }
+}
+
+@Composable
+private fun MomentQuickAction(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.FilledTonalButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 48.dp),
+        shape = XikeShapes.inner,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -1164,30 +1233,23 @@ private fun DraftSecurityRow(
     enabled: Boolean,
     onDiscard: () -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            modifier = Modifier.size(34.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Outlined.Shield,
-                    contentDescription = null,
-                    modifier = Modifier.size(17.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text("草稿自动保存在本机", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "未完成内容不会离开设备",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Shield,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "草稿自动加密保存在本机",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (hasDraft) {
             TextButton(onClick = onDiscard, enabled = enabled) { Text("清空") }
         }
@@ -1523,7 +1585,9 @@ internal fun TopicChip(
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clip(RoundedCornerShape(12.dp)).selectable(
+            selected = selected, role = Role.Checkbox, onClick = onClick,
+        ),
         shape = RoundedCornerShape(12.dp),
         color = if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
@@ -1535,7 +1599,7 @@ internal fun TopicChip(
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 9.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -1564,6 +1628,7 @@ private fun MultiImagePicker(
     selectedUris: List<String>,
     onPick: () -> Unit,
     onRemove: (String) -> Unit,
+    onPreview: (String) -> Unit,
 ) {
     if (selectedUris.isEmpty()) {
         Surface(
@@ -1618,6 +1683,7 @@ private fun MultiImagePicker(
                                 uriString = tile,
                                 order = selectedUris.indexOf(tile) + 1,
                                 onRemove = { onRemove(tile) },
+                                onPreview = { onPreview(tile) },
                                 modifier = Modifier.weight(1f).aspectRatio(1f),
                             )
                         }
@@ -1650,17 +1716,23 @@ private fun SelectedPhotoTile(
     uriString: String,
     order: Int,
     onRemove: () -> Unit,
+    onPreview: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val bitmap = rememberPreviewBitmap(uriString) {
         context.contentResolver.openInputStream(Uri.parse(uriString))
     }
-    Box(modifier = modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClickLabel = "预览照片", onClick = onPreview)
+            .semantics { contentDescription = "待保存的第 $order 张照片" },
+    ) {
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = "待保存的第 $order 张照片",
+                contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
@@ -2106,6 +2178,7 @@ internal fun PhotoGalleryDialog(
     openImage: (String) -> InputStream?,
     onDismiss: () -> Unit,
 ) {
+    if (fileNames.isEmpty()) return
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(0, fileNames.lastIndex),
         pageCount = { fileNames.size },
@@ -2118,7 +2191,7 @@ internal fun PhotoGalleryDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+        Surface(modifier = Modifier.fillMaxSize().testTag("photo-gallery-pager"), color = Color.Black) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 HorizontalPager(
                     state = pagerState,

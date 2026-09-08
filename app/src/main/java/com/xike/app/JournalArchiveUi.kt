@@ -1266,6 +1266,7 @@ private fun JournalEntryEditDialog(
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
     var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
+    var previewPhoto by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     var retainedImages by rememberSaveable(entry.id) { mutableStateOf(entry.imageFileNames) }
     var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
     var isSaving by remember { mutableStateOf(false) }
@@ -1565,6 +1566,7 @@ private fun JournalEntryEditDialog(
                         canAdd = availableImageSlots > 0 && !isSaving,
                         openImage = openImage,
                         onAdd = { showPhotoSourceDialog = true },
+                        onPreview = { previewPhoto = it },
                         onRemoveRetained = { retainedImages = retainedImages - it },
                         onRemoveNew = { uriString ->
                             newImageUriStrings = newImageUriStrings - uriString
@@ -1588,6 +1590,21 @@ private fun JournalEntryEditDialog(
                 Spacer(Modifier.height(18.dp))
                 }
             }
+        }
+    }
+
+    val photos = retainedImages + newImageUriStrings
+    previewPhoto?.let { photo ->
+        if (photo in photos) {
+            PhotoGalleryDialog(
+                fileNames = photos,
+                initialPage = photos.indexOf(photo),
+                openImage = { source ->
+                    if (source in retainedImages) openImage(source)
+                    else context.contentResolver.openInputStream(Uri.parse(source))
+                },
+                onDismiss = { previewPhoto = null },
+            )
         }
     }
 
@@ -1643,6 +1660,7 @@ private fun EditPhotoStrip(
     canAdd: Boolean,
     openImage: (String) -> InputStream?,
     onAdd: () -> Unit,
+    onPreview: (String) -> Unit,
     onRemoveRetained: (String) -> Unit,
     onRemoveNew: (String) -> Unit,
 ) {
@@ -1655,6 +1673,7 @@ private fun EditPhotoStrip(
                     contentDescription = "已有照片 ${index + 1}",
                     openStream = { openImage(fileName) },
                     onRemove = { onRemoveRetained(fileName) },
+                    onPreview = { onPreview(fileName) },
                 )
             }
         }
@@ -1665,6 +1684,7 @@ private fun EditPhotoStrip(
                     contentDescription = "新照片 ${index + 1}",
                     openStream = { context.contentResolver.openInputStream(Uri.parse(uriString)) },
                     onRemove = { onRemoveNew(uriString) },
+                    onPreview = { onPreview(uriString) },
                 )
             }
         }
@@ -1700,13 +1720,15 @@ private fun EditPhotoTile(
     contentDescription: String,
     openStream: () -> InputStream?,
     onRemove: () -> Unit,
+    onPreview: () -> Unit,
 ) {
     val bitmap = rememberPreviewBitmap(key = key, maxDimension = 360, openStream = openStream)
     Box(
         modifier = Modifier
             .size(92.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClickLabel = "预览照片", onClick = onPreview),
     ) {
         if (bitmap != null) {
             Image(

@@ -1,6 +1,16 @@
 package com.xike.app
 
+import android.graphics.Bitmap
+import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import java.io.File
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -33,7 +43,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("窗外此刻").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("窗外此刻").performScrollTo().assertIsDisplayed().performClick()
         composeRule.onNodeWithText("添加窗外此刻？").assertIsDisplayed()
         composeRule.onNodeWithText("手动选城市").assertIsDisplayed()
         composeRule.onNodeWithText("允许粗略定位").assertIsDisplayed()
@@ -60,9 +70,76 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("窗外此刻 · 上海 · 浦东").assertIsDisplayed()
+        composeRule.onNodeWithText("窗外此刻 · 上海 · 浦东").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("27°").assertIsDisplayed()
         composeRule.onNodeWithText("晴间多云").assertIsDisplayed()
+    }
+
+    @Test
+    fun newlyAddedPhotosOpenAtTappedImageAndSwipeBothDirections() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val files = (1..3).map { index ->
+            File.createTempFile("preview-$index-", ".png", context.cacheDir).also { file ->
+                val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(android.graphics.Color.rgb(index * 70, 100, 150))
+                file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                bitmap.recycle()
+            }
+        }
+        try {
+            showPhotoDraft(files.map { Uri.fromFile(it).toString() })
+            composeRule.onNodeWithContentDescription("待保存的第 2 张照片")
+                .performScrollTo().performClick()
+            waitForPhotoPage("2 / 3")
+            composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
+            composeRule.onNodeWithTag("photo-gallery-pager").performTouchInput { swipeLeft() }
+            composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
+            composeRule.onNodeWithTag("photo-gallery-pager").performTouchInput { swipeRight() }
+            composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("关闭图片查看").performClick()
+            composeRule.onNodeWithTag("photo-gallery-pager").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("待保存的第 2 张照片").assertExists()
+        } finally {
+            files.forEach { it.delete() }
+        }
+    }
+
+    @Test
+    fun singleUnavailablePhotoCanCloseAndRemovalDoesNotOpenPreview() {
+        val uri = "content://com.xike.app.missing/preview"
+        var removed: String? = null
+        showPhotoDraft(listOf(uri), onRemove = { removed = it })
+        composeRule.onNodeWithContentDescription("待保存的第 1 张照片")
+            .performScrollTo().performClick()
+        waitForPhotoPage("1 / 1")
+        composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("关闭图片查看").performClick()
+        composeRule.onNodeWithContentDescription("移除第 1 张照片").performScrollTo().performClick()
+        composeRule.runOnIdle { check(removed == uri) }
+        composeRule.onNodeWithTag("photo-gallery-pager").assertDoesNotExist()
+    }
+
+    private fun waitForPhotoPage(label: String) {
+        composeRule.waitUntil(5_000) { composeRule.onNodeWithText(label).isDisplayed() }
+    }
+
+    private fun showPhotoDraft(uris: List<String>, onRemove: (String) -> Unit = {}) {
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = JournalDraft(imageUriStrings = uris),
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = onRemove,
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
     }
 
     @get:Rule
@@ -119,8 +196,8 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("今日一刻").assertIsDisplayed()
-        composeRule.onNodeWithText(expected).assertIsDisplayed()
+        composeRule.onNodeWithText("今日一刻").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(expected).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -149,7 +226,7 @@ class JournalDraftUiTest {
     }
 
     @Test
-    fun expandedNoteFieldOffersAnExplicitKeyboardDismissAction() {
+    fun noteFieldIsImmediatelyAvailableAndOffersKeyboardDismissAction() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 MomentScreen(
@@ -167,19 +244,18 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("再留下一点").performClick()
-        composeRule.onNodeWithText("发生了什么？也可以只留下一句话……").performClick()
+        composeRule.onNodeWithText("发生了什么？也可以只留下一句话……").performScrollTo().performClick()
         composeRule.onNodeWithText("完成").assertIsDisplayed()
     }
 
     @Test
-    fun restoredDraftDetailsCanBeCollapsedAndExpandedAgain() {
+    fun collapsingOptionalDetailsKeepsTheNoteAvailable() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 MomentScreen(
                     padding = PaddingValues(),
                     entries = emptyList(),
-                    draft = JournalDraft(note = "可以收起的草稿内容"),
+                    draft = JournalDraft(note = "一直保留的草稿内容", tags = setOf("工作")),
                     dailyPromptSettings = DailyPromptSettings(enabled = false),
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
@@ -192,11 +268,12 @@ class JournalDraftUiTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
-        composeRule.onNodeWithText("再留下一点").performClick()
-        check(composeRule.onAllNodesWithText("可以收起的草稿内容").fetchSemanticsNodes().isEmpty())
-        composeRule.onNodeWithText("再留下一点").performClick()
-        composeRule.onNodeWithText("可以收起的草稿内容").assertIsDisplayed()
+        composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
+        check(composeRule.onAllNodesWithText("此刻关键词").fetchSemanticsNodes().isEmpty())
+        composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
+        composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -219,11 +296,11 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("再留下一点").performClick()
+        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
         composeRule.onNodeWithText("添加照片").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("饮食").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(selectedTag == "饮食") }
-        composeRule.onNodeWithText("其他").assertIsDisplayed()
+        composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -245,8 +322,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("再留下一点").performClick()
-        composeRule.onNodeWithText("添加照片").performScrollTo().performClick()
+        composeRule.onNodeWithText("照片").performScrollTo().performClick()
         composeRule.onNodeWithText("拍照").assertIsDisplayed()
         composeRule.onNodeWithText("从相册选择").assertIsDisplayed()
     }
@@ -303,7 +379,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("昨天 20:15").assertIsDisplayed()
+        composeRule.onNodeWithText("昨天 20:15").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("补记这一刻").assertIsDisplayed()
         composeRule.onNodeWithText("改为现在").performScrollTo().performClick()
         composeRule.runOnIdle { check(resetValue == null) }
