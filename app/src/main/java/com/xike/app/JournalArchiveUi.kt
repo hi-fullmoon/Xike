@@ -1261,6 +1261,7 @@ private fun JournalEntryEditDialog(
     onSave: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
 ) {
     val context = LocalContext.current
+    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val scope = rememberCoroutineScope()
     var selectedMoodName by rememberSaveable(entry.id) { mutableStateOf(entry.mood.name) }
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
@@ -1289,18 +1290,23 @@ private fun JournalEntryEditDialog(
     }
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
-        onImagesPicked,
-    )
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
     val documentPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
-        onImagesPicked,
-    )
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        systemActivityCallbacks.onResult()
         val captureUri = pendingCameraUriString?.let(Uri::parse)
         pendingCameraUriString = null
-        if (captured && captureUri != null && finalizeCameraCapture(context, captureUri)) {
+        if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, "照片已保存到系统相册", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "照片已添加并保存到系统相册", Toast.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
             if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
@@ -1313,16 +1319,23 @@ private fun JournalEntryEditDialog(
                 val contract = ActivityResultContracts.OpenMultipleDocuments()
                 val canOpen = contract.createIntent(context, input)
                     .resolveActivity(context.packageManager) != null
-                if (canOpen) documentPicker.launch(input)
+                if (canOpen) {
+                    systemActivityCallbacks.onLaunch()
+                    runCatching { documentPicker.launch(input) }
+                        .onFailure { systemActivityCallbacks.onResult() }
+                        .getOrThrow()
+                }
                 canOpen
             }
             val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
                 runCatching {
+                    systemActivityCallbacks.onLaunch()
                     photoPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                     true
                 }.onFailure { error ->
+                    systemActivityCallbacks.onResult()
                     Log.w("XikeEditPhotoPicker", "Photo picker launch failed", error)
                 }.getOrElse {
                     runCatching(openDocuments).getOrDefault(false)
@@ -1338,8 +1351,10 @@ private fun JournalEntryEditDialog(
             runCatching { createCameraCaptureUri(context) }
                 .onSuccess { captureUri ->
                     pendingCameraUriString = captureUri.toString()
+                    systemActivityCallbacks.onLaunch()
                     runCatching { cameraLauncher.launch(captureUri) }
                         .onFailure { error ->
+                            systemActivityCallbacks.onResult()
                             pendingCameraUriString = null
                             deleteCameraCapture(context, captureUri)
                             Log.w("XikeEditCamera", "Camera launch failed", error)

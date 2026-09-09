@@ -116,6 +116,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,6 +157,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val ADD_PHOTO_TILE = "__add_photo__"
+
+internal data class SystemActivityCallbacks(
+    val onLaunch: () -> Unit = {},
+    val onResult: () -> Unit = {},
+)
+
+internal val LocalSystemActivityCallbacks = staticCompositionLocalOf { SystemActivityCallbacks() }
 
 enum class AppScreen(val title: String) {
     HOME("此刻"),
@@ -476,6 +484,7 @@ fun MomentScreen(
     var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
     var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -534,20 +543,25 @@ fun MomentScreen(
     }
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
-        onImagesPicked,
-    )
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
     val photoDocumentPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
-        onImagesPicked,
-    )
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        systemActivityCallbacks.onResult()
         val captureUri = pendingCameraUriString?.let(Uri::parse)
         pendingCameraUriString = null
-        if (captured && captureUri != null && finalizeCameraCapture(context, captureUri)) {
+        if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, "照片已保存到系统相册", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "照片已添加并保存到系统相册", Toast.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
             if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
@@ -559,16 +573,23 @@ fun MomentScreen(
             val input = arrayOf("image/*")
             val canOpen = contract.createIntent(context, input)
                 .resolveActivity(context.packageManager) != null
-            if (canOpen) photoDocumentPicker.launch(input)
+            if (canOpen) {
+                systemActivityCallbacks.onLaunch()
+                runCatching { photoDocumentPicker.launch(input) }
+                    .onFailure { systemActivityCallbacks.onResult() }
+                    .getOrThrow()
+            }
             canOpen
         }
         val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
             runCatching {
+                systemActivityCallbacks.onLaunch()
                 photoPicker.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
                 true
             }.onFailure { error ->
+                systemActivityCallbacks.onResult()
                 Log.w("XikePhotoPicker", "Photo picker launch failed", error)
             }.getOrElse {
                 runCatching(openDocuments).onFailure { error ->
@@ -588,8 +609,10 @@ fun MomentScreen(
         runCatching { createCameraCaptureUri(context) }
             .onSuccess { captureUri ->
                 pendingCameraUriString = captureUri.toString()
+                systemActivityCallbacks.onLaunch()
                 runCatching { cameraLauncher.launch(captureUri) }
                     .onFailure { error ->
+                        systemActivityCallbacks.onResult()
                         pendingCameraUriString = null
                         deleteCameraCapture(context, captureUri)
                         Log.w("XikeCamera", "Camera launch failed", error)

@@ -38,6 +38,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,70 +119,78 @@ class MainActivity : FragmentActivity() {
                 }
             } else {
                 val journalViewModel: JournalViewModel = viewModel()
+                val systemActivityCallbacks = remember {
+                    SystemActivityCallbacks(
+                        onLaunch = lockSession::beginSystemActivity,
+                        onResult = lockSession::finishSystemActivity,
+                    )
+                }
 
                 XikeTheme(journalViewModel.selectedTheme) {
-                    XikeApp(
-                        entries = journalViewModel.entries,
-                        draft = journalViewModel.draft,
-                        selectedTheme = journalViewModel.selectedTheme,
-                        appLockEnabled = appLockEnabled,
-                        appLockTimeout = appLockTimeout,
-                        authenticationAvailable = authenticationAvailable,
-                        reminderSettings = reminderSettings,
-                        dailyPromptSettings = dailyPromptSettings,
-                        notificationPermissionGranted = notificationPermissionGranted,
-                        quickRecordRequest = quickRecordRequest,
-                        onThemeChange = journalViewModel::selectTheme,
-                        onAppLockChange = ::changeAppLock,
-                        onAppLockTimeoutChange = ::changeAppLockTimeout,
-                        onLockNow = ::lockNow,
-                        onDraftMoodChange = journalViewModel::selectDraftMood,
-                        onDraftNoteChange = journalViewModel::updateDraftNote,
-                        onDraftTagToggle = journalViewModel::toggleDraftTag,
-                        onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,
-                        onAttachCurrentOutdoor = journalViewModel::attachCurrentOutdoor,
-                        onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
-                        onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
-                        onDraftImagesAdded = journalViewModel::addDraftImages,
-                        onDraftImageRemoved = journalViewModel::removeDraftImage,
-                        onDraftDiscard = journalViewModel::discardDraft,
-                        onReminderEnabledChange = { enabled ->
-                            changeReminderEnabled(enabled) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                        },
-                        onReminderSettingsChange = ::persistReminderSettings,
-                        onDailyPromptSettingsChange = ::persistDailyPromptSettings,
-                        onSave = journalViewModel::save,
-                        onUpdate = journalViewModel::update,
-                        onDelete = journalViewModel::delete,
-                        onUndoDelete = journalViewModel::undoDelete,
-                        onFinalizeDelete = journalViewModel::finalizeDelete,
-                        onSearch = journalViewModel::search,
-                        onExportBackup = journalViewModel::exportBackup,
-                        onInspectBackup = journalViewModel::inspectBackup,
-                        onRestoreBackup = journalViewModel::restoreBackup,
-                        canUndoRestore = journalViewModel.canUndoRestore,
-                        onUndoRestore = journalViewModel::undoRestore,
-                        openImage = journalViewModel::openImage,
-                    )
-
-                    journalViewModel.dataError?.let { message ->
-                        DataErrorDialog(message, journalViewModel::dismissDataError)
-                    }
-
-                    if (journalViewModel.isLoading) {
-                        ProcessingDialog("正在读取加密日记…")
-                    }
-
-                    if (appLockEnabled && lockSession.isAppLocked) {
-                        AppLockDialog(
+                    CompositionLocalProvider(LocalSystemActivityCallbacks provides systemActivityCallbacks) {
+                        XikeApp(
+                            entries = journalViewModel.entries,
+                            draft = journalViewModel.draft,
+                            selectedTheme = journalViewModel.selectedTheme,
+                            appLockEnabled = appLockEnabled,
+                            appLockTimeout = appLockTimeout,
                             authenticationAvailable = authenticationAvailable,
-                            onUnlock = { requestAuthentication(LockAuthentication.UNLOCK) },
-                            onOpenSecuritySettings = {
-                                openDeviceSecuritySettings(LockAuthentication.UNLOCK)
+                            reminderSettings = reminderSettings,
+                            dailyPromptSettings = dailyPromptSettings,
+                            notificationPermissionGranted = notificationPermissionGranted,
+                            quickRecordRequest = quickRecordRequest,
+                            onThemeChange = journalViewModel::selectTheme,
+                            onAppLockChange = ::changeAppLock,
+                            onAppLockTimeoutChange = ::changeAppLockTimeout,
+                            onLockNow = ::lockNow,
+                            onDraftMoodChange = journalViewModel::selectDraftMood,
+                            onDraftNoteChange = journalViewModel::updateDraftNote,
+                            onDraftTagToggle = journalViewModel::toggleDraftTag,
+                            onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,
+                            onAttachCurrentOutdoor = journalViewModel::attachCurrentOutdoor,
+                            onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
+                            onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
+                            onDraftImagesAdded = journalViewModel::addDraftImages,
+                            onDraftImageRemoved = journalViewModel::removeDraftImage,
+                            onDraftDiscard = journalViewModel::discardDraft,
+                            onReminderEnabledChange = { enabled ->
+                                changeReminderEnabled(enabled) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
                             },
+                            onReminderSettingsChange = ::persistReminderSettings,
+                            onDailyPromptSettingsChange = ::persistDailyPromptSettings,
+                            onSave = journalViewModel::save,
+                            onUpdate = journalViewModel::update,
+                            onDelete = journalViewModel::delete,
+                            onUndoDelete = journalViewModel::undoDelete,
+                            onFinalizeDelete = journalViewModel::finalizeDelete,
+                            onSearch = journalViewModel::search,
+                            onExportBackup = journalViewModel::exportBackup,
+                            onInspectBackup = journalViewModel::inspectBackup,
+                            onRestoreBackup = journalViewModel::restoreBackup,
+                            canUndoRestore = journalViewModel.canUndoRestore,
+                            onUndoRestore = journalViewModel::undoRestore,
+                            openImage = journalViewModel::openImage,
                         )
+
+                        journalViewModel.dataError?.let { message ->
+                            DataErrorDialog(message, journalViewModel::dismissDataError)
+                        }
+
+                        if (journalViewModel.isLoading) {
+                            ProcessingDialog("正在读取加密日记…")
+                        }
+
+                        if (appLockEnabled && lockSession.isAppLocked) {
+                            AppLockDialog(
+                                authenticationAvailable = authenticationAvailable,
+                                onUnlock = { requestAuthentication(LockAuthentication.UNLOCK) },
+                                onOpenSecuritySettings = {
+                                    openDeviceSecuritySettings(LockAuthentication.UNLOCK)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -190,11 +199,16 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onStart() {
+        // Activity results can be delivered from super.onStart(). Capture this first so a camera
+        // return never becomes indistinguishable from a normal foreground launch.
+        val returningFromSystemActivity = lockSession.systemActivityInProgress
         super.onStart()
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
         if (appLockEnabled) {
-            if (lockSession.isAppLocked || shouldLockApp(lockSession.backgroundedAtMillis, SystemClock.elapsedRealtime(), appLockTimeout)) {
+            if (!returningFromSystemActivity &&
+                (lockSession.isAppLocked || shouldLockApp(lockSession.backgroundedAtMillis, SystemClock.elapsedRealtime(), appLockTimeout))
+            ) {
                 lockSession.isAppLocked = true
             } else {
                 lockSession.backgroundedAtMillis = null
@@ -234,7 +248,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         if (appLockEnabled && !isChangingConfigurations) {
-            lockSession.backgroundedAtMillis = SystemClock.elapsedRealtime()
+            lockSession.recordBackgrounded(SystemClock.elapsedRealtime())
         }
         super.onStop()
     }
@@ -438,8 +452,23 @@ class AppLockSessionState : ViewModel() {
     var journalSessionOpened by mutableStateOf(false)
     var backgroundedAtMillis: Long? = null
     var authenticationInProgress = false
+    internal var systemActivityInProgress = false
     internal var authenticationAction: LockAuthentication? = null
     internal var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
+
+    internal fun beginSystemActivity() {
+        systemActivityInProgress = true
+        backgroundedAtMillis = null
+    }
+
+    internal fun finishSystemActivity() {
+        systemActivityInProgress = false
+        backgroundedAtMillis = null
+    }
+
+    internal fun recordBackgrounded(nowMillis: Long) {
+        backgroundedAtMillis = if (systemActivityInProgress) null else nowMillis
+    }
 }
 
 private enum class BackupAction { EXPORT, IMPORT }
