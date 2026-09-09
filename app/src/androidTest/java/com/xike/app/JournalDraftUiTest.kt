@@ -1,5 +1,6 @@
 package com.xike.app
 
+import androidx.compose.runtime.mutableStateOf
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
@@ -117,6 +118,38 @@ class JournalDraftUiTest {
         composeRule.onNodeWithContentDescription("移除第 1 张照片").performScrollTo().performClick()
         composeRule.runOnIdle { check(removed == uri) }
         composeRule.onNodeWithTag("photo-gallery-pager").assertDoesNotExist()
+    }
+
+    @Test
+    fun addedPhotosAreRevealedWithoutOpeningKeywordsAndSurviveCollapse() {
+        val draft = mutableStateOf(JournalDraft())
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                MomentScreen(
+                    padding = PaddingValues(),
+                    entries = emptyList(),
+                    draft = draft.value,
+                    dailyPromptSettings = DailyPromptSettings(enabled = false),
+                    onDraftMoodChange = {},
+                    onDraftNoteChange = {},
+                    onDraftTagToggle = {},
+                    onDraftImagesAdded = {},
+                    onDraftImageRemoved = {},
+                    onSave = { _, _ -> Result.success(Unit) },
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            draft.value = JournalDraft(imageUriStrings = listOf("content://com.xike.app.missing/added"))
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onNodeWithContentDescription("待保存的第 1 张照片").isDisplayed()
+        }
+        composeRule.onNodeWithText("此刻关键词").assertDoesNotExist()
+        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
+        composeRule.onNodeWithText("再留下一点").performClick()
+        composeRule.onNodeWithText("此刻关键词").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("待保存的第 1 张照片").performScrollTo().assertIsDisplayed()
     }
 
     private fun waitForPhotoPage(label: String) {
@@ -297,7 +330,6 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
-        composeRule.onNodeWithText("添加照片").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(selectedTag == "饮食") }
         composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()

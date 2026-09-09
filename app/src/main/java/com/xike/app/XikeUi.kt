@@ -41,6 +41,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -114,6 +116,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -522,13 +525,12 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = entriesOnDate(entries, today)
-    val draftHasDetails = draft.tags.isNotEmpty() || draft.imageUriStrings.isNotEmpty()
+    val draftHasDetails = draft.tags.isNotEmpty()
     LaunchedEffect(draftHasDetails) {
         if (draftHasDetails) showDetails = true
     }
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         onDraftImagesAdded(uris)
-        if (uris.isNotEmpty()) showDetails = true
     }
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
@@ -726,6 +728,31 @@ fun MomentScreen(
                 )
             }
 
+            if (draft.imageUriStrings.isNotEmpty()) {
+                val previewAnchor = remember { BringIntoViewRequester() }
+                LaunchedEffect(draft.imageUriStrings) {
+                    withFrameNanos { }
+                    previewAnchor.bringIntoView()
+                }
+                PaperCard {
+                    MultiImagePicker(
+                        selectedUris = draft.imageUriStrings,
+                        firstPhotoModifier = Modifier.bringIntoViewRequester(previewAnchor),
+                        onPreview = {
+                            dismissKeyboard()
+                            previewUri = it
+                        },
+                        onPick = {
+                            if (!isSaving) {
+                                dismissKeyboard()
+                                showPhotoSourceDialog = true
+                            }
+                        },
+                        onRemove = { if (!isSaving) onDraftImageRemoved(it) },
+                    )
+                }
+            }
+
             OutdoorContextCard(
                 snapshot = draft.outdoor,
                 isBackdated = draft.recordedAt != null,
@@ -757,8 +784,8 @@ fun MomentScreen(
                     Column(Modifier.weight(1f)) {
                         Text("再留下一点", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            if (draft.tags.isEmpty() && draft.imageUriStrings.isEmpty()) "选关键词、整理照片 · 可选"
-                            else "${draft.tags.size} 个关键词 · ${draft.imageUriStrings.size} 张照片",
+                            if (draft.tags.isEmpty()) "选关键词 · 可选"
+                            else "已选 ${draft.tags.size} 个关键词",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -807,23 +834,6 @@ fun MomentScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(Modifier.height(10.dp))
-                    MultiImagePicker(
-                        selectedUris = draft.imageUriStrings,
-                        onPreview = {
-                            dismissKeyboard()
-                            previewUri = it
-                        },
-                        onPick = {
-                            if (!isSaving) {
-                                dismissKeyboard()
-                                showPhotoSourceDialog = true
-                            }
-                        },
-                        onRemove = { if (!isSaving) onDraftImageRemoved(it) },
-                    )
                 }
             }
 
@@ -1629,6 +1639,7 @@ private fun MultiImagePicker(
     onPick: () -> Unit,
     onRemove: (String) -> Unit,
     onPreview: (String) -> Unit,
+    firstPhotoModifier: Modifier = Modifier,
 ) {
     if (selectedUris.isEmpty()) {
         Surface(
@@ -1684,7 +1695,8 @@ private fun MultiImagePicker(
                                 order = selectedUris.indexOf(tile) + 1,
                                 onRemove = { onRemove(tile) },
                                 onPreview = { onPreview(tile) },
-                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                                modifier = Modifier.weight(1f).aspectRatio(1f)
+                                    .then(if (tile == selectedUris.first()) firstPhotoModifier else Modifier),
                             )
                         }
                     }
