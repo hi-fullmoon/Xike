@@ -68,7 +68,6 @@ internal fun createCameraCaptureUri(context: Context): Uri {
         put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$CAMERA_ALBUM_NAME")
-            put(MediaStore.Images.Media.IS_PENDING, 1)
         } else {
             @Suppress("DEPRECATION")
             val pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
@@ -116,11 +115,7 @@ internal fun cameraCaptureHasContent(context: Context, uri: Uri): Boolean =
     }.getOrDefault(false)
 
 internal fun finalizeCameraCapture(context: Context, uri: Uri): Boolean {
-    if (!cameraCaptureHasContent(context, uri)) return false
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
-    val values = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-    return runCatching { context.contentResolver.update(uri, values, null, null) > 0 }
-        .getOrDefault(false)
+    return cameraCaptureHasContent(context, uri)
 }
 
 internal fun deleteCameraCapture(context: Context, uri: Uri) {
@@ -132,12 +127,7 @@ internal fun deleteCameraCapture(context: Context, uri: Uri) {
 internal fun pruneCameraCaptures(context: Context) {
     val staleBeforeSeconds = System.currentTimeMillis() / 1000L - ORPHAN_CAPTURE_MAX_AGE_SECONDS
     val projection = arrayOf(MediaStore.Images.Media._ID)
-    val unfinishedClause = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        "${MediaStore.Images.Media.IS_PENDING} = 1"
-    } else {
-        "${MediaStore.Images.Media.SIZE} = 0"
-    }
-    val selection = "$unfinishedClause AND ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND " +
+    val selection = "${MediaStore.Images.Media.SIZE} = 0 AND ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? AND " +
         "${MediaStore.Images.Media.DATE_ADDED} < ?"
     val selectionArgs = arrayOf("$CAMERA_CAPTURE_PREFIX%", staleBeforeSeconds.toString())
     runCatching {
