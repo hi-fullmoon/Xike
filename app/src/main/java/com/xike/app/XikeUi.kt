@@ -79,6 +79,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PersonOutline
@@ -112,6 +113,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -143,6 +145,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import java.io.File
 import java.io.InputStream
 import java.time.Instant
 import java.time.DayOfWeek
@@ -462,6 +465,12 @@ fun MomentScreen(
     onDraftTagToggle: (String) -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Unit,
     onDraftImageRemoved: (String) -> Unit,
+    onDraftAudioRecorded: suspend (File, Long) -> Result<Unit> = { _, _ ->
+        Result.failure(IllegalStateException("录音暂时不可用。"))
+    },
+    onDraftAudioRemoved: () -> Unit = {},
+    openAudio: (String) -> InputStream? = { null },
+    onVoiceCaptureStateChange: (Boolean) -> Unit = {},
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
@@ -483,6 +492,8 @@ fun MomentScreen(
     var outdoorError by rememberSaveable { mutableStateOf<String?>(null) }
     var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
     var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
+    var showVoiceCapture by rememberSaveable { mutableStateOf(false) }
+    var voiceCaptureRequest by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val focusManager = LocalFocusManager.current
@@ -640,6 +651,31 @@ fun MomentScreen(
             galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            showVoiceCapture = true
+            voiceCaptureRequest++
+        } else {
+            Toast.makeText(context, "没有麦克风权限，仍可使用文字和照片记录", Toast.LENGTH_LONG).show()
+        }
+    }
+    val beginVoiceCapture = {
+        dismissKeyboard()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            showVoiceCapture = true
+            voiceCaptureRequest++
+            Unit
+        } else {
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(showVoiceCapture) {
+        onVoiceCaptureStateChange(showVoiceCapture)
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
         Column(
@@ -711,6 +747,13 @@ fun MomentScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MomentQuickAction(
+                        icon = Icons.Outlined.MicNone,
+                        label = "语音",
+                        enabled = !isSaving && draft.audio == null && !showVoiceCapture,
+                        modifier = Modifier.weight(1f),
+                        onClick = beginVoiceCapture,
+                    )
+                    MomentQuickAction(
                         icon = Icons.Outlined.AddPhotoAlternate,
                         label = "照片",
                         enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
@@ -749,6 +792,40 @@ fun MomentScreen(
                     enabled = !isSaving,
                     onDiscard = { showDiscardConfirmation = true },
                 )
+            }
+
+            if (showVoiceCapture || draft.audio != null) {
+                val voiceAnchor = remember { BringIntoViewRequester() }
+                LaunchedEffect(showVoiceCapture, draft.audio?.fileName) {
+                    withFrameNanos { }
+                    voiceAnchor.bringIntoView()
+                }
+                PaperCard(modifier = Modifier.bringIntoViewRequester(voiceAnchor)) {
+                    Text("语音", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (showVoiceCapture) "正在记录这一刻的声音"
+                        else "录音完成后已加密保存在本机",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    if (showVoiceCapture) {
+                        VoiceCaptureCard(
+                            startRequest = voiceCaptureRequest,
+                            enabled = !isSaving,
+                            onRecorded = onDraftAudioRecorded,
+                            onClosed = { showVoiceCapture = false },
+                        )
+                    } else {
+                        draft.audio?.let { audio ->
+                            VoicePlaybackCard(
+                                audio = audio,
+                                openAudio = openAudio,
+                                onDelete = onDraftAudioRemoved,
+                            )
+                        }
+                    }
+                }
             }
 
             if (draft.imageUriStrings.isNotEmpty()) {
@@ -873,7 +950,7 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving) return@Button
+                    if (isSaving || showVoiceCapture) return@Button
                     dismissKeyboard()
                     isSaving = true
                     scope.launch {
@@ -883,6 +960,7 @@ fun MomentScreen(
                                 mood = mood,
                                 tags = draft.tags.toList(),
                                 note = draft.note.trim(),
+                                audio = draft.audio,
                                 outdoor = draft.outdoor,
                             ),
                             draft.imageUriStrings.map(Uri::parse),
@@ -899,7 +977,7 @@ fun MomentScreen(
                         isSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving,
+                enabled = draft.mood != null && !isSaving && !showVoiceCapture,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp).height(52.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
@@ -911,6 +989,7 @@ fun MomentScreen(
                 Text(
                     when {
                         isSaving -> "正在收下…"
+                        showVoiceCapture -> "请先完成录音"
                         draft.mood == null -> "先选择一种心情"
                         draft.recordedAt != null -> "补记这一刻"
                         else -> "记下此刻"
@@ -958,7 +1037,7 @@ fun MomentScreen(
             title = { Text("放弃这份草稿？") },
             text = {
                 Text(
-                    "将清空尚未保存的心情、窗外此刻、注脚、关键词、照片和补记时间。已保存的记录不会受影响。",
+                    "将清空尚未保存的心情、窗外此刻、注脚、关键词、照片、语音和补记时间。已保存的记录不会受影响。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -2105,6 +2184,23 @@ internal fun JournalEntryCard(
                         Spacer(Modifier.height(9.dp))
                         Text(entry.note, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    entry.audio?.let { audio ->
+                        Spacer(Modifier.height(9.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.MicNone,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                "语音 · ${formatAudioDuration(audio.durationMillis)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2845,8 +2941,11 @@ internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: St
 }
 
 @Composable
-private fun PaperCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+private fun PaperCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(modifier = modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(18.dp), content = content)
     }
 }

@@ -83,6 +83,26 @@ internal data class JournalImageEntity(
     @ColumnInfo(name = "file_name") val fileName: String,
 )
 
+@Entity(
+    tableName = "journal_audios",
+    foreignKeys = [
+        ForeignKey(
+            entity = JournalEntryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["entry_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["entry_id"], unique = true)],
+)
+internal data class JournalAudioEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "entry_id") val entryId: String,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    @ColumnInfo(name = "duration_millis") val durationMillis: Long,
+    @ColumnInfo(name = "mime_type") val mimeType: String,
+)
+
 @Entity(tableName = "app_settings")
 internal data class AppSettingEntity(
     @PrimaryKey val key: String,
@@ -102,12 +122,15 @@ internal data class JournalEntryRecord(
     val tags: List<JournalTagEntity>,
     @Relation(parentColumn = "id", entityColumn = "entry_id")
     val images: List<JournalImageEntity>,
+    @Relation(parentColumn = "id", entityColumn = "entry_id")
+    val audios: List<JournalAudioEntity>,
 )
 
 internal data class JournalBundle(
     val entry: JournalEntryEntity,
     val tags: List<JournalTagEntity>,
     val images: List<JournalImageEntity>,
+    val audio: JournalAudioEntity?,
 )
 
 internal fun JournalBundle.toSearchEntity(): JournalSearchEntity = JournalSearchEntity(
@@ -129,6 +152,14 @@ internal fun JournalEntry.toBundle(): JournalBundle = JournalBundle(
     ),
     tags = tags.mapIndexed { position, tag -> JournalTagEntity(id, position, tag) },
     images = imageFileNames.mapIndexed { position, fileName -> JournalImageEntity(id, position, fileName) },
+    audio = audio?.let {
+        JournalAudioEntity(
+            entryId = id,
+            fileName = it.fileName,
+            durationMillis = it.durationMillis,
+            mimeType = it.mimeType,
+        )
+    },
 )
 
 internal fun JournalEntryRecord.toJournalEntry(): JournalEntry = JournalEntry(
@@ -138,6 +169,13 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry = JournalEntry(
     tags = tags.sortedBy { it.position }.map { it.tag },
     note = entry.note,
     imageFileNames = images.sortedBy { it.position }.map { it.fileName },
+    audio = audios.firstOrNull()?.let {
+        JournalAudio(
+            fileName = it.fileName,
+            durationMillis = it.durationMillis,
+            mimeType = it.mimeType,
+        )
+    },
     outdoor = entry.outdoorPlaceName?.let { placeName ->
         OutdoorSnapshot(
             placeName = placeName,
@@ -174,6 +212,9 @@ internal abstract class JournalDao {
 
     @Query("SELECT file_name FROM journal_images WHERE entry_id = :entryId ORDER BY position")
     protected abstract fun imageFileNames(entryId: String): List<String>
+
+    @Query("SELECT file_name FROM journal_audios")
+    abstract fun audioFileNames(): List<String>
 
     @Transaction
     @Query(
@@ -264,6 +305,9 @@ internal abstract class JournalDao {
     protected abstract fun insertImages(images: List<JournalImageEntity>)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    protected abstract fun insertAudio(audio: JournalAudioEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract fun insertSearchEntry(search: JournalSearchEntity)
 
     @Update
@@ -277,6 +321,9 @@ internal abstract class JournalDao {
 
     @Query("DELETE FROM journal_images")
     protected abstract fun deleteImages()
+
+    @Query("DELETE FROM journal_audios")
+    protected abstract fun deleteAudios()
 
     @Query("DELETE FROM journal_entries")
     protected abstract fun deleteEntries()
@@ -293,6 +340,9 @@ internal abstract class JournalDao {
     @Query("DELETE FROM journal_images WHERE entry_id = :entryId")
     protected abstract fun deleteEntryImages(entryId: String)
 
+    @Query("DELETE FROM journal_audios WHERE entry_id = :entryId")
+    protected abstract fun deleteEntryAudio(entryId: String)
+
     @Query("DELETE FROM journal_entries WHERE id = :entryId")
     protected abstract fun deleteEntry(entryId: String): Int
 
@@ -301,6 +351,7 @@ internal abstract class JournalDao {
         insertEntry(bundle.entry)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
+        bundle.audio?.let(::insertAudio)
         insertSearchEntry(bundle.toSearchEntity())
     }
 
@@ -318,9 +369,11 @@ internal abstract class JournalDao {
         check(updateEntry(bundle.entry) == 1) { "记录不存在或已经删除。" }
         deleteEntryTags(bundle.entry.id)
         deleteEntryImages(bundle.entry.id)
+        deleteEntryAudio(bundle.entry.id)
         deleteSearchEntry(bundle.entry.id)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
+        bundle.audio?.let(::insertAudio)
         insertSearchEntry(bundle.toSearchEntity())
         return previousImages
     }
@@ -330,6 +383,7 @@ internal abstract class JournalDao {
         deleteSearchEntries()
         deleteTags()
         deleteImages()
+        deleteAudios()
         deleteEntries()
         bundles.forEach(::insertJournal)
     }
@@ -357,10 +411,11 @@ internal abstract class JournalDao {
         JournalEntryEntity::class,
         JournalTagEntity::class,
         JournalImageEntity::class,
+        JournalAudioEntity::class,
         AppSettingEntity::class,
         JournalSearchEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -381,7 +436,7 @@ internal abstract class JournalDatabase : RoomDatabase() {
             val factory = SupportOpenHelperFactory(DatabaseKeyManager(context).getOrCreatePassphrase())
             return Room.databaseBuilder(context, JournalDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
         }
 
@@ -403,6 +458,26 @@ internal abstract class JournalDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_weather_code INTEGER")
                 db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_captured_at INTEGER")
                 db.execSQL("ALTER TABLE journal_entries ADD COLUMN outdoor_source TEXT")
+            }
+        }
+
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `journal_audios` (
+                        `entry_id` TEXT NOT NULL,
+                        `file_name` TEXT NOT NULL,
+                        `duration_millis` INTEGER NOT NULL,
+                        `mime_type` TEXT NOT NULL,
+                        PRIMARY KEY(`entry_id`),
+                        FOREIGN KEY(`entry_id`) REFERENCES `journal_entries`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_journal_audios_entry_id` ON `journal_audios` (`entry_id`)",
+                )
             }
         }
     }

@@ -39,7 +39,7 @@ class JournalDaoTest {
             200L,
             listOf("工作", "运动", "阅读"),
             listOf("first.xike-image", "second.xike-image"),
-        )
+        ).copy(audio = JournalAudio("newer.xike-audio", 18_000L))
 
         dao.insertJournal(older.toBundle())
         dao.insertJournal(newer.toBundle())
@@ -48,6 +48,7 @@ class JournalDaoTest {
         assertEquals(listOf("newer", "older"), stored.map { it.id })
         assertEquals(newer.tags, stored.first().tags)
         assertEquals(newer.imageFileNames, stored.first().imageFileNames)
+        assertEquals(newer.audio, stored.first().audio)
     }
 
     @Test
@@ -147,6 +148,7 @@ class JournalDaoTest {
             note = "新的可搜索注脚",
             imageFileNames = listOf("new.xike-image"),
             outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 450L),
+            audio = JournalAudio("new.xike-audio", 12_000L),
         )
 
         val previousImages = dao.updateJournal(updated.toBundle())

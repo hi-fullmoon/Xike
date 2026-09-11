@@ -78,6 +78,7 @@ fun JournalInsightsScreen(
     padding: PaddingValues,
     entries: List<JournalEntry>,
     openImage: (String) -> InputStream?,
+    openAudio: (String) -> InputStream? = { null },
 ) {
     var selectedPeriodName by rememberSaveable { mutableStateOf(InsightsPeriod.WEEK.name) }
     val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName }
@@ -189,6 +190,7 @@ fun JournalInsightsScreen(
             subtitle = request.subtitle,
             entries = entriesWithIds(entries, request.entryIds),
             openImage = openImage,
+            openAudio = openAudio,
             onDismiss = { drilldown = null },
         )
     }
@@ -861,6 +863,7 @@ private fun InsightDrilldownDialog(
     subtitle: String,
     entries: List<JournalEntry>,
     openImage: (String) -> InputStream?,
+    openAudio: (String) -> InputStream?,
     onDismiss: () -> Unit,
 ) {
     var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
@@ -910,7 +913,7 @@ private fun InsightDrilldownDialog(
     }
 
     detailEntry?.let { entry ->
-        JournalEntryDetailDialog(entry = entry, onDismiss = { detailEntry = null })
+        JournalEntryDetailDialog(entry = entry, openAudio = openAudio, onDismiss = { detailEntry = null })
     }
     galleryImages?.let { images ->
         PhotoGalleryDialog(

@@ -28,6 +28,7 @@ class JournalDatabaseMigrationTest {
     fun removeDatabase() {
         context.deleteDatabase(TEST_DATABASE)
         context.deleteDatabase(TEST_DATABASE_V2)
+        context.deleteDatabase(TEST_DATABASE_V3)
     }
 
     @Test
@@ -74,6 +75,31 @@ class JournalDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migrationFrom3To4PreservesEntriesAndCreatesAudioTable() {
+        helper.createDatabase(TEST_DATABASE_V3, 3).use { database ->
+            database.execSQL(
+                """
+                INSERT INTO journal_entries(
+                    id, created_at, mood, note, outdoor_place_name,
+                    outdoor_temperature_celsius, outdoor_weather_code,
+                    outdoor_captured_at, outdoor_source
+                ) VALUES('existing-v3', 300, 'CALM', '升级前的记录', NULL, NULL, NULL, NULL, NULL)
+                """.trimIndent(),
+            )
+        }
+
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE_V3,
+            4,
+            true,
+            JournalDatabase.MIGRATION_3_4,
+        ).use { database ->
+            assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
+            assertEquals(0, database.singleInt("SELECT COUNT(*) FROM journal_audios"))
+        }
+    }
+
     private fun SupportSQLiteDatabase.singleInt(query: String): Int =
         this.query(query).use { cursor ->
             check(cursor.moveToFirst())
@@ -83,5 +109,6 @@ class JournalDatabaseMigrationTest {
     private companion object {
         const val TEST_DATABASE = "xike-migration-v1-v2"
         const val TEST_DATABASE_V2 = "xike-migration-v2-v3"
+        const val TEST_DATABASE_V3 = "xike-migration-v3-v4"
     }
 }

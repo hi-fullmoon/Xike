@@ -56,6 +56,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.InputStream
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
@@ -152,6 +153,8 @@ class MainActivity : FragmentActivity() {
                             onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
                             onDraftImagesAdded = journalViewModel::addDraftImages,
                             onDraftImageRemoved = journalViewModel::removeDraftImage,
+                            onDraftAudioRecorded = journalViewModel::addDraftAudio,
+                            onDraftAudioRemoved = journalViewModel::removeDraftAudio,
                             onDraftDiscard = journalViewModel::discardDraft,
                             onReminderEnabledChange = { enabled ->
                                 changeReminderEnabled(enabled) {
@@ -172,6 +175,7 @@ class MainActivity : FragmentActivity() {
                             canUndoRestore = journalViewModel.canUndoRestore,
                             onUndoRestore = journalViewModel::undoRestore,
                             openImage = journalViewModel::openImage,
+                            openAudio = journalViewModel::openAudio,
                         )
 
                         journalViewModel.dataError?.let { message ->
@@ -504,6 +508,8 @@ private fun XikeApp(
     onClearDraftOutdoor: () -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Unit,
     onDraftImageRemoved: (String) -> Unit,
+    onDraftAudioRecorded: suspend (File, Long) -> Result<Unit>,
+    onDraftAudioRemoved: () -> Unit,
     onDraftDiscard: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
@@ -520,6 +526,7 @@ private fun XikeApp(
     canUndoRestore: Boolean,
     onUndoRestore: suspend () -> Result<Int>,
     openImage: (String) -> InputStream?,
+    openAudio: (String) -> InputStream?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -529,6 +536,7 @@ private fun XikeApp(
     var pendingImportUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
+    var isVoiceCaptureActive by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(quickRecordRequest) {
@@ -581,7 +589,13 @@ private fun XikeApp(
         bottomBar = {
             XikeNavigationBar(
                 selected = screen,
-                onSelected = { screen = it },
+                onSelected = { selected ->
+                    if (isVoiceCaptureActive && selected != AppScreen.HOME) {
+                        Toast.makeText(context, "请先完成或取消录音", Toast.LENGTH_SHORT).show()
+                    } else {
+                        screen = selected
+                    }
+                },
             )
         },
     ) { innerPadding ->
@@ -600,10 +614,14 @@ private fun XikeApp(
                 onClearDraftOutdoor = onClearDraftOutdoor,
                 onDraftImagesAdded = onDraftImagesAdded,
                 onDraftImageRemoved = onDraftImageRemoved,
+                onDraftAudioRecorded = onDraftAudioRecorded,
+                onDraftAudioRemoved = onDraftAudioRemoved,
+                openAudio = openAudio,
+                onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
                 onDraftDiscard = onDraftDiscard,
                 onSave = onSave,
             )
-            AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage)
+            AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage, openAudio)
             AppScreen.ARCHIVE -> JournalArchiveScreen(
                 padding = innerPadding,
                 entries = entries,
@@ -613,6 +631,7 @@ private fun XikeApp(
                 onUndoDelete = onUndoDelete,
                 onFinalizeDelete = onFinalizeDelete,
                 openImage = openImage,
+                openAudio = openAudio,
             )
             AppScreen.SETTINGS -> ProfileSettingsScreen(
                 padding = innerPadding,
@@ -657,7 +676,7 @@ private fun XikeApp(
         BackupPasswordDialog(
             title = "验证加密备份",
             confirm = "查看备份摘要",
-            description = "应用会先完整验证密码、日记和图片，此步骤不会修改设备上的内容。",
+            description = "应用会先完整验证密码、日记、图片和语音，此步骤不会修改设备上的内容。",
             onDismiss = {
                 backupAction = null
                 pendingImportUri = null
@@ -744,7 +763,10 @@ private fun RestoreConfirmationDialog(
         title = { Text("确认替换设备内容？") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片。")
+                Text(
+                    "备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片" +
+                        if (summary.audioCount > 0) "、${summary.audioCount} 段语音。" else "。",
+                )
                 Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     "当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。",

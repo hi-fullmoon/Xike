@@ -11,6 +11,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
@@ -45,6 +46,28 @@ enum class Mood(val label: String, val score: Int) {
 }
 
 const val MAX_IMAGES_PER_ENTRY = 9
+const val MAX_AUDIO_DURATION_MILLIS = 5L * 60L * 1000L
+
+data class JournalAudio(
+    val fileName: String,
+    val durationMillis: Long,
+    val mimeType: String = "audio/mp4",
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("fileName", fileName)
+        .put("durationMillis", durationMillis)
+        .put("mimeType", mimeType)
+
+    companion object {
+        fun fromJson(json: JSONObject?): JournalAudio? = json?.let {
+            JournalAudio(
+                fileName = it.optString("fileName"),
+                durationMillis = it.optLong("durationMillis"),
+                mimeType = it.optString("mimeType", "audio/mp4"),
+            ).takeIf { audio -> audio.fileName.isNotBlank() && audio.durationMillis > 0L }
+        }
+    }
+}
 
 data class JournalEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -53,6 +76,7 @@ data class JournalEntry(
     val tags: List<String>,
     val note: String,
     val imageFileNames: List<String> = emptyList(),
+    val audio: JournalAudio? = null,
     val outdoor: OutdoorSnapshot? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
@@ -62,6 +86,7 @@ data class JournalEntry(
         .put("tags", JSONArray(tags))
         .put("note", note)
         .put("imageFileNames", JSONArray(imageFileNames))
+        .put("audio", audio?.toJson() ?: JSONObject.NULL)
         .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
 
     companion object {
@@ -76,6 +101,7 @@ data class JournalEntry(
             imageFileNames = json.optJSONArray("imageFileNames")?.let { values ->
                 List(values.length()) { index -> values.getString(index) }
             } ?: listOfNotNull(json.optString("imageFileName").takeIf { it.isNotBlank() }),
+            audio = JournalAudio.fromJson(json.optJSONObject("audio")),
             outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
         )
     }
@@ -84,6 +110,7 @@ data class JournalEntry(
 internal fun normalizeRestoredEntries(
     entries: List<JournalEntry>,
     availableImages: Set<String>,
+    availableAudios: Set<String> = emptySet(),
 ): List<JournalEntry> = entries
     .distinctBy { it.id }
     .map { entry ->
@@ -92,6 +119,9 @@ internal fun normalizeRestoredEntries(
                 .distinct()
                 .filter { it in availableImages }
                 .take(MAX_IMAGES_PER_ENTRY),
+            audio = entry.audio?.takeIf {
+                it.fileName in availableAudios && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
+            },
         )
     }
     .sortedByDescending { it.createdAt }
@@ -106,6 +136,7 @@ data class JournalSnapshot(
 data class BackupSummary(
     val entryCount: Int,
     val imageCount: Int,
+    val audioCount: Int = 0,
     val oldestCreatedAt: Long?,
     val newestCreatedAt: Long?,
 )
@@ -128,6 +159,7 @@ private data class UndoSnapshotSwap(
 class JournalStore(context: Context) {
     private val appContext = context.applicationContext
     private val imagesDirectory = File(appContext.filesDir, IMAGES_DIRECTORY)
+    private val audiosDirectory = File(appContext.filesDir, AUDIOS_DIRECTORY)
     private val masterKey = MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
     private val database by lazy { JournalDatabase.get(appContext) }
     private val dao by lazy { database.journalDao() }
@@ -153,6 +185,7 @@ class JournalStore(context: Context) {
 
     init {
         check(imagesDirectory.isDirectory || imagesDirectory.mkdirs()) { "无法创建图片存储目录。" }
+        check(audiosDirectory.isDirectory || audiosDirectory.mkdirs()) { "无法创建录音存储目录。" }
     }
 
     @Synchronized
@@ -230,6 +263,7 @@ class JournalStore(context: Context) {
         val imported = importImages(imageUris)
         return runCatching {
             val storedEntry = entry.copy(imageFileNames = imported)
+            validateAudioReference(storedEntry.audio)
             dao.insertJournal(storedEntry.toBundle())
             readEntries()
         }.onFailure {
@@ -257,6 +291,7 @@ class JournalStore(context: Context) {
 
         val imported = importImages(newImageUris)
         val storedEntry = entry.copy(imageFileNames = retainedImages + imported)
+        validateAudioReference(storedEntry.audio)
         val previousImages = runCatching { dao.updateJournal(storedEntry.toBundle()) }
             .onFailure { imported.forEach(::deleteImage) }
             .getOrElse { error ->
@@ -267,6 +302,9 @@ class JournalStore(context: Context) {
         previousImages
             .filterNot { it in storedEntry.imageFileNames || it in referencedImages }
             .forEach(::deleteImage)
+        original.audio?.fileName
+            ?.takeIf { it != storedEntry.audio?.fileName && it !in referencedAudioFileNames() }
+            ?.let(::deleteAudio)
         return readEntries()
     }
 
@@ -293,6 +331,8 @@ class JournalStore(context: Context) {
             !File(imagesDirectory, fileName).isFile
         }
         check(missingImage == null) { "记录照片已经清理，无法撤销删除。" }
+        val missingAudio = deletedEntry.audio?.fileName?.takeIf { !File(audiosDirectory, it).isFile }
+        check(missingAudio == null) { "记录语音已经清理，无法撤销删除。" }
         dao.insertJournal(deletedEntry.toBundle())
         pendingDeletedEntry = null
         readEntries()
@@ -347,11 +387,51 @@ class JournalStore(context: Context) {
         ?.let { file -> runCatching { encryptedImage(file).openFileInput() }.getOrNull() }
 
     @Synchronized
-    fun removeOrphanedImages() {
+    fun importAudio(source: File, durationMillis: Long): JournalAudio {
+        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { "录音时长需要在 5 分钟以内。" }
+        require(source.isFile && source.length() > 0L) { "录音文件不可用。" }
+        val fileName = "${UUID.randomUUID()}.xike-audio"
+        val target = File(audiosDirectory, fileName)
+        runCatching {
+            FileInputStream(source).use { input ->
+                writeEncryptedAttachment(
+                    target = target,
+                    input = input,
+                    byteLimit = MAX_AUDIO_BYTES,
+                    totalBytes = null,
+                    itemName = "录音",
+                    totalName = "备份录音",
+                    totalLimit = MAX_BACKUP_AUDIO_BYTES,
+                )
+            }
+        }.onFailure {
+            target.delete()
+            throw it
+        }
+        return JournalAudio(fileName = fileName, durationMillis = durationMillis)
+    }
+
+    fun openAudio(fileName: String): InputStream? = fileName
+        .takeIf(::isSafeAudioFileName)
+        ?.let { File(audiosDirectory, it) }
+        ?.takeIf(File::isFile)
+        ?.let { file -> runCatching { encryptedAudio(file).openFileInput() }.getOrNull() }
+
+    @Synchronized
+    fun deleteUnreferencedAudio(fileName: String) {
+        if (fileName !in referencedAudioFileNames()) deleteAudio(fileName)
+    }
+
+    @Synchronized
+    fun removeOrphanedMedia(activeDraftAudioFileName: String? = null) {
         val referencedImages = referencedImageFileNames()
+        val referencedAudios = referencedAudioFileNames() + listOfNotNull(activeDraftAudioFileName)
         val activeUndoFileName = currentUndoSnapshot()?.file?.name
         imagesDirectory.listFiles()
             ?.filter { it.name !in referencedImages }
+            ?.forEach(File::delete)
+        audiosDirectory.listFiles()
+            ?.filter { it.name !in referencedAudios }
             ?.forEach(File::delete)
         appContext.filesDir.listFiles()
             ?.filter { it.isDirectory && it.name.startsWith(RESTORE_STAGING_PREFIX) }
@@ -365,11 +445,15 @@ class JournalStore(context: Context) {
             ?.forEach(File::delete)
     }
 
+    @Deprecated("Use removeOrphanedMedia so draft audio can be retained")
+    fun removeOrphanedImages() = removeOrphanedMedia()
+
     @Synchronized
     fun writeEncryptedBackup(output: OutputStream, password: String) {
         require(password.length >= 8) { "备份密码至少需要 8 位。" }
         val currentEntries = readEntries()
         val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
+        val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
         val manifest = JSONObject()
             .put("format", "xike")
             .put("version", STREAMING_BACKUP_VERSION)
@@ -389,6 +473,13 @@ class JournalStore(context: Context) {
                     archive.closeEntry()
                 }
             }
+            audioNames.forEach { fileName ->
+                openAudio(fileName)?.use { audio ->
+                    archive.putNextEntry(ZipEntry("$AUDIOS_PREFIX$fileName"))
+                    audio.copyTo(archive)
+                    archive.closeEntry()
+                }
+            }
         }
     }
 
@@ -400,6 +491,7 @@ class JournalStore(context: Context) {
             BackupSummary(
                 entryCount = prepared.entries.size,
                 imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
+                audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
                 oldestCreatedAt = createdAtValues.minOrNull(),
                 newestCreatedAt = createdAtValues.maxOrNull(),
             )
@@ -409,12 +501,16 @@ class JournalStore(context: Context) {
     }
 
     @Synchronized
-    fun restoreEncryptedBackup(input: InputStream, password: String): List<JournalEntry> {
+    fun restoreEncryptedBackup(
+        input: InputStream,
+        password: String,
+        retainedAudioFileNames: Set<String> = emptySet(),
+    ): List<JournalEntry> {
         val prepared = readEncryptedBackup(input, password)
         return try {
             val snapshotSwap = createUndoSnapshot()
             try {
-                installRestoredData(prepared.stagingDirectory, prepared.entries).also {
+                installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames).also {
                     commitUndoSnapshot(snapshotSwap)
                 }
             } catch (error: Throwable) {
@@ -430,13 +526,13 @@ class JournalStore(context: Context) {
     fun canUndoLastRestore(): Boolean = currentUndoSnapshot() != null
 
     @Synchronized
-    fun undoLastRestore(): List<JournalEntry> {
+    fun undoLastRestore(retainedAudioFileNames: Set<String> = emptySet()): List<JournalEntry> {
         val snapshot = currentUndoSnapshot() ?: error("没有可撤销的恢复操作。")
         val prepared = snapshot.file.inputStream().use { input ->
             readEncryptedBackup(input, snapshot.password)
         }
         return try {
-            installRestoredData(prepared.stagingDirectory, prepared.entries).also {
+            installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames).also {
                 clearUndoSnapshot(snapshot)
             }
         } finally {
@@ -463,8 +559,11 @@ class JournalStore(context: Context) {
         return try {
             var parsedEntries: List<JournalEntry>? = null
             val restoredImages = linkedSetOf<String>()
+            val restoredAudios = linkedSetOf<String>()
             var referencedImages = emptySet<String>()
+            var referencedAudios = emptySet<String>()
             val totalBytes = longArrayOf(0L)
+            val totalAudioBytes = longArrayOf(0L)
 
             ZipInputStream(BufferedInputStream(BackupCipher.decryptingStream(source, password))).use { archive ->
                 val manifestEntry = archive.nextEntry
@@ -482,16 +581,40 @@ class JournalStore(context: Context) {
                     .filter(::isSafeImageFileName)
                     .toSet()
                 validateBackup(referencedImages.size <= MAX_BACKUP_IMAGES) { "备份包含过多图片。" }
+                referencedAudios = parsedEntries.orEmpty()
+                    .mapNotNull { it.audio?.fileName }
+                    .filter(::isSafeAudioFileName)
+                    .toSet()
+                validateBackup(referencedAudios.size <= MAX_BACKUP_AUDIOS) { "备份包含过多录音。" }
 
                 var entry = archive.nextEntry
                 while (entry != null) {
-                    validateBackup(!entry.isDirectory && entry.name.startsWith(IMAGES_PREFIX)) { "备份中包含未知内容。" }
-                    val fileName = entry.name.removePrefix(IMAGES_PREFIX)
-                    validateBackup(fileName in referencedImages) { "备份中包含未引用的图片。" }
-                    validateBackup(fileName !in restoredImages) { "备份中包含重复图片。" }
-                    val target = File(stagingDirectory, fileName)
-                    writeEncryptedImage(target, archive, MAX_IMAGE_BYTES, totalBytes)
-                    restoredImages += fileName
+                    validateBackup(!entry.isDirectory) { "备份中包含未知内容。" }
+                    when {
+                        entry.name.startsWith(IMAGES_PREFIX) -> {
+                            val fileName = entry.name.removePrefix(IMAGES_PREFIX)
+                            validateBackup(fileName in referencedImages) { "备份中包含未引用的图片。" }
+                            validateBackup(fileName !in restoredImages) { "备份中包含重复图片。" }
+                            writeEncryptedImage(File(stagingDirectory, fileName), archive, MAX_IMAGE_BYTES, totalBytes)
+                            restoredImages += fileName
+                        }
+                        entry.name.startsWith(AUDIOS_PREFIX) -> {
+                            val fileName = entry.name.removePrefix(AUDIOS_PREFIX)
+                            validateBackup(fileName in referencedAudios) { "备份中包含未引用的录音。" }
+                            validateBackup(fileName !in restoredAudios) { "备份中包含重复录音。" }
+                            writeEncryptedAttachment(
+                                target = File(stagingDirectory, fileName),
+                                input = archive,
+                                byteLimit = MAX_AUDIO_BYTES,
+                                totalBytes = totalAudioBytes,
+                                itemName = "录音",
+                                totalName = "备份录音",
+                                totalLimit = MAX_BACKUP_AUDIO_BYTES,
+                            )
+                            restoredAudios += fileName
+                        }
+                        else -> validateBackup(false) { "备份中包含未知内容。" }
+                    }
                     archive.closeEntry()
                     entry = archive.nextEntry
                 }
@@ -500,6 +623,7 @@ class JournalStore(context: Context) {
             val restored = normalizeRestoredEntries(
                 requireNotNull(parsedEntries) { "备份清单缺失。" },
                 restoredImages,
+                restoredAudios,
             )
             PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
@@ -543,7 +667,7 @@ class JournalStore(context: Context) {
                 }
             }
 
-            val restored = normalizeRestoredEntries(parsedEntries, restoredImages)
+            val restored = normalizeRestoredEntries(parsedEntries, restoredImages, emptySet())
             PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
@@ -566,6 +690,9 @@ class JournalStore(context: Context) {
                     .filter(::isSafeImageFileName)
                     .distinct()
                     .take(MAX_IMAGES_PER_ENTRY),
+                audio = entry.audio?.takeIf {
+                    isSafeAudioFileName(it.fileName) && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
+                },
             )
         }
     }
@@ -576,18 +703,38 @@ class JournalStore(context: Context) {
         byteLimit: Long,
         totalBytes: LongArray?,
     ) {
+        writeEncryptedAttachment(
+            target = target,
+            input = input,
+            byteLimit = byteLimit,
+            totalBytes = totalBytes,
+            itemName = "图片",
+            totalName = "备份图片",
+            totalLimit = MAX_BACKUP_IMAGE_BYTES,
+        )
+    }
+
+    private fun writeEncryptedAttachment(
+        target: File,
+        input: InputStream,
+        byteLimit: Long,
+        totalBytes: LongArray?,
+        itemName: String,
+        totalName: String,
+        totalLimit: Long,
+    ) {
         runCatching {
-            encryptedImage(target).openFileOutput().buffered().use { output ->
+            encryptedFile(target).openFileOutput().buffered().use { output ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var imageBytes = 0L
+                var itemBytes = 0L
                 while (true) {
                     val count = input.read(buffer)
                     if (count < 0) break
-                    imageBytes += count
-                    validateBackup(imageBytes <= byteLimit) { "图片不能超过 20 MB。" }
+                    itemBytes += count
+                    validateBackup(itemBytes <= byteLimit) { "$itemName 超过大小限制。" }
                     if (totalBytes != null) {
                         totalBytes[0] += count
-                        validateBackup(totalBytes[0] <= MAX_BACKUP_IMAGE_BYTES) { "备份图片总大小超过限制。" }
+                        validateBackup(totalBytes[0] <= totalLimit) { "$totalName 总大小超过限制。" }
                     }
                     output.write(buffer, 0, count)
                 }
@@ -669,10 +816,12 @@ class JournalStore(context: Context) {
     private fun installRestoredData(
         stagingDirectory: File,
         restoredEntries: List<JournalEntry>,
+        retainedAudioFileNames: Set<String>,
     ): List<JournalEntry> {
         val installedFiles = mutableListOf<File>()
         return try {
-            val renamedImages = stagingDirectory.listFiles().orEmpty().associate { stagedFile ->
+            val stagedFiles = stagingDirectory.listFiles().orEmpty()
+            val renamedImages = stagedFiles.filter { it.name.endsWith(".xike-image") }.associate { stagedFile ->
                 val newName = "${UUID.randomUUID()}.xike-image"
                 val installedFile = File(imagesDirectory, newName)
                 encryptedImage(stagedFile).openFileInput().use { decryptedImage ->
@@ -686,14 +835,40 @@ class JournalStore(context: Context) {
                 installedFiles += installedFile
                 stagedFile.name to newName
             }
+            val renamedAudios = stagedFiles.filter { isSafeAudioFileName(it.name) }.associate { stagedFile ->
+                val newName = "${UUID.randomUUID()}.xike-audio"
+                val installedFile = File(audiosDirectory, newName)
+                encryptedFile(stagedFile).openFileInput().use { decryptedAudio ->
+                    writeEncryptedAttachment(
+                        target = installedFile,
+                        input = decryptedAudio,
+                        byteLimit = MAX_AUDIO_BYTES,
+                        totalBytes = null,
+                        itemName = "录音",
+                        totalName = "备份录音",
+                        totalLimit = MAX_BACKUP_AUDIO_BYTES,
+                    )
+                }
+                installedFiles += installedFile
+                stagedFile.name to newName
+            }
             val installedEntries = restoredEntries.map { entry ->
-                entry.copy(imageFileNames = entry.imageFileNames.mapNotNull(renamedImages::get))
+                entry.copy(
+                    imageFileNames = entry.imageFileNames.mapNotNull(renamedImages::get),
+                    audio = entry.audio?.let { audio ->
+                        renamedAudios[audio.fileName]?.let { audio.copy(fileName = it) }
+                    },
+                )
             }
 
             writeEntries(installedEntries)
             val referencedFiles = installedEntries.flatMap { it.imageFileNames }.toSet()
             imagesDirectory.listFiles()
                 ?.filter { it.name !in referencedFiles }
+                ?.forEach(File::delete)
+            val referencedAudios = installedEntries.mapNotNull { it.audio?.fileName }.toSet() + retainedAudioFileNames
+            audiosDirectory.listFiles()
+                ?.filter { it.name !in referencedAudios }
                 ?.forEach(File::delete)
             stagingDirectory.deleteRecursively()
             installedEntries
@@ -703,20 +878,41 @@ class JournalStore(context: Context) {
         }
     }
 
-    private fun encryptedImage(file: File): EncryptedFile = EncryptedFile.Builder(
+    private fun encryptedFile(file: File): EncryptedFile = EncryptedFile.Builder(
         appContext,
         file,
         masterKey,
         EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB,
     ).build()
 
+    private fun encryptedImage(file: File): EncryptedFile = encryptedFile(file)
+
+    private fun encryptedAudio(file: File): EncryptedFile = encryptedFile(file)
+
     private fun deleteImage(fileName: String) {
         if (isSafeImageFileName(fileName)) File(imagesDirectory, fileName).delete()
+    }
+
+    private fun deleteAudio(fileName: String) {
+        if (isSafeAudioFileName(fileName)) File(audiosDirectory, fileName).delete()
+    }
+
+    private fun validateAudioReference(audio: JournalAudio?) {
+        if (audio == null) return
+        require(audio.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { "录音时长需要在 5 分钟以内。" }
+        require(isSafeAudioFileName(audio.fileName) && File(audiosDirectory, audio.fileName).isFile) {
+            "录音文件不可用。"
+        }
     }
 
     private fun referencedImageFileNames(): Set<String> = buildSet {
         addAll(dao.imageFileNames())
         pendingDeletedEntry?.imageFileNames?.let(::addAll)
+    }
+
+    private fun referencedAudioFileNames(): Set<String> = buildSet {
+        addAll(dao.audioFileNames())
+        pendingDeletedEntry?.audio?.fileName?.let(::add)
     }
 
     private fun finalizePendingDelete() {
@@ -726,6 +922,9 @@ class JournalStore(context: Context) {
         deletedEntry.imageFileNames
             .filterNot { it in referencedImages }
             .forEach(::deleteImage)
+        deletedEntry.audio?.fileName
+            ?.takeIf { it !in referencedAudioFileNames() }
+            ?.let(::deleteAudio)
     }
 
     private fun isSafeImageFileName(fileName: String): Boolean =
@@ -734,6 +933,9 @@ class JournalStore(context: Context) {
             File(fileName).name == fileName &&
             !fileName.contains('/') &&
             !fileName.contains('\\')
+
+    private fun isSafeAudioFileName(fileName: String): Boolean =
+        isSafeImageFileName(fileName) && fileName.endsWith(".xike-audio")
 
     private fun readEntries(): List<JournalEntry> = try {
         dao.records().map(JournalEntryRecord::toJournalEntry)
@@ -776,19 +978,24 @@ class JournalStore(context: Context) {
         const val RESTORE_UNDO_FILE_KEY = "undo-file"
         const val RESTORE_UNDO_PASSWORD_KEY = "undo-password"
         const val IMAGES_DIRECTORY = "journal-images"
+        const val AUDIOS_DIRECTORY = "journal-audios"
         const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
         const val RESTORE_UNDO_PREFIX = "journal-restore-undo-"
         const val MANIFEST_ENTRY = "manifest.json"
         const val IMAGES_PREFIX = "images/"
+        const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
-        const val STREAMING_BACKUP_VERSION = 5
+        const val STREAMING_BACKUP_VERSION = 6
         const val MAX_FILE_NAME_LENGTH = 160
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
+        const val MAX_BACKUP_AUDIOS = 100_000
         const val MAX_MANIFEST_BYTES = 16L * 1024L * 1024L
         const val MAX_LEGACY_BACKUP_BYTES = 320L * 1024L * 1024L
         const val MAX_IMAGE_BYTES = 20L * 1024L * 1024L
         const val MAX_BACKUP_IMAGE_BYTES = 1024L * 1024L * 1024L
+        const val MAX_AUDIO_BYTES = 16L * 1024L * 1024L
+        const val MAX_BACKUP_AUDIO_BYTES = 1024L * 1024L * 1024L
     }
 }
 

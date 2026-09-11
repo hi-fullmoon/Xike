@@ -132,6 +132,7 @@ fun JournalArchiveScreen(
     onUndoDelete: suspend (String) -> Result<Unit>,
     onFinalizeDelete: suspend (String) -> Result<Unit>,
     openImage: (String) -> InputStream?,
+    openAudio: (String) -> InputStream? = { null },
 ) {
     val today = LocalDate.now()
     val context = LocalContext.current
@@ -419,6 +420,7 @@ fun JournalArchiveScreen(
     detailEntry?.let { entry ->
         JournalEntryDetailDialog(
             entry = entry,
+            openAudio = openAudio,
             onDismiss = { detailEntry = null },
             onRequestEdit = { editEntry = entry },
             onRequestDelete = {
@@ -432,6 +434,7 @@ fun JournalArchiveScreen(
         JournalEntryEditDialog(
             entry = entry,
             openImage = openImage,
+            openAudio = openAudio,
             onDismiss = { editEntry = null },
             onSave = { updatedEntry, retainedImages, newImageUris ->
                 onUpdate(updatedEntry, retainedImages, newImageUris).onSuccess { savedEntry ->
@@ -1112,6 +1115,7 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
 @Composable
 internal fun JournalEntryDetailDialog(
     entry: JournalEntry,
+    openAudio: (String) -> InputStream? = { null },
     onDismiss: () -> Unit,
     onRequestEdit: (() -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
@@ -1204,11 +1208,18 @@ internal fun JournalEntryDetailDialog(
 
                 Text("记录", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    entry.note.ifBlank { "这一刻只留下了一种心情。" },
+                    entry.note.ifBlank {
+                        if (entry.audio != null) "这一刻还留下了一段声音。" else "这一刻只留下了一种心情。"
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.onSurface,
                 )
+
+                entry.audio?.let { audio ->
+                    Text("这一刻的声音", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    VoicePlaybackCard(audio = audio, openAudio = openAudio)
+                }
 
                 if (entry.imageFileNames.isNotEmpty()) {
                     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
@@ -1257,6 +1268,7 @@ internal fun JournalEntryDetailDialog(
 private fun JournalEntryEditDialog(
     entry: JournalEntry,
     openImage: (String) -> InputStream?,
+    openAudio: (String) -> InputStream?,
     onDismiss: () -> Unit,
     onSave: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
 ) {
@@ -1266,6 +1278,7 @@ private fun JournalEntryEditDialog(
     var selectedMoodName by rememberSaveable(entry.id) { mutableStateOf(entry.mood.name) }
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
+    var retainedAudio by remember(entry.id) { mutableStateOf(entry.audio) }
     var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
     var previewPhoto by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     var retainedImages by rememberSaveable(entry.id) { mutableStateOf(entry.imageFileNames) }
@@ -1426,6 +1439,7 @@ private fun JournalEntryEditDialog(
                                 mood = selectedMood,
                                 tags = selectedTags,
                                 note = note.trim(),
+                                audio = retainedAudio,
                                 outdoor = editedOutdoor,
                             )
                             scope.launch {
@@ -1541,6 +1555,16 @@ private fun JournalEntryEditDialog(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+
+                retainedAudio?.let { audio ->
+                    EditSectionCard(title = "语音", supporting = "移除只影响息刻中的加密副本") {
+                        VoicePlaybackCard(
+                            audio = audio,
+                            openAudio = openAudio,
+                            onDelete = { retainedAudio = null },
+                        )
+                    }
                 }
 
                 EditSectionCard(
@@ -1821,10 +1845,14 @@ private fun DeleteJournalDialog(
                     }
                 }
                 Text(
-                    if (entry.imageFileNames.isEmpty()) {
+                    if (entry.imageFileNames.isEmpty() && entry.audio == null) {
                         "删除后可在底部提示消失前撤销。请确认这不是误操作。"
                     } else {
-                        "删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的 ${entry.imageFileNames.size} 张照片副本会一并清理；系统相册中的原图不会受影响。"
+                        val attachments = buildList {
+                            if (entry.imageFileNames.isNotEmpty()) add("${entry.imageFileNames.size} 张照片")
+                            if (entry.audio != null) add("1 段语音")
+                        }.joinToString("和")
+                        "删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的${attachments}会一并清理；系统相册中的原图不会受影响。"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

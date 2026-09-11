@@ -6,7 +6,7 @@
 
 息刻是一款面向 Android 的离线优先个人感受日记应用，产品标语是“停一刻，听见自己”。它希望让用户在十几秒内记录当下，并在之后安全、可靠地找回和理解这些记录。
 
-应用不要求账号，也没有自建服务端。日记正文、关键词、搜索索引和图片附件默认保存在设备本地并加密；仅当用户主动添加“窗外此刻”时，应用才会请求一次粗略位置并调用 Open-Meteo 获取当前天气。提醒、每日一问和分析均在设备本地完成。
+应用不要求账号，也没有自建服务端。日记正文、关键词、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“窗外此刻”时，应用才会请求一次粗略位置并调用 Open-Meteo 获取当前天气。提醒、每日一问和分析均在设备本地完成。
 
 当前仓库是一个单模块 Android 工程，应用包名为 `com.xike.app`，最低支持 Android 8.0（API 26），目标版本为 API 36。
 
@@ -23,6 +23,7 @@
 - 5 档心情：低落、疲惫、平静、轻松、愉悦。
 - 16 个预设关键词，覆盖工作、关系、身体、睡眠、兴趣等场景。
 - 最多 280 字注脚。
+- 每条记录可添加 1 段最长 5 分钟的语音，支持暂停、继续和试听。
 - 每条记录最多添加 9 张图片，单张上限 20 MB。
 - 支持系统相机拍摄和系统照片选择器。
 - 支持补记过去的日期与时间。
@@ -49,7 +50,7 @@
 
 - SQLCipher 加密整个 Room 数据库。
 - Android Keystore 中的不可导出 AES 密钥用于封装随机数据库口令。
-- 图片附件独立加密后保存在应用私有目录。
+- 图片与语音附件独立加密后保存在应用私有目录。
 - 草稿保存在 `EncryptedSharedPreferences` 中。
 - 应用锁使用系统面容、指纹或设备凭据，不自建 PIN 体系。
 - 支持由用户密码保护的加密备份、恢复前校验和恢复后一次撤销。
@@ -126,6 +127,7 @@ flowchart TD
 | [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/JournalInsightsUi.kt) | 轨迹、图表、样本说明和原始记录下钻界面。 |
 | [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 一次性粗略定位、城市检索、天气请求和天气快照规范化。 |
 | [`PhotoCapture.kt`](../app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
+| [`VoiceRecording.kt`](../app/src/main/java/com/xike/app/VoiceRecording.kt) | 麦克风录制、真实音量波形、暂停/继续和加密语音试听 UI。 |
 | [`ReminderScheduler.kt`](../app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
 | [`HabitPreferences.kt`](../app/src/main/java/com/xike/app/HabitPreferences.kt) | 提醒、勿扰、暂停和每日一问设置。 |
 | [`AppLockPreferences.kt`](../app/src/main/java/com/xike/app/AppLockPreferences.kt) | 应用锁开关和自动锁定时间设置。 |
@@ -133,13 +135,14 @@ flowchart TD
 
 ## 7. 数据模型与持久化
 
-当前 Room schema 版本为 3，包含以下表：
+当前 Room schema 版本为 4，包含以下表：
 
 | 表 | 用途 |
 | --- | --- |
 | `journal_entries` | 日记主记录，包括时间、心情、注脚和可选天气快照。 |
 | `journal_tags` | 按顺序保存每条日记的关键词。 |
 | `journal_images` | 按顺序保存每条日记引用的加密图片文件名。 |
+| `journal_audios` | 保存每条日记的加密语音文件名、时长和媒体类型。 |
 | `journal_entries_fts` | FTS4 全文搜索文档，索引注脚和关键词。 |
 | `app_settings` | 主题、旧数据迁移标记和搜索索引版本等应用设置。 |
 

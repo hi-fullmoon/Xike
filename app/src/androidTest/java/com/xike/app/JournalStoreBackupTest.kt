@@ -85,6 +85,25 @@ class JournalStoreBackupTest {
     }
 
     @Test
+    fun encryptedAudioIsIncludedInBackupAndRestore() {
+        val audioContents = ByteArray(48 * 1024) { index -> (index % 239).toByte() }
+        val sourceFile = File(context.cacheDir, "backup-test-audio.m4a").also { it.writeBytes(audioContents) }
+        val audio = store.importAudio(sourceFile, 12_500L)
+        store.add(entry("voice-source", 1_700_000_000_500L, "有一段语音").copy(audio = audio))
+        val backup = encryptedBackup()
+
+        replaceWithLocalEntry()
+
+        val summary = store.inspectEncryptedBackup(backup.inputStream(), PASSWORD)
+        assertEquals(1, summary.audioCount)
+        val restored = store.restoreEncryptedBackup(backup.inputStream(), PASSWORD).single()
+
+        assertEquals(12_500L, restored.audio?.durationMillis)
+        val restoredBytes = store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() }
+        assertArrayEquals(audioContents, restoredBytes)
+    }
+
+    @Test
     fun wrongPasswordDoesNotChangeExistingData() {
         store.add(entry("source", 100L, "备份内容"))
         val backup = encryptedBackup()
@@ -133,13 +152,18 @@ class JournalStoreBackupTest {
 
     @Test
     fun finalizedDeleteRemovesRecordSearchIndexAndPrivateImageCopy() {
+        val audioFile = File(context.cacheDir, "backup-test-audio-delete.m4a").also {
+            it.writeBytes("private audio".toByteArray())
+        }
+        val audio = store.importAudio(audioFile, 2_000L)
         val stored = store.add(
-            entry("delete-me", 300L, "待删除标记"),
+            entry("delete-me", 300L, "待删除标记").copy(audio = audio),
             imageUris(listOf("private image".toByteArray())),
         ).single()
         val imageFileName = stored.imageFileNames.single()
 
         store.openImage(imageFileName).use { input -> assertNotNull(input) }
+        store.openAudio(audio.fileName).use { input -> assertNotNull(input) }
         assertEquals(1, store.search(JournalSearchQuery(text = "待删除标记")).totalCount)
 
         val remaining = store.delete(stored.id)
@@ -152,11 +176,13 @@ class JournalStoreBackupTest {
         store.finalizeDelete(stored.id)
 
         assertNull(store.openImage(imageFileName))
+        assertNull(store.openAudio(audio.fileName))
     }
 
     private fun replaceWithLocalEntry() {
         dao.replaceJournals(emptyList())
         journalImagesDirectory().listFiles()?.forEach(File::delete)
+        journalAudiosDirectory().listFiles()?.forEach(File::delete)
         store.add(entry("local", 200L, "设备上的原记录"))
     }
 
@@ -239,6 +265,7 @@ class JournalStoreBackupTest {
         if (::dao.isInitialized) JournalDatabase.get(context).clearAllTables()
         if (::context.isInitialized) {
             journalImagesDirectory().listFiles()?.forEach(File::delete)
+            journalAudiosDirectory().listFiles()?.forEach(File::delete)
             context.filesDir.listFiles()
                 ?.filter {
                     it.name.startsWith("journal-images-restore-") ||
@@ -248,13 +275,15 @@ class JournalStoreBackupTest {
                     if (file.isDirectory) file.deleteRecursively() else file.delete()
                 }
             context.cacheDir.listFiles()
-                ?.filter { it.name.startsWith("backup-test-image-") }
+                ?.filter { it.name.startsWith("backup-test-image-") || it.name.startsWith("backup-test-audio") }
                 ?.forEach(File::delete)
             restorePreferences().edit().clear().commit()
         }
     }
 
     private fun journalImagesDirectory(): File = File(context.filesDir, "journal-images")
+
+    private fun journalAudiosDirectory(): File = File(context.filesDir, "journal-audios")
 
     private fun restorePreferences() = EncryptedSharedPreferences.create(
         context,

@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.InputStream
+import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -41,6 +42,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     init {
+        pruneVoiceTemporaryFiles(application)
         viewModelScope.launch {
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
@@ -51,7 +53,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 draftResult.onSuccess { draft = it }
                 dataError = draftResult.exceptionOrNull()?.message
                 viewModelScope.launch(Dispatchers.IO) {
-                    runCatching(store::removeOrphanedImages)
+                    runCatching { store.removeOrphanedMedia(draft.audio?.fileName) }
                 }
                 viewModelScope.launch {
                     store.observeEntries()
@@ -180,6 +182,38 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    suspend fun addDraftAudio(source: File, durationMillis: Long): Result<Unit> {
+        val requestGeneration = draftGeneration
+        val baseDraft = draft
+        val imported = withContext(Dispatchers.IO) {
+            runCatching { store.importAudio(source, durationMillis) }
+        }
+        val result = imported.mapCatching { audio ->
+            check(requestGeneration == draftGeneration) { "这段录音已经取消。" }
+            val previousAudio = baseDraft.audio
+            check(persistDraft(baseDraft.copy(audio = audio))) { "录音已经完成，但草稿保存失败。" }
+            if (previousAudio != null && previousAudio.fileName != audio.fileName) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    store.deleteUnreferencedAudio(previousAudio.fileName)
+                }
+            }
+        }
+        result.exceptionOrNull()?.let { error ->
+            imported.getOrNull()?.let { audio ->
+                withContext(Dispatchers.IO) { store.deleteUnreferencedAudio(audio.fileName) }
+            }
+            dataError = error.message ?: "录音保存失败，请重试。"
+        }
+        return result
+    }
+
+    fun removeDraftAudio() {
+        val removed = draft.audio ?: return
+        if (persistDraft(draft.copy(audio = null))) {
+            viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(removed.fileName) }
+        }
+    }
+
     fun discardDraft() {
         val discardedDraft = draft
         if (persistDraft(JournalDraft())) {
@@ -187,6 +221,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             discardedDraft.imageUriStrings
                 .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
                 .forEach(::releaseDraftImageAccess)
+            discardedDraft.audio?.fileName?.let { fileName ->
+                viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(fileName) }
+            }
         }
     }
 
@@ -273,7 +310,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                    store.restoreEncryptedBackup(input, password)
+                    store.restoreEncryptedBackup(input, password, setOfNotNull(draft.audio?.fileName))
                 } ?: error("无法读取备份文件")
             }
         }
@@ -286,7 +323,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }.await()
 
     suspend fun undoRestore(): Result<Int> = viewModelScope.async {
-        val result = withContext(Dispatchers.IO) { runCatching(store::undoLastRestore) }
+        val result = withContext(Dispatchers.IO) {
+            runCatching { store.undoLastRestore(setOfNotNull(draft.audio?.fileName)) }
+        }
         result.onSuccess {
             entries = it
             canUndoRestore = false
@@ -296,6 +335,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }.await()
 
     fun openImage(fileName: String): InputStream? = store.openImage(fileName)
+
+    fun openAudio(fileName: String): InputStream? = store.openAudio(fileName)
 
     private fun persistDraft(updated: JournalDraft): Boolean {
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
@@ -350,26 +391,31 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private fun loadAccessibleDraft(): JournalDraft {
         val loaded = draftStore.load()
         val application = getApplication<Application>()
-        if (loaded.imageUriStrings.isEmpty()) {
+        val loadedWithAccessibleAudio = if (loaded.audio == null || store.openAudio(loaded.audio.fileName)?.use { true } == true) {
+            loaded
+        } else {
+            loaded.copy(audio = null).also(draftStore::save)
+        }
+        if (loadedWithAccessibleAudio.imageUriStrings.isEmpty()) {
             pruneCameraCaptures(application)
-            return loaded
+            return loadedWithAccessibleAudio
         }
         val contentResolver = application.contentResolver
         val readableUris = contentResolver.persistedUriPermissions
             .filter { it.isReadPermission }
             .map { it.uri.toString() }
             .toSet()
-        val accessible = loaded.copy(
-            imageUriStrings = loaded.imageUriStrings.filter { uriString ->
+        val accessible = loadedWithAccessibleAudio.copy(
+            imageUriStrings = loadedWithAccessibleAudio.imageUriStrings.filter { uriString ->
                 val uri = Uri.parse(uriString)
                 (isCameraCaptureUri(application, uri) || uriString in readableUris) && runCatching {
                     contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true
                 }.getOrDefault(false)
             },
         )
-        if (accessible != loaded) {
+        if (accessible != loadedWithAccessibleAudio) {
             draftStore.save(accessible)
-            loaded.imageUriStrings
+            loadedWithAccessibleAudio.imageUriStrings
                 .filterNot { it in accessible.imageUriStrings }
                 .map(Uri::parse)
                 .forEach(::releaseDraftImageAccess)

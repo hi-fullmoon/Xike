@@ -6,12 +6,13 @@ import org.junit.Test
 
 class JournalDraftTest {
     @Test
-    fun `draft round trip preserves mood note tags images and update time`() {
+    fun `draft round trip preserves mood note tags images audio and update time`() {
         val draft = JournalDraft(
             mood = Mood.GOOD,
             note = "今天完成了重要的事",
             tags = linkedSetOf("工作", "学习"),
             imageUriStrings = listOf("content://photo/1", "content://photo/2"),
+            audio = JournalAudio("draft.xike-audio", 9_500L),
             recordedAt = 120_000L,
             updatedAt = 123_456L,
         )
@@ -54,6 +55,18 @@ class JournalDraftTest {
 
         assertTrue(draft.isEmpty)
         assertEquals(null, draft.recordedAt)
+        assertEquals(0L, draft.updatedAt)
+    }
+
+    @Test
+    fun `invalid audio duration is removed during normalization`() {
+        val draft = JournalDraft(
+            audio = JournalAudio("draft.xike-audio", MAX_AUDIO_DURATION_MILLIS + 1L),
+            updatedAt = 99L,
+        ).normalized()
+
+        assertTrue(draft.isEmpty)
+        assertEquals(null, draft.audio)
         assertEquals(0L, draft.updatedAt)
     }
 
