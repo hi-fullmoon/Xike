@@ -761,7 +761,7 @@ fun MomentScreen(
                 onSelected = onDraftMoodChange,
             )
 
-            PaperCard {
+            PaperCard(contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 10.dp)) {
                 Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
                 TextField(
@@ -3050,10 +3050,11 @@ internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: St
 @Composable
 private fun PaperCard(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(modifier = modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(18.dp), content = content)
+        Column(Modifier.padding(contentPadding), content = content)
     }
 }
 
