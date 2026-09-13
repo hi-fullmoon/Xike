@@ -347,7 +347,7 @@ fun JournalArchiveScreen(
                 ArchiveEmptyState(
                     icon = Icons.Outlined.Search,
                     title = "没有找到这一刻",
-                    description = "试试减少筛选条件，或换一个关键词。",
+                    description = "试试减少筛选条件，或换一个主题。",
                 )
             }
         } else {
@@ -589,7 +589,7 @@ private fun ArchiveSearchBar(
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         shape = XikeShapes.inner,
-        placeholder = { Text("搜索注脚或关键词") },
+        placeholder = { Text("搜索注脚或主题") },
         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         trailingIcon = {
             if (value.isNotEmpty()) {
@@ -781,7 +781,7 @@ private fun ArchiveFilters(
             }
 
             if (availableTags.isNotEmpty()) {
-                FilterTitle("此刻关键词")
+                FilterTitle("主题")
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1178,7 +1178,7 @@ internal fun JournalEntryDetailDialog(
                 }
 
                 if (entry.tags.isNotEmpty()) {
-                    Text("此刻关键词", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("主题", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.bodyLarge)
                 }
 
@@ -1568,7 +1568,7 @@ private fun JournalEntryEditDialog(
                 }
 
                 EditSectionCard(
-                    title = "此刻关键词",
+                    title = "主题",
                     supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.size}",
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {

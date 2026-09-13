@@ -6,7 +6,7 @@
 
 息刻是一款面向 Android 的离线优先个人感受日记应用，产品标语是“停一刻，听见自己”。它希望让用户在十几秒内记录当下，并在之后安全、可靠地找回和理解这些记录。
 
-应用不要求账号，也没有自建服务端。日记正文、关键词、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“窗外此刻”时，应用才会请求一次粗略位置并调用 Open-Meteo 获取当前天气。提醒、每日一问和分析均在设备本地完成。
+应用不要求账号，也没有自建服务端。日记正文、主题、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“窗外此刻”时，应用才会请求一次粗略位置并调用 Open-Meteo 获取当前天气。提醒、每日一问和分析均在设备本地完成。
 
 当前仓库是一个单模块 Android 工程，应用包名为 `com.xike.app`，最低支持 Android 8.0（API 26），目标版本为 API 36。
 
@@ -21,7 +21,7 @@
 ### 记录此刻
 
 - 5 档心情：低落、疲惫、平静、轻松、愉悦。
-- 16 个预设关键词，覆盖工作、关系、身体、睡眠、兴趣等场景。
+- 16 个预设主题，覆盖工作、关系、身体、睡眠、兴趣等场景。
 - 最多 280 字注脚。
 - 每条记录可添加 1 段最长 5 分钟的语音，支持暂停、继续和试听。
 - 每条记录最多添加 9 张图片，单张上限 20 MB。
@@ -34,14 +34,14 @@
 
 - 月历和时间流两种浏览方式。
 - 基于 Room FTS4 的本地全文搜索。
-- 可组合筛选心情、关键词、日期范围和是否包含图片。
+- 可组合筛选心情、主题、日期范围和是否包含图片。
 - 支持查看、编辑和删除已有记录。
 - 删除需要确认，并提供一次短时撤销。
 
 ### 轨迹与洞察
 
 - 支持本周、近 30 天、近 90 天和今年等时间范围。
-- 展示心情分布、记录覆盖度、前一周期对比和关键词趋势。
+- 展示心情分布、记录覆盖度、前一周期对比和主题趋势。
 - 提供工作日与周末对照。
 - 每项分析都保留样本范围说明，并可下钻到原始记录。
 - 回顾文字在本机生成；只有用户主动分享时才交给其他应用。
@@ -106,9 +106,9 @@ flowchart TD
 
 典型的保存链路如下：
 
-1. 用户在 `MomentScreen` 中选择心情、关键词、注脚和图片。
+1. 用户在 `MomentScreen` 中选择心情、主题、注脚和图片。
 2. `JournalViewModel` 持有当前草稿状态，并将草稿同步到加密偏好设置。
-3. 保存时，`JournalStore` 先导入并加密图片，再通过事务写入日记、关键词、图片引用和全文搜索文档。
+3. 保存时，`JournalStore` 先导入并加密图片，再通过事务写入日记、主题、图片引用和全文搜索文档。
 4. Room 的 `Flow` 推送最新记录列表，Compose 界面自动刷新。
 
 ## 6. 主要代码模块
@@ -121,7 +121,7 @@ flowchart TD
 | [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
 | [`JournalDraft.kt`](../app/src/main/java/com/xike/app/JournalDraft.kt) | 草稿模型、规范化、JSON 序列化和加密持久化。 |
 | [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
-| [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度、关键词与工作日/周末分析。 |
+| [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度、主题与工作日/周末分析。 |
 | [`XikeUi.kt`](../app/src/main/java/com/xike/app/XikeUi.kt) | 主题、导航、记录页、设置页和通用 Compose 组件。 |
 | [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/JournalArchiveUi.kt) | 回望、搜索、筛选、详情、编辑、删除和图片浏览界面。 |
 | [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/JournalInsightsUi.kt) | 轨迹、图表、样本说明和原始记录下钻界面。 |
@@ -140,10 +140,10 @@ flowchart TD
 | 表 | 用途 |
 | --- | --- |
 | `journal_entries` | 日记主记录，包括时间、心情、注脚和可选天气快照。 |
-| `journal_tags` | 按顺序保存每条日记的关键词。 |
+| `journal_tags` | 按顺序保存每条日记的主题。 |
 | `journal_images` | 按顺序保存每条日记引用的加密图片文件名。 |
 | `journal_audios` | 保存每条日记的加密语音文件名、时长和媒体类型。 |
-| `journal_entries_fts` | FTS4 全文搜索文档，索引注脚和关键词。 |
+| `journal_entries_fts` | FTS4 全文搜索文档，索引注脚和主题。 |
 | `app_settings` | 主题、旧数据迁移标记和搜索索引版本等应用设置。 |
 
 `journal_tags` 和 `journal_images` 通过外键关联日记，删除主记录时级联删除引用。新增、更新、删除、批量替换和搜索索引重建均由 DAO 事务封装。
@@ -268,7 +268,7 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 
 根据 [`docs/roadmap.md`](roadmap.md)，项目当前仍处于 1.0 前的快速迭代阶段。记录、回望、检索、洞察、加密、应用锁、提醒和发布主链路已经具备，后续重点包括：
 
-- 自定义关键词。
+- 自定义主题。
 - 更安全、可预览、可合并的备份恢复体验。
 - 用户授权目录中的定期加密备份。
 - Markdown/CSV 明文导出及清晰的隐私警告。

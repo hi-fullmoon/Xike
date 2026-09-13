@@ -157,7 +157,7 @@ fun JournalInsightsScreen(
             TagTrendsCard(summary.topTags, summary.evidence) { tag ->
                 drilldown = InsightDrilldown(
                     title = "${tag.tag} · ${tag.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的关键词",
+                    subtitle = "${selectedPeriod.contextName}的主题",
                     entryIds = tag.entryIds,
                 )
             }
@@ -558,11 +558,11 @@ private fun TagTrendsCard(
 ) {
     InsightSectionCard(
         icon = XikeIcons.Archive,
-        index = "关键词",
-        title = "反复出现的关键词",
+        index = "主题",
+        title = "反复出现的主题",
     ) {
         if (tags.isEmpty()) {
-            InsufficientDataNote("添加此刻关键词后，这里会显示实际出现次数。")
+            InsufficientDataNote("添加主题后，这里会显示实际出现次数。")
         } else {
             tags.forEach { tag ->
                 Row(
@@ -588,7 +588,7 @@ private fun TagTrendsCard(
             }
             if (!evidence.canDescribePatterns) {
                 Text(
-                    "样本较少，关键词仅按次数排序，不解释其意义。",
+                    "样本较少，主题仅按次数排序，不解释其意义。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

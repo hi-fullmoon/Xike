@@ -302,7 +302,7 @@ internal fun localReviewText(summary: JournalPeriodSummary): String {
         .ifBlank { "暂无心情分布" }
     val tagLine = summary.topTags.take(3)
         .joinToString("、") { "${it.tag} ${it.entryCount} 次" }
-        .ifBlank { "暂无关键词" }
+        .ifBlank { "暂无主题" }
     val comparisonLine = if (summary.comparison.hasEnoughSamples) {
         "相比前一周期，记录次数${summary.comparison.entryCountDelta.signedCount()}，记录天数${summary.comparison.recordedDayDelta.signedCount()}。"
     } else {
@@ -313,7 +313,7 @@ internal fun localReviewText(summary: JournalPeriodSummary): String {
         appendLine("${summary.startDate.format(dateFormatter)} — ${summary.endDate.format(dateFormatter)}")
         appendLine("记录 ${summary.entryCount} 次，分布在 ${summary.recordedDayCount} 天。")
         appendLine("心情分布：$moodLine。")
-        appendLine("常见关键词：$tagLine。")
+        appendLine("常见主题：$tagLine。")
         appendLine(comparisonLine)
         append("这些是本机记录的描述性统计，不代表原因、诊断或建议。")
     }

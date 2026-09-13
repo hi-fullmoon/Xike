@@ -484,6 +484,8 @@ fun MomentScreen(
 ) {
     var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
+    var revealDetailsRequest by remember { mutableIntStateOf(0) }
+    val detailsAnchor = remember { BringIntoViewRequester() }
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var isNoteFocused by remember { mutableStateOf(false) }
@@ -548,6 +550,12 @@ fun MomentScreen(
     val draftHasDetails = draft.tags.isNotEmpty()
     LaunchedEffect(draftHasDetails) {
         if (draftHasDetails) showDetails = true
+    }
+    LaunchedEffect(revealDetailsRequest) {
+        if (revealDetailsRequest > 0) {
+            withFrameNanos { }
+            detailsAnchor.bringIntoView()
+        }
     }
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         onDraftImagesAdded(uris)
@@ -695,6 +703,10 @@ fun MomentScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            if (dailyPromptSettings.enabled) {
+                DailyQuestion(today, dailyPromptSettings.style)
+            }
 
             MoodPicker(
                 selectedMood = draft.mood,
@@ -873,72 +885,85 @@ fun MomentScreen(
             )
 
             Surface(
-                modifier = Modifier.fillMaxWidth().clip(XikeShapes.card).clickable(enabled = !isSaving) {
-                    if (showDetails) dismissKeyboard()
-                    showDetails = !showDetails
-                },
+                modifier = Modifier.fillMaxWidth(),
                 shape = XikeShapes.card,
                 color = MaterialTheme.colorScheme.surface,
             ) {
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("再留下一点", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            if (draft.tags.isEmpty()) "选关键词 · 可选"
-                            else "已选 ${draft.tags.size} 个关键词",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Icon(
-                        if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                        contentDescription = if (showDetails) "收起更多内容" else "展开更多内容",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-
-            if (showDetails) {
-                PaperCard {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("此刻关键词", style = MaterialTheme.typography.titleSmall)
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                enabled = !isSaving,
+                                onClickLabel = if (showDetails) "收起主题" else "展开主题",
+                                role = Role.Button,
+                            ) {
+                                if (showDetails) dismissKeyboard()
+                                showDetails = !showDetails
+                                if (showDetails) revealDetailsRequest++
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("再留下一点", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "这一刻与什么有关？",
+                                if (draft.tags.isEmpty()) "选主题 · 可选"
+                                else "已选 ${draft.tags.size} 个主题",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            if (draft.tags.isEmpty()) "可多选" else "已选 ${draft.tags.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                        Icon(
+                            if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    Spacer(Modifier.height(7.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        journalTopics.chunked(3).forEach { rowTopics ->
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                rowTopics.forEach { topic ->
-                                    TopicChip(
-                                        topic = topic,
-                                        selected = topic.label in draft.tags,
-                                        onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
-                                        modifier = Modifier.weight(1f),
+
+                    if (showDetails) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(16.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("主题", style = MaterialTheme.typography.titleSmall)
+                                    Text(
+                                        "这一刻与什么有关？",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                repeat(3 - rowTopics.size) {
-                                    Spacer(Modifier.weight(1f))
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    if (draft.tags.isEmpty()) "可多选" else "已选 ${draft.tags.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            Spacer(Modifier.height(7.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                journalTopics.chunked(3).forEach { rowTopics ->
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        rowTopics.forEach { topic ->
+                                            TopicChip(
+                                                topic = topic,
+                                                selected = topic.label in draft.tags,
+                                                onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        repeat(3 - rowTopics.size) {
+                                            Spacer(Modifier.weight(1f))
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            if (dailyPromptSettings.enabled) {
-                DailyQuestion(today, dailyPromptSettings.style)
             }
         }
 
@@ -1037,7 +1062,7 @@ fun MomentScreen(
             title = { Text("放弃这份草稿？") },
             text = {
                 Text(
-                    "将清空尚未保存的心情、窗外此刻、注脚、关键词、照片、语音和补记时间。已保存的记录不会受影响。",
+                    "将清空尚未保存的心情、窗外此刻、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -2028,9 +2053,9 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
         if (summary.entryCount > 0) {
             InsightCard(
                 icon = Icons.Outlined.LocalOffer,
-                label = summary.mostUsedTag ?: "还没有高频关键词",
-                content = if (summary.mostUsedTag == null) "添加此刻关键词后，这里会帮你发现反复出现的线索。"
-                else "“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的关键词，或许值得多留意一点。",
+                label = summary.mostUsedTag ?: "还没有常见主题",
+                content = if (summary.mostUsedTag == null) "添加主题后，这里会帮你发现反复出现的线索。"
+                else "“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的主题，或许值得多留意一点。",
             )
         }
     }
