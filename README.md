@@ -6,15 +6,19 @@
 
 ## 应用预览
 
-以下画面来自 Android 模拟器，记录内容为虚构演示数据。
+以下画面来自 1440 × 3200 的 Android 模拟器，记录内容为虚构演示数据。点击图片可查看原图。
 
-| 记录此刻 | 轨迹（近 30 天） | 回望（时间流） |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/moment.png" alt="选择心情并写下注脚" width="260"> | <img src="docs/screenshots/insights.png" alt="查看近 30 天的心情轨迹" width="260"> | <img src="docs/screenshots/archive.png" alt="按时间流回望记录" width="260"> |
+| 记录此刻 | 回望（时间流） |
+| :---: | :---: |
+| <a href="docs/screenshots/moment.png"><img src="docs/screenshots/moment.png" alt="选择心情并写下注脚" width="360"></a> | <a href="docs/screenshots/archive.png"><img src="docs/screenshots/archive.png" alt="按时间流回望记录" width="360"></a> |
 
-| 回望（月历） | 轨迹（趋势与分布） | 设置与隐私 |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/calendar.png" alt="在月历中查看记录日期" width="260"> | <img src="docs/screenshots/insights-detail.png" alt="查看心情趋势与分布" width="260"> | <img src="docs/screenshots/settings.png" alt="应用锁、提醒和每日一问设置" width="260"> |
+| 回望（月历） | 轨迹（近 30 天） |
+| :---: | :---: |
+| <a href="docs/screenshots/calendar.png"><img src="docs/screenshots/calendar.png" alt="在月历中查看记录日期" width="360"></a> | <a href="docs/screenshots/insights.png"><img src="docs/screenshots/insights.png" alt="查看近 30 天的心情轨迹" width="360"></a> |
+
+| 轨迹（趋势与分布） | 设置与隐私 |
+| :---: | :---: |
+| <a href="docs/screenshots/insights-detail.png"><img src="docs/screenshots/insights-detail.png" alt="查看心情趋势与分布" width="360"></a> | <a href="docs/screenshots/settings.png"><img src="docs/screenshots/settings.png" alt="应用锁、提醒和每日一问设置" width="360"></a> |
 
 ## 主要功能
 
