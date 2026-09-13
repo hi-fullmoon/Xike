@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -563,7 +564,7 @@ private fun ArchiveToolbox(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
     ) {
-        Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ArchiveSearchBar(
                 value = queryText,
                 onValueChange = onQueryChange,
@@ -589,15 +590,16 @@ private fun ArchiveSearchBar(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
         singleLine = true,
         shape = XikeShapes.inner,
-        placeholder = { Text("搜索注脚或主题") },
-        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+        textStyle = MaterialTheme.typography.bodyMedium,
+        placeholder = { Text("搜索注脚或主题", style = MaterialTheme.typography.bodyMedium) },
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Icons.Outlined.Close, contentDescription = "清空搜索")
+                    Icon(Icons.Outlined.Close, contentDescription = "清空搜索", modifier = Modifier.size(18.dp))
                 }
             }
         },
@@ -620,17 +622,17 @@ private fun ArchiveControls(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
         ) {
             Row(
-                Modifier.padding(4.dp).selectableGroup(),
+                Modifier.padding(3.dp).selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 ArchiveModeButton(
@@ -651,9 +653,9 @@ private fun ArchiveControls(
         }
         Surface(
             modifier = Modifier
-                .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
+                .sizeIn(minWidth = 40.dp, minHeight = 40.dp)
                 .clickable(onClick = onToggleFilters),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(14.dp),
             color = if (showFilters || activeFilterCount > 0) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
@@ -661,7 +663,7 @@ private fun ArchiveControls(
             },
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 11.dp, vertical = 11.dp),
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -671,12 +673,12 @@ private fun ArchiveControls(
                     } else {
                         "筛选，已启用 $activeFilterCount 个条件"
                     },
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                     tint = if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (activeFilterCount > 0) {
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         activeFilterCount.toString(),
                         style = MaterialTheme.typography.labelSmall,
@@ -698,27 +700,27 @@ private fun ArchiveModeButton(
 ) {
     Surface(
         modifier = modifier
-            .sizeIn(minHeight = 44.dp)
+            .sizeIn(minHeight = 36.dp)
             .selectable(
                 selected = selected,
                 role = Role.Tab,
                 onClick = onClick,
             ),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.xikeInlineActionIcon(),
+                modifier = Modifier.size(18.dp).offset(y = 1.dp),
                 tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(XikeInlineActionGap))
+            Spacer(Modifier.width(4.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
@@ -750,8 +752,8 @@ private fun ArchiveFilters(
         shadowElevation = 1.dp,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),

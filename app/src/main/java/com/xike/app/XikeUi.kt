@@ -1212,8 +1212,8 @@ private fun MomentQuickAction(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(XikeInlineActionGap))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp).offset(y = 1.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
