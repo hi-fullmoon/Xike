@@ -17,9 +17,16 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class PendingDraftAudio(
+    val durationMillis: Long,
+    val draftGeneration: Long,
+    val stagedFileName: String? = null,
+)
+
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
     private val draftStore = JournalDraftStore(application)
+    private val pendingAudioStore = PendingDraftAudioStore(application)
     private val outdoorRepository = OutdoorContextRepository(application)
     private var draftGeneration = 0L
 
@@ -30,6 +37,15 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     var draft by mutableStateOf(JournalDraft())
+        private set
+
+    var pendingDraftAudio by mutableStateOf<PendingDraftAudio?>(null)
+        private set
+
+    var isDraftAudioSaving by mutableStateOf(false)
+        private set
+
+    var draftAudioSaveError by mutableStateOf<String?>(null)
         private set
 
     var dataError by mutableStateOf<String?>(null)
@@ -46,13 +62,21 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
+            val pendingResult = withContext(Dispatchers.IO) { runCatching(pendingAudioStore::recover) }
             result.onSuccess { snapshot ->
                 entries = snapshot.entries
                 selectedTheme = AppTheme.entries.firstOrNull { it.name == snapshot.themeName } ?: AppTheme.OCEAN
                 canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
                 draftResult.onSuccess { draft = it }
                 dataError = draftResult.exceptionOrNull()?.message
-                viewModelScope.launch(Dispatchers.IO) {
+                pendingResult.onSuccess { staged ->
+                    pendingDraftAudio = staged?.let {
+                        PendingDraftAudio(it.durationMillis, draftGeneration, it.fileName)
+                    }
+                }.onFailure { error ->
+                    dataError = error.message ?: "录音暂存文件暂时无法读取。"
+                }
+                withContext(Dispatchers.IO) {
                     runCatching { store.removeOrphanedMedia(draft.audio?.fileName) }
                 }
                 viewModelScope.launch {
@@ -66,6 +90,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 dataError = error.message ?: "日记数据库暂时无法读取，原数据未被覆盖。"
             }
             isLoading = false
+            if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
         }
     }
 
@@ -182,29 +207,115 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun addDraftAudio(source: File, durationMillis: Long): Result<Unit> {
-        val requestGeneration = draftGeneration
-        val baseDraft = draft
-        val imported = withContext(Dispatchers.IO) {
-            runCatching { store.importAudio(source, durationMillis) }
+    fun queueDraftAudio(source: File, durationMillis: Long) {
+        if (pendingDraftAudio != null) {
+            source.delete()
+            return
         }
-        val result = imported.mapCatching { audio ->
-            check(requestGeneration == draftGeneration) { "这段录音已经取消。" }
-            val previousAudio = baseDraft.audio
-            check(persistDraft(baseDraft.copy(audio = audio))) { "录音已经完成，但草稿保存失败。" }
-            if (previousAudio != null && previousAudio.fileName != audio.fileName) {
-                viewModelScope.launch(Dispatchers.IO) {
-                    store.deleteUnreferencedAudio(previousAudio.fileName)
+        val pending = PendingDraftAudio(durationMillis, draftGeneration)
+        pendingDraftAudio = pending
+        isDraftAudioSaving = true
+        draftAudioSaveError = null
+        viewModelScope.launch {
+            val staged = try {
+                withContext(Dispatchers.IO) {
+                    try {
+                        pendingAudioStore.stage(source, durationMillis)
+                    } finally {
+                        source.delete()
+                    }
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (pending === pendingDraftAudio) {
+                    pendingDraftAudio = null
+                    dataError = error.message ?: "录音未能加密暂存，请重新录制。"
+                }
+                isDraftAudioSaving = false
+                return@launch
+            }
+            if (pending !== pendingDraftAudio || pending.draftGeneration != draftGeneration) {
+                try {
+                    withContext(Dispatchers.IO) { runCatching { pendingAudioStore.delete(staged) } }
+                } finally {
+                    if (pending === pendingDraftAudio) pendingDraftAudio = null
+                    isDraftAudioSaving = false
+                }
+                return@launch
+            }
+            pendingDraftAudio = pending.copy(stagedFileName = staged.fileName)
+            isDraftAudioSaving = false
+            retryPendingDraftAudio()
+        }
+    }
+
+    fun retryPendingDraftAudio() {
+        val pending = pendingDraftAudio ?: return
+        val staged = pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
+        if (isDraftAudioSaving) return
+        isDraftAudioSaving = true
+        draftAudioSaveError = null
+        viewModelScope.launch {
+            try {
+                val imported = withContext(Dispatchers.IO) {
+                    runCatching {
+                        pendingAudioStore.open(staged).use { input ->
+                            store.importAudio(input, pending.durationMillis)
+                        }
+                    }
+                }
+                val result = imported.mapCatching { audio ->
+                    check(pending === pendingDraftAudio && pending.draftGeneration == draftGeneration) {
+                        "这段录音已经取消。"
+                    }
+                    val previousAudio = draft.audio
+                    check(persistDraft(draft.copy(audio = audio), reportError = false)) {
+                        "录音已经完成，但草稿保存失败。"
+                    }
+                    if (previousAudio != null && previousAudio.fileName != audio.fileName) {
+                        viewModelScope.launch(Dispatchers.IO) {
+                            store.deleteUnreferencedAudio(previousAudio.fileName)
+                        }
+                    }
+                }
+                imported.getOrNull()?.takeIf { result.isFailure }?.let { audio ->
+                    withContext(Dispatchers.IO) {
+                        runCatching { store.deleteUnreferencedAudio(audio.fileName) }
+                    }
+                }
+                if (pending === pendingDraftAudio) {
+                    result.onSuccess {
+                        check(withContext(Dispatchers.IO) { pendingAudioStore.delete(staged) }) {
+                            "录音已保存，但暂存文件清理失败，请重试。"
+                        }
+                        pendingDraftAudio = null
+                    }.onFailure { error ->
+                        draftAudioSaveError = error.message ?: "录音保存失败，请重试。"
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (pending === pendingDraftAudio) {
+                    draftAudioSaveError = error.message ?: "录音保存失败，请重试。"
+                }
+            } finally {
+                isDraftAudioSaving = false
             }
         }
-        result.exceptionOrNull()?.let { error ->
-            imported.getOrNull()?.let { audio ->
-                withContext(Dispatchers.IO) { store.deleteUnreferencedAudio(audio.fileName) }
-            }
-            dataError = error.message ?: "录音保存失败，请重试。"
+    }
+
+    fun discardPendingDraftAudio() {
+        if (isDraftAudioSaving) return
+        val pending = pendingDraftAudio ?: return
+        val staged = pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
+        if (!pendingAudioStore.delete(staged)) {
+            draftAudioSaveError = "录音暂存文件暂时无法删除，请重试。"
+            return
         }
-        return result
+        pendingDraftAudio = null
+        draftAudioSaveError = null
     }
 
     fun removeDraftAudio() {
@@ -215,6 +326,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun discardDraft() {
+        if (pendingDraftAudio != null) return
         val discardedDraft = draft
         if (persistDraft(JournalDraft())) {
             draftGeneration++
@@ -338,14 +450,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun openAudio(fileName: String): InputStream? = store.openAudio(fileName)
 
-    private fun persistDraft(updated: JournalDraft): Boolean {
+    private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
         return runCatching { draftStore.save(normalized) }
             .onSuccess {
                 draft = normalized
             }
             .onFailure { error ->
-                dataError = error.message ?: "草稿保存失败，请重试。"
+                if (reportError) dataError = error.message ?: "草稿保存失败，请重试。"
             }
             .isSuccess
     }

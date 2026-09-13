@@ -23,12 +23,15 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -147,18 +153,16 @@ internal class XikeAudioRecorder(private val context: Context) {
 
 @Composable
 internal fun VoiceCaptureCard(
-    startRequest: Int,
     enabled: Boolean,
-    onRecorded: suspend (File, Long) -> Result<Unit>,
+    onRecorded: (File, Long) -> Unit,
     onClosed: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
     val recorder = remember { XikeAudioRecorder(context.applicationContext) }
     var isRecording by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
-    var isSaving by remember { mutableStateOf(false) }
+    var isStopping by remember { mutableStateOf(false) }
     var startedAt by remember { mutableLongStateOf(0L) }
     var pausedAt by remember { mutableLongStateOf(0L) }
     var totalPaused by remember { mutableLongStateOf(0L) }
@@ -167,32 +171,39 @@ internal fun VoiceCaptureCard(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var limitReached by remember { mutableLongStateOf(0L) }
 
-    suspend fun finishRecording() {
-        if (!isRecording || isSaving) return
-        isSaving = true
-        val duration = elapsedMillis.coerceAtLeast(1L).coerceAtMost(MAX_AUDIO_DURATION_MILLIS)
-        val result = if (duration < 500L) {
+    fun currentDuration(): Long {
+        val now = SystemClock.elapsedRealtime()
+        val activePause = if (isPaused) now - pausedAt else 0L
+        return (now - startedAt - totalPaused - activePause)
+            .coerceIn(0L, MAX_AUDIO_DURATION_MILLIS)
+    }
+
+    fun finishRecording() {
+        if (!isRecording || isStopping) return
+        isStopping = true
+        val duration = currentDuration().coerceAtLeast(1L)
+        elapsedMillis = duration
+        if (duration < 500L) {
             recorder.cancel()
-            Result.failure(IllegalStateException("录音太短了，请再说一会儿。"))
-        } else runCatching { recorder.stop() }.mapCatching { file ->
-            try {
-                onRecorded(file, duration).getOrThrow()
-            } finally {
-                file.delete()
-            }
-        }
-        result.onSuccess {
             isRecording = false
-            onClosed()
-        }.onFailure { error ->
-            isRecording = false
-            errorMessage = error.message ?: "录音保存失败，请重试。"
+            errorMessage = "录音太短了，请再说一会儿。"
+        } else {
+            runCatching { recorder.stop() }
+                .onSuccess { file ->
+                    isRecording = false
+                    onRecorded(file, duration)
+                    onClosed()
+                }
+                .onFailure { error ->
+                    isRecording = false
+                    errorMessage = error.message ?: "录音没有完成，请重新录制。"
+                }
         }
-        isSaving = false
+        isStopping = false
     }
 
     fun beginRecording() {
-        if (!enabled || isRecording || isSaving) return
+        if (!enabled || isRecording || isStopping) return
         errorMessage = null
         runCatching {
             recorder.start { limitReached = SystemClock.elapsedRealtime() }
@@ -202,6 +213,7 @@ internal fun VoiceCaptureCard(
             totalPaused = 0L
             elapsedMillis = 0L
             amplitudes = List(28) { 0.08f }
+            limitReached = 0L
             isPaused = false
             isRecording = true
         }.onFailure { error ->
@@ -209,15 +221,14 @@ internal fun VoiceCaptureCard(
         }
     }
 
-    LaunchedEffect(startRequest) {
-        if (startRequest > 0) beginRecording()
+    LaunchedEffect(Unit) {
+        beginRecording()
     }
 
     LaunchedEffect(isRecording, isPaused) {
         while (isRecording) {
             if (!isPaused) {
-                val now = SystemClock.elapsedRealtime()
-                elapsedMillis = (now - startedAt - totalPaused).coerceAtLeast(0L)
+                elapsedMillis = currentDuration()
                 val amplitude = recorder.maxAmplitude().coerceAtLeast(0)
                 val normalized = if (amplitude == 0) 0.08f else {
                     (ln(amplitude.toFloat() + 1f) / ln(32768f)).coerceIn(0.08f, 1f)
@@ -234,7 +245,7 @@ internal fun VoiceCaptureCard(
     }
 
     val finishWhenBackgrounded by rememberUpdatedState {
-        if (isRecording && !isSaving) scope.launch { finishRecording() }
+        if (isRecording && !isStopping) finishRecording()
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -265,18 +276,26 @@ internal fun VoiceCaptureCard(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     when {
-                        isSaving -> "正在加密保存"
+                        isStopping -> "正在结束录音"
                         isPaused -> "录音已暂停"
                         isRecording -> "正在录音"
-                        else -> "录音没有完成"
+                        else -> "录音未开始"
                     },
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall,
                 )
-                Text(formatAudioDuration(elapsedMillis), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "${formatAudioDuration(elapsedMillis)} / ${formatAudioDuration(MAX_AUDIO_DURATION_MILLIS)}",
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
 
             VoiceWaveform(amplitudes)
+            Text(
+                "离开应用时会自动结束录音",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             errorMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -284,7 +303,7 @@ internal fun VoiceCaptureCard(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
-                    enabled = !isSaving,
+                    enabled = !isStopping,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         recorder.cancel()
@@ -293,7 +312,7 @@ internal fun VoiceCaptureCard(
                     },
                 ) { Text("取消") }
                 TextButton(
-                    enabled = isRecording && !isSaving,
+                    enabled = isRecording && !isStopping,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         runCatching {
@@ -313,28 +332,97 @@ internal fun VoiceCaptureCard(
                     Icon(
                         if (isPaused) Icons.Outlined.MicNone else Icons.Outlined.Pause,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.xikeInlineActionIcon(),
                     )
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (isPaused) "继续" else "暂停")
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Text(if (isPaused) "继续" else "暂停", maxLines = 1)
                 }
-                Button(
-                    enabled = isRecording && !isSaving,
+            }
+            Button(
+                enabled = enabled && !isStopping,
+                modifier = Modifier.fillMaxWidth(),
+                shape = XikeShapes.button,
+                elevation = xikeButtonElevation(),
+                onClick = { if (isRecording) finishRecording() else beginRecording() },
+            ) {
+                Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                    if (isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else Icon(
+                        if (isRecording) Icons.Outlined.StopCircle else Icons.Outlined.MicNone,
+                        contentDescription = null,
+                        modifier = Modifier.xikeInlineActionIcon(),
+                    )
+                }
+                Spacer(Modifier.width(XikeInlineActionGap))
+                Text(if (isRecording) "结束录音" else "开始录音", maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun VoicePendingSaveCard(
+    durationMillis: Long,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    var confirmDiscard by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isSaving) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(10.dp))
+                }
+                Text(
+                    if (isSaving) "正在加密保存录音" else "录音尚未保存",
                     modifier = Modifier.weight(1f),
-                    elevation = xikeButtonElevation(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 8.dp,
-                        vertical = 10.dp,
-                    ),
-                    onClick = { scope.launch { finishRecording() } },
-                ) {
-                    if (isSaving) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("完成", maxLines = 1)
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(formatAudioDuration(durationMillis), style = MaterialTheme.typography.labelLarge)
+            }
+            if (!isSaving) {
+                Text(
+                    errorMessage ?: "录音暂存在本机，可以重试保存。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (errorMessage != null) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { confirmDiscard = true }, modifier = Modifier.weight(1f)) {
+                        Text("放弃录音")
+                    }
+                    Button(onClick = onRetry, modifier = Modifier.weight(1f)) {
+                        Text("重试保存")
+                    }
                 }
             }
         }
+    }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("放弃这段录音？") },
+            text = { Text("尚未保存的录音会被删除，无法恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onDiscard()
+                }) { Text("放弃录音") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text("继续保存") }
+            },
+        )
     }
 }
 
@@ -344,6 +432,7 @@ internal fun VoicePlaybackCard(
     openAudio: (String) -> InputStream?,
     modifier: Modifier = Modifier,
     onDelete: (() -> Unit)? = null,
+    onReplace: (() -> Unit)? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -352,6 +441,8 @@ internal fun VoicePlaybackCard(
     var isPreparing by remember(audio.fileName) { mutableStateOf(false) }
     var isPlaying by remember(audio.fileName) { mutableStateOf(false) }
     var position by remember(audio.fileName) { mutableLongStateOf(0L) }
+    var isSeeking by remember(audio.fileName) { mutableStateOf(false) }
+    var seekPosition by remember(audio.fileName) { mutableFloatStateOf(0f) }
     var playbackError by remember(audio.fileName) { mutableStateOf<String?>(null) }
 
     fun releasePlayer() {
@@ -398,6 +489,7 @@ internal fun VoicePlaybackCard(
                     }
                     preparedFile.delete()
                     tempFile = null
+                    if (position > 0L) seekTo(position.coerceAtMost(duration.toLong()).toInt())
                     setOnCompletionListener {
                         isPlaying = false
                         position = 0L
@@ -418,7 +510,7 @@ internal fun VoicePlaybackCard(
 
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
-            position = player?.currentPosition?.toLong() ?: 0L
+            if (!isSeeking) position = player?.currentPosition?.toLong() ?: 0L
             delay(200)
         }
     }
@@ -446,18 +538,30 @@ internal fun VoicePlaybackCard(
                     }
                 }
                 Column(Modifier.weight(1f)) {
-                    VoiceWaveform(
-                        values = List(28) { index -> 0.16f + ((index * 17 + 11) % 13) / 18f },
-                        progress = if (audio.durationMillis <= 0L) 0f else {
-                            (position.toFloat() / audio.durationMillis).coerceIn(0f, 1f)
+                    Slider(
+                        value = (if (isSeeking) seekPosition else position.toFloat())
+                            .coerceIn(0f, audio.durationMillis.coerceAtLeast(1L).toFloat()),
+                        onValueChange = {
+                            isSeeking = true
+                            seekPosition = it
                         },
+                        onValueChangeFinished = {
+                            position = seekPosition.toLong()
+                            player?.seekTo(position.toInt())
+                            isSeeking = false
+                        },
+                        valueRange = 0f..audio.durationMillis.coerceAtLeast(1L).toFloat(),
+                        enabled = !isPreparing,
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "语音播放进度" },
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                        ),
                     )
                     Text(
-                        if (position > 0L) {
-                            "${formatAudioDuration(position)} / ${formatAudioDuration(audio.durationMillis)}"
-                        } else {
-                            "语音 · ${formatAudioDuration(audio.durationMillis)}"
-                        },
+                        "${formatAudioDuration(if (isSeeking) seekPosition.toLong() else position)} / " +
+                            formatAudioDuration(audio.durationMillis),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -476,28 +580,37 @@ internal fun VoicePlaybackCard(
             playbackError?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
+            if (onReplace != null) {
+                TextButton(onClick = {
+                    releasePlayer()
+                    onReplace()
+                }) {
+                    Icon(
+                        Icons.Outlined.MicNone,
+                        contentDescription = null,
+                        modifier = Modifier.xikeInlineActionIcon(),
+                    )
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Text("重新录制", maxLines = 1)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun VoiceWaveform(values: List<Float>, progress: Float? = null) {
+private fun VoiceWaveform(values: List<Float>) {
     Row(
         modifier = Modifier.fillMaxWidth().height(34.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         values.forEachIndexed { index, value ->
-            val played = progress == null || index.toFloat() / values.size <= progress
             Box(
                 Modifier
                     .weight(1f)
                     .height((5f + value.coerceIn(0f, 1f) * 25f).dp)
-                    .background(
-                        if (played) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                        RoundedCornerShape(2.dp),
-                    ),
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
             )
         }
     }

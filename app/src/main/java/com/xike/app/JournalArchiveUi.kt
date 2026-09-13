@@ -651,7 +651,7 @@ private fun ArchiveControls(
         }
         Surface(
             modifier = Modifier
-                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
                 .clickable(onClick = onToggleFilters),
             shape = RoundedCornerShape(18.dp),
             color = if (showFilters || activeFilterCount > 0) {
@@ -661,7 +661,7 @@ private fun ArchiveControls(
             },
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 13.dp, vertical = 13.dp),
+                modifier = Modifier.padding(horizontal = 11.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -671,7 +671,7 @@ private fun ArchiveControls(
                     } else {
                         "筛选，已启用 $activeFilterCount 个条件"
                     },
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -698,7 +698,7 @@ private fun ArchiveModeButton(
 ) {
     Surface(
         modifier = modifier
-            .sizeIn(minHeight = 40.dp)
+            .sizeIn(minHeight = 44.dp)
             .selectable(
                 selected = selected,
                 role = Role.Tab,
@@ -708,21 +708,22 @@ private fun ArchiveModeButton(
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(17.dp),
+                modifier = Modifier.xikeInlineActionIcon(),
                 tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(XikeInlineActionGap))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
                 color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
             )
         }
     }
@@ -777,7 +778,7 @@ private fun ArchiveFilters(
                         onClick = { onToggleMood(mood) },
                         label = { Text(mood.label) },
                         leadingIcon = {
-                            Icon(mood.moodIcon(), contentDescription = null, modifier = Modifier.size(17.dp))
+                            Icon(mood.moodIcon(), contentDescription = null, modifier = Modifier.size(18.dp))
                         },
                     )
                 }
@@ -810,7 +811,7 @@ private fun ArchiveFilters(
                             selected = true,
                             onClick = onClearDate,
                             label = { Text(selectedDate.asShortChineseDate()) },
-                            trailingIcon = { Icon(Icons.Outlined.Close, "清除指定日期", Modifier.size(17.dp)) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, "清除指定日期", Modifier.size(18.dp)) },
                         )
                     }
                 }
@@ -1200,7 +1201,7 @@ internal fun JournalEntryDetailDialog(
                             )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("窗外此刻 · ${outdoor.placeName}", style = MaterialTheme.typography.titleSmall)
+                                Text("此刻窗外 · ${outdoor.placeName}", style = MaterialTheme.typography.titleSmall)
                                 Text(
                                     "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -1250,9 +1251,9 @@ internal fun JournalEntryDetailDialog(
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) {
-                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text("删除记录")
+                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+                            Spacer(Modifier.width(XikeInlineActionGap))
+                            Text("删除记录", maxLines = 1)
                         }
                         OutlinedButton(
                             onClick = onDismiss,
@@ -1529,6 +1530,7 @@ private fun JournalEntryEditDialog(
                             Icon(
                                 Icons.Outlined.CalendarMonth,
                                 contentDescription = null,
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             Spacer(Modifier.width(11.dp))
@@ -1540,6 +1542,7 @@ private fun JournalEntryEditDialog(
                             Icon(
                                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                                 contentDescription = null,
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -1768,25 +1771,7 @@ private fun EditPhotoStrip(
         }
         if (canAdd) {
             item(key = "add-photo") {
-                Surface(
-                    modifier = Modifier.size(92.dp).clickable(onClick = onAdd),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            Icons.Outlined.AddPhotoAlternate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text("添加照片", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+                AddPhotoTile(modifier = Modifier.size(92.dp), label = "添加照片", onClick = onAdd)
             }
         }
     }

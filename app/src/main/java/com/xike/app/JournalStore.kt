@@ -47,6 +47,7 @@ enum class Mood(val label: String, val score: Int) {
 
 const val MAX_IMAGES_PER_ENTRY = 9
 const val MAX_AUDIO_DURATION_MILLIS = 5L * 60L * 1000L
+internal const val MAX_AUDIO_BYTES = 16L * 1024L * 1024L
 
 data class JournalAudio(
     val fileName: String,
@@ -388,22 +389,25 @@ class JournalStore(context: Context) {
 
     @Synchronized
     fun importAudio(source: File, durationMillis: Long): JournalAudio {
-        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { "录音时长需要在 5 分钟以内。" }
         require(source.isFile && source.length() > 0L) { "录音文件不可用。" }
+        return FileInputStream(source).use { input -> importAudio(input, durationMillis) }
+    }
+
+    @Synchronized
+    fun importAudio(input: InputStream, durationMillis: Long): JournalAudio {
+        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { "录音时长需要在 5 分钟以内。" }
         val fileName = "${UUID.randomUUID()}.xike-audio"
         val target = File(audiosDirectory, fileName)
         runCatching {
-            FileInputStream(source).use { input ->
-                writeEncryptedAttachment(
-                    target = target,
-                    input = input,
-                    byteLimit = MAX_AUDIO_BYTES,
-                    totalBytes = null,
-                    itemName = "录音",
-                    totalName = "备份录音",
-                    totalLimit = MAX_BACKUP_AUDIO_BYTES,
-                )
-            }
+            writeEncryptedAttachment(
+                target = target,
+                input = input,
+                byteLimit = MAX_AUDIO_BYTES,
+                totalBytes = null,
+                itemName = "录音",
+                totalName = "备份录音",
+                totalLimit = MAX_BACKUP_AUDIO_BYTES,
+            )
         }.onFailure {
             target.delete()
             throw it
@@ -994,7 +998,6 @@ class JournalStore(context: Context) {
         const val MAX_LEGACY_BACKUP_BYTES = 320L * 1024L * 1024L
         const val MAX_IMAGE_BYTES = 20L * 1024L * 1024L
         const val MAX_BACKUP_IMAGE_BYTES = 1024L * 1024L * 1024L
-        const val MAX_AUDIO_BYTES = 16L * 1024L * 1024L
         const val MAX_BACKUP_AUDIO_BYTES = 1024L * 1024L * 1024L
     }
 }

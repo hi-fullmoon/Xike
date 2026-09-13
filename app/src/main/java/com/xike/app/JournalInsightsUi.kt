@@ -469,7 +469,7 @@ private fun MoodDistributionCard(
                 Icon(
                     item.mood.moodIcon(),
                     contentDescription = item.mood.label,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f + item.mood.score * 0.08f),
                 )
                 Spacer(Modifier.width(12.dp))
@@ -491,7 +491,7 @@ private fun MoodDistributionCard(
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                         contentDescription = null,
-                        modifier = Modifier.size(17.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
                 }
@@ -813,7 +813,7 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
                             role = Role.RadioButton,
                             onClick = { onSelected(period) },
                         )
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -854,11 +854,12 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                         .putExtra(Intent.EXTRA_TEXT, reviewText)
                     context.startActivity(Intent.createChooser(shareIntent, "分享息刻回顾"))
                 },
+                shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
             ) {
-                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("选择分享应用")
+                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+                Spacer(Modifier.width(XikeInlineActionGap))
+                Text("选择分享应用", maxLines = 1)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },

@@ -19,6 +19,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Rule
@@ -44,8 +46,10 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("窗外此刻").performScrollTo().assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("添加窗外此刻？").assertIsDisplayed()
+        composeRule.onNodeWithText("此刻窗外").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("地点与天气 · 可选").assertIsDisplayed()
+        composeRule.onNodeWithText("添加").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("添加此刻窗外？").assertIsDisplayed()
         composeRule.onNodeWithText("手动选城市").assertIsDisplayed()
         composeRule.onNodeWithText("允许粗略定位").assertIsDisplayed()
     }
@@ -71,7 +75,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("窗外此刻 · 上海 · 浦东").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("此刻窗外 · 上海 · 浦东").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("27°").assertIsDisplayed()
         composeRule.onNodeWithText("晴间多云").assertIsDisplayed()
     }
@@ -90,7 +94,7 @@ class JournalDraftUiTest {
         try {
             showPhotoDraft(files.map { Uri.fromFile(it).toString() })
             composeRule.onNodeWithContentDescription("待保存的第 2 张照片")
-                .performScrollTo().performClick()
+                .performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
             waitForPhotoPage("2 / 3")
             composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
             composeRule.onNodeWithTag("photo-gallery-pager").performTouchInput { swipeLeft() }
@@ -111,7 +115,7 @@ class JournalDraftUiTest {
         var removed: String? = null
         showPhotoDraft(listOf(uri), onRemove = { removed = it })
         composeRule.onNodeWithContentDescription("待保存的第 1 张照片")
-            .performScrollTo().performClick()
+            .performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitForPhotoPage("1 / 1")
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("关闭图片查看").performClick()

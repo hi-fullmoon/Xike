@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -132,6 +133,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -333,6 +335,10 @@ internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonEleva
     disabledElevation = 0.dp,
 )
 
+internal val XikeInlineActionGap = 6.dp
+
+internal fun Modifier.xikeInlineActionIcon(): Modifier = size(20.dp).offset(y = 1.dp)
+
 @Composable
 internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -350,13 +356,13 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
         tonalElevation = 0.dp,
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
             shape = RoundedCornerShape(26.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 1.dp,
             tonalElevation = 0.dp,
         ) {
-            Row(modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp).selectableGroup()) {
+            Row(modifier = Modifier.padding(horizontal = 5.dp, vertical = 4.dp).selectableGroup()) {
                 AppScreen.entries.forEach { item ->
                     val isSelected = selected == item
                     Column(
@@ -372,7 +378,7 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                                 role = Role.Tab,
                                 onClick = { onSelected(item) },
                             )
-                            .padding(vertical = 10.dp),
+                            .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
@@ -383,7 +389,7 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                                 AppScreen.SETTINGS -> XikeIcons.Settings
                             },
                             contentDescription = null,
-                            modifier = Modifier.size(21.dp),
+                            modifier = Modifier.size(20.dp),
                             tint = if (isSelected) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -470,16 +476,16 @@ fun AppLockScreen(
                 Button(
                     onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
                     shape = XikeShapes.button,
-                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
                     elevation = xikeButtonElevation(),
                 ) {
                     Icon(
                         if (authenticationAvailable) Icons.Outlined.LockOpen else Icons.Outlined.Shield,
                         contentDescription = null,
-                        modifier = Modifier.size(19.dp),
+                        modifier = Modifier.xikeInlineActionIcon(),
                     )
-                    Spacer(Modifier.width(9.dp))
-                    Text(if (authenticationAvailable) "解锁息刻" else "设置设备锁屏")
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Text(if (authenticationAvailable) "解锁息刻" else "设置设备锁屏", maxLines = 1)
                 }
             }
 
@@ -504,9 +510,12 @@ fun MomentScreen(
     onDraftTagToggle: (String) -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Unit,
     onDraftImageRemoved: (String) -> Unit,
-    onDraftAudioRecorded: suspend (File, Long) -> Result<Unit> = { _, _ ->
-        Result.failure(IllegalStateException("录音暂时不可用。"))
-    },
+    pendingDraftAudio: PendingDraftAudio? = null,
+    isDraftAudioSaving: Boolean = false,
+    draftAudioSaveError: String? = null,
+    onDraftAudioRecorded: (File, Long) -> Unit = { file, _ -> file.delete() },
+    onDraftAudioRetry: () -> Unit = {},
+    onDraftAudioDiscard: () -> Unit = {},
     onDraftAudioRemoved: () -> Unit = {},
     openAudio: (String) -> InputStream? = { null },
     onVoiceCaptureStateChange: (Boolean) -> Unit = {},
@@ -533,8 +542,7 @@ fun MomentScreen(
     var outdoorError by rememberSaveable { mutableStateOf<String?>(null) }
     var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
     var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
-    var showVoiceCapture by rememberSaveable { mutableStateOf(false) }
-    var voiceCaptureRequest by rememberSaveable { mutableIntStateOf(0) }
+    var showVoiceCapture by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val focusManager = LocalFocusManager.current
@@ -703,7 +711,6 @@ fun MomentScreen(
     ) { granted ->
         if (granted) {
             showVoiceCapture = true
-            voiceCaptureRequest++
         } else {
             Toast.makeText(context, "没有麦克风权限，仍可使用文字和照片记录", Toast.LENGTH_LONG).show()
         }
@@ -714,7 +721,6 @@ fun MomentScreen(
             PackageManager.PERMISSION_GRANTED
         ) {
             showVoiceCapture = true
-            voiceCaptureRequest++
             Unit
         } else {
             microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -789,14 +795,14 @@ fun MomentScreen(
                         )
                         if (isNoteFocused) {
                             TextButton(onClick = dismissKeyboard) {
-                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("完成")
+                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+                                Spacer(Modifier.width(XikeInlineActionGap))
+                                Text("完成", maxLines = 1)
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 8.dp))
+                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -804,7 +810,7 @@ fun MomentScreen(
                     MomentQuickAction(
                         icon = Icons.Outlined.MicNone,
                         label = "语音",
-                        enabled = !isSaving && draft.audio == null && !showVoiceCapture,
+                        enabled = !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
                         modifier = Modifier.weight(1f),
                         onClick = beginVoiceCapture,
                     )
@@ -844,12 +850,17 @@ fun MomentScreen(
                 }
                 DraftSecurityRow(
                     hasDraft = !draft.isEmpty,
-                    enabled = !isSaving,
+                    enabled = !isSaving && !showVoiceCapture && pendingDraftAudio == null,
                     onDiscard = { showDiscardConfirmation = true },
+                    statusText = when {
+                        showVoiceCapture -> "录音结束后将加密保存"
+                        pendingDraftAudio != null -> "录音仍待加密保存"
+                        else -> null
+                    },
                 )
             }
 
-            if (showVoiceCapture || draft.audio != null) {
+            if (showVoiceCapture || pendingDraftAudio != null || draft.audio != null) {
                 val voiceAnchor = remember { BringIntoViewRequester() }
                 LaunchedEffect(showVoiceCapture, draft.audio?.fileName) {
                     withFrameNanos { }
@@ -858,18 +869,29 @@ fun MomentScreen(
                 PaperCard(modifier = Modifier.bringIntoViewRequester(voiceAnchor)) {
                     Text("语音", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (showVoiceCapture) "正在记录这一刻的声音"
-                        else "录音完成后已加密保存在本机",
+                        when {
+                            showVoiceCapture -> "正在记录这一刻的声音"
+                            pendingDraftAudio != null && isDraftAudioSaving -> "正在加密保存到草稿"
+                            pendingDraftAudio != null -> "保存失败，录音仍暂存在本机"
+                            else -> "录音已加密保存在本机"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
                     if (showVoiceCapture) {
                         VoiceCaptureCard(
-                            startRequest = voiceCaptureRequest,
                             enabled = !isSaving,
                             onRecorded = onDraftAudioRecorded,
                             onClosed = { showVoiceCapture = false },
+                        )
+                    } else if (pendingDraftAudio != null) {
+                        VoicePendingSaveCard(
+                            durationMillis = pendingDraftAudio.durationMillis,
+                            isSaving = isDraftAudioSaving,
+                            errorMessage = draftAudioSaveError,
+                            onRetry = onDraftAudioRetry,
+                            onDiscard = onDraftAudioDiscard,
                         )
                     } else {
                         draft.audio?.let { audio ->
@@ -877,6 +899,7 @@ fun MomentScreen(
                                 audio = audio,
                                 openAudio = openAudio,
                                 onDelete = onDraftAudioRemoved,
+                                onReplace = beginVoiceCapture,
                             )
                         }
                     }
@@ -945,7 +968,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1018,7 +1041,7 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving || showVoiceCapture) return@Button
+                    if (isSaving || showVoiceCapture || pendingDraftAudio != null) return@Button
                     dismissKeyboard()
                     isSaving = true
                     scope.launch {
@@ -1045,8 +1068,8 @@ fun MomentScreen(
                         isSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving && !showVoiceCapture,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).height(52.dp),
+                enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
                 colors = ButtonDefaults.buttonColors(
@@ -1058,6 +1081,7 @@ fun MomentScreen(
                     when {
                         isSaving -> "正在收下…"
                         showVoiceCapture -> "请先完成录音"
+                        pendingDraftAudio != null -> if (isDraftAudioSaving) "正在保存语音…" else "请先处理录音"
                         draft.mood == null -> "先选择一种心情"
                         draft.recordedAt != null -> "补记这一刻"
                         else -> "记下此刻"
@@ -1065,8 +1089,8 @@ fun MomentScreen(
                     style = MaterialTheme.typography.labelLarge,
                 )
                 if (draft.mood != null && !isSaving) {
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                 }
             }
         }
@@ -1105,7 +1129,7 @@ fun MomentScreen(
             title = { Text("放弃这份草稿？") },
             text = {
                 Text(
-                    "将清空尚未保存的心情、窗外此刻、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。",
+                    "将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -1128,7 +1152,7 @@ fun MomentScreen(
         AlertDialog(
             onDismissRequest = { showOutdoorDisclosure = false },
             shape = XikeShapes.dialog,
-            title = { Text("添加窗外此刻？") },
+            title = { Text("添加此刻窗外？") },
             text = {
                 Text(
                     "息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。" +
@@ -1177,13 +1201,19 @@ private fun MomentQuickAction(
     androidx.compose.material3.FilledTonalButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier.heightIn(min = 44.dp),
         shape = XikeShapes.inner,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+        Spacer(Modifier.width(XikeInlineActionGap))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1216,7 +1246,7 @@ private fun OutdoorContextCard(
         shape = XikeShapes.card,
         color = containerColor,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(42.dp),
@@ -1236,25 +1266,25 @@ private fun OutdoorContextCard(
                             snapshot != null -> Icon(
                                 Icons.Outlined.Cloud,
                                 contentDescription = null,
-                                modifier = Modifier.size(21.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             isBackdated -> Icon(
                                 Icons.Outlined.History,
                                 contentDescription = null,
-                                modifier = Modifier.size(21.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             errorMessage != null -> Icon(
                                 Icons.Outlined.LocationOff,
                                 contentDescription = null,
-                                modifier = Modifier.size(21.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             else -> Icon(
                                 Icons.Outlined.LocationOn,
                                 contentDescription = null,
-                                modifier = Modifier.size(21.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                         }
@@ -1264,11 +1294,11 @@ private fun OutdoorContextCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         when {
-                            snapshot != null -> "窗外此刻 · ${snapshot.placeName}"
-                            isLoading -> "正在寻找窗外此刻"
+                            snapshot != null -> "此刻窗外 · ${snapshot.placeName}"
+                            isLoading -> "正在获取地点与天气"
                             isBackdated -> "补记不使用今天的天气"
-                            errorMessage != null -> "暂时没有添加窗外此刻"
-                            else -> "窗外此刻"
+                            errorMessage != null -> "暂时无法添加地点与天气"
+                            else -> "此刻窗外"
                         },
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
@@ -1280,7 +1310,7 @@ private fun OutdoorContextCard(
                             isLoading -> "只获取一次，不会在后台持续定位"
                             isBackdated -> "避免把现在的环境误记到过去"
                             errorMessage != null -> errorMessage
-                            else -> "地点与真实天气 · 可选"
+                            else -> "地点与天气 · 可选"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1303,7 +1333,7 @@ private fun OutdoorContextCard(
                 } else if (isEmpty) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "轻触添加",
+                            "添加",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1361,9 +1391,9 @@ private fun OutdoorCardAction(
     onClick: () -> Unit,
 ) {
     TextButton(onClick = onClick, enabled = enabled) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp))
-        Spacer(Modifier.width(5.dp))
-        Text(label)
+        Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+        Spacer(Modifier.width(XikeInlineActionGap))
+        Text(label, maxLines = 1)
     }
 }
 
@@ -1412,6 +1442,7 @@ private fun DraftSecurityRow(
     hasDraft: Boolean,
     enabled: Boolean,
     onDiscard: () -> Unit,
+    statusText: String? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -1425,7 +1456,7 @@ private fun DraftSecurityRow(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            "草稿自动加密保存在本机",
+            statusText ?: "草稿自动加密保存在本机",
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1451,13 +1482,13 @@ private fun RecordedAtSelector(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 Icons.Outlined.CalendarMonth,
                 contentDescription = null,
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.width(11.dp))
@@ -1475,6 +1506,7 @@ private fun RecordedAtSelector(
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1577,7 +1609,6 @@ private fun MoodPicker(
         modifier = Modifier.fillMaxWidth(),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
         tonalElevation = 0.dp,
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
@@ -1603,6 +1634,7 @@ private fun MoodPicker(
                         mood = mood,
                         selected = selectedMood == mood,
                         enabled = enabled,
+                        useEmoji = true,
                         onClick = { onSelected(mood) },
                         modifier = Modifier.weight(1f),
                     )
@@ -1612,7 +1644,6 @@ private fun MoodPicker(
                 Spacer(Modifier.height(12.dp))
                 val visual = selectedMood.visualStyle()
                 val isDark = isSystemInDarkTheme()
-                val moodColor = if (isDark) visual.container else visual.accent
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = XikeShapes.inner,
@@ -1622,11 +1653,10 @@ private fun MoodPicker(
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            selectedMood.moodIcon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = moodColor,
+                        Text(
+                            selectedMood.emojiGlyph(),
+                            modifier = Modifier.clearAndSetSemantics { },
+                            fontSize = 18.sp,
                         )
                         Spacer(Modifier.width(9.dp))
                         Text(
@@ -1661,7 +1691,6 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                 Mood.entries.forEach { mood ->
                     val visual = mood.visualStyle()
                     val isDark = isSystemInDarkTheme()
-                    val moodColor = if (isDark) visual.container else visual.accent
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = XikeShapes.inner,
@@ -1671,11 +1700,10 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                mood.moodIcon(),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = moodColor,
+                            Text(
+                                mood.emojiGlyph(),
+                                modifier = Modifier.clearAndSetSemantics { },
+                                fontSize = 24.sp,
                             )
                             Spacer(Modifier.width(11.dp))
                             Column {
@@ -1700,6 +1728,7 @@ internal fun MoodChoice(
     mood: Mood,
     selected: Boolean,
     enabled: Boolean,
+    useEmoji: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1721,11 +1750,11 @@ internal fun MoodChoice(
                 role = Role.RadioButton,
                 onClick = onClick,
             )
-            .padding(vertical = 2.dp),
+            .padding(vertical = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(44.dp),
             shape = CircleShape,
             color = containerColor,
             border = BorderStroke(
@@ -1736,15 +1765,23 @@ internal fun MoodChoice(
             shadowElevation = if (selected) 2.dp else 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    mood.moodIcon(),
-                    contentDescription = null,
-                    modifier = Modifier.size(27.dp),
-                    tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
-                )
+                if (useEmoji) {
+                    Text(
+                        mood.emojiGlyph(),
+                        modifier = Modifier.clearAndSetSemantics { },
+                        fontSize = 25.sp,
+                    )
+                } else {
+                    Icon(
+                        mood.moodIcon(),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             mood.label,
             style = MaterialTheme.typography.labelSmall,
@@ -1777,16 +1814,16 @@ internal fun TopicChip(
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 9.dp, vertical = 8.dp),
+            modifier = Modifier.heightIn(min = 44.dp).padding(horizontal = 9.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(18.dp).offset(y = 1.dp),
                 tint = topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(XikeInlineActionGap))
             Text(
                 topic.label,
                 maxLines = 1,
@@ -1819,7 +1856,7 @@ private fun MultiImagePicker(
             Row(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(Modifier.width(11.dp))
@@ -1856,7 +1893,11 @@ private fun MultiImagePicker(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     rowTiles.forEach { tile ->
                         if (tile == ADD_PHOTO_TILE) {
-                            AddPhotoTile(Modifier.weight(1f).aspectRatio(1f), onPick)
+                            AddPhotoTile(
+                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                                label = "继续添加",
+                                onClick = onPick,
+                            )
                         } else {
                             SelectedPhotoTile(
                                 uriString = tile,
@@ -1876,7 +1917,7 @@ private fun MultiImagePicker(
 }
 
 @Composable
-private fun AddPhotoTile(modifier: Modifier, onClick: () -> Unit) {
+internal fun AddPhotoTile(modifier: Modifier, label: String, onClick: () -> Unit) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
@@ -1884,9 +1925,9 @@ private fun AddPhotoTile(modifier: Modifier, onClick: () -> Unit) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(23.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
-            Text("继续添加", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -2674,7 +2715,7 @@ private fun SettingsToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -2869,7 +2910,7 @@ private fun AppLockToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -2949,7 +2990,7 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row {
                     Box(Modifier.size(18.dp).clip(CircleShape).background(theme.primary))
@@ -2958,7 +2999,7 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
                 Spacer(Modifier.weight(1f))
                 if (selected) Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Text(theme.title, style = MaterialTheme.typography.titleSmall)
         }
     }
@@ -2967,7 +3008,7 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
 @Composable
 private fun SettingsAction(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -3078,6 +3119,14 @@ private fun moodSummary(average: Double): String = when {
 }
 
 private data class MoodVisualStyle(val accent: Color, val container: Color)
+
+private fun Mood.emojiGlyph(): String = when (this) {
+    Mood.LOW -> "😞"
+    Mood.TIRED -> "😫"
+    Mood.CALM -> "😌"
+    Mood.GOOD -> "🙂"
+    Mood.JOYFUL -> "😄"
+}
 
 private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
     Mood.LOW -> MoodVisualStyle(

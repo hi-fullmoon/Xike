@@ -52,7 +52,8 @@ class JournalInsightsUiTest {
             }
         }
 
-        composeRule.onNodeWithText("2 次 · 67%").performScrollTo().performClick()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("2 次 · 67%"))
+        composeRule.onNodeWithText("2 次 · 67%").performClick()
         composeRule.onNodeWithText("轻松 · 2 条").assertIsDisplayed()
         composeRule.onNodeWithText("第一条可追溯记录").assertIsDisplayed()
         composeRule.onNodeWithText("第二条可追溯记录").assertIsDisplayed()
