@@ -71,6 +71,8 @@ class JournalInsightsUiTest {
             }
         }
 
+        composeRule.onNodeWithText("已留下 1 条心情记录").assertIsDisplayed()
+        composeRule.onNodeWithText("先看看留下的记录，积累更多片段后再回顾变化。").assertIsDisplayed()
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("查看本地回顾"))
         composeRule.onNodeWithText("查看本地回顾").performClick()
         composeRule.onNodeWithText("本地回顾").assertIsDisplayed()

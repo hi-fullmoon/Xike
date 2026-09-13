@@ -207,7 +207,7 @@ fun journalPeriodSummary(
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
         .take(MAX_TAG_INSIGHTS)
         .map { (tag, count) ->
-            val taggedEntries = journals.filter { tag in it.tags }
+            val taggedEntries = journals.filter { it.tags.containsTopic(tag) }
             TagTrendItem(
                 tag = tag,
                 entryCount = count,
@@ -425,7 +425,7 @@ private fun evidenceLevel(entryCount: Int, recordedDayCount: Int): InsightEviden
 private fun List<JournalEntry>.moodAverage(): Double? =
     map { it.mood.score }.average().takeUnless(Double::isNaN)
 
-private fun List<JournalEntry>.tagCounts(): Map<String, Int> = flatMap { entry -> entry.tags.distinct() }
+private fun List<JournalEntry>.tagCounts(): Map<String, Int> = flatMap { entry -> entry.tags.canonicalTopics() }
     .groupingBy { it }
     .eachCount()
 

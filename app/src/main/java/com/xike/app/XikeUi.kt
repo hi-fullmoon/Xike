@@ -50,13 +50,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -67,7 +65,6 @@ import androidx.compose.material.icons.outlined.Commute
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.History
@@ -102,6 +99,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -198,14 +197,11 @@ internal val journalTopics = listOf(
     JournalTopic("身体", Color(0xFF568063), Icons.Outlined.SelfImprovement),
     JournalTopic("睡眠", Color(0xFF637197), Icons.Outlined.Bedtime),
     JournalTopic("饮食", Color(0xFFA87548), Icons.Outlined.Restaurant),
-    JournalTopic("运动", Color(0xFF4F866B), Icons.AutoMirrored.Outlined.DirectionsRun),
     JournalTopic("金钱", Color(0xFF987838), Icons.Outlined.AccountBalanceWallet),
     JournalTopic("自我", Color(0xFF447E78), Icons.Outlined.PersonOutline),
     JournalTopic("兴趣", Color(0xFF8A6190), Icons.Outlined.Interests),
-    JournalTopic("社交", Color(0xFF5E719A), Icons.Outlined.Groups),
     JournalTopic("出行", Color(0xFF4C7F8C), Icons.Outlined.Commute),
     JournalTopic("居住", Color(0xFF8B7057), Icons.Outlined.HomeWork),
-    JournalTopic("创作", Color(0xFF9A626C), Icons.Outlined.Brush),
     JournalTopic("其他", Color(0xFF6F766F), Icons.Outlined.MoreHoriz),
 )
 
@@ -262,14 +258,31 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onPrimary = Color(0xFF18352B),
             primaryContainer = theme.primary.copy(alpha = 0.58f),
             onPrimaryContainer = Color(0xFFF4FAF5),
+            secondary = theme.accent,
+            onSecondary = Color(0xFF18352B),
             secondaryContainer = theme.secondary.copy(alpha = 0.18f),
             onSecondaryContainer = Color(0xFFF2EEE6),
+            tertiary = Color(0xFFD3BCA4),
+            onTertiary = Color(0xFF3D372E),
+            tertiaryContainer = theme.secondary.copy(alpha = 0.24f),
+            onTertiaryContainer = Color(0xFFF2EEE6),
             background = Color(0xFF121614),
             onBackground = Color(0xFFE8E9E4),
             surface = Color(0xFF1B211E),
             onSurface = Color(0xFFE8E9E4),
             surfaceVariant = Color(0xFF282D29),
             onSurfaceVariant = Color(0xFFB8BDB7),
+            surfaceTint = theme.accent,
+            surfaceDim = Color(0xFF121614),
+            surfaceBright = Color(0xFF39423C),
+            surfaceContainerLowest = Color(0xFF101512),
+            surfaceContainerLow = Color(0xFF1B211E),
+            surfaceContainer = Color(0xFF202723),
+            surfaceContainerHigh = Color(0xFF272E29),
+            surfaceContainerHighest = Color(0xFF313933),
+            inverseSurface = Color(0xFFE8ECE8),
+            inverseOnSurface = Color(0xFF28312B),
+            inversePrimary = theme.primary,
             outline = Color(0xFF68706A),
             outlineVariant = Color(0xFF363C37),
         )
@@ -279,14 +292,31 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onPrimary = Color.White,
             primaryContainer = theme.accent,
             onPrimaryContainer = Color(0xFF183229),
+            secondary = theme.primary,
+            onSecondary = Color.White,
             secondaryContainer = theme.secondary,
             onSecondaryContainer = Color(0xFF3D372E),
+            tertiary = Color(0xFF7A6755),
+            onTertiary = Color.White,
+            tertiaryContainer = theme.secondary,
+            onTertiaryContainer = Color(0xFF3D372E),
             background = Color(0xFFF4F6F5),
             onBackground = Color(0xFF20231F),
             surface = Color(0xFFFFFFFF),
             onSurface = Color(0xFF20231F),
             surfaceVariant = Color(0xFFEAF0ED),
             onSurfaceVariant = Color(0xFF626761),
+            surfaceTint = theme.primary,
+            surfaceDim = Color(0xFFE8EBE8),
+            surfaceBright = Color.White,
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = Color(0xFFF8FAF8),
+            surfaceContainer = Color(0xFFF3F6F3),
+            surfaceContainerHigh = Color(0xFFEDF1ED),
+            surfaceContainerHighest = Color(0xFFE5EBE6),
+            inverseSurface = Color(0xFF2E3530),
+            inverseOnSurface = Color(0xFFF2F5F2),
+            inversePrimary = theme.accent,
             outline = Color(0xFF7C817B),
             outlineVariant = Color(0xFFDADDD6),
         )
@@ -301,6 +331,15 @@ internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonEleva
     focusedElevation = 0.dp,
     hoveredElevation = 0.dp,
     disabledElevation = 0.dp,
+)
+
+@Composable
+internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outline,
 )
 
 @Composable
@@ -695,14 +734,16 @@ fun MomentScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             BrandHeader(today)
-            Spacer(Modifier.height(6.dp))
-            Text("此刻，心情怎样？", style = MaterialTheme.typography.headlineLarge)
-            Text(
-                if (todayEntryCount == 0) "不用解释，选一个最接近的感受。"
-                else "今天已经停下来听见自己 $todayEntryCount 次。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column {
+                Text("此刻，心情怎样？", style = MaterialTheme.typography.headlineLarge)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (todayEntryCount == 0) "不用解释，选一个最接近的感受。"
+                    else "今天已经停下来听见自己 $todayEntryCount 次。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             if (dailyPromptSettings.enabled) {
                 DailyQuestion(today, dailyPromptSettings.style)
@@ -735,25 +776,27 @@ fun MomentScreen(
                         disabledIndicatorColor = Color.Transparent,
                     ),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (isNoteFocused) {
-                        TextButton(onClick = dismissKeyboard) {
-                            Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("完成")
+                if (draft.note.isNotEmpty() || isNoteFocused) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (isNoteFocused) {
+                            TextButton(onClick = dismissKeyboard) {
+                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("完成")
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
+                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -950,7 +993,7 @@ fun MomentScreen(
                                         rowTopics.forEach { topic ->
                                             TopicChip(
                                                 topic = topic,
-                                                selected = topic.label in draft.tags,
+                                                selected = draft.tags.containsTopic(topic.label),
                                                 onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
                                                 modifier = Modifier.weight(1f),
                                             )
@@ -1003,7 +1046,7 @@ fun MomentScreen(
                     }
                 },
                 enabled = draft.mood != null && !isSaving && !showVoiceCapture,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp).height(52.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).height(52.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
                 colors = ButtonDefaults.buttonColors(
@@ -1537,21 +1580,19 @@ private fun MoodPicker(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 16.dp)) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("此刻心情", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "选择最接近当下的感受，没有标准答案",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text("此刻心情", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 TextButton(
                     onClick = { showGuide = true },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 ) { Text("选择参考") }
             }
+            Text(
+                "选最接近的感受，没有标准答案",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().selectableGroup(),
@@ -2233,7 +2274,7 @@ internal fun JournalEntryCard(
 }
 
 @Composable
-private fun JournalPhotoMosaic(
+internal fun JournalPhotoMosaic(
     fileNames: List<String>,
     openImage: (String) -> InputStream?,
     onImageClick: (Int) -> Unit,
@@ -2646,7 +2687,7 @@ private fun SettingsToggleRow(
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = enabled, onCheckedChange = null)
+        Switch(checked = enabled, onCheckedChange = null, colors = xikeSwitchColors())
     }
 }
 
@@ -2755,7 +2796,7 @@ private fun ReminderScheduleDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = quietHoursEnabled, onCheckedChange = null)
+                    Switch(checked = quietHoursEnabled, onCheckedChange = null, colors = xikeSwitchColors())
                 }
             }
         },
@@ -2855,7 +2896,7 @@ private fun AppLockToggleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = enabled, onCheckedChange = null)
+        Switch(checked = enabled, onCheckedChange = null, colors = xikeSwitchColors())
     }
 }
 
@@ -2892,7 +2933,7 @@ private fun AppLockTimeoutDialog(
         },
         confirmButton = {},
         dismissButton = {
-            Button(onClick = onDismiss, elevation = xikeButtonElevation()) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
 }
@@ -2944,7 +2985,7 @@ private fun SettingsAction(icon: ImageVector, title: String, subtitle: String, o
 @Composable
 private fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 16.dp),
+        modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         content = content,
     )

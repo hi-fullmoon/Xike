@@ -125,6 +125,29 @@ class JournalAnalyticsTest {
     }
 
     @Test
+    fun `insights combine retired topics per entry and across periods`() {
+        val currentFirst = entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("关系", "社交"))
+            .copy(id = "current-first")
+        val currentSecond = entry(LocalDate.of(2026, 8, 18), Mood.LOW, listOf("社交"))
+            .copy(id = "current-second")
+        val previous = entry(LocalDate.of(2026, 8, 10), Mood.CALM, listOf("关系"))
+
+        val summary = journalPeriodSummary(
+            listOf(currentFirst, currentSecond, previous),
+            InsightsPeriod.WEEK,
+            today,
+            zone,
+        )
+        val relationships = summary.topTags.single { it.tag == "关系" }
+
+        assertEquals(2, relationships.entryCount)
+        assertEquals(1, relationships.previousEntryCount)
+        assertEquals(listOf("current-first", "current-second"), relationships.entryIds)
+        assertEquals(2.5, relationships.averageScore!!, 0.01)
+        assertEquals("关系", summary.mostUsedTag)
+    }
+
+    @Test
     fun `period comparison uses the immediately preceding equal window`() {
         val currentEntries = listOf(
             entry(today.minusDays(2), Mood.GOOD),

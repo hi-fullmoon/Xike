@@ -333,6 +333,9 @@ class JournalDraftUiTest {
         composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(selectedTag == "饮食") }
         composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()
+        check(composeRule.onAllNodesWithText("社交").fetchSemanticsNodes().isEmpty())
+        check(composeRule.onAllNodesWithText("运动").fetchSemanticsNodes().isEmpty())
+        check(composeRule.onAllNodesWithText("创作").fetchSemanticsNodes().isEmpty())
     }
 
     @Test

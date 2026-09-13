@@ -92,7 +92,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun toggleDraftTag(tag: String) {
-        val updatedTags = if (tag in draft.tags) draft.tags - tag else draft.tags + tag
+        val updatedTags = toggleTopic(draft.tags, tag).toSet()
         persistDraft(draft.copy(tags = updatedTags))
     }
 

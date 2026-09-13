@@ -123,6 +123,44 @@ class JournalDaoTest {
     }
 
     @Test
+    fun currentTopicFilterAndTextSearchIncludeHistoricalEntries() {
+        dao.insertJournal(entry("old", 100L, listOf("社交")).toBundle())
+        dao.insertJournal(entry("new", 200L, listOf("关系")).toBundle())
+        dao.insertJournal(entry("other", 300L, listOf("身体")).toBundle())
+
+        val topicResults = dao.searchRecords(
+            hasText = 0,
+            ftsQuery = "\"\"",
+            startInclusive = 0L,
+            endExclusive = 400L,
+            filterMoods = 0,
+            moods = listOf(Mood.CALM.name),
+            filterTags = 1,
+            tags = expandedTopicLabels(listOf("关系")),
+            imageFilter = JournalImageFilter.ANY.name,
+            limit = 20,
+            offset = 0,
+        ).map(JournalEntryRecord::toJournalEntry)
+        val textResults = dao.searchRecords(
+            hasText = 1,
+            ftsQuery = journalFtsQuery("关系"),
+            startInclusive = 0L,
+            endExclusive = 400L,
+            filterMoods = 0,
+            moods = listOf(Mood.CALM.name),
+            filterTags = 0,
+            tags = listOf(""),
+            imageFilter = JournalImageFilter.ANY.name,
+            limit = 20,
+            offset = 0,
+        ).map(JournalEntryRecord::toJournalEntry)
+
+        assertEquals(listOf("new", "old"), topicResults.map { it.id })
+        assertEquals(listOf("new", "old"), textResults.map { it.id })
+        assertEquals(listOf("社交"), dao.record("old")?.toJournalEntry()?.tags)
+    }
+
+    @Test
     fun observedRecordsEmitDatabaseChangesInDisplayOrder() = runBlocking {
         dao.insertJournal(entry("older", 100L).toBundle())
         dao.insertJournal(entry("newer", 200L).toBundle())

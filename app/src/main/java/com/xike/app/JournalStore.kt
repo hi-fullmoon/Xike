@@ -227,7 +227,7 @@ class JournalStore(context: Context) {
         val filterMoods = if (query.moods.isEmpty()) 0 else 1
         val moods = query.moods.map(Mood::name).ifEmpty { listOf(Mood.CALM.name) }
         val filterTags = if (query.tags.isEmpty()) 0 else 1
-        val tags = query.tags.toList().ifEmpty { listOf("") }
+        val tags = expandedTopicLabels(query.tags).ifEmpty { listOf("") }
         val imageFilter = query.imageFilter.name
         val records = dao.searchRecords(
             hasText = hasText,

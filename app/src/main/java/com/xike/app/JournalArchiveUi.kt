@@ -60,6 +60,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -146,7 +147,7 @@ fun JournalArchiveScreen(
     var datePresetName by rememberSaveable { mutableStateOf(ArchiveDatePreset.ALL.name) }
     var selectedDateValue by rememberSaveable { mutableStateOf<String?>(null) }
     var visibleMonthValue by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
-    var viewModeName by rememberSaveable { mutableStateOf(ArchiveViewMode.CALENDAR.name) }
+    var viewModeName by rememberSaveable { mutableStateOf(ArchiveViewMode.TIMELINE.name) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     var resultEntries by remember { mutableStateOf(entries) }
     var totalResultCount by remember { mutableIntStateOf(entries.size) }
@@ -158,7 +159,7 @@ fun JournalArchiveScreen(
     var galleryInitialPage by remember { mutableIntStateOf(0) }
     var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
     var editEntry by remember { mutableStateOf<JournalEntry?>(null) }
-    var pendingScrollPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var scrollToSelectedDateResults by remember { mutableStateOf(false) }
     var deleteCandidate by remember { mutableStateOf<JournalEntry?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
@@ -209,10 +210,12 @@ fun JournalArchiveScreen(
                 searchError = error.message ?: "搜索暂时不可用"
             }
         isSearching = false
-        pendingScrollPosition?.let { (index, offset) ->
+        if (scrollToSelectedDateResults) {
             withFrameNanos { }
-            archiveListState.scrollToItem(index, offset)
-            pendingScrollPosition = null
+            archiveListState.animateScrollToItem(
+                2 + (if (showFilters) 1 else 0) + (if (viewModeName == ArchiveViewMode.CALENDAR.name) 1 else 0),
+            )
+            scrollToSelectedDateResults = false
         }
     }
 
@@ -220,7 +223,7 @@ fun JournalArchiveScreen(
         resultEntries.groupBy { it.localDate() }.toList().sortedByDescending { it.first }
     }
     val availableTags = remember(entries) {
-        entries.flatMap { it.tags }
+        entries.flatMap { it.tags.canonicalTopics() }
             .groupingBy { it }
             .eachCount()
             .entries
@@ -282,7 +285,7 @@ fun JournalArchiveScreen(
                     onToggleMood = { mood ->
                         selectedMoodNames = selectedMoodNames.toggle(mood.name)
                     },
-                    onToggleTag = { tag -> selectedTags = selectedTags.toggle(tag) },
+                    onToggleTag = { tag -> selectedTags = toggleTopic(selectedTags, tag) },
                     onImageFilterChange = { imageFilterName = it.name },
                     onDatePresetChange = {
                         datePresetName = it.name
@@ -314,8 +317,7 @@ fun JournalArchiveScreen(
                     onPreviousMonth = { visibleMonthValue = visibleMonth.minusMonths(1).toString() },
                     onNextMonth = { visibleMonthValue = visibleMonth.plusMonths(1).toString() },
                     onSelectDate = { date ->
-                        pendingScrollPosition = archiveListState.firstVisibleItemIndex to
-                            archiveListState.firstVisibleItemScrollOffset
+                        scrollToSelectedDateResults = true
                         selectedDateValue = if (selectedDate == date) null else date.toString()
                         datePresetName = ArchiveDatePreset.ALL.name
                     },
@@ -420,6 +422,7 @@ fun JournalArchiveScreen(
     detailEntry?.let { entry ->
         JournalEntryDetailDialog(
             entry = entry,
+            openImage = openImage,
             openAudio = openAudio,
             onDismiss = { detailEntry = null },
             onRequestEdit = { editEntry = entry },
@@ -622,8 +625,9 @@ private fun ArchiveControls(
     ) {
         Surface(
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
         ) {
             Row(
                 Modifier.padding(4.dp).selectableGroup(),
@@ -701,11 +705,10 @@ private fun ArchiveModeButton(
                 onClick = onClick,
             ),
         shape = RoundedCornerShape(15.dp),
-        color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
-        shadowElevation = if (selected) 1.dp else 0.dp,
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -713,13 +716,13 @@ private fun ArchiveModeButton(
                 icon,
                 contentDescription = null,
                 modifier = Modifier.size(17.dp),
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -788,7 +791,7 @@ private fun ArchiveFilters(
                 ) {
                     items(availableTags, key = { it }) { tag ->
                         FilterChip(
-                            selected = tag in selectedTags,
+                            selected = selectedTags.containsTopic(tag),
                             onClick = { onToggleTag(tag) },
                             label = { Text(tag) },
                         )
@@ -1115,11 +1118,13 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
 @Composable
 internal fun JournalEntryDetailDialog(
     entry: JournalEntry,
+    openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream? = { null },
     onDismiss: () -> Unit,
     onRequestEdit: (() -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
 ) {
+    var photoPage by remember(entry.id) { mutableIntStateOf(-1) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -1222,21 +1227,18 @@ internal fun JournalEntryDetailDialog(
                 }
 
                 if (entry.imageFileNames.isNotEmpty()) {
+                    Text("照片 · ${entry.imageFileNames.size} 张", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Image, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(12.dp))
-                            Text("包含 ${entry.imageFileNames.size} 张照片，可在记录卡片中点按查看。")
-                        }
+                        JournalPhotoMosaic(entry.imageFileNames, openImage) { photoPage = it }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
                 if (onRequestDelete == null) {
-                    Button(
+                    OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
-                        elevation = xikeButtonElevation(),
+                        shape = XikeShapes.button,
                     ) { Text("关闭") }
                 } else {
                     Row(
@@ -1252,15 +1254,23 @@ internal fun JournalEntryDetailDialog(
                             Spacer(Modifier.width(7.dp))
                             Text("删除记录")
                         }
-                        Button(
+                        OutlinedButton(
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
-                            elevation = xikeButtonElevation(),
+                            shape = XikeShapes.button,
                         ) { Text("关闭") }
                     }
                 }
             }
         }
+    }
+    if (photoPage >= 0 && photoPage < entry.imageFileNames.size) {
+        PhotoGalleryDialog(
+            fileNames = entry.imageFileNames,
+            initialPage = photoPage,
+            openImage = openImage,
+            onDismiss = { photoPage = -1 },
+        )
     }
 }
 
@@ -1285,6 +1295,7 @@ private fun JournalEntryEditDialog(
     var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var showDiscardConfirmation by rememberSaveable(entry.id) { mutableStateOf(false) }
     var showPhotoSourceDialog by rememberSaveable(entry.id) { mutableStateOf(false) }
     var pendingCameraUriString by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     val selectedMood = Mood.entries.firstOrNull { it.name == selectedMoodName } ?: entry.mood
@@ -1396,10 +1407,20 @@ private fun JournalEntryEditDialog(
             galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
-    val dismissEditor = {
+    val hasUnsavedChanges = selectedMood != entry.mood ||
+        createdAt != entry.createdAt ||
+        note != entry.note ||
+        selectedTags != entry.tags ||
+        retainedAudio != entry.audio ||
+        retainedImages != entry.imageFileNames ||
+        newImageUriStrings.isNotEmpty()
+    val discardEditor = {
         pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
         pendingCameraUriString = null
         onDismiss()
+    }
+    val dismissEditor = {
+        if (hasUnsavedChanges) showDiscardConfirmation = true else discardEditor()
     }
 
     Dialog(
@@ -1569,7 +1590,7 @@ private fun JournalEntryEditDialog(
 
                 EditSectionCard(
                     title = "主题",
-                    supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.size}",
+                    supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.canonicalTopics().size}",
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         journalTopics.chunked(3).forEach { rowTopics ->
@@ -1580,9 +1601,9 @@ private fun JournalEntryEditDialog(
                                 rowTopics.forEach { topic ->
                                     TopicChip(
                                         topic = topic,
-                                        selected = topic.label in selectedTags,
+                                        selected = selectedTags.containsTopic(topic.label),
                                         onClick = {
-                                            if (!isSaving) selectedTags = selectedTags.toggle(topic.label)
+                                            if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
                                         },
                                         modifier = Modifier.weight(1f),
                                     )
@@ -1659,6 +1680,24 @@ private fun JournalEntryEditDialog(
                 openPhotoPicker()
             },
             onDismiss = { showPhotoSourceDialog = false },
+        )
+    }
+
+    if (showDiscardConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirmation = false },
+            shape = XikeShapes.dialog,
+            title = { Text("放弃未保存的修改？") },
+            text = { Text("心情、时间、注脚、主题和附件的本次修改都不会保存。") },
+            dismissButton = {
+                TextButton(onClick = { showDiscardConfirmation = false }) { Text("继续编辑") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardConfirmation = false
+                    discardEditor()
+                }) { Text("放弃修改") }
+            },
         )
     }
 }

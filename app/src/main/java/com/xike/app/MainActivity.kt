@@ -26,8 +26,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,11 +52,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -538,6 +548,7 @@ private fun XikeApp(
     var busyMessage by remember { mutableStateOf<String?>(null) }
     var isVoiceCaptureActive by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val screenStateHolder = rememberSaveableStateHolder()
 
     LaunchedEffect(quickRecordRequest) {
         if (quickRecordRequest > 0) screen = AppScreen.HOME
@@ -599,61 +610,63 @@ private fun XikeApp(
             )
         },
     ) { innerPadding ->
-        when (screen) {
-            AppScreen.HOME -> MomentScreen(
-                padding = innerPadding,
-                entries = entries,
-                draft = draft,
-                dailyPromptSettings = dailyPromptSettings,
-                onDraftMoodChange = onDraftMoodChange,
-                onDraftNoteChange = onDraftNoteChange,
-                onDraftTagToggle = onDraftTagToggle,
-                onDraftRecordedAtChange = onDraftRecordedAtChange,
-                onAttachCurrentOutdoor = onAttachCurrentOutdoor,
-                onAttachOutdoorForCity = onAttachOutdoorForCity,
-                onClearDraftOutdoor = onClearDraftOutdoor,
-                onDraftImagesAdded = onDraftImagesAdded,
-                onDraftImageRemoved = onDraftImageRemoved,
-                onDraftAudioRecorded = onDraftAudioRecorded,
-                onDraftAudioRemoved = onDraftAudioRemoved,
-                openAudio = openAudio,
-                onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
-                onDraftDiscard = onDraftDiscard,
-                onSave = onSave,
-            )
-            AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage, openAudio)
-            AppScreen.ARCHIVE -> JournalArchiveScreen(
-                padding = innerPadding,
-                entries = entries,
-                onSearch = onSearch,
-                onUpdate = onUpdate,
-                onDelete = onDelete,
-                onUndoDelete = onUndoDelete,
-                onFinalizeDelete = onFinalizeDelete,
-                openImage = openImage,
-                openAudio = openAudio,
-            )
-            AppScreen.SETTINGS -> ProfileSettingsScreen(
-                padding = innerPadding,
-                selectedTheme = selectedTheme,
-                appLockEnabled = appLockEnabled,
-                appLockTimeout = appLockTimeout,
-                authenticationAvailable = authenticationAvailable,
-                reminderSettings = reminderSettings,
-                dailyPromptSettings = dailyPromptSettings,
-                notificationPermissionGranted = notificationPermissionGranted,
-                onThemeChange = onThemeChange,
-                onAppLockChange = onAppLockChange,
-                onAppLockTimeoutChange = onAppLockTimeoutChange,
-                onLockNow = onLockNow,
-                onReminderEnabledChange = onReminderEnabledChange,
-                onReminderSettingsChange = onReminderSettingsChange,
-                onDailyPromptSettingsChange = onDailyPromptSettingsChange,
-                onExport = { backupAction = BackupAction.EXPORT },
-                onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json")) },
-                canUndoRestore = canUndoRestore,
-                onUndoRestore = { scope.launch { runUndoRestore() } },
-            )
+        screenStateHolder.SaveableStateProvider(screen.name) {
+            when (screen) {
+                AppScreen.HOME -> MomentScreen(
+                    padding = innerPadding,
+                    entries = entries,
+                    draft = draft,
+                    dailyPromptSettings = dailyPromptSettings,
+                    onDraftMoodChange = onDraftMoodChange,
+                    onDraftNoteChange = onDraftNoteChange,
+                    onDraftTagToggle = onDraftTagToggle,
+                    onDraftRecordedAtChange = onDraftRecordedAtChange,
+                    onAttachCurrentOutdoor = onAttachCurrentOutdoor,
+                    onAttachOutdoorForCity = onAttachOutdoorForCity,
+                    onClearDraftOutdoor = onClearDraftOutdoor,
+                    onDraftImagesAdded = onDraftImagesAdded,
+                    onDraftImageRemoved = onDraftImageRemoved,
+                    onDraftAudioRecorded = onDraftAudioRecorded,
+                    onDraftAudioRemoved = onDraftAudioRemoved,
+                    openAudio = openAudio,
+                    onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
+                    onDraftDiscard = onDraftDiscard,
+                    onSave = onSave,
+                )
+                AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage, openAudio)
+                AppScreen.ARCHIVE -> JournalArchiveScreen(
+                    padding = innerPadding,
+                    entries = entries,
+                    onSearch = onSearch,
+                    onUpdate = onUpdate,
+                    onDelete = onDelete,
+                    onUndoDelete = onUndoDelete,
+                    onFinalizeDelete = onFinalizeDelete,
+                    openImage = openImage,
+                    openAudio = openAudio,
+                )
+                AppScreen.SETTINGS -> ProfileSettingsScreen(
+                    padding = innerPadding,
+                    selectedTheme = selectedTheme,
+                    appLockEnabled = appLockEnabled,
+                    appLockTimeout = appLockTimeout,
+                    authenticationAvailable = authenticationAvailable,
+                    reminderSettings = reminderSettings,
+                    dailyPromptSettings = dailyPromptSettings,
+                    notificationPermissionGranted = notificationPermissionGranted,
+                    onThemeChange = onThemeChange,
+                    onAppLockChange = onAppLockChange,
+                    onAppLockTimeoutChange = onAppLockTimeoutChange,
+                    onLockNow = onLockNow,
+                    onReminderEnabledChange = onReminderEnabledChange,
+                    onReminderSettingsChange = onReminderSettingsChange,
+                    onDailyPromptSettingsChange = onDailyPromptSettingsChange,
+                    onExport = { backupAction = BackupAction.EXPORT },
+                    onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json")) },
+                    canUndoRestore = canUndoRestore,
+                    onUndoRestore = { scope.launch { runUndoRestore() } },
+                )
+            }
         }
     }
 
@@ -662,6 +675,7 @@ private fun XikeApp(
             title = "创建加密备份",
             confirm = "选择保存位置",
             description = "备份会流式加密，可安全保存到本地或系统接入的云盘。密码只属于你，我们不会保存。",
+            requireConfirmation = true,
             onDismiss = { backupAction = null },
             onConfirm = { password ->
                 pendingExportPassword = password
@@ -775,7 +789,10 @@ private fun RestoreConfirmationDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("替换并恢复") }
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text("替换并恢复") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
@@ -788,10 +805,13 @@ private fun BackupPasswordDialog(
     title: String,
     description: String,
     confirm: String,
+    requireConfirmation: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
@@ -807,14 +827,37 @@ private fun BackupPasswordDialog(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("备份密码（至少 8 位）") },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
+                            )
+                        }
+                    },
                     singleLine = true,
                 )
+                if (requireConfirmation) {
+                    OutlinedTextField(
+                        value = confirmation,
+                        onValueChange = { confirmation = it },
+                        label = { Text("再次输入备份密码") },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        isError = confirmation.isNotEmpty() && confirmation != password,
+                        supportingText = if (confirmation.isNotEmpty() && confirmation != password) {
+                            { Text("两次密码不一致") }
+                        } else null,
+                        singleLine = true,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = password.length >= 8,
+                enabled = password.length >= 8 && (!requireConfirmation || confirmation == password),
                 onClick = { onConfirm(password) },
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             ) { Text(confirm) }

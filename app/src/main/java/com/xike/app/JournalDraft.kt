@@ -27,7 +27,7 @@ data class JournalDraft(
 
     fun normalized(): JournalDraft {
         val normalizedNote = note.take(MAX_DRAFT_NOTE_LENGTH)
-        val normalizedTags = tags.filterTo(linkedSetOf()) { it.isNotBlank() }
+        val normalizedTags = tags.filter(String::isNotBlank).canonicalTopics().toCollection(linkedSetOf())
         val normalizedImages = imageUriStrings
             .filter(String::isNotBlank)
             .distinct()

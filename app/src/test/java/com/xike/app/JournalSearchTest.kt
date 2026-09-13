@@ -75,6 +75,25 @@ class JournalSearchTest {
     }
 
     @Test
+    fun `current topic filters and text find historical labels`() {
+        val entries = listOf(
+            entry("old", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("社交"), "见了朋友", emptyList()),
+            entry("new", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("关系"), "打了电话", emptyList()),
+            entry("other", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("身体"), "散步", emptyList()),
+        )
+
+        assertEquals(
+            listOf("old", "new"),
+            filterJournalEntries(entries, JournalSearchQuery(tags = setOf("关系")), zone).map { it.id },
+        )
+        assertEquals(
+            listOf("old", "new"),
+            filterJournalEntries(entries, JournalSearchQuery(text = "关系"), zone).map { it.id },
+        )
+        assertTrue(journalFtsQuery("关系").contains("\"社交*\""))
+    }
+
+    @Test
     fun `calendar begins on Monday and only allocates required weeks`() {
         val august = monthCalendarCells(YearMonth.of(2026, 8))
         val february = monthCalendarCells(YearMonth.of(2027, 2))

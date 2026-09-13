@@ -221,7 +221,11 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                     )
                     Spacer(Modifier.height(7.dp))
                     Text(
-                        summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录",
+                        when {
+                            summary.entryCount == 0 -> "等待第一条心情记录"
+                            !summary.evidence.canDescribePatterns -> "已留下 ${summary.entryCount} 条心情记录"
+                            else -> summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录"
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -243,7 +247,11 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让轨迹从这里开始。",
+                when {
+                    summary.entryCount == 0 -> "记录此刻的心情，让轨迹从这里开始。"
+                    !summary.evidence.canDescribePatterns -> "先看看留下的记录，积累更多片段后再回顾变化。"
+                    else -> summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让轨迹从这里开始。"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -913,7 +921,12 @@ private fun InsightDrilldownDialog(
     }
 
     detailEntry?.let { entry ->
-        JournalEntryDetailDialog(entry = entry, openAudio = openAudio, onDismiss = { detailEntry = null })
+        JournalEntryDetailDialog(
+            entry = entry,
+            openImage = openImage,
+            openAudio = openAudio,
+            onDismiss = { detailEntry = null },
+        )
     }
     galleryImages?.let { images ->
         PhotoGalleryDialog(

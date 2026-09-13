@@ -33,6 +33,18 @@ class JournalDraftTest {
     }
 
     @Test
+    fun `restored draft uses current topics without duplicating merged choices`() {
+        val restored = JournalDraft(
+            tags = linkedSetOf("社交", "关系", "运动", "创作"),
+        ).toJson().toString()
+
+        assertEquals(
+            linkedSetOf("关系", "身体", "兴趣"),
+            parseJournalDraft(restored).tags,
+        )
+    }
+
+    @Test
     fun `empty draft resets update time`() {
         val draft = JournalDraft(updatedAt = 99L).normalized()
 

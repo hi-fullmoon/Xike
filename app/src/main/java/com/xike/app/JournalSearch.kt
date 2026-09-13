@@ -58,15 +58,19 @@ fun filterJournalEntries(
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): List<JournalEntry> {
     val text = query.normalizedText
-    val textTerms = SEARCH_TERM.findAll(text).map { it.value }.toList()
+    val textTerms = SEARCH_TERM.findAll(text)
+        .map { it.value }
+        .map { term -> term to expandedTopicLabels(listOf(term)) }
+        .toList()
+    val selectedTopics = query.tags.canonicalTopics().toSet()
     return entries.filter { entry ->
         val date = Instant.ofEpochMilli(entry.createdAt).atZone(zoneId).toLocalDate()
-        val textMatches = text.isEmpty() || textTerms.isNotEmpty() && textTerms.all { term ->
+        val textMatches = text.isEmpty() || textTerms.isNotEmpty() && textTerms.all { (term, topicTerms) ->
             entry.note.contains(term, ignoreCase = true) ||
-                entry.tags.any { it.contains(term, ignoreCase = true) }
+                entry.tags.any { tag -> topicTerms.any { tag.contains(it, ignoreCase = true) } }
         }
         val moodMatches = query.moods.isEmpty() || entry.mood in query.moods
-        val tagMatches = query.tags.isEmpty() || entry.tags.any { it in query.tags }
+        val tagMatches = selectedTopics.isEmpty() || entry.tags.any { canonicalTopic(it) in selectedTopics }
         val startMatches = query.startDate?.let { !date.isBefore(it) } ?: true
         val endMatches = query.endDate?.let { !date.isAfter(it) } ?: true
         val imageMatches = when (query.imageFilter) {
@@ -103,15 +107,16 @@ internal fun journalSearchDocument(note: String, tags: List<String>): String {
 
 internal fun journalFtsQuery(text: String): String {
     val terms = SEARCH_TERM.findAll(text.trim())
-        .map { it.value }
-        .flatMap { term ->
-            if (term.all(::isCjkCharacter) && term.length > 2) {
-                term.asSequence().map { it.toString() }
-            } else {
-                sequenceOf(term)
+        .map { match ->
+            val term = match.value
+            val topicTerms = expandedTopicLabels(listOf(term))
+            when {
+                topicTerms.size > 1 -> topicTerms.joinToString(" OR ", "(", ")") { quoteFtsTerm(it) }
+                term.all(::isCjkCharacter) && term.length > 2 ->
+                    term.asSequence().joinToString(" AND ") { quoteFtsTerm(it.toString()) }
+                else -> quoteFtsTerm(term)
             }
         }
-        .map(::quoteFtsTerm)
         .toList()
     return terms.joinToString(" AND ").ifEmpty { quoteFtsTerm("__xike_no_match__") }
 }

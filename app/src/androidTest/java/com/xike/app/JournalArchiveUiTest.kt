@@ -3,6 +3,7 @@ package com.xike.app
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,8 +19,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -100,6 +99,7 @@ class JournalArchiveUiTest {
             }
         }
 
+        composeRule.onNodeWithText("月历").performClick()
         val spokenDate = emptyDate.format(
             DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA),
         )
@@ -107,7 +107,7 @@ class JournalArchiveUiTest {
     }
 
     @Test
-    fun selectingRecordedSundayKeepsCalendarScrollPosition() {
+    fun selectingRecordedSundayBringsItsRecordIntoView() {
         val today = LocalDate.now()
         val firstOfMonth = today.withDayOfMonth(1)
         val sunday = generateSequence(firstOfMonth) { date -> date.plusDays(1) }
@@ -150,12 +150,12 @@ class JournalArchiveUiTest {
             }
         }
 
+        composeRule.onNodeWithText("月历").performClick()
         val spokenDate = sunday.format(
             DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA),
         )
         val sundayNode = composeRule.onNodeWithContentDescription("$spokenDate，1 条记录")
         sundayNode.performScrollTo()
-        val beforeTop = sundayNode.fetchSemanticsNode().boundsInRoot.top
         sundayNode.performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) {
             composeRule.onAllNodesWithText(
@@ -163,9 +163,7 @@ class JournalArchiveUiTest {
             ).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.waitForIdle()
-        val afterTop = sundayNode.fetchSemanticsNode().boundsInRoot.top
-
-        assertTrue("calendar moved from $beforeTop to $afterTop", abs(afterTop - beforeTop) < 2f)
+        composeRule.onNodeWithText("周日记录").assertIsDisplayed()
     }
 
     @Test
@@ -217,7 +215,7 @@ class JournalArchiveUiTest {
 
     @Test
     fun editingARecordUpdatesWeatherNoteAndKeywords() {
-        val journal = entry("edit-me", LocalDate.now(), listOf("自我"), "准备编辑的记录")
+        val journal = entry("edit-me", LocalDate.now(), listOf("社交"), "准备编辑的记录")
         var updatedEntry: JournalEntry? = null
 
         composeRule.setContent {
@@ -250,6 +248,7 @@ class JournalArchiveUiTest {
             hasSetTextAction() and hasText("准备编辑的记录"),
         ).performTextReplacement("修改后的注脚")
         composeRule.onNodeWithText("平静").performClick()
+        composeRule.onNodeWithText("关系").performScrollTo().assertIsSelected()
         composeRule.onNodeWithText("工作").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("已选 2").fetchSemanticsNodes().isNotEmpty()
@@ -261,8 +260,46 @@ class JournalArchiveUiTest {
             val saved = checkNotNull(updatedEntry)
             check(saved.note == "修改后的注脚")
             check(saved.mood == Mood.CALM)
-            check(saved.tags == listOf("自我", "工作"))
+            check(saved.tags == listOf("社交", "工作"))
         }
+    }
+
+    @Test
+    fun closingChangedEditorRequiresConfirmation() {
+        val journal = entry("unsaved-edit", LocalDate.now(), emptyList(), "尚未保存的记录")
+        var updateCount = 0
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                JournalArchiveScreen(
+                    padding = PaddingValues(),
+                    entries = listOf(journal),
+                    onSearch = { query, offset, limit ->
+                        val matches = filterJournalEntries(listOf(journal), query)
+                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                    },
+                    onUpdate = { updated, _, _ ->
+                        updateCount++
+                        Result.success(updated)
+                    },
+                    onDelete = { Result.success(Unit) },
+                    onUndoDelete = { Result.success(Unit) },
+                    onFinalizeDelete = { Result.success(Unit) },
+                    openImage = { null },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("尚未保存的记录").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("编辑记录").performClick()
+        composeRule.onNodeWithText("平静").performClick()
+        composeRule.onNodeWithContentDescription("取消编辑").performClick()
+        composeRule.onNodeWithText("放弃未保存的修改？").assertIsDisplayed()
+        composeRule.onNodeWithText("继续编辑").performClick()
+        composeRule.onNodeWithText("编辑这一刻").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("取消编辑").performClick()
+        composeRule.onNodeWithText("放弃修改").performClick()
+        composeRule.onNodeWithContentDescription("编辑记录").assertIsDisplayed()
+        composeRule.runOnIdle { check(updateCount == 0) }
     }
 
     private fun entry(
