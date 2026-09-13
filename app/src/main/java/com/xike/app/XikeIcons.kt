@@ -1,11 +1,5 @@
 package com.xike.app
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.SentimentDissatisfied
-import androidx.compose.material.icons.rounded.SentimentNeutral
-import androidx.compose.material.icons.rounded.SentimentSatisfied
-import androidx.compose.material.icons.rounded.SentimentVeryDissatisfied
-import androidx.compose.material.icons.rounded.SentimentVerySatisfied
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -216,11 +210,11 @@ object XikeIcons {
 }
 
 internal fun Mood.moodIcon(): ImageVector = when (this) {
-    Mood.LOW -> Icons.Rounded.SentimentVeryDissatisfied
-    Mood.TIRED -> Icons.Rounded.SentimentDissatisfied
-    Mood.CALM -> Icons.Rounded.SentimentNeutral
-    Mood.GOOD -> Icons.Rounded.SentimentSatisfied
-    Mood.JOYFUL -> Icons.Rounded.SentimentVerySatisfied
+    Mood.LOW -> XikeIcons.MoodLow
+    Mood.TIRED -> XikeIcons.MoodTired
+    Mood.CALM -> XikeIcons.MoodCalm
+    Mood.GOOD -> XikeIcons.MoodGood
+    Mood.JOYFUL -> XikeIcons.MoodJoyful
 }
 
 internal fun Mood.moodDescription(): String = when (this) {

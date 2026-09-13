@@ -133,7 +133,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -968,7 +968,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -992,7 +992,7 @@ fun MomentScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
-                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(16.dp)) {
+                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column {
                                     Text("主题", style = MaterialTheme.typography.titleSmall)
@@ -1198,22 +1198,30 @@ private fun MomentQuickAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    androidx.compose.material3.FilledTonalButton(
+    val colors = ButtonDefaults.filledTonalButtonColors()
+    Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = 44.dp),
+        modifier = modifier.semantics { role = Role.Button },
         shape = XikeShapes.inner,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        color = if (enabled) colors.containerColor else colors.disabledContainerColor,
+        contentColor = if (enabled) colors.contentColor else colors.disabledContentColor,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-        Spacer(Modifier.width(XikeInlineActionGap))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.heightIn(min = 36.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(XikeInlineActionGap))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -1634,7 +1642,6 @@ private fun MoodPicker(
                         mood = mood,
                         selected = selectedMood == mood,
                         enabled = enabled,
-                        useEmoji = true,
                         onClick = { onSelected(mood) },
                         modifier = Modifier.weight(1f),
                     )
@@ -1653,10 +1660,11 @@ private fun MoodPicker(
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            selectedMood.emojiGlyph(),
-                            modifier = Modifier.clearAndSetSemantics { },
-                            fontSize = 18.sp,
+                        Icon(
+                            selectedMood.moodIcon(),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (isDark) visual.container else visual.accent,
                         )
                         Spacer(Modifier.width(9.dp))
                         Text(
@@ -1700,10 +1708,11 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                mood.emojiGlyph(),
-                                modifier = Modifier.clearAndSetSemantics { },
-                                fontSize = 24.sp,
+                            Icon(
+                                mood.moodIcon(),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = if (isDark) visual.container else visual.accent,
                             )
                             Spacer(Modifier.width(11.dp))
                             Column {
@@ -1728,7 +1737,6 @@ internal fun MoodChoice(
     mood: Mood,
     selected: Boolean,
     enabled: Boolean,
-    useEmoji: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1765,20 +1773,12 @@ internal fun MoodChoice(
             shadowElevation = if (selected) 2.dp else 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (useEmoji) {
-                    Text(
-                        mood.emojiGlyph(),
-                        modifier = Modifier.clearAndSetSemantics { },
-                        fontSize = 25.sp,
-                    )
-                } else {
-                    Icon(
-                        mood.moodIcon(),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
-                    )
-                }
+                Icon(
+                    mood.moodIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
+                )
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -1814,7 +1814,7 @@ internal fun TopicChip(
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 44.dp).padding(horizontal = 9.dp, vertical = 6.dp),
+            modifier = Modifier.heightIn(min = 36.dp).padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -3119,14 +3119,6 @@ private fun moodSummary(average: Double): String = when {
 }
 
 private data class MoodVisualStyle(val accent: Color, val container: Color)
-
-private fun Mood.emojiGlyph(): String = when (this) {
-    Mood.LOW -> "😞"
-    Mood.TIRED -> "😫"
-    Mood.CALM -> "😌"
-    Mood.GOOD -> "🙂"
-    Mood.JOYFUL -> "😄"
-}
 
 private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
     Mood.LOW -> MoodVisualStyle(
