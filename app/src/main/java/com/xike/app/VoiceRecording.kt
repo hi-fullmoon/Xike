@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
@@ -325,7 +326,15 @@ internal fun VoiceCaptureCard(
                         isRecording = false
                         onClosed()
                     },
-                ) { Text("取消") }
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = null,
+                        modifier = Modifier.xikeInlineActionIcon(),
+                    )
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Text("取消", maxLines = 1)
+                }
                 OutlinedButton(
                     enabled = isRecording && !isStopping,
                     modifier = Modifier.weight(1f),
@@ -347,7 +356,7 @@ internal fun VoiceCaptureCard(
                     },
                 ) {
                     Icon(
-                        if (isPaused) Icons.Outlined.MicNone else Icons.Outlined.Pause,
+                        if (isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
                         contentDescription = null,
                         modifier = Modifier.xikeInlineActionIcon(),
                     )
