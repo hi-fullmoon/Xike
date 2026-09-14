@@ -3,6 +3,7 @@ package com.xike.app
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -57,6 +58,24 @@ class JournalInsightsUiTest {
         composeRule.onNodeWithText("轻松 · 2 条").assertIsDisplayed()
         composeRule.onNodeWithText("第一条可追溯记录").assertIsDisplayed()
         composeRule.onNodeWithText("第二条可追溯记录").assertIsDisplayed()
+    }
+
+    @Test
+    fun trendPointStillOpensItsOriginalEntries() {
+        val entries = listOf(
+            entry("trend-1", Mood.GOOD, "趋势里的第一条"),
+            entry("trend-2", Mood.CALM, "趋势里的第二条"),
+            entry("trend-3", Mood.TIRED, "趋势里的第三条"),
+        )
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN) {
+                JournalInsightsScreen(PaddingValues(), entries, openImage = { null })
+            }
+        }
+
+        composeRule.onNode(hasContentDescription("3 条记录", substring = true)).performScrollTo().performClick()
+        composeRule.onNodeWithText("趋势里的第一条").assertIsDisplayed()
+        composeRule.onNodeWithText("趋势里的第二条").assertIsDisplayed()
     }
 
     @Test

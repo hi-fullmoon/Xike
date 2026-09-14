@@ -780,7 +780,7 @@ private fun ArchiveFilters(
                         onClick = { onToggleMood(mood) },
                         label = { Text(mood.label) },
                         leadingIcon = {
-                            Icon(mood.moodIcon(), contentDescription = null, modifier = Modifier.size(18.dp))
+                            MoodEmoji(mood, size = 18.dp)
                         },
                     )
                 }
@@ -1165,12 +1165,7 @@ internal fun JournalEntryDetailDialog(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    entry.mood.moodIcon(),
-                                    contentDescription = entry.mood.label,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                                MoodEmoji(entry.mood, size = 28.dp)
                             }
                         }
                         Spacer(Modifier.width(14.dp))

@@ -53,7 +53,7 @@
 - 图片与语音附件独立加密后保存在应用私有目录。
 - 草稿保存在 `EncryptedSharedPreferences` 中。
 - 应用锁使用系统面容、指纹或设备凭据，不自建 PIN 体系。
-- 支持由用户密码保护的加密备份、恢复前校验和恢复后一次撤销。
+- 支持密码加密 `.xike` 或未加密 `.zip` 备份；归档包含离线 HTML 阅读页，恢复前校验并可在恢复后撤销一次。
 - 禁止 Android 系统自动备份应用数据。
 
 ### 温和习惯支持
@@ -96,7 +96,7 @@ flowchart TD
     VM --> Outdoor[OutdoorContextRepository]
     Store <--> Room[(Room + SQLCipher)]
     Store <--> Images[(私有目录加密图片)]
-    Store <--> Backup[密码加密 .xike 备份]
+    Store <--> Backup[加密 .xike / 可浏览 .zip 备份]
     Activity <--> Habits[HabitPreferences<br/>提醒与每日一问设置]
     Activity <--> Scheduler[AlarmManager / Notification]
     Activity <--> Biometric[系统生物识别或设备凭据]

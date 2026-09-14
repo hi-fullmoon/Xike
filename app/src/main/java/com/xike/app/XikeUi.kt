@@ -1660,12 +1660,7 @@ private fun MoodPicker(
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            selectedMood.moodIcon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isDark) visual.container else visual.accent,
-                        )
+                        MoodEmoji(selectedMood, size = 20.dp)
                         Spacer(Modifier.width(9.dp))
                         Text(
                             "${selectedMood.label} · ${selectedMood.moodDescription()}",
@@ -1708,12 +1703,7 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                mood.moodIcon(),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = if (isDark) visual.container else visual.accent,
-                            )
+                            MoodEmoji(mood, size = 24.dp)
                             Spacer(Modifier.width(11.dp))
                             Column {
                                 Text(mood.label, style = MaterialTheme.typography.titleSmall)
@@ -1773,12 +1763,7 @@ internal fun MoodChoice(
             shadowElevation = if (selected) 2.dp else 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    mood.moodIcon(),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = moodColor.copy(alpha = if (selected) 1f else 0.78f),
-                )
+                MoodEmoji(mood, size = 24.dp)
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -2249,12 +2234,7 @@ internal fun JournalEntryCard(
             Row(Modifier.padding(18.dp), verticalAlignment = Alignment.Top) {
                 Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            entry.mood.moodIcon(),
-                            contentDescription = entry.mood.label,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+                        MoodEmoji(entry.mood, size = 24.dp)
                     }
                 }
                 Spacer(Modifier.width(14.dp))
@@ -2637,15 +2617,15 @@ fun ProfileSettingsScreen(
                 Column {
                     SettingsAction(
                         icon = Icons.Outlined.CloudUpload,
-                        title = "导出加密备份",
-                        subtitle = "保存到本地或系统云盘",
+                        title = "导出日记备份",
+                        subtitle = "可选密码加密，附离线阅读页",
                         onClick = onExport,
                     )
                     HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsAction(
                         icon = Icons.Outlined.Restore,
                         title = "从备份恢复",
-                        subtitle = "使用密码恢复已有记录",
+                        subtitle = "支持加密和未加密备份",
                         onClick = onImport,
                     )
                     if (canUndoRestore) {

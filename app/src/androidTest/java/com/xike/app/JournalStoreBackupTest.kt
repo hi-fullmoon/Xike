@@ -6,10 +6,12 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
@@ -91,6 +93,26 @@ class JournalStoreBackupTest {
         val audio = store.importAudio(sourceFile, 12_500L)
         store.add(entry("voice-source", 1_700_000_000_500L, "有一段语音").copy(audio = audio))
         val backup = encryptedBackup()
+        assertTrue(store.backupRequiresPassword(backup.inputStream()))
+        val encryptedInput = backup.inputStream().also { input ->
+            val magic = ByteArray(BackupCipher.magicSize)
+            assertEquals(magic.size, input.read(magic))
+            assertTrue(BackupCipher.hasStreamingMagic(magic))
+        }
+        ZipInputStream(BufferedInputStream(BackupCipher.decryptingStream(encryptedInput, PASSWORD))).use { archive ->
+            val names = mutableListOf<String>()
+            var item = archive.nextEntry
+            while (item != null) {
+                names += item.name
+                val contents = archive.readBytes()
+                if (item.name == "index.html") {
+                    assertTrue(contents.toString(Charsets.UTF_8).contains("有一段语音"))
+                }
+                archive.closeEntry()
+                item = archive.nextEntry
+            }
+            assertEquals(listOf("manifest.json", "index.html"), names.take(2))
+        }
 
         replaceWithLocalEntry()
 
@@ -101,6 +123,75 @@ class JournalStoreBackupTest {
         assertEquals(12_500L, restored.audio?.durationMillis)
         val restoredBytes = store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() }
         assertArrayEquals(audioContents, restoredBytes)
+    }
+
+    @Test
+    fun unencryptedBackupContainsReadableHtmlAndRestoresAllMedia() {
+        val imageContents = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jX/0AAAAASUVORK5CYII=",
+        )
+        val audioContents = ByteArray(1024) { it.toByte() }
+        val audioFile = File(context.cacheDir, "backup-test-audio-plain.m4a").also { it.writeBytes(audioContents) }
+        val audio = store.importAudio(audioFile, 2_000L)
+        val source = store.add(
+            entry("plain", 1_700_000_000_000L, "浏览器可读 <内容>").copy(audio = audio),
+            imageUris(listOf(imageContents)),
+        ).single()
+        val backup = ByteArrayOutputStream().also { store.writeBackup(it, null) }.toByteArray()
+
+        assertFalse(store.backupRequiresPassword(backup.inputStream()))
+        val archiveEntries = mutableMapOf<String, ByteArray>()
+        ZipInputStream(backup.inputStream()).use { archive ->
+            var item = archive.nextEntry
+            while (item != null) {
+                archiveEntries[item.name] = archive.readBytes()
+                archive.closeEntry()
+                item = archive.nextEntry
+            }
+        }
+        val html = archiveEntries.getValue("index.html").toString(Charsets.UTF_8)
+        assertTrue(html.contains("浏览器可读 &lt;内容&gt;"))
+        assertTrue(html.contains(".png\""))
+        assertTrue(html.contains(".m4a\""))
+        assertEquals(1, archiveEntries.keys.count { it.startsWith("images/") })
+        assertEquals(1, archiveEntries.keys.count { it.startsWith("audios/") })
+
+        replaceWithLocalEntry()
+        val summary = store.inspectBackup(backup.inputStream(), null)
+        assertEquals(1, summary.entryCount)
+        assertEquals(1, summary.imageCount)
+        assertEquals(1, summary.audioCount)
+        val restored = store.restoreBackup(backup.inputStream(), null).single()
+        assertEquals(source.note, restored.note)
+        assertImageContents(restored, listOf(imageContents))
+        assertArrayEquals(audioContents, store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() })
+        assertTrue(store.canUndoLastRestore())
+        assertEquals("设备上的原记录", store.undoLastRestore().single().note)
+    }
+
+    @Test
+    fun incompleteUnencryptedBackupDoesNotReplaceExistingData() {
+        replaceWithLocalEntry()
+        val manifest = JSONObject()
+            .put("format", "xike")
+            .put("version", 7)
+            .put("entries", JSONArray(listOf(entry("missing", 300L, "缺少图片")
+                .copy(imageFileNames = listOf("missing.png")).toJson())))
+            .toString()
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { archive ->
+            archive.putNextEntry(ZipEntry("manifest.json"))
+            archive.write(manifest.toByteArray())
+            archive.closeEntry()
+            archive.putNextEntry(ZipEntry("index.html"))
+            archive.write("<html></html>".toByteArray())
+            archive.closeEntry()
+            archive.putNextEntry(ZipEntry("complete.txt"))
+            archive.write("XIKE_BACKUP_COMPLETE".toByteArray())
+            archive.closeEntry()
+        }
+
+        assertRestoreFailsWithoutChangingData(output.toByteArray(), null)
     }
 
     @Test
@@ -219,12 +310,12 @@ class JournalStoreBackupTest {
         return output.toByteArray()
     }
 
-    private fun assertRestoreFailsWithoutChangingData(backup: ByteArray, password: String) {
+    private fun assertRestoreFailsWithoutChangingData(backup: ByteArray, password: String?) {
         val beforeEntries = store.entries()
         val beforeImages = storedImageContents(beforeEntries)
 
         val failure = runCatching {
-            store.restoreEncryptedBackup(backup.inputStream(), password)
+            store.restoreBackup(backup.inputStream(), password)
         }.exceptionOrNull()
 
         assertNotNull("恢复应当失败", failure)

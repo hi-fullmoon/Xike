@@ -33,12 +33,12 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-enum class Mood(val label: String, val score: Int) {
-    LOW("低落", 1),
-    TIRED("疲惫", 2),
-    CALM("平静", 3),
-    GOOD("轻松", 4),
-    JOYFUL("愉悦", 5);
+enum class Mood(val label: String, val score: Int, val emoji: String) {
+    LOW("低落", 1, "😔"),
+    TIRED("疲惫", 2, "😫"),
+    CALM("平静", 3, "😌"),
+    GOOD("轻松", 4, "🙂"),
+    JOYFUL("愉悦", 5, "😄");
 
     companion object {
         fun fromName(value: String): Mood = entries.firstOrNull { it.name == value } ?: CALM
@@ -453,43 +453,88 @@ class JournalStore(context: Context) {
     fun removeOrphanedImages() = removeOrphanedMedia()
 
     @Synchronized
-    fun writeEncryptedBackup(output: OutputStream, password: String) {
-        require(password.length >= 8) { "备份密码至少需要 8 位。" }
+    fun writeEncryptedBackup(output: OutputStream, password: String) = writeBackup(output, password)
+
+    @Synchronized
+    fun writeBackup(output: OutputStream, password: String?) {
+        if (password != null) require(password.length >= 8) { "备份密码至少需要 8 位。" }
         val currentEntries = readEntries()
         val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
         val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
+        val imageExportNames = imageNames.associateWith { name ->
+            val extension = openImage(name)?.use(::imageExtension) ?: error("备份图片无法读取：$name")
+            "${name.removeSuffix(".xike-image")}.$extension"
+        }
+        val audioExportNames = audioNames.associateWith { name ->
+            "${name.removeSuffix(".xike-audio")}.m4a"
+        }
+        val exportedEntries = currentEntries.map { entry ->
+            entry.copy(
+                imageFileNames = entry.imageFileNames.map { imageExportNames.getValue(it) },
+                audio = entry.audio?.let { it.copy(fileName = audioExportNames.getValue(it.fileName)) },
+            )
+        }
         val manifest = JSONObject()
             .put("format", "xike")
             .put("version", STREAMING_BACKUP_VERSION)
-            .put("entries", JSONArray(currentEntries.map { it.toJson() }))
+            .put("entries", JSONArray(exportedEntries.map { it.toJson() }))
             .toString()
+        val html = BackupHtml.render(exportedEntries)
+        val manifestBytes = manifest.toByteArray(Charsets.UTF_8)
+        val htmlBytes = html.toByteArray(Charsets.UTF_8)
+        require(manifestBytes.size <= MAX_MANIFEST_BYTES && htmlBytes.size <= MAX_HTML_BYTES) {
+            "日记内容超出单个备份文件的大小限制。"
+        }
 
-        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, password))).use { archive ->
+        val destination = if (password == null) output else BackupCipher.encryptingStream(output, password)
+        ZipOutputStream(BufferedOutputStream(destination)).use { archive ->
             archive.setLevel(Deflater.BEST_SPEED)
             archive.putNextEntry(ZipEntry(MANIFEST_ENTRY))
-            archive.write(manifest.toByteArray(Charsets.UTF_8))
+            archive.write(manifestBytes)
+            archive.closeEntry()
+
+            archive.putNextEntry(ZipEntry(HTML_ENTRY))
+            archive.write(htmlBytes)
             archive.closeEntry()
 
             imageNames.forEach { fileName ->
-                openImage(fileName)?.use { image ->
-                    archive.putNextEntry(ZipEntry("$IMAGES_PREFIX$fileName"))
+                (openImage(fileName) ?: error("备份图片无法读取：$fileName")).use { image ->
+                    archive.putNextEntry(ZipEntry("$IMAGES_PREFIX${imageExportNames.getValue(fileName)}"))
                     image.copyTo(archive)
                     archive.closeEntry()
                 }
             }
             audioNames.forEach { fileName ->
-                openAudio(fileName)?.use { audio ->
-                    archive.putNextEntry(ZipEntry("$AUDIOS_PREFIX$fileName"))
+                (openAudio(fileName) ?: error("备份录音无法读取：$fileName")).use { audio ->
+                    archive.putNextEntry(ZipEntry("$AUDIOS_PREFIX${audioExportNames.getValue(fileName)}"))
                     audio.copyTo(archive)
                     archive.closeEntry()
                 }
             }
+            archive.putNextEntry(ZipEntry(COMPLETION_ENTRY))
+            archive.write(COMPLETION_MARKER.toByteArray(Charsets.US_ASCII))
+            archive.closeEntry()
+        }
+    }
+
+    fun backupRequiresPassword(input: InputStream): Boolean {
+        val prefix = ByteArray(BackupCipher.magicSize)
+        val count = input.readAvailable(prefix)
+        return when {
+            count == prefix.size && BackupCipher.hasStreamingMagic(prefix) -> true
+            count >= 4 && prefix[0] == 'P'.code.toByte() && prefix[1] == 'K'.code.toByte() &&
+                prefix[2] == 3.toByte() && prefix[3] == 4.toByte() -> false
+            count > 0 && prefix[0] == '{'.code.toByte() -> true
+            else -> throw IllegalArgumentException("这不是息刻备份文件。")
         }
     }
 
     @Synchronized
-    fun inspectEncryptedBackup(input: InputStream, password: String): BackupSummary {
-        val prepared = readEncryptedBackup(input, password)
+    fun inspectEncryptedBackup(input: InputStream, password: String): BackupSummary = inspectBackup(input, password)
+
+    @Synchronized
+    fun inspectBackup(input: InputStream, password: String?): BackupSummary {
+        val prepared = readBackup(input, password)
         return try {
             val createdAtValues = prepared.entries.map { it.createdAt }
             BackupSummary(
@@ -509,8 +554,15 @@ class JournalStore(context: Context) {
         input: InputStream,
         password: String,
         retainedAudioFileNames: Set<String> = emptySet(),
+    ): List<JournalEntry> = restoreBackup(input, password, retainedAudioFileNames)
+
+    @Synchronized
+    fun restoreBackup(
+        input: InputStream,
+        password: String?,
+        retainedAudioFileNames: Set<String> = emptySet(),
     ): List<JournalEntry> {
-        val prepared = readEncryptedBackup(input, password)
+        val prepared = readBackup(input, password)
         return try {
             val snapshotSwap = createUndoSnapshot()
             try {
@@ -533,7 +585,7 @@ class JournalStore(context: Context) {
     fun undoLastRestore(retainedAudioFileNames: Set<String> = emptySet()): List<JournalEntry> {
         val snapshot = currentUndoSnapshot() ?: error("没有可撤销的恢复操作。")
         val prepared = snapshot.file.inputStream().use { input ->
-            readEncryptedBackup(input, snapshot.password)
+            readBackup(input, snapshot.password)
         }
         return try {
             installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames).also {
@@ -544,21 +596,26 @@ class JournalStore(context: Context) {
         }
     }
 
-    private fun readEncryptedBackup(input: InputStream, password: String): PreparedBackup {
-        require(password.length >= 8) { "备份密码至少需要 8 位。" }
+    private fun readBackup(input: InputStream, password: String?): PreparedBackup {
         val source = PushbackInputStream(BufferedInputStream(input), BackupCipher.magicSize)
         val prefix = ByteArray(BackupCipher.magicSize)
         val prefixSize = source.readAvailable(prefix)
 
         return if (prefixSize == BackupCipher.magicSize && BackupCipher.hasStreamingMagic(prefix)) {
-            readStreamingBackup(source, password)
+            require(!password.isNullOrEmpty()) { "请输入备份密码。" }
+            readStreamingBackup(source, password, encrypted = true)
+        } else if (prefixSize >= 4 && prefix[0] == 'P'.code.toByte() && prefix[1] == 'K'.code.toByte() &&
+            prefix[2] == 3.toByte() && prefix[3] == 4.toByte()) {
+            source.unread(prefix, 0, prefixSize)
+            readStreamingBackup(source, null, encrypted = false)
         } else {
+            require(!password.isNullOrEmpty()) { "请输入备份密码。" }
             if (prefixSize > 0) source.unread(prefix, 0, prefixSize)
             readLegacyBackup(source.readUtf8Limited(MAX_LEGACY_BACKUP_BYTES), password)
         }
     }
 
-    private fun readStreamingBackup(source: InputStream, password: String): PreparedBackup {
+    private fun readStreamingBackup(source: InputStream, password: String?, encrypted: Boolean): PreparedBackup {
         val stagingDirectory = createStagingDirectory()
         return try {
             var parsedEntries: List<JournalEntry>? = null
@@ -568,15 +625,23 @@ class JournalStore(context: Context) {
             var referencedAudios = emptySet<String>()
             val totalBytes = longArrayOf(0L)
             val totalAudioBytes = longArrayOf(0L)
+            var version = 0
+            var htmlSeen = false
+            var completionSeen = false
 
-            ZipInputStream(BufferedInputStream(BackupCipher.decryptingStream(source, password))).use { archive ->
+            val archiveSource = if (encrypted) BackupCipher.decryptingStream(source, requireNotNull(password)) else source
+            ZipInputStream(BufferedInputStream(archiveSource)).use { archive ->
                 val manifestEntry = archive.nextEntry
                 validateBackup(manifestEntry?.name == MANIFEST_ENTRY) { "备份清单缺失或顺序不正确。" }
                 val manifest = JSONObject(archive.readUtf8Limited(MAX_MANIFEST_BYTES))
                 archive.closeEntry()
                 validateBackup(manifest.optString("format") == "xike") { "这不是息刻备份文件。" }
-                validateBackup(manifest.optInt("version") in MIN_STREAMING_BACKUP_VERSION..STREAMING_BACKUP_VERSION) {
+                version = manifest.optInt("version")
+                validateBackup(version in MIN_STREAMING_BACKUP_VERSION..STREAMING_BACKUP_VERSION) {
                     "暂不支持这个版本的息刻备份。"
+                }
+                validateBackup(encrypted || version == STREAMING_BACKUP_VERSION) {
+                    "未加密备份格式不受支持。"
                 }
 
                 parsedEntries = parseEntries(manifest.getJSONArray("entries"))
@@ -590,11 +655,24 @@ class JournalStore(context: Context) {
                     .filter(::isSafeAudioFileName)
                     .toSet()
                 validateBackup(referencedAudios.size <= MAX_BACKUP_AUDIOS) { "备份包含过多录音。" }
+                validateBackup(referencedImages.intersect(referencedAudios).isEmpty()) {
+                    "备份中的图片和录音文件名重复。"
+                }
 
                 var entry = archive.nextEntry
                 while (entry != null) {
                     validateBackup(!entry.isDirectory) { "备份中包含未知内容。" }
                     when {
+                        entry.name == HTML_ENTRY && version >= 7 -> {
+                            validateBackup(!htmlSeen) { "备份中包含重复的 HTML。" }
+                            archive.readUtf8Limited(MAX_HTML_BYTES)
+                            htmlSeen = true
+                        }
+                        entry.name == COMPLETION_ENTRY && version >= 7 -> {
+                            validateBackup(!completionSeen) { "备份中包含重复的结束标记。" }
+                            validateBackup(archive.readUtf8Limited(64) == COMPLETION_MARKER) { "备份文件不完整。" }
+                            completionSeen = true
+                        }
                         entry.name.startsWith(IMAGES_PREFIX) -> {
                             val fileName = entry.name.removePrefix(IMAGES_PREFIX)
                             validateBackup(fileName in referencedImages) { "备份中包含未引用的图片。" }
@@ -621,6 +699,14 @@ class JournalStore(context: Context) {
                     }
                     archive.closeEntry()
                     entry = archive.nextEntry
+                    validateBackup(!completionSeen || entry == null) { "备份结束标记后包含多余内容。" }
+                }
+            }
+
+            if (version >= 7) {
+                validateBackup(htmlSeen && completionSeen) { "备份文件不完整。" }
+                validateBackup(restoredImages == referencedImages && restoredAudios == referencedAudios) {
+                    "备份缺少图片或录音。"
                 }
             }
 
@@ -825,7 +911,9 @@ class JournalStore(context: Context) {
         val installedFiles = mutableListOf<File>()
         return try {
             val stagedFiles = stagingDirectory.listFiles().orEmpty()
-            val renamedImages = stagedFiles.filter { it.name.endsWith(".xike-image") }.associate { stagedFile ->
+            val imageNames = restoredEntries.flatMap { it.imageFileNames }.toSet()
+            val audioNames = restoredEntries.mapNotNull { it.audio?.fileName }.toSet()
+            val renamedImages = stagedFiles.filter { it.name in imageNames }.associate { stagedFile ->
                 val newName = "${UUID.randomUUID()}.xike-image"
                 val installedFile = File(imagesDirectory, newName)
                 encryptedImage(stagedFile).openFileInput().use { decryptedImage ->
@@ -839,7 +927,7 @@ class JournalStore(context: Context) {
                 installedFiles += installedFile
                 stagedFile.name to newName
             }
-            val renamedAudios = stagedFiles.filter { isSafeAudioFileName(it.name) }.associate { stagedFile ->
+            val renamedAudios = stagedFiles.filter { it.name in audioNames }.associate { stagedFile ->
                 val newName = "${UUID.randomUUID()}.xike-audio"
                 val installedFile = File(audiosDirectory, newName)
                 encryptedFile(stagedFile).openFileInput().use { decryptedAudio ->
@@ -939,7 +1027,24 @@ class JournalStore(context: Context) {
             !fileName.contains('\\')
 
     private fun isSafeAudioFileName(fileName: String): Boolean =
-        isSafeImageFileName(fileName) && fileName.endsWith(".xike-audio")
+        isSafeImageFileName(fileName) && (fileName.endsWith(".xike-audio") || fileName.endsWith(".m4a"))
+
+    private fun imageExtension(input: InputStream): String {
+        val header = ByteArray(16)
+        val size = input.readAvailable(header)
+        return when {
+            size >= 3 && header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() -> "jpg"
+            size >= 8 && header.copyOfRange(0, 8).contentEquals(
+                byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A),
+            ) -> "png"
+            size >= 6 && String(header, 0, 3, Charsets.US_ASCII) == "GIF" -> "gif"
+            size >= 12 && String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+                String(header, 8, 4, Charsets.US_ASCII) == "WEBP" -> "webp"
+            size >= 12 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp" &&
+                String(header, 8, 4, Charsets.US_ASCII) in setOf("heic", "heix", "hevc", "mif1") -> "heic"
+            else -> "bin"
+        }
+    }
 
     private fun readEntries(): List<JournalEntry> = try {
         dao.records().map(JournalEntryRecord::toJournalEntry)
@@ -986,15 +1091,19 @@ class JournalStore(context: Context) {
         const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
         const val RESTORE_UNDO_PREFIX = "journal-restore-undo-"
         const val MANIFEST_ENTRY = "manifest.json"
+        const val HTML_ENTRY = "index.html"
+        const val COMPLETION_ENTRY = "complete.txt"
+        const val COMPLETION_MARKER = "XIKE_BACKUP_COMPLETE"
         const val IMAGES_PREFIX = "images/"
         const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
-        const val STREAMING_BACKUP_VERSION = 6
+        const val STREAMING_BACKUP_VERSION = 7
         const val MAX_FILE_NAME_LENGTH = 160
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
         const val MAX_BACKUP_AUDIOS = 100_000
         const val MAX_MANIFEST_BYTES = 16L * 1024L * 1024L
+        const val MAX_HTML_BYTES = 64L * 1024L * 1024L
         const val MAX_LEGACY_BACKUP_BYTES = 320L * 1024L * 1024L
         const val MAX_IMAGE_BYTES = 20L * 1024L * 1024L
         const val MAX_BACKUP_IMAGE_BYTES = 1024L * 1024L * 1024L

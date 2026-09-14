@@ -402,27 +402,34 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching { store.search(query, offset, limit) }
     }.await()
 
-    suspend fun exportBackup(uri: Uri, password: String): Result<Unit> = viewModelScope.async(Dispatchers.IO) {
+    suspend fun exportBackup(uri: Uri, password: String?): Result<Unit> = viewModelScope.async(Dispatchers.IO) {
         runCatching {
             getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
-                store.writeEncryptedBackup(output, password)
+                store.writeBackup(output, password)
             } ?: error("无法写入备份文件")
         }
     }.await()
 
-    suspend fun inspectBackup(uri: Uri, password: String): Result<BackupSummary> = viewModelScope.async(Dispatchers.IO) {
+    suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> = viewModelScope.async(Dispatchers.IO) {
+        runCatching {
+            getApplication<Application>().contentResolver.openInputStream(uri)?.use(store::backupRequiresPassword)
+                ?: error("无法读取备份文件")
+        }
+    }.await()
+
+    suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> = viewModelScope.async(Dispatchers.IO) {
         runCatching {
             getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                store.inspectEncryptedBackup(input, password)
+                store.inspectBackup(input, password)
             } ?: error("无法读取备份文件")
         }
     }.await()
 
-    suspend fun restoreBackup(uri: Uri, password: String): Result<Int> = viewModelScope.async {
+    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                    store.restoreEncryptedBackup(input, password, setOfNotNull(draft.audio?.fileName))
+                    store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName))
                 } ?: error("无法读取备份文件")
             }
         }

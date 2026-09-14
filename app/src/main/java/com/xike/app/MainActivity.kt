@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
@@ -38,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -185,6 +188,7 @@ class MainActivity : FragmentActivity() {
                             onFinalizeDelete = journalViewModel::finalizeDelete,
                             onSearch = journalViewModel::search,
                             onExportBackup = journalViewModel::exportBackup,
+                            onBackupRequiresPassword = journalViewModel::backupRequiresPassword,
                             onInspectBackup = journalViewModel::inspectBackup,
                             onRestoreBackup = journalViewModel::restoreBackup,
                             canUndoRestore = journalViewModel.canUndoRestore,
@@ -494,9 +498,11 @@ private enum class BackupAction { EXPORT, IMPORT }
 
 private data class PendingRestore(
     val uri: Uri,
-    val password: String,
+    val password: String?,
     val summary: BackupSummary,
 )
+
+private data class PendingExport(val password: String?)
 
 @Composable
 private fun XikeApp(
@@ -540,9 +546,10 @@ private fun XikeApp(
     onUndoDelete: suspend (String) -> Result<Unit>,
     onFinalizeDelete: suspend (String) -> Result<Unit>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
-    onExportBackup: suspend (Uri, String) -> Result<Unit>,
-    onInspectBackup: suspend (Uri, String) -> Result<BackupSummary>,
-    onRestoreBackup: suspend (Uri, String) -> Result<Int>,
+    onExportBackup: suspend (Uri, String?) -> Result<Unit>,
+    onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
+    onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
+    onRestoreBackup: suspend (Uri, String?) -> Result<Int>,
     canUndoRestore: Boolean,
     onUndoRestore: suspend () -> Result<Int>,
     openImage: (String) -> InputStream?,
@@ -552,7 +559,7 @@ private fun XikeApp(
     val scope = rememberCoroutineScope()
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
-    var pendingExportPassword by remember { mutableStateOf<String?>(null) }
+    var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
     var pendingImportUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
@@ -577,17 +584,23 @@ private fun XikeApp(
         busyMessage = null
     }
 
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream"),
-    ) { uri ->
-        val password = pendingExportPassword
-        pendingExportPassword = null
-        if (uri != null && password != null) {
+    suspend fun inspectSelectedBackup(uri: Uri, password: String?) {
+        busyMessage = "正在验证备份…"
+        onInspectBackup(uri, password)
+            .onSuccess { summary -> pendingRestore = PendingRestore(uri, password, summary) }
+            .onFailure { Toast.makeText(context, it.message ?: "备份验证失败", Toast.LENGTH_LONG).show() }
+        busyMessage = null
+    }
+
+    fun handleExportSelection(uri: Uri?) {
+        val export = pendingExport
+        pendingExport = null
+        if (uri != null && export != null) {
             scope.launch {
-                busyMessage = "正在创建加密备份…"
-                onExportBackup(uri, password)
+                busyMessage = "正在创建备份…"
+                onExportBackup(uri, export.password)
                     .onSuccess {
-                        Toast.makeText(context, "加密备份已保存", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "备份已保存", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
                         Toast.makeText(context, it.message ?: "备份失败", Toast.LENGTH_SHORT).show()
@@ -597,10 +610,34 @@ private fun XikeApp(
         }
     }
 
+    val encryptedExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+        ::handleExportSelection,
+    )
+    val plainExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+        ::handleExportSelection,
+    )
+
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            pendingImportUri = uri.toString()
-            backupAction = BackupAction.IMPORT
+            scope.launch {
+                busyMessage = "正在识别备份…"
+                onBackupRequiresPassword(uri)
+                    .onSuccess { requiresPassword ->
+                        busyMessage = null
+                        if (requiresPassword) {
+                            pendingImportUri = uri.toString()
+                            backupAction = BackupAction.IMPORT
+                        } else {
+                            inspectSelectedBackup(uri, null)
+                        }
+                    }
+                    .onFailure {
+                        busyMessage = null
+                        Toast.makeText(context, it.message ?: "无法识别备份", Toast.LENGTH_LONG).show()
+                    }
+            }
         }
     }
 
@@ -677,7 +714,7 @@ private fun XikeApp(
                     onReminderSettingsChange = onReminderSettingsChange,
                     onDailyPromptSettingsChange = onDailyPromptSettingsChange,
                     onExport = { backupAction = BackupAction.EXPORT },
-                    onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json")) },
+                    onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "application/zip", "application/x-zip-compressed")) },
                     canUndoRestore = canUndoRestore,
                     onUndoRestore = { scope.launch { runUndoRestore() } },
                 )
@@ -686,26 +723,23 @@ private fun XikeApp(
     }
 
     if (backupAction == BackupAction.EXPORT) {
-        BackupPasswordDialog(
-            title = "创建加密备份",
-            confirm = "选择保存位置",
-            description = "备份会流式加密，可安全保存到本地或系统接入的云盘。密码只属于你，我们不会保存。",
-            requireConfirmation = true,
+        BackupExportDialog(
             onDismiss = { backupAction = null },
             onConfirm = { password ->
-                pendingExportPassword = password
+                pendingExport = PendingExport(password)
                 backupAction = null
                 val date = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
-                exportLauncher.launch("xike-backup-$date.xike")
+                if (password == null) plainExportLauncher.launch("xike-backup-$date.zip")
+                else encryptedExportLauncher.launch("xike-backup-$date.xike")
             },
         )
     }
 
     if (backupAction == BackupAction.IMPORT) {
         BackupPasswordDialog(
-            title = "验证加密备份",
+            title = "解锁备份",
             confirm = "查看备份摘要",
-            description = "应用会先完整验证密码、日记、图片和语音，此步骤不会修改设备上的内容。",
+            description = "输入创建备份时设置的密码。应用会先完整验证内容，不会修改设备上的日记。",
             onDismiss = {
                 backupAction = null
                 pendingImportUri = null
@@ -715,17 +749,7 @@ private fun XikeApp(
                 pendingImportUri = null
                 backupAction = null
                 if (uri != null) {
-                    scope.launch {
-                        busyMessage = "正在验证备份…"
-                        onInspectBackup(uri, password)
-                            .onSuccess { summary ->
-                                pendingRestore = PendingRestore(uri, password, summary)
-                            }
-                            .onFailure {
-                                Toast.makeText(context, it.message ?: "备份验证失败", Toast.LENGTH_LONG).show()
-                            }
-                        busyMessage = null
-                    }
+                    scope.launch { inspectSelectedBackup(uri, password) }
                 }
             },
         )
@@ -812,6 +836,78 @@ private fun RestoreConfirmationDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
         },
+    )
+}
+
+@Composable
+private fun BackupExportDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+) {
+    var encrypted by rememberSaveable { mutableStateOf(true) }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text("导出日记备份", style = MaterialTheme.typography.headlineSmall) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("备份包含全部日记、照片和录音。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("使用密码加密", style = MaterialTheme.typography.titleSmall)
+                        Text("建议开启；密码不会保存在应用中", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = encrypted, onCheckedChange = { encrypted = it })
+                }
+                if (encrypted) {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("备份密码（至少 8 位）") },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
+                                )
+                            }
+                        },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = confirmation,
+                        onValueChange = { confirmation = it },
+                        label = { Text("再次输入备份密码") },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        isError = confirmation.isNotEmpty() && confirmation != password,
+                        singleLine = true,
+                    )
+                    Text("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Text(
+                        "未加密文件保存为 .zip。解压后打开 index.html 即可离线查看；拿到文件的人也能看到全部内容。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !encrypted || (password.length >= 8 && confirmation == password),
+                onClick = { onConfirm(password.takeIf { encrypted }) },
+            ) { Text("选择保存位置") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }
 

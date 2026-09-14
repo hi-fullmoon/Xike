@@ -9,8 +9,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * A small, purpose-built icon family for Xike. Rounded strokes and a shared,
- * softly organic face outline keep the mood set calm and visually consistent.
+ * A small, purpose-built icon family for the app navigation and controls.
  */
 object XikeIcons {
     val Mark: ImageVector by lazy {
@@ -102,92 +101,6 @@ object XikeIcons {
         }
     }
 
-    val MoodLow: ImageVector by lazy {
-        outlineIcon("XikeMoodLow") {
-            moodFace()
-            moveTo(7.5f, 9.0f)
-            curveTo(8.3f, 8.5f, 9.2f, 8.5f, 10.0f, 9.0f)
-            moveTo(14.0f, 9.0f)
-            curveTo(14.8f, 8.5f, 15.7f, 8.5f, 16.5f, 9.0f)
-            moveTo(8.2f, 11.1f)
-            lineTo(9.4f, 11.4f)
-            moveTo(14.6f, 11.4f)
-            lineTo(15.8f, 11.1f)
-            moveTo(8.6f, 16.8f)
-            curveTo(10.3f, 14.8f, 13.7f, 14.8f, 15.4f, 16.8f)
-            moveTo(17.3f, 11.4f)
-            curveTo(16.7f, 12.3f, 16.4f, 12.8f, 16.4f, 13.3f)
-            curveTo(16.4f, 13.9f, 16.8f, 14.3f, 17.3f, 14.3f)
-            curveTo(17.8f, 14.3f, 18.2f, 13.9f, 18.2f, 13.3f)
-            curveTo(18.2f, 12.8f, 17.9f, 12.3f, 17.3f, 11.4f)
-        }
-    }
-
-    val MoodTired: ImageVector by lazy {
-        outlineIcon("XikeMoodTired") {
-            moodFace()
-            moveTo(7.4f, 10.0f)
-            curveTo(8.2f, 10.7f, 9.3f, 10.8f, 10.1f, 10.2f)
-            moveTo(13.9f, 10.2f)
-            curveTo(14.7f, 10.8f, 15.8f, 10.7f, 16.6f, 10.0f)
-            moveTo(8.0f, 12.4f)
-            lineTo(9.6f, 12.4f)
-            moveTo(14.4f, 12.4f)
-            lineTo(16.0f, 12.4f)
-            moveTo(9.0f, 16.1f)
-            curveTo(10.8f, 16.6f, 13.2f, 16.6f, 15.0f, 16.1f)
-        }
-    }
-
-    val MoodCalm: ImageVector by lazy {
-        outlineIcon("XikeMoodCalm") {
-            moodFace()
-            moveTo(7.4f, 10.4f)
-            curveTo(8.2f, 11.0f, 9.3f, 11.0f, 10.1f, 10.4f)
-            moveTo(13.9f, 10.4f)
-            curveTo(14.7f, 11.0f, 15.8f, 11.0f, 16.6f, 10.4f)
-            moveTo(8.9f, 15.3f)
-            curveTo(10.7f, 16.8f, 13.3f, 16.8f, 15.1f, 15.3f)
-        }
-    }
-
-    val MoodGood: ImageVector by lazy {
-        outlineIcon("XikeMoodGood") {
-            moodFace()
-            moveTo(8.8f, 9.8f)
-            lineTo(8.8f, 10.7f)
-            moveTo(15.2f, 9.8f)
-            lineTo(15.2f, 10.7f)
-            moveTo(8.5f, 14.8f)
-            curveTo(10.3f, 17.0f, 13.7f, 17.0f, 15.5f, 14.8f)
-        }
-    }
-
-    val MoodJoyful: ImageVector by lazy {
-        outlineIcon("XikeMoodJoyful") {
-            moodFace()
-            moveTo(7.3f, 10.8f)
-            curveTo(8.0f, 9.5f, 9.5f, 9.5f, 10.3f, 10.8f)
-            moveTo(13.7f, 10.8f)
-            curveTo(14.5f, 9.5f, 16.0f, 9.5f, 16.7f, 10.8f)
-            moveTo(8.0f, 14.2f)
-            curveTo(9.6f, 17.6f, 14.4f, 17.6f, 16.0f, 14.2f)
-            moveTo(6.5f, 13.5f)
-            lineTo(7.4f, 13.7f)
-            moveTo(16.6f, 13.7f)
-            lineTo(17.5f, 13.5f)
-        }
-    }
-
-    private fun androidx.compose.ui.graphics.vector.PathBuilder.moodFace() {
-        moveTo(12.0f, 3.2f)
-        curveTo(7.1f, 3.2f, 3.5f, 6.8f, 3.5f, 11.8f)
-        curveTo(3.5f, 17.0f, 7.2f, 20.8f, 12.0f, 20.8f)
-        curveTo(16.8f, 20.8f, 20.5f, 17.0f, 20.5f, 11.8f)
-        curveTo(20.5f, 6.8f, 16.9f, 3.2f, 12.0f, 3.2f)
-        close()
-    }
-
     private inline fun outlineIcon(
         name: String,
         block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
@@ -207,14 +120,6 @@ object XikeIcons {
             pathBuilder = block,
         )
     }.build()
-}
-
-internal fun Mood.moodIcon(): ImageVector = when (this) {
-    Mood.LOW -> XikeIcons.MoodLow
-    Mood.TIRED -> XikeIcons.MoodTired
-    Mood.CALM -> XikeIcons.MoodCalm
-    Mood.GOOD -> XikeIcons.MoodGood
-    Mood.JOYFUL -> XikeIcons.MoodJoyful
 }
 
 internal fun Mood.moodDescription(): String = when (this) {

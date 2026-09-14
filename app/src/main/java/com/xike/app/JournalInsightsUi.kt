@@ -2,6 +2,7 @@ package com.xike.app
 
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DataUsage
@@ -51,7 +52,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -236,12 +241,11 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            summary.averageScore.averageMoodIcon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(29.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+                        if (summary.averageScore == null) {
+                            Text("—", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                        } else {
+                            MoodEmoji(summary.averageScore.averageMood(), size = 29.dp)
+                        }
                     }
                 }
             }
@@ -375,7 +379,7 @@ private fun TrendCard(
     onPointClick: (MoodTrendPoint) -> Unit,
 ) {
     InsightSectionCard(
-        icon = Icons.Outlined.BarChart,
+        icon = Icons.AutoMirrored.Outlined.ShowChart,
         index = "趋势",
         title = summary.period.trendTitle,
         trailing = if (summary.period == InsightsPeriod.YEAR) "按月" else null,
@@ -388,63 +392,115 @@ private fun TrendCard(
             shape = XikeShapes.inner,
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(154.dp).padding(horizontal = 10.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(if (summary.trendPoints.size > 9) 3.dp else 8.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                summary.trendPoints.forEach { point ->
-                    val isCurrent = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+            MoodTrendChart(summary.trendPoints, today, onPointClick)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "折线表示五档心情的平均位置；没有记录的时段会断开。点按时间段可查看原始记录。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun MoodTrendChart(
+    points: List<MoodTrendPoint>,
+    today: LocalDate,
+    onPointClick: (MoodTrendPoint) -> Unit,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val guide = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
+    val emptyPoint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp)) {
+        Box(Modifier.fillMaxWidth().height(142.dp)) {
+            Canvas(Modifier.fillMaxSize()) {
+                if (points.isEmpty()) return@Canvas
+                val step = size.width / points.size
+                val top = 16.dp.toPx()
+                val bottom = size.height - 14.dp.toPx()
+                fun position(index: Int, score: Double): Offset = Offset(
+                    x = step * (index + 0.5f),
+                    y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
+                )
+                listOf(1.0, 3.0, 5.0).forEach { score ->
+                    val y = position(0, score).y
+                    drawLine(guide, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                }
+                var runStart = 0
+                while (runStart < points.size) {
+                    if (points[runStart].averageScore == null) {
+                        runStart++
+                        continue
+                    }
+                    var runEnd = runStart
+                    while (runEnd + 1 < points.size && points[runEnd + 1].averageScore != null) runEnd++
+                    if (runEnd > runStart) {
+                        val first = position(runStart, requireNotNull(points[runStart].averageScore))
+                        val path = Path().apply { moveTo(first.x, first.y) }
+                        for (index in runStart until runEnd) {
+                            val from = position(index, requireNotNull(points[index].averageScore))
+                            val to = position(index + 1, requireNotNull(points[index + 1].averageScore))
+                            val midX = (from.x + to.x) / 2f
+                            path.cubicTo(midX, from.y, midX, to.y, to.x, to.y)
+                        }
+                        val area = Path().apply {
+                            addPath(path)
+                            lineTo(position(runEnd, requireNotNull(points[runEnd].averageScore)).x, bottom)
+                            lineTo(first.x, bottom)
+                            close()
+                        }
+                        drawPath(area, Brush.verticalGradient(listOf(primary.copy(alpha = 0.18f), primary.copy(alpha = 0.01f))))
+                        drawPath(path, primary.copy(alpha = 0.8f), style = Stroke(width = 2.5.dp.toPx()))
+                    }
+                    runStart = runEnd + 1
+                }
+                points.forEachIndexed { index, point ->
+                    val x = step * (index + 0.5f)
+                    val score = point.averageScore
+                    if (score == null) {
+                        drawCircle(emptyPoint, radius = 2.5.dp.toPx(), center = Offset(x, bottom))
+                    } else {
+                        val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                        val center = position(index, score)
+                        if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
+                        drawCircle(primary, radius = if (current) 5.dp.toPx() else 4.dp.toPx(), center = center)
+                        drawCircle(Color.White, radius = 1.7.dp.toPx(), center = center)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxSize()) {
+                points.forEach { point ->
                     val description = buildString {
                         append(point.dateRangeLabel())
                         append("，${point.entryCount} 条记录")
                         point.averageScore?.let { append("，心情平均位置 ${it.oneDecimal()}") }
                     }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
+                    Box(
+                        Modifier.weight(1f).fillMaxSize()
                             .semantics { contentDescription = description }
                             .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                    ) {
-                        Text(
-                            point.entryCount.takeIf { it > 0 }?.toString().orEmpty(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Surface(
-                            modifier = Modifier
-                                .width(if (summary.trendPoints.size > 9) 13.dp else 22.dp)
-                                .height(point.averageScore?.let { (14 + it * 9).dp } ?: 5.dp),
-                            shape = CircleShape,
-                            color = if (point.averageScore == null) {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary.copy(alpha = if (isCurrent) 1f else 0.48f)
-                            },
-                        ) {}
-                        Spacer(Modifier.height(8.dp))
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            points.forEachIndexed { index, point ->
+                val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (points.size <= 9 || index % 2 == 0 || current) {
                         Text(
                             point.label,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = if (summary.trendPoints.size > 9) 10.sp else 11.sp,
-                            ),
-                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = if (points.size > 9) 10.sp else 11.sp),
+                            color = if (current) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1,
                         )
                     }
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "柱高表示该时间段在五档心情中的平均位置，数字表示记录条数；点按可查看原始记录。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -466,12 +522,7 @@ private fun MoodDistributionCard(
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    item.mood.moodIcon(),
-                    contentDescription = item.mood.label,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f + item.mood.score * 0.08f),
-                )
+                MoodEmoji(item.mood, size = 20.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
@@ -732,13 +783,6 @@ private fun InsightSectionCard(
     ) {
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(width = 4.dp, height = 38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-                Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Text(title, style = MaterialTheme.typography.titleMedium)
@@ -961,13 +1005,12 @@ private fun moodBandLabel(average: Double): String = when {
     else -> "低落时刻较多"
 }
 
-private fun Double?.averageMoodIcon() = when {
-    this == null -> Mood.CALM.moodIcon()
-    this >= 4.5 -> Mood.JOYFUL.moodIcon()
-    this >= 3.5 -> Mood.GOOD.moodIcon()
-    this >= 2.5 -> Mood.CALM.moodIcon()
-    this >= 1.5 -> Mood.TIRED.moodIcon()
-    else -> Mood.LOW.moodIcon()
+private fun Double.averageMood(): Mood = when {
+    this >= 4.5 -> Mood.JOYFUL
+    this >= 3.5 -> Mood.GOOD
+    this >= 2.5 -> Mood.CALM
+    this >= 1.5 -> Mood.TIRED
+    else -> Mood.LOW
 }
 
 private fun moodSummary(average: Double): String = when {
