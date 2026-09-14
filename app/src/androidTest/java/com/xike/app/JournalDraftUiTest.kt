@@ -281,7 +281,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("发生了什么？也可以只留下一句话……").performScrollTo().performClick()
+        composeRule.onNodeWithText("这一刻，有什么想留下？").performScrollTo().performClick()
         composeRule.onNodeWithText("完成").assertIsDisplayed()
     }
 

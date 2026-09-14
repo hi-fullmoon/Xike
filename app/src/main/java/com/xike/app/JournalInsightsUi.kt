@@ -102,9 +102,9 @@ fun JournalInsightsScreen(
     ) {
         item(key = "insights-header") {
             ScreenHeader(
-                eyebrow = summary.dateRangeLabel(),
+                eyebrow = "THE LITTLE TRACES",
                 title = "轨迹",
-                supporting = "看看心情怎样变化，不急着为起伏寻找原因。",
+                supporting = "${summary.dateRangeLabel()} · 看看心情怎样变化，不急着寻找原因。",
             )
         }
         item(key = "insights-period") {
@@ -321,15 +321,14 @@ private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
 
 @Composable
 private fun InsightsSectionLabel(title: String, supporting: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 2.dp, end = 2.dp),
-        verticalAlignment = Alignment.Bottom,
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 2.dp, end = 2.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.weight(1f))
+        Text(title, style = XikeSectionTitleStyle)
+        Spacer(Modifier.height(3.dp))
         Text(
             supporting,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -779,13 +778,13 @@ private fun InsightSectionCard(
         modifier = Modifier.fillMaxWidth(),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
     ) {
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(3.dp))
+                    Text(title, style = XikeSectionTitleStyle.copy(fontSize = 21.sp, lineHeight = 29.sp))
                 }
                 if (trailing != null) {
                     Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -841,8 +840,7 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(modifier = Modifier.padding(4.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             InsightsPeriod.entries.forEach { period ->
@@ -851,7 +849,7 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent)
                         .selectable(
                             selected = isSelected,
                             role = Role.RadioButton,
@@ -864,7 +862,7 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
                         period.label,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                     )
                 }

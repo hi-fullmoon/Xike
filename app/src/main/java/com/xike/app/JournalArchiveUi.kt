@@ -92,6 +92,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.io.InputStream
@@ -511,39 +512,31 @@ fun JournalArchiveScreen(
 
 @Composable
 private fun ArchiveHeader(recordLabel: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.Bottom,
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 5.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                recordLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(5.dp))
-            Text("回望", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "翻一翻走过的日子，看见当时的自己。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Outlined.CalendarMonth,
-                    contentDescription = null,
-                    modifier = Modifier.size(23.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+        Text("MOMENTS TO REMEMBER", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("回望", modifier = Modifier.weight(1f), style = XikePageTitleStyle)
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+            ) {
+                Text(
+                    recordLabel,
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
+        Spacer(Modifier.height(7.dp))
+        Text(
+            "翻一翻走过的日子，看见当时的自己。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -562,9 +555,8 @@ private fun ArchiveToolbox(
         modifier = Modifier.fillMaxWidth(),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp,
     ) {
-        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             ArchiveSearchBar(
                 value = queryText,
                 onValueChange = onQueryChange,
@@ -590,12 +582,17 @@ private fun ArchiveSearchBar(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        modifier = Modifier.fillMaxWidth().height(56.dp),
         singleLine = true,
         shape = XikeShapes.inner,
         textStyle = MaterialTheme.typography.bodyMedium,
         placeholder = { Text("搜索注脚或主题", style = MaterialTheme.typography.bodyMedium) },
-        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+        prefix = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(4.dp))
+            }
+        },
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = onClear) {
@@ -628,8 +625,7 @@ private fun ArchiveControls(
         Surface(
             modifier = Modifier.weight(1f),
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Row(
                 Modifier.padding(3.dp).selectableGroup(),
@@ -707,7 +703,7 @@ private fun ArchiveModeButton(
                 onClick = onClick,
             ),
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -718,13 +714,13 @@ private fun ArchiveModeButton(
                 icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp).offset(y = 1.dp),
-                tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(4.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
@@ -749,7 +745,6 @@ private fun ArchiveFilters(
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -875,7 +870,7 @@ private fun JournalMonthCalendar(
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(monthTitle, style = MaterialTheme.typography.headlineSmall)
+                    Text(monthTitle, style = XikeSectionTitleStyle)
                     Text(
                         if (monthEntryCount == 0) "这个月还没有留下记录" else "${monthEntries.size} 天 · $monthEntryCount 条记录",
                         style = MaterialTheme.typography.bodySmall,
@@ -1023,7 +1018,7 @@ private fun ArchiveResultStatus(
             Column(Modifier.weight(1f)) {
                 Text(
                     selectedDate?.let { "${it.asShortChineseDate()}的记录" } ?: "最近的片段",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = XikeSectionTitleStyle.copy(fontSize = 21.sp, lineHeight = 29.sp),
                 )
                 Text(
                     if (selectedDate == null) "按时间从近到远" else "只看这一天留下的片段",
@@ -1066,7 +1061,7 @@ private fun ArchiveDateHeader(date: LocalDate, count: Int) {
     ) {
         Text(
             date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
-            style = MaterialTheme.typography.titleLarge,
+            style = XikeSectionTitleStyle,
         )
         Spacer(Modifier.width(9.dp))
         Text(
@@ -1111,7 +1106,7 @@ private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVec
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.headlineSmall)
+            Text(title, style = XikeSectionTitleStyle)
             Spacer(Modifier.height(7.dp))
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1142,7 +1137,7 @@ internal fun JournalEntryDetailDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("这一刻", style = MaterialTheme.typography.headlineSmall)
+                    Text("这一刻", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                     Spacer(Modifier.weight(1f))
                     if (onRequestEdit != null) {
                         IconButton(onClick = onRequestEdit) {
@@ -1440,7 +1435,7 @@ private fun JournalEntryEditDialog(
                     }
                     Spacer(Modifier.width(4.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("编辑这一刻", style = MaterialTheme.typography.headlineSmall)
+                        Text("编辑这一刻", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                         Text(
                             "修改会同步更新回望、搜索与轨迹",
                             style = MaterialTheme.typography.bodySmall,

@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -126,6 +127,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -215,6 +217,27 @@ object XikeShapes {
     val dialog = RoundedCornerShape(30.dp)
 }
 
+internal val XikePageTitleStyle = TextStyle(
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Medium,
+    fontSize = 34.sp,
+    lineHeight = 43.sp,
+)
+
+internal val XikeSectionTitleStyle = TextStyle(
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Medium,
+    fontSize = 23.sp,
+    lineHeight = 32.sp,
+)
+
+internal val XikeEyebrowStyle = TextStyle(
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 11.sp,
+    lineHeight = 17.sp,
+    letterSpacing = 1.7.sp,
+)
+
 private val XikeTypography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -302,20 +325,20 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             onTertiary = Color.White,
             tertiaryContainer = theme.secondary,
             onTertiaryContainer = Color(0xFF3D372E),
-            background = Color(0xFFF4F6F5),
+            background = Color(0xFFF8F7F2),
             onBackground = Color(0xFF20231F),
             surface = Color(0xFFFFFFFF),
             onSurface = Color(0xFF20231F),
-            surfaceVariant = Color(0xFFEAF0ED),
-            onSurfaceVariant = Color(0xFF626761),
+            surfaceVariant = Color(0xFFF0F4F0),
+            onSurfaceVariant = Color(0xFF68756D),
             surfaceTint = theme.primary,
             surfaceDim = Color(0xFFE8EBE8),
             surfaceBright = Color.White,
             surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFF8FAF8),
-            surfaceContainer = Color(0xFFF3F6F3),
-            surfaceContainerHigh = Color(0xFFEDF1ED),
-            surfaceContainerHighest = Color(0xFFE5EBE6),
+            surfaceContainerLow = Color(0xFFF1F4EF),
+            surfaceContainer = Color(0xFFF2F5F0),
+            surfaceContainerHigh = Color(0xFFECF1EB),
+            surfaceContainerHighest = Color(0xFFE4EBE4),
             inverseSurface = Color(0xFF2E3530),
             inverseOnSurface = Color(0xFFF2F5F2),
             inversePrimary = theme.accent,
@@ -352,56 +375,50 @@ internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
 fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
     Surface(
         modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
-        color = MaterialTheme.colorScheme.background,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(26.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 1.dp,
-            tonalElevation = 0.dp,
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp).selectableGroup(),
         ) {
-            Row(modifier = Modifier.padding(horizontal = 5.dp, vertical = 4.dp).selectableGroup()) {
-                AppScreen.entries.forEach { item ->
-                    val isSelected = selected == item
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.86f)
-                                else Color.Transparent,
-                            )
-                            .selectable(
-                                selected = isSelected,
-                                role = Role.Tab,
-                                onClick = { onSelected(item) },
-                            )
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = when (item) {
-                                AppScreen.HOME -> XikeIcons.Moment
-                                AppScreen.INSIGHTS -> XikeIcons.Insights
-                                AppScreen.ARCHIVE -> XikeIcons.Archive
-                                AppScreen.SETTINGS -> XikeIcons.Settings
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+            AppScreen.entries.forEach { item ->
+                val isSelected = selected == item
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            else Color.Transparent,
                         )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            item.title,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        .selectable(
+                            selected = isSelected,
+                            role = Role.Tab,
+                            onClick = { onSelected(item) },
                         )
-                    }
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        imageVector = when (item) {
+                            AppScreen.HOME -> XikeIcons.Moment
+                            AppScreen.INSIGHTS -> XikeIcons.Insights
+                            AppScreen.ARCHIVE -> XikeIcons.Archive
+                            AppScreen.SETTINGS -> XikeIcons.Settings
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -461,7 +478,9 @@ fun AppLockScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Text("息刻已锁定", style = MaterialTheme.typography.headlineMedium)
+                Text("A SPACE OF YOUR OWN", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(9.dp))
+                Text("息刻已锁定", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                 Spacer(Modifier.height(8.dp))
                 Text(
                     if (authenticationAvailable) {
@@ -740,13 +759,22 @@ fun MomentScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             BrandHeader(today)
-            Column {
-                Text("此刻，心情怎样？", style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.height(4.dp))
+            Column(modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)) {
                 Text(
-                    if (todayEntryCount == 0) "不用解释，选一个最接近的感受。"
+                    "A MOMENT FOR YOURSELF",
+                    style = XikeEyebrowStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    "给这一刻，\n留个位置。",
+                    style = XikePageTitleStyle,
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    if (todayEntryCount == 0) "不用解释，先感受自己。"
                     else "今天已经停下来听见自己 $todayEntryCount 次。",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -761,30 +789,41 @@ fun MomentScreen(
                 onSelected = onDraftMoodChange,
             )
 
-            PaperCard(contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 10.dp)) {
-                Text("此刻的注脚", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
-                TextField(
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("写下一点点", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Text("02 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(16.dp))
+                BasicTextField(
                     value = draft.note,
                     onValueChange = { if (!isSaving) onDraftNoteChange(it) },
+                    enabled = !isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .semantics { contentDescription = "此刻的注脚" }
                         .onFocusChanged { isNoteFocused = it.isFocused },
                     minLines = 2,
                     maxLines = 5,
-                    placeholder = { Text("发生了什么？也可以只留下一句话……") },
-                    shape = XikeShapes.inner,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
+                            if (draft.note.isEmpty()) {
+                                Text(
+                                    "这一刻，有什么想留下？",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 if (draft.note.isNotEmpty() || isNoteFocused) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -803,6 +842,8 @@ fun MomentScreen(
                     }
                 }
                 Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
+                Text("可选", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(7.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -968,7 +1009,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -989,10 +1030,10 @@ fun MomentScreen(
 
                     if (showDetails) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = 18.dp),
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
-                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(horizontal = 18.dp, vertical = 12.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column {
                                     Text("主题", style = MaterialTheme.typography.titleSmall)
@@ -1198,14 +1239,18 @@ private fun MomentQuickAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val colors = ButtonDefaults.filledTonalButtonColors()
+    val isDark = isSystemInDarkTheme()
+    val containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant
+    else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
+    val actionColor = if (isDark) MaterialTheme.colorScheme.onSurface
+    else MaterialTheme.colorScheme.onSecondaryContainer
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.semantics { role = Role.Button },
-        shape = XikeShapes.inner,
-        color = if (enabled) colors.containerColor else colors.disabledContainerColor,
-        contentColor = if (enabled) colors.contentColor else colors.disabledContentColor,
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor.copy(alpha = if (enabled) 1f else 0.52f),
+        contentColor = actionColor.copy(alpha = if (enabled) 1f else 0.45f),
     ) {
         Row(
             modifier = Modifier.heightIn(min = 36.dp).padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1589,20 +1634,24 @@ private fun Long.asDraftMomentLabel(zoneId: ZoneId = ZoneId.systemDefault()): St
 @Composable
 private fun BrandHeader(today: LocalDate) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+        Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     XikeIcons.Mark,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(17.dp),
                     tint = MaterialTheme.colorScheme.onPrimary,
                 )
             }
         }
-        Spacer(Modifier.width(10.dp))
-        Text("息刻", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.width(9.dp))
+        Text("息刻", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.weight(1f))
-        Text(today.asChineseDay(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            today.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1619,20 +1668,24 @@ private fun MoodPicker(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("此刻心情", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("此刻的心情", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "选最接近的感受，没有标准答案",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 TextButton(
                     onClick = { showGuide = true },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                ) { Text("选择参考") }
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                ) { Text("选择参考", style = MaterialTheme.typography.labelSmall) }
             }
-            Text(
-                "选最接近的感受，没有标准答案",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -1644,17 +1697,16 @@ private fun MoodPicker(
                         enabled = enabled,
                         onClick = { onSelected(mood) },
                         modifier = Modifier.weight(1f),
+                        quietStyle = true,
                     )
                 }
             }
             if (selectedMood != null) {
                 Spacer(Modifier.height(12.dp))
-                val visual = selectedMood.visualStyle()
-                val isDark = isSystemInDarkTheme()
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = XikeShapes.inner,
-                    color = visual.container.copy(alpha = if (isDark) 0.16f else 0.62f),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
@@ -1663,7 +1715,7 @@ private fun MoodPicker(
                         MoodEmoji(selectedMood, size = 20.dp)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            "${selectedMood.label} · ${selectedMood.moodDescription()}",
+                            selectedMood.momentAffirmation(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1676,6 +1728,14 @@ private fun MoodPicker(
     if (showGuide) {
         MoodGuideDialog(onDismiss = { showGuide = false })
     }
+}
+
+private fun Mood.momentAffirmation(): String = when (this) {
+    Mood.LOW -> "低落，也值得被好好看见。"
+    Mood.TIRED -> "疲惫时，可以慢一点。"
+    Mood.CALM -> "平静，也是一种很好的答案。"
+    Mood.GOOD -> "轻松，就记住这一刻。"
+    Mood.JOYFUL -> "愉悦，和自己分享一下。"
 }
 
 @Composable
@@ -1729,11 +1789,15 @@ internal fun MoodChoice(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    quietStyle: Boolean = false,
 ) {
     val visual = mood.visualStyle()
     val isDark = isSystemInDarkTheme()
-    val moodColor = if (isDark) visual.container else visual.accent
+    val moodColor = if (quietStyle) MaterialTheme.colorScheme.primary
+    else if (isDark) visual.container else visual.accent
     val containerColor = when {
+        quietStyle && selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+        quietStyle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         selected && isDark -> visual.accent.copy(alpha = 0.28f)
         selected -> visual.container
         isDark -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
@@ -2478,8 +2542,9 @@ fun ProfileSettingsScreen(
 
     ScreenColumn(padding) {
         ScreenHeader(
-            eyebrow = "偏好与数据",
+            eyebrow = "A SPACE OF YOUR OWN",
             title = "设置",
+            supporting = "让记录保持你的节奏。",
         )
 
         Surface(
@@ -3014,15 +3079,15 @@ private fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScop
 
 @Composable
 internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: String? = null) {
-    Column {
+    Column(modifier = Modifier.padding(top = 10.dp, bottom = 5.dp)) {
         if (eyebrow != null) {
-            Text(eyebrow, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(4.dp))
+            Text(eyebrow, style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(9.dp))
         }
-        Text(title, style = MaterialTheme.typography.headlineMedium)
+        Text(title, style = XikePageTitleStyle)
         if (supporting != null) {
-            Spacer(Modifier.height(2.dp))
-            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(7.dp))
+            Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -3041,9 +3106,9 @@ private fun PaperCard(
 @Composable
 private fun SectionTitle(index: String, title: String, trailing: String? = null) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(index, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(10.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Text(title, style = XikeSectionTitleStyle)
         if (trailing != null) {
             Spacer(Modifier.weight(1f))
             Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
