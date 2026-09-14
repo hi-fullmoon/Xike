@@ -907,8 +907,18 @@ fun MomentScreen(
                     withFrameNanos { }
                     voiceAnchor.bringIntoView()
                 }
-                PaperCard(modifier = Modifier.bringIntoViewRequester(voiceAnchor)) {
-                    Text("语音", style = MaterialTheme.typography.titleMedium)
+                Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor).padding(horizontal = 3.dp)) {
+                    Text("VOICE NOTE", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        when {
+                            showVoiceCapture -> "录下这一刻"
+                            pendingDraftAudio != null -> "收好这段声音"
+                            else -> "这一刻的声音"
+                        },
+                        style = XikeSectionTitleStyle,
+                    )
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         when {
                             showVoiceCapture -> "正在记录这一刻的声音"
@@ -919,7 +929,7 @@ fun MomentScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                     if (showVoiceCapture) {
                         VoiceCaptureCard(
                             enabled = !isSaving,

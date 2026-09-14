@@ -5,6 +5,7 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.SystemClock
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -48,7 +50,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -260,18 +261,21 @@ internal fun VoiceCaptureCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = XikeShapes.inner,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier
-                        .size(9.dp)
-                        .background(if (isPaused) MaterialTheme.colorScheme.outline else Color(0xFFC4504D), CircleShape),
+                        .size(8.dp)
+                        .background(
+                            if (isPaused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
+                            CircleShape,
+                        ),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -286,34 +290,47 @@ internal fun VoiceCaptureCard(
                 )
                 Text(
                     "${formatAudioDuration(elapsedMillis)} / ${formatAudioDuration(MAX_AUDIO_DURATION_MILLIS)}",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            VoiceWaveform(amplitudes)
-            Text(
-                "离开应用时会自动结束录音",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Surface(
+                shape = XikeShapes.inner,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
+                    VoiceWaveform(amplitudes, isPaused)
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "最长 5 分钟 · 离开应用时自动结束",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             errorMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
+                OutlinedButton(
                     enabled = !isStopping,
                     modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     onClick = {
                         recorder.cancel()
                         isRecording = false
                         onClosed()
                     },
                 ) { Text("取消") }
-                TextButton(
+                OutlinedButton(
                     enabled = isRecording && !isStopping,
                     modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     onClick = {
                         runCatching {
                             if (isPaused) {
@@ -340,7 +357,7 @@ internal fun VoiceCaptureCard(
             }
             Button(
                 enabled = enabled && !isStopping,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
                 onClick = { if (isRecording) finishRecording() else beginRecording() },
@@ -371,12 +388,12 @@ internal fun VoicePendingSaveCard(
     var confirmDiscard by remember { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = XikeShapes.inner,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isSaving) {
@@ -388,20 +405,35 @@ internal fun VoicePendingSaveCard(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall,
                 )
-                Text(formatAudioDuration(durationMillis), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    formatAudioDuration(durationMillis),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (!isSaving) {
-                Text(
-                    errorMessage ?: "录音暂存在本机，可以重试保存。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (errorMessage != null) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
+                ) {
+                    Text(
+                        errorMessage ?: "录音暂存在本机，可以重试保存。",
+                        modifier = Modifier.fillMaxWidth().padding(13.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (errorMessage != null) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { confirmDiscard = true }, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(
+                        onClick = { confirmDiscard = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
                         Text("放弃录音")
                     }
-                    Button(onClick = onRetry, modifier = Modifier.weight(1f)) {
+                    Button(onClick = onRetry, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
                         Text("重试保存")
                     }
                 }
@@ -521,12 +553,28 @@ internal fun VoicePlaybackCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = XikeShapes.inner,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
+        Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(enabled = !isPreparing, onClick = ::togglePlayback) {
+                Text("声音片段", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    formatAudioDuration(audio.durationMillis),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    enabled = !isPreparing,
+                    onClick = ::togglePlayback,
+                    modifier = Modifier.background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        CircleShape,
+                    ),
+                ) {
                     if (isPreparing) {
                         CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
                     } else {
@@ -573,7 +621,11 @@ internal fun VoicePlaybackCard(
                             onDelete()
                         },
                     ) {
-                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除语音")
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            contentDescription = "删除语音",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -599,9 +651,9 @@ internal fun VoicePlaybackCard(
 }
 
 @Composable
-private fun VoiceWaveform(values: List<Float>) {
+private fun VoiceWaveform(values: List<Float>, isPaused: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(34.dp),
+        modifier = Modifier.fillMaxWidth().height(42.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -609,8 +661,12 @@ private fun VoiceWaveform(values: List<Float>) {
             Box(
                 Modifier
                     .weight(1f)
-                    .height((5f + value.coerceIn(0f, 1f) * 25f).dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                    .height((5f + value.coerceIn(0f, 1f) * 31f).dp)
+                    .background(
+                        if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        else MaterialTheme.colorScheme.primary.copy(alpha = if (index < values.lastIndex - 7) 0.5f else 1f),
+                        RoundedCornerShape(2.dp),
+                    ),
             )
         }
     }
