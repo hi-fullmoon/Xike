@@ -825,7 +825,7 @@ fun MomentScreen(
                                 Text(
                                     "这一刻，有什么想留下？",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                 )
                             }
                             innerTextField()
@@ -854,7 +854,7 @@ fun MomentScreen(
                     }
                 }
                 Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
-                Text("可选", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("添加内容 · 可选", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(7.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1031,7 +1031,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1312,7 +1312,7 @@ private fun OutdoorContextCard(
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
     val containerColor = when {
         snapshot != null -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-        isEmpty -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
+        isEmpty -> MaterialTheme.colorScheme.surfaceContainerHighest
         else -> MaterialTheme.colorScheme.surface
     }
     val cardModifier = if (isEmpty && enabled) {
