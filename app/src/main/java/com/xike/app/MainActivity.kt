@@ -815,7 +815,10 @@ private fun RestoreConfirmationDialog(
         shape = XikeShapes.dialog,
         title = { Text("确认替换设备内容？") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Text(
                     "备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片" +
                         if (summary.audioCount > 0) "、${summary.audioCount} 段语音。" else "。",
@@ -928,7 +931,10 @@ private fun BackupPasswordDialog(
         shape = XikeShapes.dialog,
         title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
                 Text(
                     description,
                     style = MaterialTheme.typography.bodyMedium,

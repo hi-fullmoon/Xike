@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -252,7 +254,11 @@ fun JournalArchiveScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = archiveListState,
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier
+                .widthIn(max = XikeContentMaxWidth)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .padding(padding),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -582,7 +588,7 @@ private fun ArchiveSearchBar(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         singleLine = true,
         shape = XikeShapes.inner,
         textStyle = MaterialTheme.typography.bodyMedium,
@@ -649,7 +655,7 @@ private fun ArchiveControls(
         }
         Surface(
             modifier = Modifier
-                .sizeIn(minWidth = 40.dp, minHeight = 40.dp)
+                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clickable(onClick = onToggleFilters),
             shape = RoundedCornerShape(14.dp),
             color = if (showFilters || activeFilterCount > 0) {
@@ -696,7 +702,7 @@ private fun ArchiveModeButton(
 ) {
     Surface(
         modifier = modifier
-            .sizeIn(minHeight = 36.dp)
+            .sizeIn(minHeight = 48.dp)
             .selectable(
                 selected = selected,
                 role = Role.Tab,
@@ -910,7 +916,7 @@ private fun JournalMonthCalendar(
                 Row(Modifier.fillMaxWidth()) {
                     week.forEach { date ->
                         if (date == null) {
-                            Spacer(Modifier.weight(1f).height(46.dp))
+                            Spacer(Modifier.weight(1f).height(48.dp))
                         } else {
                             val dayEntries = entriesByDate[date].orEmpty()
                             CalendarDay(
@@ -943,7 +949,7 @@ private fun CalendarDay(
     val spokenDate = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
     Surface(
         modifier = modifier
-            .height(46.dp)
+            .height(48.dp)
             .padding(horizontal = 2.dp)
             .semantics {
                 contentDescription = "$spokenDate，${if (count == 0) "没有记录" else "$count 条记录"}"

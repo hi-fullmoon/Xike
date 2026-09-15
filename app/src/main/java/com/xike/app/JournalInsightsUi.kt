@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -95,97 +99,103 @@ fun JournalInsightsScreen(
     var drilldown by remember { mutableStateOf<InsightDrilldown?>(null) }
     var showReview by rememberSaveable { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item(key = "insights-header") {
-            ScreenHeader(
-                eyebrow = "THE LITTLE TRACES",
-                title = "轨迹",
-                supporting = "${summary.dateRangeLabel()} · 看看心情怎样变化，不急着寻找原因。",
-            )
-        }
-        item(key = "insights-period") {
-            InsightsPeriodSelector(
-                selected = selectedPeriod,
-                onSelected = { selectedPeriodName = it.name },
-            )
-        }
-        item(key = "insights-overview") {
-            InsightsOverviewCard(
-                summary = summary,
-                onClick = {
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .widthIn(max = XikeContentMaxWidth)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item(key = "insights-header") {
+                ScreenHeader(
+                    eyebrow = "THE LITTLE TRACES",
+                    title = "轨迹",
+                    supporting = "${summary.dateRangeLabel()} · 看看心情怎样变化，不急着寻找原因。",
+                )
+            }
+            item(key = "insights-period") {
+                InsightsPeriodSelector(
+                    selected = selectedPeriod,
+                    onSelected = { selectedPeriodName = it.name },
+                )
+            }
+            item(key = "insights-overview") {
+                InsightsOverviewCard(
+                    summary = summary,
+                    onClick = {
+                        drilldown = InsightDrilldown(
+                            title = "${selectedPeriod.contextName}的记录",
+                            subtitle = summary.dateRangeLabel(),
+                            entryIds = summary.entryIds,
+                        )
+                    },
+                )
+            }
+            item(key = "insights-section-label") {
+                InsightsSectionLabel(
+                    title = "细看这段时间",
+                    supporting = "每一项都可以回到原始记录",
+                )
+            }
+            item(key = "insights-trend") {
+                TrendCard(summary = summary, today = today) { point ->
                     drilldown = InsightDrilldown(
-                        title = "${selectedPeriod.contextName}的记录",
-                        subtitle = summary.dateRangeLabel(),
-                        entryIds = summary.entryIds,
+                        title = "${point.label} · ${point.entryCount} 条",
+                        subtitle = point.dateRangeLabel(),
+                        entryIds = point.entryIds,
                     )
-                },
-            )
-        }
-        item(key = "insights-section-label") {
-            InsightsSectionLabel(
-                title = "细看这段时间",
-                supporting = "每一项都可以回到原始记录",
-            )
-        }
-        item(key = "insights-trend") {
-            TrendCard(summary = summary, today = today) { point ->
-                drilldown = InsightDrilldown(
-                    title = "${point.label} · ${point.entryCount} 条",
-                    subtitle = point.dateRangeLabel(),
-                    entryIds = point.entryIds,
-                )
+                }
             }
-        }
-        item(key = "insights-distribution") {
-            MoodDistributionCard(summary.moodDistribution) { item ->
-                drilldown = InsightDrilldown(
-                    title = "${item.mood.label} · ${item.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的心情分布",
-                    entryIds = item.entryIds,
-                )
-            }
-        }
-        item(key = "insights-comparison") {
-            PeriodComparisonCard(summary.comparison) { previous ->
-                drilldown = InsightDrilldown(
-                    title = if (previous) "前一周期的记录" else "${selectedPeriod.contextName}的记录",
-                    subtitle = if (previous) summary.comparison.dateRangeLabel() else summary.dateRangeLabel(),
-                    entryIds = if (previous) summary.comparison.entryIds else summary.entryIds,
-                )
-            }
-        }
-        item(key = "insights-tags") {
-            TagTrendsCard(summary.topTags, summary.evidence) { tag ->
-                drilldown = InsightDrilldown(
-                    title = "${tag.tag} · ${tag.entryCount} 条",
-                    subtitle = "${selectedPeriod.contextName}的主题",
-                    entryIds = tag.entryIds,
-                )
-            }
-        }
-        item(key = "insights-day-type") {
-            DayTypeCard(
-                weekday = summary.weekdayInsight,
-                weekend = summary.weekendInsight,
-                onClick = { insight ->
+            item(key = "insights-distribution") {
+                MoodDistributionCard(summary.moodDistribution) { item ->
                     drilldown = InsightDrilldown(
-                        title = "${insight.type.label} · ${insight.entryCount} 条",
-                        subtitle = "${selectedPeriod.contextName}的记录",
-                        entryIds = insight.entryIds,
+                        title = "${item.mood.label} · ${item.entryCount} 条",
+                        subtitle = "${selectedPeriod.contextName}的心情分布",
+                        entryIds = item.entryIds,
                     )
-                },
-            )
-        }
-        item(key = "insights-review") {
-            LocalReviewCard(
-                enabled = summary.entryCount > 0,
-                periodName = selectedPeriod.contextName,
-                onOpen = { showReview = true },
-            )
+                }
+            }
+            item(key = "insights-comparison") {
+                PeriodComparisonCard(summary.comparison) { previous ->
+                    drilldown = InsightDrilldown(
+                        title = if (previous) "前一周期的记录" else "${selectedPeriod.contextName}的记录",
+                        subtitle = if (previous) summary.comparison.dateRangeLabel() else summary.dateRangeLabel(),
+                        entryIds = if (previous) summary.comparison.entryIds else summary.entryIds,
+                    )
+                }
+            }
+            item(key = "insights-tags") {
+                TagTrendsCard(summary.topTags, summary.evidence) { tag ->
+                    drilldown = InsightDrilldown(
+                        title = "${tag.tag} · ${tag.entryCount} 条",
+                        subtitle = "${selectedPeriod.contextName}的主题",
+                        entryIds = tag.entryIds,
+                    )
+                }
+            }
+            item(key = "insights-day-type") {
+                DayTypeCard(
+                    weekday = summary.weekdayInsight,
+                    weekend = summary.weekendInsight,
+                    onClick = { insight ->
+                        drilldown = InsightDrilldown(
+                            title = "${insight.type.label} · ${insight.entryCount} 条",
+                            subtitle = "${selectedPeriod.contextName}的记录",
+                            entryIds = insight.entryIds,
+                        )
+                    },
+                )
+            }
+            item(key = "insights-review") {
+                LocalReviewCard(
+                    enabled = summary.entryCount > 0,
+                    periodName = selectedPeriod.contextName,
+                    onOpen = { showReview = true },
+                )
+            }
         }
     }
 
@@ -210,6 +220,7 @@ fun JournalInsightsScreen(
 
 @Composable
 private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> Unit) {
+    val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
         shape = XikeShapes.card,
@@ -260,14 +271,26 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OverviewMetric("记录", "${summary.entryCount} 次", Modifier.weight(1f))
-                OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.weight(1f))
-                OverviewMetric(
-                    "日期覆盖",
-                    "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
-                    Modifier.weight(1f),
-                )
+            if (stackMetrics) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverviewMetric("记录", "${summary.entryCount} 次", Modifier.fillMaxWidth())
+                    OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.fillMaxWidth())
+                    OverviewMetric(
+                        "日期覆盖",
+                        "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
+                        Modifier.fillMaxWidth(),
+                    )
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverviewMetric("记录", "${summary.entryCount} 次", Modifier.weight(1f))
+                    OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.weight(1f))
+                    OverviewMetric(
+                        "日期覆盖",
+                        "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
+                        Modifier.weight(1f),
+                    )
+                }
             }
             Spacer(Modifier.height(14.dp))
             RatioBar(
@@ -411,80 +434,96 @@ private fun MoodTrendChart(
     val primary = MaterialTheme.colorScheme.primary
     val guide = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
     val emptyPoint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
+    val axisWidth = if (LocalDensity.current.fontScale >= 1.5f) 52.dp else 36.dp
     Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp)) {
         Box(Modifier.fillMaxWidth().height(142.dp)) {
-            Canvas(Modifier.fillMaxSize()) {
-                if (points.isEmpty()) return@Canvas
-                val step = size.width / points.size
-                val top = 16.dp.toPx()
-                val bottom = size.height - 14.dp.toPx()
-                fun position(index: Int, score: Double): Offset = Offset(
-                    x = step * (index + 0.5f),
-                    y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
-                )
-                listOf(1.0, 3.0, 5.0).forEach { score ->
-                    val y = position(0, score).y
-                    drawLine(guide, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                }
-                var runStart = 0
-                while (runStart < points.size) {
-                    if (points[runStart].averageScore == null) {
-                        runStart++
-                        continue
-                    }
-                    var runEnd = runStart
-                    while (runEnd + 1 < points.size && points[runEnd + 1].averageScore != null) runEnd++
-                    if (runEnd > runStart) {
-                        val first = position(runStart, requireNotNull(points[runStart].averageScore))
-                        val path = Path().apply { moveTo(first.x, first.y) }
-                        for (index in runStart until runEnd) {
-                            val from = position(index, requireNotNull(points[index].averageScore))
-                            val to = position(index + 1, requireNotNull(points[index + 1].averageScore))
-                            val midX = (from.x + to.x) / 2f
-                            path.cubicTo(midX, from.y, midX, to.y, to.x, to.y)
-                        }
-                        val area = Path().apply {
-                            addPath(path)
-                            lineTo(position(runEnd, requireNotNull(points[runEnd].averageScore)).x, bottom)
-                            lineTo(first.x, bottom)
-                            close()
-                        }
-                        drawPath(area, Brush.verticalGradient(listOf(primary.copy(alpha = 0.18f), primary.copy(alpha = 0.01f))))
-                        drawPath(path, primary.copy(alpha = 0.8f), style = Stroke(width = 2.5.dp.toPx()))
-                    }
-                    runStart = runEnd + 1
-                }
-                points.forEachIndexed { index, point ->
-                    val x = step * (index + 0.5f)
-                    val score = point.averageScore
-                    if (score == null) {
-                        drawCircle(emptyPoint, radius = 2.5.dp.toPx(), center = Offset(x, bottom))
-                    } else {
-                        val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
-                        val center = position(index, score)
-                        if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
-                        drawCircle(primary, radius = if (current) 5.dp.toPx() else 4.dp.toPx(), center = center)
-                        drawCircle(Color.White, radius = 1.7.dp.toPx(), center = center)
-                    }
+            Column(
+                modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                listOf("愉悦", "平静", "低落").forEach { label ->
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
-            Row(Modifier.fillMaxSize()) {
-                points.forEach { point ->
-                    val description = buildString {
-                        append(point.dateRangeLabel())
-                        append("，${point.entryCount} 条记录")
-                        point.averageScore?.let { append("，心情平均位置 ${it.oneDecimal()}") }
-                    }
-                    Box(
-                        Modifier.weight(1f).fillMaxSize()
-                            .semantics { contentDescription = description }
-                            .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
+            Box(Modifier.fillMaxSize().padding(start = axisWidth)) {
+                Canvas(Modifier.fillMaxSize()) {
+                    if (points.isEmpty()) return@Canvas
+                    val step = size.width / points.size
+                    val top = 16.dp.toPx()
+                    val bottom = size.height - 14.dp.toPx()
+                    fun position(index: Int, score: Double): Offset = Offset(
+                        x = step * (index + 0.5f),
+                        y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
                     )
+                    listOf(1.0, 3.0, 5.0).forEach { score ->
+                        val y = position(0, score).y
+                        drawLine(guide, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                    }
+                    var runStart = 0
+                    while (runStart < points.size) {
+                        if (points[runStart].averageScore == null) {
+                            runStart++
+                            continue
+                        }
+                        var runEnd = runStart
+                        while (runEnd + 1 < points.size && points[runEnd + 1].averageScore != null) runEnd++
+                        if (runEnd > runStart) {
+                            val first = position(runStart, requireNotNull(points[runStart].averageScore))
+                            val path = Path().apply { moveTo(first.x, first.y) }
+                            for (index in runStart until runEnd) {
+                                val from = position(index, requireNotNull(points[index].averageScore))
+                                val to = position(index + 1, requireNotNull(points[index + 1].averageScore))
+                                val midX = (from.x + to.x) / 2f
+                                path.cubicTo(midX, from.y, midX, to.y, to.x, to.y)
+                            }
+                            val area = Path().apply {
+                                addPath(path)
+                                lineTo(position(runEnd, requireNotNull(points[runEnd].averageScore)).x, bottom)
+                                lineTo(first.x, bottom)
+                                close()
+                            }
+                            drawPath(area, Brush.verticalGradient(listOf(primary.copy(alpha = 0.18f), primary.copy(alpha = 0.01f))))
+                            drawPath(path, primary.copy(alpha = 0.8f), style = Stroke(width = 2.5.dp.toPx()))
+                        }
+                        runStart = runEnd + 1
+                    }
+                    points.forEachIndexed { index, point ->
+                        val x = step * (index + 0.5f)
+                        val score = point.averageScore
+                        if (score == null) {
+                            drawCircle(emptyPoint, radius = 2.5.dp.toPx(), center = Offset(x, bottom))
+                        } else {
+                            val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                            val center = position(index, score)
+                            if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
+                            drawCircle(primary, radius = if (current) 5.dp.toPx() else 4.dp.toPx(), center = center)
+                            drawCircle(Color.White, radius = 1.7.dp.toPx(), center = center)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxSize()) {
+                    points.forEach { point ->
+                        val description = buildString {
+                            append(point.dateRangeLabel())
+                            append("，${point.entryCount} 条记录")
+                            point.averageScore?.let { append("，心情平均位置 ${it.oneDecimal()}") }
+                        }
+                        Box(
+                            Modifier.weight(1f).fillMaxSize()
+                                .semantics { contentDescription = description }
+                                .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
+                        )
+                    }
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(start = axisWidth)) {
             points.forEachIndexed { index, point ->
                 val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -517,6 +556,7 @@ private fun MoodDistributionCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clickable(enabled = item.entryCount > 0) { onClick(item) }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -552,28 +592,46 @@ private fun MoodDistributionCard(
 
 @Composable
 private fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previous: Boolean) -> Unit) {
+    val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     InsightSectionCard(
         icon = Icons.AutoMirrored.Outlined.CompareArrows,
         index = "对比",
         title = "与前一周期",
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ComparisonMetric(
-                label = "当前",
-                count = comparison.currentEntryCount,
-                days = comparison.currentRecordedDayCount,
-                average = comparison.currentAverageScore,
-                modifier = Modifier.weight(1f),
-                onClick = { onClick(false) },
-            )
-            ComparisonMetric(
-                label = "前期",
-                count = comparison.entryCount,
-                days = comparison.recordedDayCount,
-                average = comparison.averageScore,
-                modifier = Modifier.weight(1f),
-                onClick = { onClick(true) },
-            )
+        if (stackMetrics) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ComparisonMetric(
+                    "当前",
+                    comparison.currentEntryCount,
+                    comparison.currentRecordedDayCount,
+                    comparison.currentAverageScore,
+                    Modifier.fillMaxWidth(),
+                ) { onClick(false) }
+                ComparisonMetric(
+                    "前期",
+                    comparison.entryCount,
+                    comparison.recordedDayCount,
+                    comparison.averageScore,
+                    Modifier.fillMaxWidth(),
+                ) { onClick(true) }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ComparisonMetric(
+                    "当前",
+                    comparison.currentEntryCount,
+                    comparison.currentRecordedDayCount,
+                    comparison.currentAverageScore,
+                    Modifier.weight(1f),
+                ) { onClick(false) }
+                ComparisonMetric(
+                    "前期",
+                    comparison.entryCount,
+                    comparison.recordedDayCount,
+                    comparison.averageScore,
+                    Modifier.weight(1f),
+                ) { onClick(true) }
+            }
         }
         Spacer(Modifier.height(12.dp))
         Text(
@@ -624,7 +682,7 @@ private fun TagTrendsCard(
         } else {
             tags.forEach { tag ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable { onClick(tag) }.padding(vertical = 9.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { onClick(tag) }.padding(vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -661,14 +719,22 @@ private fun DayTypeCard(
     weekend: DayTypeInsight,
     onClick: (DayTypeInsight) -> Unit,
 ) {
+    val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     InsightSectionCard(
         icon = Icons.Outlined.CalendarMonth,
         index = "节奏",
         title = "工作日与周末",
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DayTypeMetric(weekday, Modifier.weight(1f)) { onClick(weekday) }
-            DayTypeMetric(weekend, Modifier.weight(1f)) { onClick(weekend) }
+        if (stackMetrics) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DayTypeMetric(weekday, Modifier.fillMaxWidth()) { onClick(weekday) }
+                DayTypeMetric(weekend, Modifier.fillMaxWidth()) { onClick(weekend) }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DayTypeMetric(weekday, Modifier.weight(1f)) { onClick(weekday) }
+                DayTypeMetric(weekend, Modifier.weight(1f)) { onClick(weekend) }
+            }
         }
         Spacer(Modifier.height(10.dp))
         val enough = weekday.entryCount >= 3 && weekend.entryCount >= 3

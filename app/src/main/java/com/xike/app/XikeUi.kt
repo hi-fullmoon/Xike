@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
@@ -217,6 +218,8 @@ object XikeShapes {
     val dialog = RoundedCornerShape(30.dp)
 }
 
+internal val XikeContentMaxWidth = 640.dp
+
 internal val XikePageTitleStyle = TextStyle(
     fontFamily = FontFamily.Serif,
     fontWeight = FontWeight.Medium,
@@ -378,47 +381,54 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp).selectableGroup(),
-        ) {
-            AppScreen.entries.forEach { item ->
-                val isSelected = selected == item
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                            else Color.Transparent,
+        Box(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .selectableGroup(),
+            ) {
+                AppScreen.entries.forEach { item ->
+                    val isSelected = selected == item
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                                else Color.Transparent,
+                            )
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.Tab,
+                                onClick = { onSelected(item) },
+                            )
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = when (item) {
+                                AppScreen.HOME -> XikeIcons.Moment
+                                AppScreen.INSIGHTS -> XikeIcons.Insights
+                                AppScreen.ARCHIVE -> XikeIcons.Archive
+                                AppScreen.SETTINGS -> XikeIcons.Settings
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        .selectable(
-                            selected = isSelected,
-                            role = Role.Tab,
-                            onClick = { onSelected(item) },
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            item.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        .padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        imageVector = when (item) {
-                            AppScreen.HOME -> XikeIcons.Moment
-                            AppScreen.INSIGHTS -> XikeIcons.Insights
-                            AppScreen.ARCHIVE -> XikeIcons.Archive
-                            AppScreen.SETTINGS -> XikeIcons.Settings
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        item.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    }
                 }
             }
         }
@@ -753,7 +763,9 @@ fun MomentScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
+                .widthIn(max = XikeContentMaxWidth)
                 .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -1120,7 +1132,12 @@ fun MomentScreen(
                     }
                 },
                 enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).height(48.dp),
+                modifier = Modifier
+                    .widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .height(48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
                 colors = ButtonDefaults.buttonColors(
@@ -1755,7 +1772,10 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
         shape = XikeShapes.dialog,
         title = { Text("五种心情，怎么选？") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
                     "选择最接近此刻的一种即可，不必把复杂的感受说得很准确。",
                     style = MaterialTheme.typography.bodySmall,
@@ -1873,7 +1893,7 @@ internal fun TopicChip(
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 36.dp).padding(horizontal = 9.dp, vertical = 4.dp),
+            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -1889,7 +1909,7 @@ internal fun TopicChip(
                 style = MaterialTheme.typography.labelLarge,
                 color = when {
                     selected && isDark -> MaterialTheme.colorScheme.onSurface
-                    selected -> topic.accent
+                    selected -> MaterialTheme.colorScheme.onSurface
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
@@ -2806,7 +2826,10 @@ private fun ReminderScheduleDialog(
         shape = XikeShapes.dialog,
         title = { Text("提醒时间") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
                         TimePickerDialog(
@@ -2927,7 +2950,7 @@ private fun DailyPromptStyleDialog(
         shape = XikeShapes.dialog,
         title = { Text("本地问题库") },
         text = {
-            Column(Modifier.selectableGroup()) {
+            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                 DailyPromptStyle.entries.forEach { style ->
                     Row(
                         modifier = Modifier
@@ -3007,7 +3030,7 @@ private fun AppLockTimeoutDialog(
         shape = XikeShapes.dialog,
         title = { Text("自动锁定") },
         text = {
-            Column(Modifier.selectableGroup()) {
+            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                 AppLockTimeout.entries.forEach { timeout ->
                     Row(
                         modifier = Modifier
@@ -3080,11 +3103,18 @@ private fun SettingsAction(icon: ImageVector, title: String, subtitle: String, o
 
 @Composable
 private fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        content = content,
-    )
+    Box(Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = XikeContentMaxWidth)
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable

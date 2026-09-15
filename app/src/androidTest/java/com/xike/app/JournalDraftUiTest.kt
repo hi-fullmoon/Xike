@@ -1,6 +1,7 @@
 package com.xike.app
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
@@ -21,6 +22,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Rule
@@ -260,6 +263,36 @@ class JournalDraftUiTest {
         composeRule.onNodeWithText("五种心情，怎么选？").assertIsDisplayed()
         composeRule.onNodeWithText("难过、无助，或有些不知所措").assertIsDisplayed()
         composeRule.onNodeWithText("舒展、不错，或有一点期待").assertIsDisplayed()
+    }
+
+    @Test
+    fun moodGuideRemainsScrollableAtLargeFontScale() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 2f),
+            ) {
+                XikeTheme(AppTheme.OCEAN) {
+                    MomentScreen(
+                        padding = PaddingValues(),
+                        entries = emptyList(),
+                        draft = JournalDraft(),
+                        dailyPromptSettings = DailyPromptSettings(enabled = false),
+                        onDraftMoodChange = {},
+                        onDraftNoteChange = {},
+                        onDraftTagToggle = {},
+                        onDraftImagesAdded = {},
+                        onDraftImageRemoved = {},
+                        onSave = { _, _ -> Result.success(Unit) },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("选择参考").performClick()
+        composeRule.onNodeWithText("开心、兴奋，或充满能量")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
