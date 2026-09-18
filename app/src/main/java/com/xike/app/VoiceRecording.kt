@@ -319,7 +319,7 @@ internal fun VoiceCaptureCard(
                 OutlinedButton(
                     enabled = !isStopping,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = XikeShapes.button,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     onClick = {
                         recorder.cancel()
@@ -338,7 +338,7 @@ internal fun VoiceCaptureCard(
                 OutlinedButton(
                     enabled = isRecording && !isStopping,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = XikeShapes.button,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     onClick = {
                         runCatching {
@@ -422,7 +422,7 @@ internal fun VoicePendingSaveCard(
             }
             if (!isSaving) {
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
                 ) {
                     Text(
@@ -437,12 +437,12 @@ internal fun VoicePendingSaveCard(
                     OutlinedButton(
                         onClick = { confirmDiscard = true },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = XikeShapes.button,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
                         Text("放弃录音")
                     }
-                    Button(onClick = onRetry, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
+                    Button(onClick = onRetry, modifier = Modifier.weight(1f), shape = XikeShapes.button) {
                         Text("重试保存")
                     }
                 }

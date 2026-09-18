@@ -77,6 +77,7 @@ import kotlinx.coroutines.launch
 class MainActivity : FragmentActivity() {
     private val lockSession: AppLockSessionState by viewModels()
     private lateinit var lockPreferences: AppLockPreferences
+    private lateinit var appearancePreferences: AppearancePreferences
     private lateinit var biometricPrompt: BiometricPrompt
     private lateinit var habitPreferences: HabitPreferences
     private var appLockEnabled by mutableStateOf(false)
@@ -86,10 +87,17 @@ class MainActivity : FragmentActivity() {
     private var dailyPromptSettings by mutableStateOf(DailyPromptSettings())
     private var notificationPermissionGranted by mutableStateOf(false)
     private var quickRecordRequest by mutableStateOf(0)
+    private var lockScreenTheme by mutableStateOf(AppTheme.OCEAN)
+    private var lockScreenStyle by mutableStateOf(AppStyle.BREATHE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lockPreferences = AppLockPreferences(this)
+        appearancePreferences = AppearancePreferences(this)
+        appearancePreferences.current().let { appearance ->
+            lockScreenTheme = appearance.theme
+            lockScreenStyle = appearance.style
+        }
         habitPreferences = HabitPreferences(this)
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
@@ -122,7 +130,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
             if (!lockSession.journalSessionOpened) {
-                XikeTheme(AppTheme.OCEAN) {
+                XikeTheme(lockScreenTheme, lockScreenStyle) {
                     AppLockScreen(
                         authenticationAvailable = authenticationAvailable,
                         onUnlock = { requestAuthentication(LockAuthentication.UNLOCK) },
@@ -133,6 +141,12 @@ class MainActivity : FragmentActivity() {
                 }
             } else {
                 val journalViewModel: JournalViewModel = viewModel()
+                LaunchedEffect(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
+                    lockScreenTheme = journalViewModel.selectedTheme
+                    lockScreenStyle = journalViewModel.selectedStyle
+                    appearancePreferences.saveTheme(journalViewModel.selectedTheme)
+                    appearancePreferences.saveStyle(journalViewModel.selectedStyle)
+                }
                 val systemActivityCallbacks = remember {
                     SystemActivityCallbacks(
                         onLaunch = lockSession::beginSystemActivity,
@@ -140,12 +154,13 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                XikeTheme(journalViewModel.selectedTheme) {
+                XikeTheme(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
                     CompositionLocalProvider(LocalSystemActivityCallbacks provides systemActivityCallbacks) {
                         XikeApp(
                             entries = journalViewModel.entries,
                             draft = journalViewModel.draft,
                             selectedTheme = journalViewModel.selectedTheme,
+                            selectedStyle = journalViewModel.selectedStyle,
                             appLockEnabled = appLockEnabled,
                             appLockTimeout = appLockTimeout,
                             authenticationAvailable = authenticationAvailable,
@@ -154,6 +169,7 @@ class MainActivity : FragmentActivity() {
                             notificationPermissionGranted = notificationPermissionGranted,
                             quickRecordRequest = quickRecordRequest,
                             onThemeChange = journalViewModel::selectTheme,
+                            onStyleChange = journalViewModel::selectStyle,
                             onAppLockChange = ::changeAppLock,
                             onAppLockTimeoutChange = ::changeAppLockTimeout,
                             onLockNow = ::lockNow,
@@ -509,6 +525,7 @@ private fun XikeApp(
     entries: List<JournalEntry>,
     draft: JournalDraft,
     selectedTheme: AppTheme,
+    selectedStyle: AppStyle,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
@@ -517,6 +534,7 @@ private fun XikeApp(
     notificationPermissionGranted: Boolean,
     quickRecordRequest: Int,
     onThemeChange: (AppTheme) -> Unit,
+    onStyleChange: (AppStyle) -> Unit,
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
@@ -700,6 +718,7 @@ private fun XikeApp(
                 AppScreen.SETTINGS -> ProfileSettingsScreen(
                     padding = innerPadding,
                     selectedTheme = selectedTheme,
+                    selectedStyle = selectedStyle,
                     appLockEnabled = appLockEnabled,
                     appLockTimeout = appLockTimeout,
                     authenticationAvailable = authenticationAvailable,
@@ -707,6 +726,7 @@ private fun XikeApp(
                     dailyPromptSettings = dailyPromptSettings,
                     notificationPermissionGranted = notificationPermissionGranted,
                     onThemeChange = onThemeChange,
+                    onStyleChange = onStyleChange,
                     onAppLockChange = onAppLockChange,
                     onAppLockTimeoutChange = onAppLockTimeoutChange,
                     onLockNow = onLockNow,

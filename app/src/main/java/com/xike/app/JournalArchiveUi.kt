@@ -259,8 +259,11 @@ fun JournalArchiveScreen(
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(
+                horizontal = XikeScreenHorizontalPadding,
+                vertical = XikeScreenVerticalPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
         ) {
         item(key = "archive-header") {
             ArchiveHeader(
@@ -630,7 +633,7 @@ private fun ArchiveControls(
     ) {
         Surface(
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(16.dp),
+            shape = XikeShapes.inner,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Row(
@@ -657,7 +660,7 @@ private fun ArchiveControls(
             modifier = Modifier
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clickable(onClick = onToggleFilters),
-            shape = RoundedCornerShape(14.dp),
+            shape = XikeShapes.button,
             color = if (showFilters || activeFilterCount > 0) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
@@ -708,7 +711,7 @@ private fun ArchiveModeButton(
                 role = Role.Tab,
                 onClick = onClick,
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = XikeShapes.button,
         color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent,
     ) {
         Row(
@@ -884,7 +887,7 @@ private fun JournalMonthCalendar(
                     )
                 }
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = XikeShapes.button,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
                 ) {
                     Row {
@@ -1787,7 +1790,7 @@ private fun EditPhotoTile(
     Box(
         modifier = Modifier
             .size(92.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(XikeShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClickLabel = "预览照片", onClick = onPreview),
     ) {

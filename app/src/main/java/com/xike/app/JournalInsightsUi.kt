@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -106,8 +105,11 @@ fun JournalInsightsScreen(
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                horizontal = XikeScreenHorizontalPadding,
+                vertical = XikeScreenVerticalPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
         ) {
             item(key = "insights-header") {
                 ScreenHeader(
@@ -248,7 +250,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 }
                 Surface(
                     modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(19.dp),
+                    shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -331,7 +333,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
 private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
     ) {
         Column(Modifier.padding(horizontal = 11.dp, vertical = 10.dp)) {
@@ -781,7 +783,7 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(42.dp),
-                    shape = RoundedCornerShape(15.dp),
+                    shape = XikeShapes.button,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -891,7 +893,7 @@ private fun RatioBar(ratio: Double, description: String) {
 
 @Composable
 private fun InsufficientDataNote(message: String) {
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)) {
+    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)) {
         Text(
             message,
             modifier = Modifier.fillMaxWidth().padding(13.dp),
@@ -905,7 +907,7 @@ private fun InsufficientDataNote(message: String) {
 private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (InsightsPeriod) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(modifier = Modifier.padding(4.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -914,7 +916,7 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(XikeShapes.button)
                         .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent)
                         .selectable(
                             selected = isSelected,

@@ -30,7 +30,7 @@
 | 应用锁 | 系统面容/指纹/设备凭据、立即/1/5/30 分钟锁定、后台缩略图保护 | 已可用；需要增加生命周期与 UI 自动化回归 |
 | 备份迁移 | 可选密码加密、离线 HTML 阅读页、全部附件、兼容旧格式、恢复前校验与一次撤销 | 核心链路已实现；恢复会替换现有内容，仍缺少合并和定期备份 |
 | 温和习惯 | 可选本地提醒、星期/夜间勿扰/暂停、桌面快捷入口、3 套本地问题库 | 默认关闭且完全离线；桌面小组件等待使用验证后再决定投入 |
-| 个性化 | 4 套主题、跟随系统深浅色 | 已可用；版本号从 `BuildConfig` 读取 |
+| 个性化 | 3 套界面风格、6 种主色调、跟随系统深浅色 | 已可用；风格与主色可自由组合，版本号从 `BuildConfig` 读取 |
 | 工程发布 | Room schema 导出、单元/数据库迁移/Compose UI 测试、PR CI、标签触发签名/APK/AAB/GitHub Release | 发布链路已具备；缺少真机性能基线和完整 API 26–36 设备矩阵 |
 
 代码依据主要来自 [记录与存储](../app/src/main/java/com/xike/app/JournalStore.kt)、[数据库](../app/src/main/java/com/xike/app/JournalDatabase.kt)、[洞察计算](../app/src/main/java/com/xike/app/JournalAnalytics.kt)、[洞察界面](../app/src/main/java/com/xike/app/JournalInsightsUi.kt)、[主界面](../app/src/main/java/com/xike/app/XikeUi.kt)、[应用锁与备份入口](../app/src/main/java/com/xike/app/MainActivity.kt) 和 [发布流水线](../.github/workflows/release.yml)。

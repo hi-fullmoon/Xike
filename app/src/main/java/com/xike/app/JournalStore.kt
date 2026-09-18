@@ -132,6 +132,7 @@ class JournalDataException(message: String, cause: Throwable) : IllegalStateExce
 data class JournalSnapshot(
     val entries: List<JournalEntry>,
     val themeName: String?,
+    val styleName: String? = null,
 )
 
 data class BackupSummary(
@@ -202,7 +203,11 @@ class JournalStore(context: Context) {
             dao.importLegacyIfNeeded(legacyEntries.map(JournalEntry::toBundle), legacyTheme)
         }
         ensureSearchIndex()
-        JournalSnapshot(readEntries(), dao.settingValue(THEME_SETTING))
+        JournalSnapshot(
+            entries = readEntries(),
+            themeName = dao.settingValue(THEME_SETTING),
+            styleName = dao.settingValue(THEME_STYLE_SETTING),
+        )
     } catch (error: JournalDataException) {
         throw error
     } catch (error: Throwable) {
@@ -353,6 +358,12 @@ class JournalStore(context: Context) {
     fun saveThemeName(themeName: String) {
         runCatching { dao.putSetting(AppSettingEntity(THEME_SETTING, themeName)) }
             .getOrElse { error -> throw JournalDataException("外观设置保存失败，请重试。", error) }
+    }
+
+    @Synchronized
+    fun saveStyleName(styleName: String) {
+        runCatching { dao.putSetting(AppSettingEntity(THEME_STYLE_SETTING, styleName)) }
+            .getOrElse { error -> throw JournalDataException("界面风格保存失败，请重试。", error) }
     }
 
     private fun importImages(uris: List<Uri>): List<String> {

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 internal const val THEME_SETTING = "theme"
+internal const val THEME_STYLE_SETTING = "theme-style"
 internal const val LEGACY_MIGRATION_SETTING = "legacy-shared-preferences-migrated-v1"
 internal const val SEARCH_INDEX_SETTING = "journal-search-index-version"
 internal const val SEARCH_INDEX_VERSION = "1"

@@ -130,6 +130,7 @@ flowchart TD
 | [`VoiceRecording.kt`](../app/src/main/java/com/xike/app/VoiceRecording.kt) | 麦克风录制、真实音量波形、暂停/继续和加密语音试听 UI。 |
 | [`ReminderScheduler.kt`](../app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
 | [`HabitPreferences.kt`](../app/src/main/java/com/xike/app/HabitPreferences.kt) | 提醒、勿扰、暂停和每日一问设置。 |
+| [`AppearancePreferences.kt`](../app/src/main/java/com/xike/app/AppearancePreferences.kt) | 保存非敏感的界面风格与主色镜像，使锁定页在数据库打开前也能保持用户外观。 |
 | [`AppLockPreferences.kt`](../app/src/main/java/com/xike/app/AppLockPreferences.kt) | 应用锁开关和自动锁定时间设置。 |
 | [`DatabaseKeyManager.kt`](../app/src/main/java/com/xike/app/DatabaseKeyManager.kt) | 创建随机 SQLCipher 口令，并使用 Android Keystore AES-256-GCM 密钥封装。 |
 
@@ -144,7 +145,7 @@ flowchart TD
 | `journal_images` | 按顺序保存每条日记引用的加密图片文件名。 |
 | `journal_audios` | 保存每条日记的加密语音文件名、时长和媒体类型。 |
 | `journal_entries_fts` | FTS4 全文搜索文档，索引注脚和主题。 |
-| `app_settings` | 主题、旧数据迁移标记和搜索索引版本等应用设置。 |
+| `app_settings` | 界面风格与主色调的兼容镜像、旧数据迁移标记和搜索索引版本等应用设置。 |
 
 `journal_tags` 和 `journal_images` 通过外键关联日记，删除主记录时级联删除引用。新增、更新、删除、批量替换和搜索索引重建均由 DAO 事务封装。
 

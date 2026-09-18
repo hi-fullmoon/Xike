@@ -28,12 +28,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val draftStore = JournalDraftStore(application)
     private val pendingAudioStore = PendingDraftAudioStore(application)
     private val outdoorRepository = OutdoorContextRepository(application)
+    private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
 
     var entries by mutableStateOf(emptyList<JournalEntry>())
         private set
 
-    var selectedTheme by mutableStateOf(AppTheme.OCEAN)
+    var selectedTheme by mutableStateOf(appearancePreferences.current().theme)
+        private set
+
+    var selectedStyle by mutableStateOf(appearancePreferences.current().style)
         private set
 
     var draft by mutableStateOf(JournalDraft())
@@ -64,8 +68,13 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
             val pendingResult = withContext(Dispatchers.IO) { runCatching(pendingAudioStore::recover) }
             result.onSuccess { snapshot ->
+                val appearance = appearancePreferences.migrateFromDatabase(
+                    themeName = snapshot.themeName,
+                    styleName = snapshot.styleName,
+                )
                 entries = snapshot.entries
-                selectedTheme = AppTheme.entries.firstOrNull { it.name == snapshot.themeName } ?: AppTheme.OCEAN
+                selectedTheme = appearance.theme
+                selectedStyle = appearance.style
                 canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
                 draftResult.onSuccess { draft = it }
                 dataError = draftResult.exceptionOrNull()?.message
@@ -100,10 +109,22 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun selectTheme(theme: AppTheme) {
         selectedTheme = theme
+        appearancePreferences.saveTheme(theme)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { runCatching { store.saveThemeName(theme.name) } }
                 .onFailure { error ->
                     dataError = error.message ?: "外观设置保存失败，请重试。"
+                }
+        }
+    }
+
+    fun selectStyle(style: AppStyle) {
+        selectedStyle = style
+        appearancePreferences.saveStyle(style)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { store.saveStyleName(style.name) } }
+                .onFailure { error ->
+                    dataError = error.message ?: "界面风格保存失败，请重试。"
                 }
         }
     }

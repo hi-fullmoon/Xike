@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -112,6 +114,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -144,6 +147,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -186,11 +190,41 @@ enum class AppTheme(
     val accent: Color,
     val secondary: Color,
 ) {
-    PINE("雾松", "沉静的森林绿", Color(0xFF34584A), Color(0xFFDDEAE2), Color(0xFFF0E8D9)),
-    VIOLET("暮紫", "柔和的暮色紫", Color(0xFF66567E), Color(0xFFEAE3F0), Color(0xFFF1E4DC)),
-    OCEAN("潮汐", "克制的雾蓝绿", Color(0xFF355E5B), Color(0xFFDFECE8), Color(0xFFF0E5D6)),
-    TERRA("陶日", "温暖的赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
+    PINE("雾松", "森林绿", Color(0xFF34584A), Color(0xFFDDEAE2), Color(0xFFF0E8D9)),
+    VIOLET("暮紫", "暮色紫", Color(0xFF66567E), Color(0xFFEAE3F0), Color(0xFFF1E4DC)),
+    OCEAN("潮汐", "雾蓝绿", Color(0xFF355E5B), Color(0xFFDFECE8), Color(0xFFF0E5D6)),
+    TERRA("陶日", "赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
+    AMBER("麦芒", "琥珀金", Color(0xFF82611E), Color(0xFFF4E8C8), Color(0xFFE5ECE5)),
+    ROSE("山茶", "柔雾红", Color(0xFF8B5360), Color(0xFFF3E0E4), Color(0xFFE8E8F0)),
 }
+
+enum class AppStyle(
+    val title: String,
+    val subtitle: String,
+) {
+    BREATHE("呼吸", "圆润留白，像一段缓慢的停顿"),
+    PAPER("纸页", "克制线条，像翻开一册手记"),
+    FOCUS("专注", "紧凑清晰，让内容更快抵达"),
+}
+
+private enum class XikeNavigationTreatment { CAPSULE, UNDERLINE, SOLID }
+
+private data class XikeStyleSpec(
+    val style: AppStyle,
+    val cardCorner: Dp,
+    val innerCorner: Dp,
+    val buttonCorner: Dp,
+    val dialogCorner: Dp,
+    val navigationCorner: Dp,
+    val contentMaxWidth: Dp,
+    val screenHorizontalPadding: Dp,
+    val screenVerticalPadding: Dp,
+    val contentGap: Dp,
+    val pageTitleStyle: TextStyle,
+    val sectionTitleStyle: TextStyle,
+    val eyebrowStyle: TextStyle,
+    val navigationTreatment: XikeNavigationTreatment,
+)
 
 internal data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
 
@@ -210,38 +244,146 @@ internal val journalTopics = listOf(
     JournalTopic("其他", Color(0xFF6F766F), Icons.Outlined.MoreHoriz),
 )
 
-object XikeShapes {
-    // Standalone content cards share one radius; nested panels use inner.
-    val card = RoundedCornerShape(24.dp)
-    val inner = RoundedCornerShape(16.dp)
-    val button = RoundedCornerShape(16.dp)
-    val dialog = RoundedCornerShape(30.dp)
+private val BreatheStyleSpec = XikeStyleSpec(
+    style = AppStyle.BREATHE,
+    cardCorner = 28.dp,
+    innerCorner = 18.dp,
+    buttonCorner = 18.dp,
+    dialogCorner = 30.dp,
+    navigationCorner = 18.dp,
+    contentMaxWidth = 640.dp,
+    screenHorizontalPadding = 20.dp,
+    screenVerticalPadding = 18.dp,
+    contentGap = 15.dp,
+    pageTitleStyle = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 35.sp,
+        lineHeight = 44.sp,
+    ),
+    sectionTitleStyle = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 23.sp,
+        lineHeight = 32.sp,
+    ),
+    eyebrowStyle = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        lineHeight = 17.sp,
+        letterSpacing = 1.7.sp,
+    ),
+    navigationTreatment = XikeNavigationTreatment.CAPSULE,
+)
+
+private val PaperStyleSpec = XikeStyleSpec(
+    style = AppStyle.PAPER,
+    cardCorner = 6.dp,
+    innerCorner = 3.dp,
+    buttonCorner = 6.dp,
+    dialogCorner = 12.dp,
+    navigationCorner = 0.dp,
+    contentMaxWidth = 680.dp,
+    screenHorizontalPadding = 24.dp,
+    screenVerticalPadding = 22.dp,
+    contentGap = 19.dp,
+    pageTitleStyle = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 38.sp,
+        lineHeight = 48.sp,
+        letterSpacing = 0.2.sp,
+    ),
+    sectionTitleStyle = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 24.sp,
+        lineHeight = 34.sp,
+    ),
+    eyebrowStyle = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 1.2.sp,
+    ),
+    navigationTreatment = XikeNavigationTreatment.UNDERLINE,
+)
+
+private val FocusStyleSpec = XikeStyleSpec(
+    style = AppStyle.FOCUS,
+    cardCorner = 14.dp,
+    innerCorner = 10.dp,
+    buttonCorner = 10.dp,
+    dialogCorner = 18.dp,
+    navigationCorner = 10.dp,
+    contentMaxWidth = 720.dp,
+    screenHorizontalPadding = 16.dp,
+    screenVerticalPadding = 12.dp,
+    contentGap = 10.dp,
+    pageTitleStyle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 31.sp,
+        lineHeight = 38.sp,
+        letterSpacing = (-0.4).sp,
+    ),
+    sectionTitleStyle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 21.sp,
+        lineHeight = 28.sp,
+    ),
+    eyebrowStyle = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 1.1.sp,
+    ),
+    navigationTreatment = XikeNavigationTreatment.SOLID,
+)
+
+private fun AppStyle.spec(): XikeStyleSpec = when (this) {
+    AppStyle.BREATHE -> BreatheStyleSpec
+    AppStyle.PAPER -> PaperStyleSpec
+    AppStyle.FOCUS -> FocusStyleSpec
 }
 
-internal val XikeContentMaxWidth = 640.dp
+private val LocalXikeStyle = staticCompositionLocalOf { BreatheStyleSpec }
 
-internal val XikePageTitleStyle = TextStyle(
-    fontFamily = FontFamily.Serif,
-    fontWeight = FontWeight.Medium,
-    fontSize = 34.sp,
-    lineHeight = 43.sp,
-)
+object XikeShapes {
+    val card: RoundedCornerShape
+        @Composable get() = RoundedCornerShape(LocalXikeStyle.current.cardCorner)
+    val inner: RoundedCornerShape
+        @Composable get() = RoundedCornerShape(LocalXikeStyle.current.innerCorner)
+    val button: RoundedCornerShape
+        @Composable get() = RoundedCornerShape(LocalXikeStyle.current.buttonCorner)
+    val dialog: RoundedCornerShape
+        @Composable get() = RoundedCornerShape(LocalXikeStyle.current.dialogCorner)
+}
 
-internal val XikeSectionTitleStyle = TextStyle(
-    fontFamily = FontFamily.Serif,
-    fontWeight = FontWeight.Medium,
-    fontSize = 23.sp,
-    lineHeight = 32.sp,
-)
+internal val XikeContentMaxWidth: Dp
+    @Composable get() = LocalXikeStyle.current.contentMaxWidth
 
-internal val XikeEyebrowStyle = TextStyle(
-    fontWeight = FontWeight.SemiBold,
-    fontSize = 11.sp,
-    lineHeight = 17.sp,
-    letterSpacing = 1.7.sp,
-)
+internal val XikeScreenHorizontalPadding: Dp
+    @Composable get() = LocalXikeStyle.current.screenHorizontalPadding
 
-private val XikeTypography = Typography(
+internal val XikeScreenVerticalPadding: Dp
+    @Composable get() = LocalXikeStyle.current.screenVerticalPadding
+
+internal val XikeContentGap: Dp
+    @Composable get() = LocalXikeStyle.current.contentGap
+
+internal val XikePageTitleStyle: TextStyle
+    @Composable get() = LocalXikeStyle.current.pageTitleStyle
+
+internal val XikeSectionTitleStyle: TextStyle
+    @Composable get() = LocalXikeStyle.current.sectionTitleStyle
+
+internal val XikeEyebrowStyle: TextStyle
+    @Composable get() = LocalXikeStyle.current.eyebrowStyle
+
+private val BreatheTypography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
@@ -278,36 +420,113 @@ private val XikeTypography = Typography(
     labelSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp),
 )
 
+private val PaperTypography = BreatheTypography.copy(
+    titleLarge = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 30.sp),
+    titleMedium = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 26.sp),
+    titleSmall = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 23.sp),
+    bodyLarge = TextStyle(fontFamily = FontFamily.Serif, fontSize = 18.sp, lineHeight = 29.sp),
+    bodyMedium = TextStyle(fontFamily = FontFamily.Serif, fontSize = 15.sp, lineHeight = 25.sp),
+    bodySmall = TextStyle(fontFamily = FontFamily.Serif, fontSize = 13.sp, lineHeight = 21.sp),
+)
+
+private val FocusTypography = BreatheTypography.copy(
+    displaySmall = TextStyle(fontWeight = FontWeight.Bold, fontSize = 38.sp, lineHeight = 46.sp, letterSpacing = (-0.7).sp),
+    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 35.sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.Bold, fontSize = 25.sp, lineHeight = 32.sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.Bold, fontSize = 21.sp, lineHeight = 27.sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 25.sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp),
+    titleSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 21.sp),
+    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 18.sp),
+)
+
+private fun typographyFor(style: AppStyle): Typography = when (style) {
+    AppStyle.BREATHE -> BreatheTypography
+    AppStyle.PAPER -> PaperTypography
+    AppStyle.FOCUS -> FocusTypography
+}
+
 @Composable
-fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
+fun XikeTheme(
+    theme: AppTheme,
+    style: AppStyle = AppStyle.BREATHE,
+    content: @Composable () -> Unit,
+) {
+    val styleSpec = style.spec()
     val colors: ColorScheme = if (isSystemInDarkTheme()) {
         darkColorScheme(
             primary = theme.accent,
-            onPrimary = Color(0xFF18352B),
+            onPrimary = Color(0xFF20201E),
             primaryContainer = theme.primary.copy(alpha = 0.58f),
-            onPrimaryContainer = Color(0xFFF4FAF5),
+            onPrimaryContainer = Color(0xFFF4F3EF),
             secondary = theme.accent,
-            onSecondary = Color(0xFF18352B),
+            onSecondary = Color(0xFF20201E),
             secondaryContainer = theme.secondary.copy(alpha = 0.18f),
-            onSecondaryContainer = Color(0xFFF2EEE6),
+            onSecondaryContainer = Color(0xFFF2F0EB),
             tertiary = Color(0xFFD3BCA4),
             onTertiary = Color(0xFF3D372E),
             tertiaryContainer = theme.secondary.copy(alpha = 0.24f),
             onTertiaryContainer = Color(0xFFF2EEE6),
-            background = Color(0xFF121614),
+            background = when (style) {
+                AppStyle.BREATHE -> Color(0xFF121614)
+                AppStyle.PAPER -> Color(0xFF191714)
+                AppStyle.FOCUS -> Color(0xFF101312)
+            },
             onBackground = Color(0xFFE8E9E4),
-            surface = Color(0xFF1B211E),
+            surface = when (style) {
+                AppStyle.BREATHE -> Color(0xFF1B211E)
+                AppStyle.PAPER -> Color(0xFF242019)
+                AppStyle.FOCUS -> Color(0xFF1A1E1C)
+            },
             onSurface = Color(0xFFE8E9E4),
-            surfaceVariant = Color(0xFF282D29),
-            onSurfaceVariant = Color(0xFFB8BDB7),
+            surfaceVariant = when (style) {
+                AppStyle.BREATHE -> Color(0xFF282D29)
+                AppStyle.PAPER -> Color(0xFF302A22)
+                AppStyle.FOCUS -> Color(0xFF252A27)
+            },
+            onSurfaceVariant = when (style) {
+                AppStyle.BREATHE -> Color(0xFFB8BDB7)
+                AppStyle.PAPER -> Color(0xFFC5BCAF)
+                AppStyle.FOCUS -> Color(0xFFB7BDB9)
+            },
             surfaceTint = theme.accent,
-            surfaceDim = Color(0xFF121614),
-            surfaceBright = Color(0xFF39423C),
-            surfaceContainerLowest = Color(0xFF101512),
-            surfaceContainerLow = Color(0xFF1B211E),
-            surfaceContainer = Color(0xFF202723),
-            surfaceContainerHigh = Color(0xFF272E29),
-            surfaceContainerHighest = Color(0xFF313933),
+            surfaceDim = when (style) {
+                AppStyle.BREATHE -> Color(0xFF121614)
+                AppStyle.PAPER -> Color(0xFF191714)
+                AppStyle.FOCUS -> Color(0xFF101312)
+            },
+            surfaceBright = when (style) {
+                AppStyle.BREATHE -> Color(0xFF39423C)
+                AppStyle.PAPER -> Color(0xFF413A31)
+                AppStyle.FOCUS -> Color(0xFF363C38)
+            },
+            surfaceContainerLowest = when (style) {
+                AppStyle.BREATHE -> Color(0xFF101512)
+                AppStyle.PAPER -> Color(0xFF14120F)
+                AppStyle.FOCUS -> Color(0xFF0D100F)
+            },
+            surfaceContainerLow = when (style) {
+                AppStyle.BREATHE -> Color(0xFF1B211E)
+                AppStyle.PAPER -> Color(0xFF211D18)
+                AppStyle.FOCUS -> Color(0xFF171B19)
+            },
+            surfaceContainer = when (style) {
+                AppStyle.BREATHE -> Color(0xFF202723)
+                AppStyle.PAPER -> Color(0xFF28231C)
+                AppStyle.FOCUS -> Color(0xFF1D221F)
+            },
+            surfaceContainerHigh = when (style) {
+                AppStyle.BREATHE -> Color(0xFF272E29)
+                AppStyle.PAPER -> Color(0xFF302A22)
+                AppStyle.FOCUS -> Color(0xFF252B27)
+            },
+            surfaceContainerHighest = when (style) {
+                AppStyle.BREATHE -> Color(0xFF313933)
+                AppStyle.PAPER -> Color(0xFF3B342A)
+                AppStyle.FOCUS -> Color(0xFF303631)
+            },
             inverseSurface = Color(0xFFE8ECE8),
             inverseOnSurface = Color(0xFF28312B),
             inversePrimary = theme.primary,
@@ -319,37 +538,91 @@ fun XikeTheme(theme: AppTheme, content: @Composable () -> Unit) {
             primary = theme.primary,
             onPrimary = Color.White,
             primaryContainer = theme.accent,
-            onPrimaryContainer = Color(0xFF183229),
+            onPrimaryContainer = Color(0xFF24231F),
             secondary = theme.primary,
             onSecondary = Color.White,
             secondaryContainer = theme.secondary,
-            onSecondaryContainer = Color(0xFF3D372E),
+            onSecondaryContainer = Color(0xFF302E2A),
             tertiary = Color(0xFF7A6755),
             onTertiary = Color.White,
             tertiaryContainer = theme.secondary,
             onTertiaryContainer = Color(0xFF3D372E),
-            background = Color(0xFFF8F7F2),
+            background = when (style) {
+                AppStyle.BREATHE -> Color(0xFFF8F7F2)
+                AppStyle.PAPER -> Color(0xFFF3EEE4)
+                AppStyle.FOCUS -> Color(0xFFF3F6F4)
+            },
             onBackground = Color(0xFF20231F),
-            surface = Color(0xFFFFFFFF),
+            surface = when (style) {
+                AppStyle.BREATHE -> Color.White
+                AppStyle.PAPER -> Color(0xFFFFFCF5)
+                AppStyle.FOCUS -> Color(0xFFFCFDFC)
+            },
             onSurface = Color(0xFF20231F),
-            surfaceVariant = Color(0xFFF0F4F0),
-            onSurfaceVariant = Color(0xFF68756D),
+            surfaceVariant = when (style) {
+                AppStyle.BREATHE -> Color(0xFFF0F4F0)
+                AppStyle.PAPER -> Color(0xFFECE4D7)
+                AppStyle.FOCUS -> Color(0xFFE7ECE9)
+            },
+            onSurfaceVariant = when (style) {
+                AppStyle.BREATHE -> Color(0xFF68756D)
+                AppStyle.PAPER -> Color(0xFF71695F)
+                AppStyle.FOCUS -> Color(0xFF626D67)
+            },
             surfaceTint = theme.primary,
-            surfaceDim = Color(0xFFE8EBE8),
-            surfaceBright = Color.White,
-            surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFF1F4EF),
-            surfaceContainer = Color(0xFFF2F5F0),
-            surfaceContainerHigh = Color(0xFFECF1EB),
-            surfaceContainerHighest = Color(0xFFE4EBE4),
+            surfaceDim = when (style) {
+                AppStyle.BREATHE -> Color(0xFFE8EBE8)
+                AppStyle.PAPER -> Color(0xFFE3DDD1)
+                AppStyle.FOCUS -> Color(0xFFE5EAE7)
+            },
+            surfaceBright = when (style) {
+                AppStyle.BREATHE -> Color.White
+                AppStyle.PAPER -> Color(0xFFFFFDF8)
+                AppStyle.FOCUS -> Color(0xFFFFFFFF)
+            },
+            surfaceContainerLowest = when (style) {
+                AppStyle.BREATHE -> Color.White
+                AppStyle.PAPER -> Color(0xFFFFFEFA)
+                AppStyle.FOCUS -> Color(0xFFFFFFFF)
+            },
+            surfaceContainerLow = when (style) {
+                AppStyle.BREATHE -> Color(0xFFF1F4EF)
+                AppStyle.PAPER -> Color(0xFFF8F2E8)
+                AppStyle.FOCUS -> Color(0xFFF0F4F1)
+            },
+            surfaceContainer = when (style) {
+                AppStyle.BREATHE -> Color(0xFFF2F5F0)
+                AppStyle.PAPER -> Color(0xFFF3ECE0)
+                AppStyle.FOCUS -> Color(0xFFEBF0ED)
+            },
+            surfaceContainerHigh = when (style) {
+                AppStyle.BREATHE -> Color(0xFFECF1EB)
+                AppStyle.PAPER -> Color(0xFFEBE2D4)
+                AppStyle.FOCUS -> Color(0xFFE3E9E5)
+            },
+            surfaceContainerHighest = when (style) {
+                AppStyle.BREATHE -> Color(0xFFE4EBE4)
+                AppStyle.PAPER -> Color(0xFFE1D7C8)
+                AppStyle.FOCUS -> Color(0xFFDCE3DE)
+            },
             inverseSurface = Color(0xFF2E3530),
             inverseOnSurface = Color(0xFFF2F5F2),
             inversePrimary = theme.accent,
             outline = Color(0xFF7C817B),
-            outlineVariant = Color(0xFFDADDD6),
+            outlineVariant = when (style) {
+                AppStyle.BREATHE -> Color(0xFFDADDD6)
+                AppStyle.PAPER -> Color(0xFFD2C8B9)
+                AppStyle.FOCUS -> Color(0xFFD4DAD6)
+            },
         )
     }
-    MaterialTheme(colorScheme = colors, typography = XikeTypography, content = content)
+    CompositionLocalProvider(LocalXikeStyle provides styleSpec) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = typographyFor(style),
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -376,58 +649,91 @@ internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
 
 @Composable
 fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
+    val style = LocalXikeStyle.current
+    val treatment = style.navigationTreatment
     Surface(
         modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = when (treatment) {
+            XikeNavigationTreatment.CAPSULE -> MaterialTheme.colorScheme.surfaceContainerLow
+            XikeNavigationTreatment.UNDERLINE -> MaterialTheme.colorScheme.surface
+            XikeNavigationTreatment.SOLID -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         tonalElevation = 0.dp,
     ) {
-        Box(Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .widthIn(max = XikeContentMaxWidth)
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-                    .selectableGroup(),
-            ) {
-                AppScreen.entries.forEach { item ->
-                    val isSelected = selected == item
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                                else Color.Transparent,
-                            )
-                            .selectable(
-                                selected = isSelected,
-                                role = Role.Tab,
-                                onClick = { onSelected(item) },
-                            )
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = when (item) {
-                                AppScreen.HOME -> XikeIcons.Moment
-                                AppScreen.INSIGHTS -> XikeIcons.Insights
-                                AppScreen.ARCHIVE -> XikeIcons.Archive
-                                AppScreen.SETTINGS -> XikeIcons.Settings
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+        Column {
+            if (treatment == XikeNavigationTreatment.UNDERLINE) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+            Box(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = XikeContentMaxWidth)
+                        .fillMaxWidth()
+                        .align(Alignment.Center)
+                        .padding(
+                            horizontal = if (treatment == XikeNavigationTreatment.SOLID) 10.dp else 14.dp,
+                            vertical = if (treatment == XikeNavigationTreatment.UNDERLINE) 4.dp else 6.dp,
                         )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            item.title,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        .selectableGroup(),
+                ) {
+                    AppScreen.entries.forEach { item ->
+                        val isSelected = selected == item
+                        val selectedBackground = when (treatment) {
+                            XikeNavigationTreatment.CAPSULE -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            XikeNavigationTreatment.UNDERLINE -> Color.Transparent
+                            XikeNavigationTreatment.SOLID -> MaterialTheme.colorScheme.primary
+                        }
+                        val selectedForeground = if (treatment == XikeNavigationTreatment.SOLID) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("navigation-${item.name.lowercase()}")
+                                .clip(RoundedCornerShape(style.navigationCorner))
+                                .background(if (isSelected) selectedBackground else Color.Transparent)
+                                .selectable(
+                                    selected = isSelected,
+                                    role = Role.Tab,
+                                    onClick = { onSelected(item) },
+                                )
+                                .padding(vertical = if (treatment == XikeNavigationTreatment.SOLID) 8.dp else 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                imageVector = when (item) {
+                                    AppScreen.HOME -> XikeIcons.Moment
+                                    AppScreen.INSIGHTS -> XikeIcons.Insights
+                                    AppScreen.ARCHIVE -> XikeIcons.Archive
+                                    AppScreen.SETTINGS -> XikeIcons.Settings
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = if (isSelected) selectedForeground
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                item.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) selectedForeground
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (treatment == XikeNavigationTreatment.UNDERLINE) {
+                                Spacer(Modifier.height(3.dp))
+                                Box(
+                                    Modifier
+                                        .width(26.dp)
+                                        .height(2.dp)
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        ),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -767,8 +1073,13 @@ fun MomentScreen(
                 .fillMaxWidth()
                 .align(Alignment.CenterHorizontally)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(
+                    start = XikeScreenHorizontalPadding,
+                    end = XikeScreenHorizontalPadding,
+                    top = XikeScreenVerticalPadding,
+                    bottom = XikeScreenVerticalPadding,
+                ),
+            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
         ) {
             BrandHeader(today)
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)) {
@@ -1267,15 +1578,29 @@ private fun MomentQuickAction(
     onClick: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant
-    else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
-    val actionColor = if (isDark) MaterialTheme.colorScheme.onSurface
-    else MaterialTheme.colorScheme.onSecondaryContainer
+    val style = LocalXikeStyle.current.style
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val restingContainerColor = when {
+        isDark -> MaterialTheme.colorScheme.surfaceVariant
+        style == AppStyle.BREATHE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val containerColor = if (isPressed) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.72f else 0.82f)
+    } else {
+        restingContainerColor
+    }
+    val actionColor = when {
+        isDark || style != AppStyle.BREATHE -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSecondaryContainer
+    }
     Surface(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         modifier = modifier.semantics { role = Role.Button },
-        shape = RoundedCornerShape(14.dp),
+        shape = XikeShapes.button,
         color = containerColor.copy(alpha = if (enabled) 1f else 0.52f),
         contentColor = actionColor.copy(alpha = if (enabled) 1f else 0.45f),
     ) {
@@ -1284,7 +1609,12 @@ private fun MomentQuickAction(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp).offset(y = 1.dp))
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp).offset(y = 1.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.45f),
+            )
             Spacer(Modifier.width(4.dp))
             Text(
                 label,
@@ -1732,7 +2062,7 @@ private fun MoodPicker(
                 Spacer(Modifier.height(12.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                 ) {
                     Row(
@@ -1879,10 +2209,10 @@ internal fun TopicChip(
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
-        modifier = modifier.clip(RoundedCornerShape(12.dp)).selectable(
+        modifier = modifier.clip(XikeShapes.inner).selectable(
             selected = selected, role = Role.Checkbox, onClick = onClick,
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape = XikeShapes.inner,
         color = if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
         border = BorderStroke(
@@ -1999,7 +2329,7 @@ private fun MultiImagePicker(
 internal fun AddPhotoTile(modifier: Modifier, label: String, onClick: () -> Unit) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -2024,7 +2354,7 @@ private fun SelectedPhotoTile(
         context.contentResolver.openInputStream(Uri.parse(uriString))
     }
     Box(
-        modifier = modifier.clip(RoundedCornerShape(16.dp))
+        modifier = modifier.clip(XikeShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClickLabel = "预览照片", onClick = onPreview)
             .semantics { contentDescription = "待保存的第 $order 张照片" },
@@ -2293,7 +2623,7 @@ internal fun DateSectionHeader(date: LocalDate, count: Int) {
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(shape = RoundedCornerShape(13.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Surface(shape = XikeShapes.button, color = MaterialTheme.colorScheme.primaryContainer) {
             Text(
                 date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
                 modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
@@ -2548,6 +2878,7 @@ internal fun PhotoGalleryDialog(
 fun ProfileSettingsScreen(
     padding: PaddingValues,
     selectedTheme: AppTheme,
+    selectedStyle: AppStyle,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
@@ -2555,6 +2886,7 @@ fun ProfileSettingsScreen(
     dailyPromptSettings: DailyPromptSettings,
     notificationPermissionGranted: Boolean,
     onThemeChange: (AppTheme) -> Unit,
+    onStyleChange: (AppStyle) -> Unit,
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
@@ -2690,10 +3022,21 @@ fun ProfileSettingsScreen(
             }
         }
 
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionTitle(index = "外观", title = "界面风格", trailing = "布局与质感")
+            AppStyle.entries.forEach { style ->
+                StyleTile(
+                    style = style,
+                    selected = selectedStyle == style,
+                    onClick = { onStyleChange(style) },
+                )
+            }
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "外观", title = "色调")
-            AppTheme.entries.chunked(2).forEach { themes ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(index = "主色", title = "强调色", trailing = "可自由搭配")
+            AppTheme.entries.chunked(3).forEach { themes ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     themes.forEach { theme ->
                         ThemeTile(
                             theme = theme,
@@ -2874,7 +3217,7 @@ private fun ReminderScheduleDialog(
                                         .clickable {
                                             selectedDays = if (selected) selectedDays - day else selectedDays + day
                                         },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = XikeShapes.button,
                                     color = if (selected) {
                                         MaterialTheme.colorScheme.primaryContainer
                                     } else {
@@ -3060,25 +3403,160 @@ private fun AppLockTimeoutDialog(
 @Composable
 private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = XikeShapes.card,
+        modifier = modifier.selectable(
+            selected = selected,
+            role = Role.RadioButton,
+            onClick = onClick,
+        ),
+        shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             if (selected) 1.5.dp else 1.dp,
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Row {
-                    Box(Modifier.size(18.dp).clip(CircleShape).background(theme.primary))
-                    Box(Modifier.padding(start = 4.dp).size(18.dp).clip(CircleShape).background(theme.accent))
-                }
+                Box(Modifier.size(20.dp).clip(CircleShape).background(theme.primary))
                 Spacer(Modifier.weight(1f))
                 if (selected) Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.height(8.dp))
             Text(theme.title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                theme.subtitle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StyleTile(style: AppStyle, selected: Boolean, onClick: () -> Unit) {
+    val cardCorner = when (style) {
+        AppStyle.BREATHE -> 28.dp
+        AppStyle.PAPER -> 6.dp
+        AppStyle.FOCUS -> 14.dp
+    }
+    val innerCorner = when (style) {
+        AppStyle.BREATHE -> 14.dp
+        AppStyle.PAPER -> 2.dp
+        AppStyle.FOCUS -> 7.dp
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        shape = RoundedCornerShape(cardCorner),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            if (selected) 1.5.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StylePreview(style = style, corner = innerCorner)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        style.title,
+                        modifier = Modifier.weight(1f),
+                        style = when (style) {
+                            AppStyle.PAPER -> MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Serif)
+                            AppStyle.FOCUS -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            AppStyle.BREATHE -> MaterialTheme.typography.titleMedium
+                        },
+                    )
+                    if (selected) {
+                        Icon(
+                            Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    style.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StylePreview(style: AppStyle, corner: Dp) {
+    Surface(
+        modifier = Modifier.size(width = 78.dp, height = 62.dp),
+        shape = RoundedCornerShape(corner),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        when (style) {
+            AppStyle.BREATHE -> Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(0.62f)
+                        .height(7.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface),
+                )
+            }
+            AppStyle.PAPER -> Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(Modifier.fillMaxWidth(0.56f).height(3.dp).background(MaterialTheme.colorScheme.primary))
+                repeat(3) {
+                    Box(Modifier.fillMaxWidth(if (it == 2) 0.7f else 1f).height(2.dp).background(MaterialTheme.colorScheme.outline))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.primary)
+            }
+            AppStyle.FOCUS -> Column(
+                modifier = Modifier.padding(7.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                repeat(3) { index ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .padding(start = 5.dp)
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (index == 0) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -3110,8 +3588,11 @@ private fun ScreenColumn(padding: PaddingValues, content: @Composable ColumnScop
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(
+                    horizontal = XikeScreenHorizontalPadding,
+                    vertical = XikeScreenVerticalPadding,
+                ),
+            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
             content = content,
         )
     }
@@ -3148,10 +3629,15 @@ private fun SectionTitle(index: String, title: String, trailing: String? = null)
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
-        Text(title, style = XikeSectionTitleStyle)
+        Text(title, modifier = Modifier.weight(1f), style = XikeSectionTitleStyle)
         if (trailing != null) {
-            Spacer(Modifier.weight(1f))
-            Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                trailing,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
