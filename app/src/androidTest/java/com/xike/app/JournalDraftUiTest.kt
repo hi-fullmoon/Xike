@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import java.time.LocalDate
 import java.time.ZoneId
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -114,6 +115,7 @@ class JournalDraftUiTest {
 
     @Test
     fun singleUnavailablePhotoCanCloseAndRemovalDoesNotOpenPreview() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val uri = "content://com.xike.app.missing/preview"
         var removed: String? = null
         showPhotoDraft(listOf(uri), onRemove = { removed = it })
@@ -122,7 +124,12 @@ class JournalDraftUiTest {
         waitForPhotoPage("1 / 1")
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("关闭图片查看").performClick()
-        composeRule.onNodeWithContentDescription("移除第 1 张照片").performScrollTo().performClick()
+        val removeButton = composeRule.onNodeWithContentDescription("移除第 1 张照片").performScrollTo()
+        val removeBounds = removeButton.fetchSemanticsNode().boundsInRoot
+        val minimumTouchTargetPx = 48f * context.resources.displayMetrics.density
+        assertTrue(removeBounds.width >= minimumTouchTargetPx - 1f)
+        assertTrue(removeBounds.height >= minimumTouchTargetPx - 1f)
+        removeButton.performClick()
         composeRule.runOnIdle { check(removed == uri) }
         composeRule.onNodeWithTag("photo-gallery-pager").assertDoesNotExist()
     }

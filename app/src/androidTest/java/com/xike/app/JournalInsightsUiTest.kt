@@ -1,17 +1,22 @@
 package com.xike.app
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density
 import java.time.LocalDate
 import java.time.ZoneId
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -34,6 +39,35 @@ class JournalInsightsUiTest {
         composeRule.onNodeWithText("暂无样本").assertIsDisplayed()
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("有记录后可生成"))
         composeRule.onNodeWithText("有记录后可生成").assertIsDisplayed()
+    }
+
+    @Test
+    fun largeFontOverviewKeepsHeadlineClearOfMoodBadge() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                XikeTheme(AppTheme.OCEAN) {
+                    JournalInsightsScreen(
+                        padding = PaddingValues(),
+                        entries = emptyList(),
+                        openImage = { null },
+                    )
+                }
+            }
+        }
+
+        val headlineBounds = composeRule
+            .onNodeWithTag("insights-overview-headline", useUnmergedTree = true)
+            .assertIsDisplayed()
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val badgeBounds = composeRule
+            .onNodeWithTag("insights-overview-badge", useUnmergedTree = true)
+            .assertIsDisplayed()
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue("Large-font headline should be placed below the mood badge", headlineBounds.top >= badgeBounds.bottom)
     }
 
     @Test

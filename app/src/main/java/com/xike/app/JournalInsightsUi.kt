@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -115,7 +116,7 @@ fun JournalInsightsScreen(
                 ScreenHeader(
                     eyebrow = "THE LITTLE TRACES",
                     title = "轨迹",
-                    supporting = "${summary.dateRangeLabel()} · 看看心情怎样变化，不急着寻找原因。",
+                    supporting = "${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。",
                 )
             }
             item(key = "insights-period") {
@@ -222,7 +223,12 @@ fun JournalInsightsScreen(
 
 @Composable
 private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> Unit) {
-    val stackMetrics = LocalDensity.current.fontScale >= 1.5f
+    val stackContent = LocalDensity.current.fontScale >= 1.5f
+    val headline = when {
+        summary.entryCount == 0 -> "等待第一条心情记录"
+        !summary.evidence.canDescribePatterns -> "已留下 ${summary.entryCount} 条心情记录"
+        else -> summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录"
+    }
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
         shape = XikeShapes.card,
@@ -230,36 +236,40 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
     ) {
         Column(Modifier.padding(22.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            if (stackContent) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "${summary.period.contextName} · 心情",
+                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        when {
-                            summary.entryCount == 0 -> "等待第一条心情记录"
-                            !summary.evidence.canDescribePatterns -> "已留下 ${summary.entryCount} 条心情记录"
-                            else -> summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录"
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
+                    OverviewMoodBadge(summary)
                 }
-                Surface(
-                    modifier = Modifier.size(56.dp),
-                    shape = XikeShapes.inner,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (summary.averageScore == null) {
-                            Text("—", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            MoodEmoji(summary.averageScore.averageMood(), size = 29.dp)
-                        }
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    headline,
+                    modifier = Modifier.testTag("insights-overview-headline"),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "${summary.period.contextName} · 心情",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.height(7.dp))
+                        Text(
+                            headline,
+                            modifier = Modifier.testTag("insights-overview-headline"),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
                     }
+                    OverviewMoodBadge(summary)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -270,10 +280,10 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                     else -> summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让轨迹从这里开始。"
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
             )
             Spacer(Modifier.height(18.dp))
-            if (stackMetrics) {
+            if (stackContent) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OverviewMetric("记录", "${summary.entryCount} 次", Modifier.fillMaxWidth())
                     OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.fillMaxWidth())
@@ -314,7 +324,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                     summary.evidence.level.description,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
                 )
                 if (summary.entryCount > 0) {
                     Icon(
@@ -324,6 +334,23 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewMoodBadge(summary: JournalPeriodSummary) {
+    Surface(
+        modifier = Modifier.size(56.dp).testTag("insights-overview-badge"),
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (summary.averageScore == null) {
+                Text("—", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            } else {
+                MoodEmoji(summary.averageScore.averageMood(), size = 29.dp)
             }
         }
     }
@@ -766,7 +793,7 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
             Text(
                 "${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
             )
         }
     }
@@ -898,7 +925,7 @@ private fun InsufficientDataNote(message: String) {
             message,
             modifier = Modifier.fillMaxWidth().padding(13.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
         )
     }
 }

@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -722,7 +721,7 @@ private fun ArchiveModeButton(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp).offset(y = 1.dp),
+                modifier = Modifier.size(18.dp),
                 tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(4.dp))
@@ -1178,7 +1177,7 @@ internal fun JournalEntryDetailDialog(
                             Text(
                                 entry.createdAt.asDetailChineseDateTime(),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
                             )
                         }
                     }
@@ -1752,7 +1751,7 @@ private fun EditPhotoStrip(
             item(key = "existing-$fileName") {
                 EditPhotoTile(
                     key = "existing-$fileName",
-                    contentDescription = "已有照片 ${index + 1}",
+                    photoDescription = "已有照片 ${index + 1}",
                     openStream = { openImage(fileName) },
                     onRemove = { onRemoveRetained(fileName) },
                     onPreview = { onPreview(fileName) },
@@ -1763,7 +1762,7 @@ private fun EditPhotoStrip(
             item(key = "new-$uriString") {
                 EditPhotoTile(
                     key = "new-$uriString",
-                    contentDescription = "新照片 ${index + 1}",
+                    photoDescription = "新照片 ${index + 1}",
                     openStream = { context.contentResolver.openInputStream(Uri.parse(uriString)) },
                     onRemove = { onRemoveNew(uriString) },
                     onPreview = { onPreview(uriString) },
@@ -1781,12 +1780,13 @@ private fun EditPhotoStrip(
 @Composable
 private fun EditPhotoTile(
     key: String,
-    contentDescription: String,
+    photoDescription: String,
     openStream: () -> InputStream?,
     onRemove: () -> Unit,
     onPreview: () -> Unit,
 ) {
     val bitmap = rememberPreviewBitmap(key = key, maxDimension = 360, openStream = openStream)
+    val removeDescription = "移除$photoDescription"
     Box(
         modifier = Modifier
             .size(92.dp)
@@ -1797,30 +1797,38 @@ private fun EditPhotoTile(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = contentDescription,
+                contentDescription = photoDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
         } else {
             Icon(
                 Icons.Outlined.Image,
-                contentDescription = contentDescription,
+                contentDescription = photoDescription,
                 modifier = Modifier.align(Alignment.Center),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Surface(
-            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.66f),
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(48.dp)
+                .semantics { contentDescription = removeDescription },
         ) {
-            IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = "移除$contentDescription",
-                    modifier = Modifier.size(16.dp),
-                    tint = Color.White,
-                )
+            Surface(
+                modifier = Modifier.size(30.dp),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.66f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White,
+                    )
+                }
             }
         }
     }

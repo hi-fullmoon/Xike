@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -636,7 +635,7 @@ internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonEleva
 
 internal val XikeInlineActionGap = 6.dp
 
-internal fun Modifier.xikeInlineActionIcon(): Modifier = size(20.dp).offset(y = 1.dp)
+internal fun Modifier.xikeInlineActionIcon(): Modifier = size(20.dp)
 
 @Composable
 internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
@@ -1447,7 +1446,7 @@ fun MomentScreen(
                     .widthIn(max = XikeContentMaxWidth)
                     .fillMaxWidth()
                     .align(Alignment.CenterHorizontally)
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = 8.dp)
                     .height(48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
@@ -1612,7 +1611,7 @@ private fun MomentQuickAction(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp).offset(y = 1.dp),
+                modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.45f),
             )
             Spacer(Modifier.width(4.dp))
@@ -1723,7 +1722,11 @@ private fun OutdoorContextCard(
                             else -> "地点与天气 · 可选"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (snapshot != null) {
+                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         maxLines = if (errorMessage == null) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1737,7 +1740,7 @@ private fun OutdoorContextCard(
                         Text(
                             weatherConditionLabel(snapshot.weatherCode),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.76f),
                         )
                     }
                 } else if (isEmpty) {
@@ -2074,7 +2077,7 @@ private fun MoodPicker(
                         Text(
                             selectedMood.momentAffirmation(),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
                         )
                     }
                 }
@@ -2229,7 +2232,7 @@ internal fun TopicChip(
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp).offset(y = 1.dp),
+                modifier = Modifier.size(18.dp),
                 tint = topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
             Spacer(Modifier.width(XikeInlineActionGap))
@@ -2379,14 +2382,27 @@ private fun SelectedPhotoTile(
                 color = Color.White,
             )
         }
-        Surface(
-            modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-            shadowElevation = 0.dp,
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(2.dp)
+                .size(48.dp)
+                .semantics { contentDescription = "移除第 $order 张照片" },
         ) {
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Outlined.Close, contentDescription = "移除第 $order 张照片", modifier = Modifier.size(16.dp))
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                shadowElevation = 0.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }
@@ -2919,7 +2935,11 @@ fun ProfileSettingsScreen(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("核心记录离线且加密", style = MaterialTheme.typography.titleSmall)
-                    Text("无需账号；窗外天气仅在主动添加时联网", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "无需账号；窗外天气仅在主动添加时联网",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                    )
                 }
             }
         }
@@ -3626,14 +3646,20 @@ private fun PaperCard(
 
 @Composable
 private fun SectionTitle(index: String, title: String, trailing: String? = null) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            index,
+            modifier = Modifier.alignByBaseline(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.width(12.dp))
-        Text(title, modifier = Modifier.weight(1f), style = XikeSectionTitleStyle)
+        Text(title, modifier = Modifier.weight(1f).alignByBaseline(), style = XikeSectionTitleStyle)
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))
             Text(
                 trailing,
+                modifier = Modifier.alignByBaseline(),
                 maxLines = 1,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
