@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -937,29 +938,37 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Row(modifier = Modifier.padding(4.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            InsightsPeriod.entries.forEach { period ->
-                val isSelected = selected == period
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(XikeShapes.button)
-                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent)
-                        .selectable(
-                            selected = isSelected,
-                            role = Role.RadioButton,
-                            onClick = { onSelected(period) },
-                        )
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        period.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(4.dp)) {
+            val columns = if (maxWidth < 320.dp || LocalDensity.current.fontScale >= 1.5f) 2 else 4
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                InsightsPeriod.entries.chunked(columns).forEach { periods ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        periods.forEach { period ->
+                            val isSelected = selected == period
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(XikeShapes.button)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent)
+                                    .selectable(
+                                        selected = isSelected,
+                                        role = Role.RadioButton,
+                                        onClick = { onSelected(period) },
+                                    )
+                                    .heightIn(min = 48.dp)
+                                    .padding(horizontal = 4.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    period.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

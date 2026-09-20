@@ -9,6 +9,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -73,6 +74,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -668,6 +671,7 @@ private fun ArchiveControls(
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -870,6 +874,8 @@ private fun JournalMonthCalendar(
     val cells = remember(month) { monthCalendarCells(month) }
     val monthEntries = entriesByDate.filterKeys { YearMonth.from(it) == month }
     val monthEntryCount = monthEntries.values.sumOf(List<JournalEntry>::size)
+    val dayDiameter = 32.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val dayHeight = dayDiameter + 16.dp
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
@@ -902,34 +908,40 @@ private fun JournalMonthCalendar(
 
             Spacer(Modifier.height(14.dp))
 
-            Row(Modifier.fillMaxWidth()) {
-                listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
-                    Text(
-                        weekday,
-                        modifier = Modifier.weight(1f).padding(vertical = 5.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                }
-            }
-
-            cells.chunked(7).forEach { week ->
+            Column(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .widthIn(min = (dayDiameter + 4.dp) * 7),
+            ) {
                 Row(Modifier.fillMaxWidth()) {
-                    week.forEach { date ->
-                        if (date == null) {
-                            Spacer(Modifier.weight(1f).height(48.dp))
-                        } else {
-                            val dayEntries = entriesByDate[date].orEmpty()
-                            CalendarDay(
-                                date = date,
-                                count = dayEntries.size,
-                                isToday = date == today,
-                                isSelected = date == selectedDate,
-                                enabled = dayEntries.isNotEmpty(),
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSelectDate(date) },
-                            )
+                    listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
+                        Text(
+                            weekday,
+                            modifier = Modifier.weight(1f).padding(vertical = 5.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+                }
+
+                cells.chunked(7).forEach { week ->
+                    Row(Modifier.fillMaxWidth()) {
+                        week.forEach { date ->
+                            if (date == null) {
+                                Spacer(Modifier.weight(1f).height(dayHeight))
+                            } else {
+                                val dayEntries = entriesByDate[date].orEmpty()
+                                CalendarDay(
+                                    date = date,
+                                    count = dayEntries.size,
+                                    isToday = date == today,
+                                    isSelected = date == selectedDate,
+                                    enabled = dayEntries.isNotEmpty(),
+                                    diameter = dayDiameter,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onSelectDate(date) },
+                                )
+                            }
                         }
                     }
                 }
@@ -945,13 +957,14 @@ private fun CalendarDay(
     isToday: Boolean,
     isSelected: Boolean,
     enabled: Boolean,
+    diameter: Dp,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
     val spokenDate = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
     Surface(
         modifier = modifier
-            .height(48.dp)
+            .height(diameter + 16.dp)
             .padding(horizontal = 2.dp)
             .semantics {
                 contentDescription = "$spokenDate，${if (count == 0) "没有记录" else "$count 条记录"}"
@@ -966,7 +979,7 @@ private fun CalendarDay(
             verticalArrangement = Arrangement.Center,
         ) {
             Surface(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(diameter),
                 shape = CircleShape,
                 color = when {
                     isSelected -> MaterialTheme.colorScheme.primary
@@ -978,6 +991,7 @@ private fun CalendarDay(
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         date.dayOfMonth.toString(),
+                        maxLines = 1,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = when {

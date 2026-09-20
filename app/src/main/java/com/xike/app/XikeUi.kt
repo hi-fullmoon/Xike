@@ -1447,7 +1447,7 @@ fun MomentScreen(
                     .fillMaxWidth()
                     .align(Alignment.CenterHorizontally)
                     .padding(horizontal = XikeScreenHorizontalPadding, vertical = 8.dp)
-                    .height(48.dp),
+                    .heightIn(min = 48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
                 colors = ButtonDefaults.buttonColors(
@@ -3166,6 +3166,7 @@ private fun SettingsToggleRow(
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Spacer(Modifier.width(12.dp))
         Switch(checked = enabled, onCheckedChange = null, colors = xikeSwitchColors())
     }
 }
@@ -3378,6 +3379,7 @@ private fun AppLockToggleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Spacer(Modifier.width(12.dp))
         Switch(checked = enabled, onCheckedChange = null, colors = xikeSwitchColors())
     }
 }
