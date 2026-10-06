@@ -14,8 +14,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -75,6 +77,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -706,6 +709,14 @@ private fun ArchiveModeButton(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelLarge
+    val labelWidth = with(LocalDensity.current) {
+        maxOf(
+            textMeasurer.measure("月历", labelStyle, softWrap = false).size.width,
+            textMeasurer.measure("时间流", labelStyle, softWrap = false).size.width,
+        ).toDp()
+    }
     Surface(
         modifier = modifier
             .sizeIn(minHeight = 48.dp)
@@ -717,24 +728,46 @@ private fun ArchiveModeButton(
         shape = XikeShapes.button,
         color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+        BoxWithConstraints(
+            Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            val iconContent: @Composable () -> Unit = {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            val labelContent: @Composable () -> Unit = {
+                Text(
+                    label,
+                    style = labelStyle,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+            if (maxWidth < labelWidth + 22.dp) {
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    iconContent()
+                    labelContent()
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    iconContent()
+                    Spacer(Modifier.width(4.dp))
+                    labelContent()
+                }
+            }
         }
     }
 }
@@ -882,8 +915,13 @@ private fun JournalMonthCalendar(
         shadowElevation = 1.dp,
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
                     Text(monthTitle, style = XikeSectionTitleStyle)
                     Text(
                         if (monthEntryCount == 0) "这个月还没有留下记录" else "${monthEntries.size} 天 · $monthEntryCount 条记录",
@@ -908,39 +946,41 @@ private fun JournalMonthCalendar(
 
             Spacer(Modifier.height(14.dp))
 
-            Column(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .widthIn(min = (dayDiameter + 4.dp) * 7),
-            ) {
-                Row(Modifier.fillMaxWidth()) {
-                    listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
-                        Text(
-                            weekday,
-                            modifier = Modifier.weight(1f).padding(vertical = 5.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
-                    }
-                }
-
-                cells.chunked(7).forEach { week ->
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.horizontalScroll(rememberScrollState())
+                        .width(maxOf(maxWidth, (dayDiameter + 4.dp) * 7)),
+                ) {
                     Row(Modifier.fillMaxWidth()) {
-                        week.forEach { date ->
-                            if (date == null) {
-                                Spacer(Modifier.weight(1f).height(dayHeight))
-                            } else {
-                                val dayEntries = entriesByDate[date].orEmpty()
-                                CalendarDay(
-                                    date = date,
-                                    count = dayEntries.size,
-                                    isToday = date == today,
-                                    isSelected = date == selectedDate,
-                                    enabled = dayEntries.isNotEmpty(),
-                                    diameter = dayDiameter,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { onSelectDate(date) },
-                                )
+                        listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
+                            Text(
+                                weekday,
+                                modifier = Modifier.weight(1f).padding(vertical = 5.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
+                    }
+
+                    cells.chunked(7).forEach { week ->
+                        Row(Modifier.fillMaxWidth()) {
+                            week.forEach { date ->
+                                if (date == null) {
+                                    Spacer(Modifier.weight(1f).height(dayHeight))
+                                } else {
+                                    val dayEntries = entriesByDate[date].orEmpty()
+                                    CalendarDay(
+                                        date = date,
+                                        count = dayEntries.size,
+                                        isToday = date == today,
+                                        isSelected = date == selectedDate,
+                                        enabled = dayEntries.isNotEmpty(),
+                                        diameter = dayDiameter,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onSelectDate(date) },
+                                    )
+                                }
                             }
                         }
                     }

@@ -189,7 +189,7 @@ enum class AppTheme(
     val accent: Color,
     val secondary: Color,
 ) {
-    PINE("雾松", "森林绿", Color(0xFF34584A), Color(0xFFDDEAE2), Color(0xFFF0E8D9)),
+    PINE("雾松", "森林绿", Color(0xFF496738), Color(0xFFE4ECD9), Color(0xFFF0E8D9)),
     VIOLET("暮紫", "暮色紫", Color(0xFF66567E), Color(0xFFEAE3F0), Color(0xFFF1E4DC)),
     OCEAN("潮汐", "雾蓝绿", Color(0xFF355E5B), Color(0xFFDFECE8), Color(0xFFF0E5D6)),
     TERRA("陶日", "赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
@@ -1389,6 +1389,7 @@ fun MomentScreen(
                                         rowTopics.forEach { topic ->
                                             TopicChip(
                                                 topic = topic,
+                                                minHeight = 36.dp,
                                                 selected = draft.tags.containsTopic(topic.label),
                                                 onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
                                                 modifier = Modifier.weight(1f),
@@ -2209,6 +2210,7 @@ internal fun TopicChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    minHeight: Dp = 48.dp,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -2226,7 +2228,7 @@ internal fun TopicChip(
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 9.dp, vertical = 4.dp),
+            modifier = Modifier.heightIn(min = minHeight).padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -3235,6 +3237,7 @@ private fun ReminderScheduleDialog(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
+                                        .heightIn(min = 48.dp)
                                         .clickable {
                                             selectedDays = if (selected) selectedDays - day else selectedDays + day
                                         },
