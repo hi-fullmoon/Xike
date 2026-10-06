@@ -10,8 +10,8 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 enum class DailyPromptStyle(
-    val label: String,
-    val description: String,
+    private val sourceLabel: String,
+    private val sourceDescription: String,
     internal val questions: List<String>,
 ) {
     GENTLE(
@@ -213,6 +213,9 @@ enum class DailyPromptStyle(
         ),
     );
 
+    val label: String get() = localizedText(sourceLabel)
+    val description: String get() = localizedText(sourceDescription)
+
     companion object {
         fun fromStorage(value: String?): DailyPromptStyle = entries
             .firstOrNull { it.name == value }
@@ -236,26 +239,26 @@ data class ReminderSettings(
     val quietHoursEnd: Int = 8,
 ) {
     init {
-        require(hour in 0..23) { "提醒小时需要在 0 到 23 之间。" }
-        require(minute in 0..59) { "提醒分钟需要在 0 到 59 之间。" }
-        require(quietHoursStart in 0..23) { "勿扰开始时间需要在 0 到 23 之间。" }
-        require(quietHoursEnd in 0..23) { "勿扰结束时间需要在 0 到 23 之间。" }
+        require(hour in 0..23) { localizedText("提醒小时需要在 0 到 23 之间。") }
+        require(minute in 0..59) { localizedText("提醒分钟需要在 0 到 59 之间。") }
+        require(quietHoursStart in 0..23) { localizedText("勿扰开始时间需要在 0 到 23 之间。") }
+        require(quietHoursEnd in 0..23) { localizedText("勿扰结束时间需要在 0 到 23 之间。") }
     }
 
     val timeLabel: String
         get() = "%02d:%02d".format(Locale.ROOT, hour, minute)
 
-    fun summary(locale: Locale = Locale.CHINA): String {
+    fun summary(locale: Locale = AppLocale.locale): String {
         val days = when {
-            weekdays.size == DayOfWeek.entries.size -> "每天"
+            weekdays.size == DayOfWeek.entries.size -> localizedText("每天")
             weekdays == setOf(
                 DayOfWeek.MONDAY,
                 DayOfWeek.TUESDAY,
                 DayOfWeek.WEDNESDAY,
                 DayOfWeek.THURSDAY,
                 DayOfWeek.FRIDAY,
-            ) -> "工作日"
-            else -> weekdays.sortedBy(DayOfWeek::getValue).joinToString("、") {
+            ) -> localizedText("工作日")
+            else -> weekdays.sortedBy(DayOfWeek::getValue).joinToString(tr("、", ", ")) {
                 it.getDisplayName(TextStyle.SHORT, locale)
             }
         }
@@ -265,12 +268,12 @@ data class ReminderSettings(
     fun pauseLabel(today: LocalDate = LocalDate.now()): String? = pausedUntilEpochDay
         ?.let(LocalDate::ofEpochDay)
         ?.takeIf { it.isAfter(today) }
-        ?.format(DateTimeFormatter.ofPattern("M 月 d 日恢复"))
+        ?.format(DateTimeFormatter.ofPattern(tr("M 月 d 日恢复", "'Resumes' MMM d"), AppLocale.locale))
 }
 
 internal fun dailyQuestion(date: LocalDate, style: DailyPromptStyle): String {
     val questions = style.questions
-    return questions[Math.floorMod(date.toEpochDay(), questions.size.toLong()).toInt()]
+    return localizedText(questions[Math.floorMod(date.toEpochDay(), questions.size.toLong()).toInt()])
 }
 
 internal fun nextReminderAt(
@@ -314,7 +317,7 @@ internal class HabitPreferences(context: Context) {
                     .putBoolean(PROMPT_ENABLED, value.enabled)
                     .putString(PROMPT_STYLE, value.style.name)
                     .commit(),
-            ) { "无法保存每日一问设置。" }
+            ) { localizedText("无法保存每日一问设置。") }
         }
 
     var reminder: ReminderSettings
@@ -346,7 +349,7 @@ internal class HabitPreferences(context: Context) {
             } else {
                 editor.putLong(REMINDER_PAUSED_UNTIL, value.pausedUntilEpochDay)
             }
-            check(editor.commit()) { "无法保存提醒设置。" }
+            check(editor.commit()) { localizedText("无法保存提醒设置。") }
         }
 
     private companion object {

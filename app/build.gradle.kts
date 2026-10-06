@@ -79,6 +79,11 @@ android {
         buildConfig = true
     }
 
+    bundle {
+        // Both languages must remain available offline after installation on any system locale.
+        language { enableSplit = false }
+    }
+
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
     }

@@ -123,9 +123,9 @@ object XikeIcons {
 }
 
 internal fun Mood.moodDescription(): String = when (this) {
-    Mood.LOW -> "难过、无助，或有些不知所措"
-    Mood.TIRED -> "疲倦、压抑，或有些提不起劲"
-    Mood.CALM -> "安稳、放松，或没有明显起伏"
-    Mood.GOOD -> "舒展、不错，或有一点期待"
-    Mood.JOYFUL -> "开心、兴奋，或充满能量"
+    Mood.LOW -> tr("难过、无助，或有些不知所措", "Sad, helpless or a little overwhelmed")
+    Mood.TIRED -> tr("疲倦、压抑，或有些提不起劲", "Tired, weighed down or low on energy")
+    Mood.CALM -> tr("安稳、放松，或没有明显起伏", "Settled, relaxed or without strong changes")
+    Mood.GOOD -> tr("舒展、不错，或有一点期待", "At ease, feeling good or a little hopeful")
+    Mood.JOYFUL -> tr("开心、兴奋，或充满能量", "Happy, excited or full of energy")
 }

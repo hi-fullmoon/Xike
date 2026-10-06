@@ -118,11 +118,13 @@ import kotlinx.coroutines.withContext
 private const val ARCHIVE_PAGE_SIZE = 60
 private enum class ArchiveViewMode { CALENDAR, TIMELINE }
 
-private enum class ArchiveDatePreset(val label: String) {
+private enum class ArchiveDatePreset(private val sourceLabel: String) {
     ALL("全部日期"),
     LAST_7_DAYS("近 7 天"),
     LAST_30_DAYS("近 30 天"),
     THIS_YEAR("今年");
+
+    val label: String get() = localizedText(sourceLabel)
 
     fun range(today: LocalDate): Pair<LocalDate?, LocalDate?> = when (this) {
         ALL -> null to null
@@ -216,7 +218,7 @@ fun JournalArchiveScreen(
                 resultEntries = fallback
                 totalResultCount = fallback.size
                 hasMoreResults = false
-                searchError = error.message ?: "搜索暂时不可用"
+                searchError = error.message ?: localizedText("搜索暂时不可用")
             }
         isSearching = false
         if (scrollToSelectedDateResults) {
@@ -272,7 +274,7 @@ fun JournalArchiveScreen(
         ) {
         item(key = "archive-header") {
             ArchiveHeader(
-                recordLabel = if (searchQuery.isEmpty) "${entries.size} 条记录" else "找到 $totalResultCount 条",
+                recordLabel = if (searchQuery.isEmpty) tr("${entries.size} 条记录", "${entries.size} entries") else tr("找到 $totalResultCount 条", "$totalResultCount entries found"),
             )
         }
 
@@ -356,16 +358,16 @@ fun JournalArchiveScreen(
             item(key = "archive-empty") {
                 ArchiveEmptyState(
                     icon = Icons.Outlined.CalendarMonth,
-                    title = "这里还很安静",
-                    description = "第一条不必完整，选一种心情就够了。",
+                    title = localizedText("这里还很安静"),
+                    description = localizedText("第一条不必完整，选一种心情就够了。"),
                 )
             }
         } else if (resultEntries.isEmpty() && !isSearching) {
             item(key = "archive-no-results") {
                 ArchiveEmptyState(
                     icon = Icons.Outlined.Search,
-                    title = "没有找到这一刻",
-                    description = "试试减少筛选条件，或换一个主题。",
+                    title = localizedText("没有找到这一刻"),
+                    description = localizedText("试试减少筛选条件，或换一个主题。"),
                 )
             }
         } else {
@@ -400,7 +402,7 @@ fun JournalArchiveScreen(
                                         searchError = null
                                     }
                                     .onFailure { error ->
-                                        searchError = error.message ?: "更多记录暂时无法读取"
+                                        searchError = error.message ?: localizedText("更多记录暂时无法读取")
                                     }
                                 isLoadingMore = false
                             }
@@ -410,7 +412,7 @@ fun JournalArchiveScreen(
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text(if (isLoadingMore) "正在读取…" else "加载更多记录")
+                        Text(if (isLoadingMore) localizedText("正在读取…") else localizedText("加载更多记录"))
                     }
                 }
             }
@@ -483,7 +485,7 @@ fun JournalArchiveScreen(
                         val result = onDelete(entry)
                         isDeleting = false
                         result.onFailure { error ->
-                            deleteError = error.message ?: "删除失败，请重试。"
+                            deleteError = error.message ?: localizedText("删除失败，请重试。")
                         }
                         if (result.isSuccess) {
                             if (detailEntry?.id == entry.id) detailEntry = null
@@ -492,8 +494,8 @@ fun JournalArchiveScreen(
                             var deleteWasUndone = false
                             try {
                                 val snackbarResult = snackbarHostState.showSnackbar(
-                                    message = "记录已删除",
-                                    actionLabel = "撤销",
+                                    message = localizedText("记录已删除"),
+                                    actionLabel = localizedText("撤销"),
                                     withDismissAction = true,
                                     duration = SnackbarDuration.Long,
                                 )
@@ -501,12 +503,12 @@ fun JournalArchiveScreen(
                                     onUndoDelete(entry.id)
                                         .onSuccess {
                                             deleteWasUndone = true
-                                            Toast.makeText(context, "记录已恢复", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, localizedText("记录已恢复"), Toast.LENGTH_SHORT).show()
                                         }
                                         .onFailure { error ->
                                             Toast.makeText(
                                                 context,
-                                                error.message ?: "撤销删除失败",
+                                                error.message ?: localizedText("撤销删除失败"),
                                                 Toast.LENGTH_LONG,
                                             ).show()
                                         }
@@ -529,10 +531,10 @@ private fun ArchiveHeader(recordLabel: String) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 5.dp),
     ) {
-        Text("MOMENTS TO REMEMBER", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+        Text(tr("值得记住的时刻", "MOMENTS TO REMEMBER"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(9.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("回望", modifier = Modifier.weight(1f), style = XikePageTitleStyle)
+            Text(localizedText("回望"), modifier = Modifier.weight(1f), style = XikePageTitleStyle)
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
@@ -547,7 +549,7 @@ private fun ArchiveHeader(recordLabel: String) {
         }
         Spacer(Modifier.height(7.dp))
         Text(
-            "翻一翻走过的日子，看见当时的自己。",
+            localizedText("翻一翻走过的日子，看见当时的自己。"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -600,7 +602,7 @@ private fun ArchiveSearchBar(
         singleLine = true,
         shape = XikeShapes.inner,
         textStyle = MaterialTheme.typography.bodyMedium,
-        placeholder = { Text("搜索注脚或主题", style = MaterialTheme.typography.bodyMedium) },
+        placeholder = { Text(localizedText("搜索注脚或主题"), style = MaterialTheme.typography.bodyMedium) },
         prefix = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -610,7 +612,7 @@ private fun ArchiveSearchBar(
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Icons.Outlined.Close, contentDescription = "清空搜索", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Close, contentDescription = localizedText("清空搜索"), modifier = Modifier.size(18.dp))
                 }
             }
         },
@@ -646,14 +648,14 @@ private fun ArchiveControls(
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 ArchiveModeButton(
-                    label = "月历",
+                    label = localizedText("月历"),
                     icon = Icons.Outlined.CalendarMonth,
                     selected = viewMode == ArchiveViewMode.CALENDAR,
                     modifier = Modifier.weight(1f),
                     onClick = { onViewModeChange(ArchiveViewMode.CALENDAR) },
                 )
                 ArchiveModeButton(
-                    label = "时间流",
+                    label = localizedText("时间流"),
                     icon = Icons.Outlined.ViewAgenda,
                     selected = viewMode == ArchiveViewMode.TIMELINE,
                     modifier = Modifier.weight(1f),
@@ -680,9 +682,9 @@ private fun ArchiveControls(
                 Icon(
                     Icons.Outlined.Tune,
                     contentDescription = if (activeFilterCount == 0) {
-                        "打开筛选"
+                        localizedText("打开筛选")
                     } else {
-                        "筛选，已启用 $activeFilterCount 个条件"
+                        tr("筛选，已启用 $activeFilterCount 个条件", "Filters: $activeFilterCount active")
                     },
                     modifier = Modifier.size(18.dp),
                     tint = if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
@@ -713,8 +715,8 @@ private fun ArchiveModeButton(
     val labelStyle = MaterialTheme.typography.labelLarge
     val labelWidth = with(LocalDensity.current) {
         maxOf(
-            textMeasurer.measure("月历", labelStyle, softWrap = false).size.width,
-            textMeasurer.measure("时间流", labelStyle, softWrap = false).size.width,
+            textMeasurer.measure(localizedText("月历"), labelStyle, softWrap = false).size.width,
+            textMeasurer.measure(localizedText("时间流"), labelStyle, softWrap = false).size.width,
         ).toDp()
     }
     Surface(
@@ -800,16 +802,16 @@ private fun ArchiveFilters(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("筛选这段记忆", style = MaterialTheme.typography.titleMedium)
+                    Text(localizedText("筛选这段记忆"), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "条件可以叠加使用",
+                        localizedText("条件可以叠加使用"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onClearAll) { Text("全部清除") }
+                TextButton(onClick = onClearAll) { Text(localizedText("全部清除")) }
             }
-            FilterTitle("心情")
+            FilterTitle(localizedText("心情"))
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -827,7 +829,7 @@ private fun ArchiveFilters(
             }
 
             if (availableTags.isNotEmpty()) {
-                FilterTitle("主题")
+                FilterTitle(localizedText("主题"))
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -836,13 +838,13 @@ private fun ArchiveFilters(
                         FilterChip(
                             selected = selectedTags.containsTopic(tag),
                             onClick = { onToggleTag(tag) },
-                            label = { Text(tag) },
+                            label = { Text(localizedText(tag)) },
                         )
                     }
                 }
             }
 
-            FilterTitle("日期")
+            FilterTitle(localizedText("日期"))
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -853,7 +855,7 @@ private fun ArchiveFilters(
                             selected = true,
                             onClick = onClearDate,
                             label = { Text(selectedDate.asShortChineseDate()) },
-                            trailingIcon = { Icon(Icons.Outlined.Close, "清除指定日期", Modifier.size(18.dp)) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, localizedText("清除指定日期"), Modifier.size(18.dp)) },
                         )
                     }
                 }
@@ -866,7 +868,7 @@ private fun ArchiveFilters(
                 }
             }
 
-            FilterTitle("照片")
+            FilterTitle(localizedText("照片"))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -903,7 +905,7 @@ private fun JournalMonthCalendar(
     onNextMonth: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
 ) {
-    val monthTitle = month.format(DateTimeFormatter.ofPattern("yyyy年 M月", Locale.CHINA))
+    val monthTitle = month.format(DateTimeFormatter.ofPattern(tr("yyyy年 M月", "MMMM yyyy"), AppLocale.locale))
     val cells = remember(month) { monthCalendarCells(month) }
     val monthEntries = entriesByDate.filterKeys { YearMonth.from(it) == month }
     val monthEntryCount = monthEntries.values.sumOf(List<JournalEntry>::size)
@@ -924,7 +926,7 @@ private fun JournalMonthCalendar(
                 Column {
                     Text(monthTitle, style = XikeSectionTitleStyle)
                     Text(
-                        if (monthEntryCount == 0) "这个月还没有留下记录" else "${monthEntries.size} 天 · $monthEntryCount 条记录",
+                        if (monthEntryCount == 0) localizedText("这个月还没有留下记录") else tr("${monthEntries.size} 天 · $monthEntryCount 条记录", "${monthEntries.size} days · $monthEntryCount entries"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -935,10 +937,10 @@ private fun JournalMonthCalendar(
                 ) {
                     Row {
                         IconButton(onClick = onPreviousMonth) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = "上个月")
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = localizedText("上个月"))
                         }
                         IconButton(onClick = onNextMonth) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = "下个月")
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = localizedText("下个月"))
                         }
                     }
                 }
@@ -952,7 +954,7 @@ private fun JournalMonthCalendar(
                         .width(maxOf(maxWidth, (dayDiameter + 4.dp) * 7)),
                 ) {
                     Row(Modifier.fillMaxWidth()) {
-                        listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
+                        listOf(localizedText("一"), localizedText("二"), localizedText("三"), localizedText("四"), localizedText("五"), localizedText("六"), localizedText("日")).forEach { weekday ->
                             Text(
                                 weekday,
                                 modifier = Modifier.weight(1f).padding(vertical = 5.dp),
@@ -1001,13 +1003,13 @@ private fun CalendarDay(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val spokenDate = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
+    val spokenDate = date.format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"), AppLocale.locale))
     Surface(
         modifier = modifier
             .height(diameter + 16.dp)
             .padding(horizontal = 2.dp)
             .semantics {
-                contentDescription = "$spokenDate，${if (count == 0) "没有记录" else "$count 条记录"}"
+                contentDescription = "$spokenDate，${if (count == 0) localizedText("没有记录") else tr("$count 条记录", "$count entries")}"
                 selected = isSelected
             }
             .clickable(enabled = enabled, onClick = onClick),
@@ -1079,11 +1081,11 @@ private fun ArchiveResultStatus(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    selectedDate?.let { "${it.asShortChineseDate()}的记录" } ?: "最近的片段",
+                    selectedDate?.let { tr("${it.asShortChineseDate()}的记录", "Entries for ${it.asShortChineseDate()}") } ?: localizedText("最近的片段"),
                     style = XikeSectionTitleStyle.copy(fontSize = 21.sp, lineHeight = 29.sp),
                 )
                 Text(
-                    if (selectedDate == null) "按时间从近到远" else "只看这一天留下的片段",
+                    if (selectedDate == null) localizedText("按时间从近到远") else localizedText("只看这一天留下的片段"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1095,9 +1097,9 @@ private fun ArchiveResultStatus(
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)) {
                 Text(
                     when {
-                        shownCount < matchingCount -> "$shownCount / $matchingCount 条"
-                        matchingCount == libraryCount -> "$matchingCount 条"
-                        else -> "$matchingCount / $libraryCount 条"
+                        shownCount < matchingCount -> tr("$shownCount / $matchingCount 条", "$shownCount / $matchingCount entries")
+                        matchingCount == libraryCount -> tr("$matchingCount 条", "$matchingCount entries")
+                        else -> tr("$matchingCount / $libraryCount 条", "$matchingCount / $libraryCount entries")
                     },
                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.labelSmall,
@@ -1107,7 +1109,7 @@ private fun ArchiveResultStatus(
         }
         if (searchError != null) {
             Text(
-                "$searchError，已使用当前页面内容继续筛选。",
+                tr("$searchError，已使用当前页面内容继续筛选。", "$searchError. Filtering continues using the entries on this page."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1122,18 +1124,18 @@ private fun ArchiveDateHeader(date: LocalDate, count: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
+            date.format(DateTimeFormatter.ofPattern(tr("M月d日", "MMM d"), AppLocale.locale)),
             style = XikeSectionTitleStyle,
         )
         Spacer(Modifier.width(9.dp))
         Text(
-            date.format(DateTimeFormatter.ofPattern("EEEE", Locale.CHINA)),
+            date.format(DateTimeFormatter.ofPattern("EEEE", AppLocale.locale)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.weight(1f))
         Text(
-            "$count 条",
+            tr("$count 条", "$count entries"),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1199,15 +1201,15 @@ internal fun JournalEntryDetailDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("这一刻", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
+                    Text(localizedText("这一刻"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                     Spacer(Modifier.weight(1f))
                     if (onRequestEdit != null) {
                         IconButton(onClick = onRequestEdit) {
-                            Icon(Icons.Outlined.Edit, contentDescription = "编辑记录")
+                            Icon(Icons.Outlined.Edit, contentDescription = localizedText("编辑记录"))
                         }
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, contentDescription = "关闭记录详情")
+                        Icon(Icons.Outlined.Close, contentDescription = localizedText("关闭记录详情"))
                     }
                 }
 
@@ -1238,8 +1240,8 @@ internal fun JournalEntryDetailDialog(
                 }
 
                 if (entry.tags.isNotEmpty()) {
-                    Text("主题", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.bodyLarge)
+                    Text(localizedText("主题"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(entry.tags.joinToString("  ·  ") { localizedText(it) }, style = MaterialTheme.typography.bodyLarge)
                 }
 
                 entry.outdoor?.let { outdoor ->
@@ -1255,7 +1257,7 @@ internal fun JournalEntryDetailDialog(
                             )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("此刻窗外 · ${outdoor.placeName}", style = MaterialTheme.typography.titleSmall)
+                                Text(tr("此刻窗外 · ${outdoor.placeName}", "Outside now · ${outdoor.placeName}"), style = MaterialTheme.typography.titleSmall)
                                 Text(
                                     "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -1266,10 +1268,10 @@ internal fun JournalEntryDetailDialog(
                     }
                 }
 
-                Text("记录", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(localizedText("记录"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
                     entry.note.ifBlank {
-                        if (entry.audio != null) "这一刻还留下了一段声音。" else "这一刻只留下了一种心情。"
+                        if (entry.audio != null) localizedText("这一刻还留下了一段声音。") else localizedText("这一刻只留下了一种心情。")
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
@@ -1277,12 +1279,12 @@ internal fun JournalEntryDetailDialog(
                 )
 
                 entry.audio?.let { audio ->
-                    Text("这一刻的声音", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(localizedText("这一刻的声音"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     VoicePlaybackCard(audio = audio, openAudio = openAudio)
                 }
 
                 if (entry.imageFileNames.isNotEmpty()) {
-                    Text("照片 · ${entry.imageFileNames.size} 张", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(tr("照片 · ${entry.imageFileNames.size} 张", "Photos · ${entry.imageFileNames.size}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
                         JournalPhotoMosaic(entry.imageFileNames, openImage) { photoPage = it }
                     }
@@ -1294,7 +1296,7 @@ internal fun JournalEntryDetailDialog(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
                         shape = XikeShapes.button,
-                    ) { Text("关闭") }
+                    ) { Text(localizedText("关闭")) }
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1307,13 +1309,13 @@ internal fun JournalEntryDetailDialog(
                         ) {
                             Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                             Spacer(Modifier.width(XikeInlineActionGap))
-                            Text("删除记录", maxLines = 1)
+                            Text(localizedText("删除记录"), maxLines = 1)
                         }
                         OutlinedButton(
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
                             shape = XikeShapes.button,
-                        ) { Text("关闭") }
+                        ) { Text(localizedText("关闭")) }
                     }
                 }
             }
@@ -1364,7 +1366,7 @@ private fun JournalEntryEditDialog(
             .take(availableImageSlots.coerceAtLeast(0))
         newImageUriStrings = newImageUriStrings + additions
         if (additions.size < uris.distinct().size) {
-            Toast.makeText(context, "每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), Toast.LENGTH_SHORT).show()
         }
     }
     val photoPicker = rememberLauncherForActivityResult(
@@ -1385,10 +1387,10 @@ private fun JournalEntryEditDialog(
         pendingCameraUriString = null
         if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, "照片已添加并保存到系统相册", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, localizedText("照片已添加并保存到系统相册"), Toast.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
-            if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
+            if (captured) Toast.makeText(context, localizedText("照片保存失败，请重试"), Toast.LENGTH_SHORT).show()
         }
     }
     val openPhotoPicker = {
@@ -1422,7 +1424,7 @@ private fun JournalEntryEditDialog(
             } else {
                 runCatching(openDocuments).getOrDefault(false)
             }
-            if (!opened) Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
+            if (!opened) Toast.makeText(context, localizedText("无法打开系统照片选择器"), Toast.LENGTH_LONG).show()
         }
     }
     val launchSystemCamera = {
@@ -1437,12 +1439,12 @@ private fun JournalEntryEditDialog(
                             pendingCameraUriString = null
                             deleteCameraCapture(context, captureUri)
                             Log.w("XikeEditCamera", "Camera launch failed", error)
-                            Toast.makeText(context, "无法打开系统相机", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, localizedText("无法打开系统相机"), Toast.LENGTH_LONG).show()
                         }
                 }
                 .onFailure { error ->
                     Log.w("XikeEditCamera", "Camera capture file creation failed", error)
-                    Toast.makeText(context, "无法准备拍照，请重试", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, localizedText("无法准备拍照，请重试"), Toast.LENGTH_LONG).show()
                 }
         }
     }
@@ -1452,7 +1454,7 @@ private fun JournalEntryEditDialog(
         if (granted) {
             launchSystemCamera()
         } else {
-            Toast.makeText(context, "需要存储权限才能把照片保存到系统相册", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), Toast.LENGTH_LONG).show()
         }
     }
     val openCamera = {
@@ -1493,13 +1495,13 @@ private fun JournalEntryEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(enabled = !isSaving, onClick = dismissEditor) {
-                        Icon(Icons.Outlined.Close, contentDescription = "取消编辑")
+                        Icon(Icons.Outlined.Close, contentDescription = localizedText("取消编辑"))
                     }
                     Spacer(Modifier.width(4.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("编辑这一刻", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
+                        Text(localizedText("编辑这一刻"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                         Text(
-                            "修改会同步更新回望、搜索与轨迹",
+                            localizedText("修改会同步更新回望、搜索与轨迹"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1524,9 +1526,9 @@ private fun JournalEntryEditDialog(
                                     retainedImages,
                                     newImageUriStrings.map(Uri::parse),
                                 ).onSuccess {
-                                    Toast.makeText(context, "修改已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
                                 }.onFailure { error ->
-                                    saveError = error.message ?: "修改保存失败，请重试。"
+                                    saveError = error.message ?: localizedText("修改保存失败，请重试。")
                                 }
                                 isSaving = false
                             }
@@ -1536,7 +1538,7 @@ private fun JournalEntryEditDialog(
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(7.dp))
                         }
-                        Text(if (isSaving) "保存中" else "保存")
+                        Text(if (isSaving) localizedText("保存中") else localizedText("保存"))
                     }
                 }
 
@@ -1548,8 +1550,8 @@ private fun JournalEntryEditDialog(
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                 EditSectionCard(
-                    title = "心情",
-                    supporting = "重新选择最接近那一刻的感受",
+                    title = localizedText("心情"),
+                    supporting = localizedText("重新选择最接近那一刻的感受"),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 18.dp),
                 ) {
                     Row(
@@ -1569,7 +1571,7 @@ private fun JournalEntryEditDialog(
                     }
                 }
 
-                EditSectionCard(title = "记录时间", supporting = "可修正补记日期与具体时间") {
+                EditSectionCard(title = localizedText("记录时间"), supporting = localizedText("可修正补记日期与具体时间")) {
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable(enabled = !isSaving) {
                             showRecordedAtPicker(context, createdAt) { createdAt = it }
@@ -1603,14 +1605,14 @@ private fun JournalEntryEditDialog(
                     }
                     if (removesOutdoor) {
                         Text(
-                            "日期已经改变，保存时会移除原先的窗外天气，避免误记到另一天。",
+                            localizedText("日期已经改变，保存时会移除原先的窗外天气，避免误记到另一天。"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
                 }
 
-                EditSectionCard(title = "此刻的注脚", supporting = "最多 $MAX_DRAFT_NOTE_LENGTH 字") {
+                EditSectionCard(title = localizedText("此刻的注脚"), supporting = tr("最多 $MAX_DRAFT_NOTE_LENGTH 字", "Up to $MAX_DRAFT_NOTE_LENGTH characters")) {
                     TextField(
                         value = note,
                         onValueChange = { note = it.take(MAX_DRAFT_NOTE_LENGTH) },
@@ -1618,7 +1620,7 @@ private fun JournalEntryEditDialog(
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 4,
                         maxLines = 8,
-                        placeholder = { Text("这一刻发生了什么？") },
+                        placeholder = { Text(localizedText("这一刻发生了什么？")) },
                         shape = XikeShapes.inner,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
@@ -1636,7 +1638,7 @@ private fun JournalEntryEditDialog(
                 }
 
                 retainedAudio?.let { audio ->
-                    EditSectionCard(title = "语音", supporting = "移除只影响息刻中的加密副本") {
+                    EditSectionCard(title = localizedText("语音"), supporting = localizedText("移除只影响息刻中的加密副本")) {
                         VoicePlaybackCard(
                             audio = audio,
                             openAudio = openAudio,
@@ -1646,8 +1648,8 @@ private fun JournalEntryEditDialog(
                 }
 
                 EditSectionCard(
-                    title = "主题",
-                    supporting = if (selectedTags.isEmpty()) "可多选" else "已选 ${selectedTags.canonicalTopics().size}",
+                    title = localizedText("主题"),
+                    supporting = if (selectedTags.isEmpty()) localizedText("可多选") else tr("已选 ${selectedTags.canonicalTopics().size}", "${selectedTags.canonicalTopics().size} selected"),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         journalTopics.chunked(3).forEach { rowTopics ->
@@ -1674,8 +1676,8 @@ private fun JournalEntryEditDialog(
                 }
 
                 EditSectionCard(
-                    title = "照片",
-                    supporting = "${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · 移除只影响息刻副本",
+                    title = localizedText("照片"),
+                    supporting = tr("${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · 移除只影响息刻副本", "${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · Removal only affects the Xike copy"),
                 ) {
                     EditPhotoStrip(
                         retainedImages = retainedImages,
@@ -1744,16 +1746,16 @@ private fun JournalEntryEditDialog(
         AlertDialog(
             onDismissRequest = { showDiscardConfirmation = false },
             shape = XikeShapes.dialog,
-            title = { Text("放弃未保存的修改？") },
-            text = { Text("心情、时间、注脚、主题和附件的本次修改都不会保存。") },
+            title = { Text(localizedText("放弃未保存的修改？")) },
+            text = { Text(localizedText("心情、时间、注脚、主题和附件的本次修改都不会保存。")) },
             dismissButton = {
-                TextButton(onClick = { showDiscardConfirmation = false }) { Text("继续编辑") }
+                TextButton(onClick = { showDiscardConfirmation = false }) { Text(localizedText("继续编辑")) }
             },
             confirmButton = {
                 TextButton(onClick = {
                     showDiscardConfirmation = false
                     discardEditor()
-                }) { Text("放弃修改") }
+                }) { Text(localizedText("放弃修改")) }
             },
         )
     }
@@ -1805,7 +1807,7 @@ private fun EditPhotoStrip(
             item(key = "existing-$fileName") {
                 EditPhotoTile(
                     key = "existing-$fileName",
-                    photoDescription = "已有照片 ${index + 1}",
+                    photoDescription = tr("已有照片 ${index + 1}", "Existing photo ${index + 1}"),
                     openStream = { openImage(fileName) },
                     onRemove = { onRemoveRetained(fileName) },
                     onPreview = { onPreview(fileName) },
@@ -1816,7 +1818,7 @@ private fun EditPhotoStrip(
             item(key = "new-$uriString") {
                 EditPhotoTile(
                     key = "new-$uriString",
-                    photoDescription = "新照片 ${index + 1}",
+                    photoDescription = tr("新照片 ${index + 1}", "New photo ${index + 1}"),
                     openStream = { context.contentResolver.openInputStream(Uri.parse(uriString)) },
                     onRemove = { onRemoveNew(uriString) },
                     onPreview = { onPreview(uriString) },
@@ -1825,7 +1827,7 @@ private fun EditPhotoStrip(
         }
         if (canAdd) {
             item(key = "add-photo") {
-                AddPhotoTile(modifier = Modifier.size(92.dp), label = "添加照片", onClick = onAdd)
+                AddPhotoTile(modifier = Modifier.size(92.dp), label = localizedText("添加照片"), onClick = onAdd)
             }
         }
     }
@@ -1840,13 +1842,13 @@ private fun EditPhotoTile(
     onPreview: () -> Unit,
 ) {
     val bitmap = rememberPreviewBitmap(key = key, maxDimension = 360, openStream = openStream)
-    val removeDescription = "移除$photoDescription"
+    val removeDescription = tr("移除$photoDescription", "Remove $photoDescription")
     Box(
         modifier = Modifier
             .size(92.dp)
             .clip(XikeShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClickLabel = "预览照片", onClick = onPreview),
+            .clickable(onClickLabel = localizedText("预览照片"), onClick = onPreview),
     ) {
         if (bitmap != null) {
             Image(
@@ -1914,7 +1916,7 @@ private fun DeleteJournalDialog(
                 }
             }
         },
-        title = { Text("删除这条记录？") },
+        title = { Text(localizedText("删除这条记录？")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
@@ -1933,13 +1935,13 @@ private fun DeleteJournalDialog(
                 }
                 Text(
                     if (entry.imageFileNames.isEmpty() && entry.audio == null) {
-                        "删除后可在底部提示消失前撤销。请确认这不是误操作。"
+                        localizedText("删除后可在底部提示消失前撤销。请确认这不是误操作。")
                     } else {
                         val attachments = buildList {
-                            if (entry.imageFileNames.isNotEmpty()) add("${entry.imageFileNames.size} 张照片")
-                            if (entry.audio != null) add("1 段语音")
-                        }.joinToString("和")
-                        "删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的${attachments}会一并清理；系统相册中的原图不会受影响。"
+                            if (entry.imageFileNames.isNotEmpty()) add(tr("${entry.imageFileNames.size} 张照片", "${entry.imageFileNames.size} photos"))
+                            if (entry.audio != null) add(localizedText("1 段语音"))
+                        }.joinToString(localizedText("和"))
+                        tr("删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的${attachments}会一并清理；系统相册中的原图不会受影响。", "You can undo deletion before the message at the bottom disappears. After that, the entry and its ${attachments} in Xike are removed. Originals in the system gallery are unaffected.")
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1950,7 +1952,7 @@ private fun DeleteJournalDialog(
             }
         },
         dismissButton = {
-            TextButton(enabled = !isDeleting, onClick = onDismiss) { Text("取消") }
+            TextButton(enabled = !isDeleting, onClick = onDismiss) { Text(localizedText("取消")) }
         },
         confirmButton = {
             TextButton(
@@ -1961,9 +1963,9 @@ private fun DeleteJournalDialog(
                 if (isDeleting) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(7.dp))
-                    Text("正在删除…")
+                    Text(localizedText("正在删除…"))
                 } else {
-                    Text("确认删除")
+                    Text(localizedText("确认删除"))
                 }
             }
         },
@@ -1976,8 +1978,8 @@ private fun JournalEntry.localDate(zoneId: ZoneId = ZoneId.systemDefault()): Loc
     Instant.ofEpochMilli(createdAt).atZone(zoneId).toLocalDate()
 
 private fun LocalDate.asShortChineseDate(): String =
-    format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA))
+    format(DateTimeFormatter.ofPattern(tr("M月d日", "MMM d"), AppLocale.locale))
 
 private fun Long.asDetailChineseDateTime(): String =
-    DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE · HH:mm", Locale.CHINA)
+    DateTimeFormatter.ofPattern(tr("yyyy年M月d日 EEEE · HH:mm", "EEE, MMM d, yyyy · HH:mm"), AppLocale.locale)
         .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))

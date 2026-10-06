@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Xike</string>
+    <string name="shortcut_quick_record_short">Keep this moment</string>
+    <string name="shortcut_quick_record_long">Quickly record your mood now</string>
+    <string name="shortcut_quick_record_disabled">Quick recording is unavailable</string>
+</resources>

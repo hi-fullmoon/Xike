@@ -21,13 +21,13 @@ internal class DatabaseKeyManager(private val context: Context) {
         if (stored != null) {
             return runCatching { unwrap(Base64.decode(stored, Base64.NO_WRAP)) }
                 .getOrElse { error ->
-                    throw JournalDataException("数据库密钥无法读取，原数据未被覆盖。", error)
+                    throw JournalDataException(localizedText("数据库密钥无法读取，原数据未被覆盖。"), error)
                 }
         }
 
         if (context.getDatabasePath(JournalDatabase.DATABASE_NAME).isFile) {
             throw JournalDataException(
-                "数据库密钥缺失，已停止打开数据库以保护原数据。",
+                localizedText("数据库密钥缺失，已停止打开数据库以保护原数据。"),
                 IllegalStateException("Missing wrapped database passphrase"),
             )
         }
@@ -36,12 +36,12 @@ internal class DatabaseKeyManager(private val context: Context) {
         return runCatching {
             val encoded = Base64.encodeToString(wrap(passphrase), Base64.NO_WRAP)
             check(preferences.edit().putString(WRAPPED_PASSPHRASE, encoded).commit()) {
-                "无法保存数据库密钥。"
+                localizedText("无法保存数据库密钥。")
             }
             passphrase
         }.getOrElse { error ->
             passphrase.fill(0)
-            throw JournalDataException("数据库密钥初始化失败，未创建数据库。", error)
+            throw JournalDataException(localizedText("数据库密钥初始化失败，未创建数据库。"), error)
         }
     }
 

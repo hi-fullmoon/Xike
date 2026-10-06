@@ -43,6 +43,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -72,7 +74,7 @@ internal fun hasGalleryWriteAccess(context: Context): Boolean =
         ) == PackageManager.PERMISSION_GRANTED
 
 internal fun createCameraCaptureUri(context: Context): Uri {
-    check(hasGalleryWriteAccess(context)) { "没有系统相册写入权限" }
+    check(hasGalleryWriteAccess(context)) { localizedText("没有系统相册写入权限") }
     val displayName = CAMERA_CAPTURE_PREFIX +
         LocalDateTime.now().format(cameraFileNameFormatter) + "_" +
         UUID.randomUUID().toString().take(8) + CAMERA_CAPTURE_SUFFIX
@@ -86,13 +88,13 @@ internal fun createCameraCaptureUri(context: Context): Uri {
             @Suppress("DEPRECATION")
             val pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
             val album = File(pictures, CAMERA_ALBUM_NAME)
-            check(album.isDirectory || album.mkdirs()) { "无法创建系统相册目录" }
+            check(album.isDirectory || album.mkdirs()) { localizedText("无法创建系统相册目录") }
             @Suppress("DEPRECATION")
             put(MediaStore.Images.Media.DATA, File(album, displayName).absolutePath)
         }
     }
     return context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        ?: error("无法在系统相册中创建照片")
+        ?: error(localizedText("无法在系统相册中创建照片"))
 }
 
 internal fun isCameraCaptureUri(context: Context, uri: Uri): Boolean =
@@ -171,20 +173,32 @@ internal fun PhotoSourceDialog(
     onChoosePhotos: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val density = LocalDensity.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         sheetMaxWidth = XikeContentMaxWidth,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surface,
-        contentWindowInsets = { WindowInsets.safeDrawing },
+        contentWindowInsets = {
+            val safeInsets = WindowInsets.safeDrawing
+            // Only reserve the part of the top safe area that the sheet actually overlaps.
+            val sheetTop = runCatching { sheetState.requireOffset() }.getOrDefault(Float.POSITIVE_INFINITY)
+            WindowInsets(
+                left = safeInsets.getLeft(density, LocalLayoutDirection.current),
+                top = (safeInsets.getTop(density) - sheetTop).coerceAtLeast(0f).toInt(),
+                right = safeInsets.getRight(density, LocalLayoutDirection.current),
+                bottom = safeInsets.getBottom(density),
+            )
+        },
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("添加照片", style = MaterialTheme.typography.titleLarge)
+            Text(localizedText("添加照片"), style = MaterialTheme.typography.titleLarge)
             Surface(
                 shape = XikeShapes.inner,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -192,8 +206,8 @@ internal fun PhotoSourceDialog(
                 Column {
                     PhotoSourceOption(
                         icon = Icons.Outlined.CameraAlt,
-                        title = "拍照",
-                        supporting = if (cameraAvailable) "拍摄后保存到系统相册" else "当前设备没有可用的相机",
+                        title = localizedText("拍照"),
+                        supporting = if (cameraAvailable) localizedText("拍摄后保存到系统相册") else localizedText("当前设备没有可用的相机"),
                         enabled = cameraAvailable,
                         onClick = onTakePhoto,
                     )
@@ -203,8 +217,8 @@ internal fun PhotoSourceDialog(
                     )
                     PhotoSourceOption(
                         icon = Icons.Outlined.PhotoLibrary,
-                        title = "从相册选择",
-                        supporting = "可一次选择多张照片",
+                        title = localizedText("从相册选择"),
+                        supporting = localizedText("可一次选择多张照片"),
                         enabled = true,
                         onClick = onChoosePhotos,
                     )
@@ -214,7 +228,7 @@ internal fun PhotoSourceDialog(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 shape = XikeShapes.button,
-            ) { Text("取消") }
+            ) { Text(localizedText("取消")) }
         }
     }
 }

@@ -80,19 +80,19 @@ private const val MIN_WEATHER_CODE = 0
 private const val MAX_WEATHER_CODE = 99
 
 internal fun weatherConditionLabel(code: Int): String = when (code) {
-    0 -> "晴朗"
-    1, 2 -> "晴间多云"
-    3 -> "阴"
-    45, 48 -> "有雾"
-    51, 53, 55 -> "毛毛雨"
-    56, 57, 66, 67 -> "冻雨"
-    61, 63, 65 -> "有雨"
-    71, 73, 75, 77 -> "有雪"
-    80, 81, 82 -> "阵雨"
-    85, 86 -> "阵雪"
-    95 -> "雷雨"
-    96, 99 -> "雷雨伴冰雹"
-    else -> "天气未知"
+    0 -> localizedText("晴朗")
+    1, 2 -> localizedText("晴间多云")
+    3 -> localizedText("阴")
+    45, 48 -> localizedText("有雾")
+    51, 53, 55 -> localizedText("毛毛雨")
+    56, 57, 66, 67 -> localizedText("冻雨")
+    61, 63, 65 -> localizedText("有雨")
+    71, 73, 75, 77 -> localizedText("有雪")
+    80, 81, 82 -> localizedText("阵雨")
+    85, 86 -> localizedText("阵雪")
+    95 -> localizedText("雷雨")
+    96, 99 -> localizedText("雷雨伴冰雹")
+    else -> localizedText("天气未知")
 }
 
 internal fun retainOutdoorForEditedTime(
@@ -142,13 +142,13 @@ internal class OutdoorContextRepository(context: Context) {
 
     suspend fun current(): OutdoorSnapshot {
         val location = currentCoarseLocation()
-        val placeName = reverseGeocode(location) ?: "当前位置"
+        val placeName = reverseGeocode(location) ?: localizedText("当前位置")
         return fetchWeather(location.latitude, location.longitude, placeName)
     }
 
     suspend fun city(query: String): OutdoorSnapshot {
         val normalizedQuery = query.trim()
-        require(normalizedQuery.isNotBlank()) { "请输入城市名称。" }
+        require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
         return fetchWeather(city.latitude, city.longitude, city.label)
     }
@@ -157,10 +157,10 @@ internal class OutdoorContextRepository(context: Context) {
         if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_COARSE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            throw OutdoorContextException("需要粗略位置权限才能获取当前位置。")
+            throw OutdoorContextException(localizedText("需要粗略位置权限才能获取当前位置。"))
         }
         if (!LocationManagerCompat.isLocationEnabled(locationManager)) {
-            throw OutdoorContextException("系统定位尚未开启，也可以手动选择城市。")
+            throw OutdoorContextException(localizedText("系统定位尚未开启，也可以手动选择城市。"))
         }
 
         val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
@@ -169,14 +169,14 @@ internal class OutdoorContextRepository(context: Context) {
                     runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false)
             }
         if (providers.isEmpty()) {
-            throw OutdoorContextException("暂时找不到可用的定位服务，也可以手动选择城市。")
+            throw OutdoorContextException(localizedText("暂时找不到可用的定位服务，也可以手动选择城市。"))
         }
 
         val location = withTimeoutOrNull(LOCATION_TIMEOUT_MILLIS) {
             firstNonNullResult(providers, ::requestCurrentLocation)
         }
         if (location != null) return location
-        throw OutdoorContextException("暂时无法取得当前位置，请稍后重试或手动选择城市。")
+        throw OutdoorContextException(localizedText("暂时无法取得当前位置，请稍后重试或手动选择城市。"))
     }
 
     private suspend fun requestCurrentLocation(provider: String): Location? =
@@ -206,7 +206,7 @@ internal class OutdoorContextRepository(context: Context) {
 
     private suspend fun reverseGeocode(location: Location): String? {
         if (!Geocoder.isPresent()) return null
-        val geocoder = Geocoder(appContext, Locale.CHINA)
+        val geocoder = Geocoder(appContext, AppLocale.locale)
         val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             suspendCancellableCoroutine { continuation ->
                 geocoder.getFromLocation(
@@ -251,22 +251,22 @@ internal class OutdoorContextRepository(context: Context) {
             append("&current=temperature_2m,weather_code&timezone=auto&forecast_days=1")
         }
         val current = requestJson(url).optJSONObject("current")
-            ?: throw OutdoorContextException("天气服务暂时没有返回当前天气。")
+            ?: throw OutdoorContextException(localizedText("天气服务暂时没有返回当前天气。"))
         OutdoorSnapshot(
             placeName = placeName,
             temperatureCelsius = current.optDouble("temperature_2m", Double.NaN),
             weatherCode = current.optInt("weather_code", -1),
             capturedAt = System.currentTimeMillis(),
-        ).normalizedOrNull() ?: throw OutdoorContextException("天气服务返回了无法识别的数据。")
+        ).normalizedOrNull() ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
     }
 
     private fun searchCity(query: String): CityCoordinate {
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
         val response = requestJson(
-            "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=zh&format=json",
+            "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=${AppLocale.locale.language}&format=json",
         )
         val result = response.optJSONArray("results")?.optJSONObject(0)
-            ?: throw OutdoorContextException("没有找到这个城市，请换一种写法。")
+            ?: throw OutdoorContextException(localizedText("没有找到这个城市，请换一种写法。"))
         val name = result.optString("name").trim()
         val admin = result.optString("admin1").trim()
         val label = listOf(admin, name)
@@ -279,7 +279,7 @@ internal class OutdoorContextRepository(context: Context) {
             latitude = result.optDouble("latitude", Double.NaN),
             longitude = result.optDouble("longitude", Double.NaN),
         ).takeIf { it.latitude.isFinite() && it.longitude.isFinite() }
-            ?: throw OutdoorContextException("城市服务返回了无法识别的位置。")
+            ?: throw OutdoorContextException(localizedText("城市服务返回了无法识别的位置。"))
     }
 
     private fun requestJson(url: String): JSONObject {
@@ -293,14 +293,14 @@ internal class OutdoorContextRepository(context: Context) {
         return try {
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
-                throw OutdoorContextException("天气服务暂时不可用，请稍后重试。")
+                throw OutdoorContextException(localizedText("天气服务暂时不可用，请稍后重试。"))
             }
             val payload = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             JSONObject(payload)
         } catch (error: OutdoorContextException) {
             throw error
         } catch (error: Exception) {
-            throw OutdoorContextException("无法连接天气服务，请检查网络后重试。", error)
+            throw OutdoorContextException(localizedText("无法连接天气服务，请检查网络后重试。"), error)
         } finally {
             connection.disconnect()
         }

@@ -7,6 +7,19 @@ import org.junit.Test
 
 class JournalTopicsTest {
     @Test
+    fun `English search includes original and historical topic keys without changing storage keys`() {
+        assertEquals(listOf("WoRk", "工作"), searchTopicLabels("WoRk"))
+        assertEquals(listOf("Relationships", "关系", "社交"), searchTopicLabels("Relationships"))
+        assertEquals("Work", canonicalTopic("Work"))
+        assertEquals("(\"Work*\" OR \"工作*\")", journalFtsQuery("Work"))
+        assertEquals(listOf("Social", "关系", "社交"), searchTopicLabels("Social"))
+        assertEquals(listOf("EXERCISE", "身体", "运动"), searchTopicLabels("EXERCISE"))
+        assertEquals(listOf("Creating", "兴趣", "创作"), searchTopicLabels("Creating"))
+        assertEquals("(\"Social*\" OR \"关系*\" OR \"社交*\")", journalFtsQuery("Social"))
+        assertEquals("Social", canonicalTopic("Social"))
+    }
+
+    @Test
     fun `merged topics keep historical labels searchable without changing stored values`() {
         assertEquals(
             listOf("关系", "身体", "兴趣", "阅读"),

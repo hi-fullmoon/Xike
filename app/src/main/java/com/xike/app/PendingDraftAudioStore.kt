@@ -20,12 +20,12 @@ internal class PendingDraftAudioStore(context: Context) {
         .build()
 
     init {
-        check(directory.isDirectory || directory.mkdirs()) { "无法创建录音暂存目录。" }
+        check(directory.isDirectory || directory.mkdirs()) { localizedText("无法创建录音暂存目录。") }
     }
 
     fun stage(source: File, durationMillis: Long): StagedDraftAudio {
-        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { "录音时长需要在 5 分钟以内。" }
-        require(source.isFile && source.length() > 0L) { "录音文件不可用。" }
+        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音时长需要在 5 分钟以内。") }
+        require(source.isFile && source.length() > 0L) { localizedText("录音文件不可用。") }
         val file = File(directory, "$FILE_PREFIX${UUID.randomUUID()}$FILE_SUFFIX")
         try {
             DataOutputStream(encryptedFile(file).openFileOutput().buffered()).use { output ->
@@ -40,26 +40,23 @@ internal class PendingDraftAudioStore(context: Context) {
     }
 
     fun recover(): StagedDraftAudio? {
-        val candidates = directory.listFiles()
-            ?.filter { it.isFile && isStagedFileName(it.name) }
-            ?.sortedByDescending(File::lastModified)
-            .orEmpty()
-        var recovered: StagedDraftAudio? = null
-        candidates.forEach { file ->
-            val staged = runCatching { validate(file) }.getOrNull()
-            if (staged != null && recovered == null) {
-                recovered = staged
-            } else {
-                file.delete()
-            }
+        val candidates = checkNotNull(directory.listFiles()) { "录音暂存目录暂时无法读取，原文件已保留。" }
+            .filter { it.isFile && isStagedFileName(it.name) }
+            .sortedByDescending(File::lastModified)
+        val validated = try {
+            candidates.map(::validate)
+        } catch (error: Exception) {
+            throw IllegalStateException("录音暂存文件暂时无法读取，原文件已保留。", error)
         }
-        return recovered
+        // Do not remove any candidate until all files have been read successfully.
+        candidates.drop(1).forEach(File::delete)
+        return validated.firstOrNull()
     }
 
     fun open(staged: StagedDraftAudio): InputStream {
         val input = DataInputStream(encryptedFile(resolve(staged.fileName)).openFileInput().buffered())
         try {
-            check(input.readLong() == staged.durationMillis) { "录音暂存信息不匹配。" }
+            check(input.readLong() == staged.durationMillis) { localizedText("录音暂存信息不匹配。") }
             return input
         } catch (error: Throwable) {
             input.close()
@@ -75,7 +72,7 @@ internal class PendingDraftAudioStore(context: Context) {
     private fun validate(file: File): StagedDraftAudio {
         val durationMillis = DataInputStream(encryptedFile(file).openFileInput().buffered()).use { input ->
             val duration = input.readLong()
-            require(duration in 1..MAX_AUDIO_DURATION_MILLIS) { "录音暂存时长无效。" }
+            require(duration in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音暂存时长无效。") }
             copyBounded(input) { _, _ -> }
             duration
         }
@@ -89,14 +86,14 @@ internal class PendingDraftAudioStore(context: Context) {
             val count = input.read(buffer)
             if (count < 0) break
             total += count
-            require(total <= MAX_AUDIO_BYTES) { "录音超过大小限制。" }
+            require(total <= MAX_AUDIO_BYTES) { localizedText("录音超过大小限制。") }
             consume(buffer, count)
         }
-        require(total > 0L) { "录音文件不可用。" }
+        require(total > 0L) { localizedText("录音文件不可用。") }
     }
 
     private fun resolve(fileName: String): File {
-        require(isStagedFileName(fileName)) { "录音暂存文件名无效。" }
+        require(isStagedFileName(fileName)) { localizedText("录音暂存文件名无效。") }
         return File(directory, fileName)
     }
 

@@ -94,7 +94,7 @@ fun JournalInsightsScreen(
     val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName }
         ?: InsightsPeriod.WEEK
     val today = LocalDate.now()
-    val summary = remember(entries, selectedPeriod, today) {
+    val summary = remember(entries, selectedPeriod, today, AppLocale.language) {
         journalPeriodSummary(entries, selectedPeriod, today)
     }
     var drilldown by remember { mutableStateOf<InsightDrilldown?>(null) }
@@ -115,9 +115,9 @@ fun JournalInsightsScreen(
         ) {
             item(key = "insights-header") {
                 ScreenHeader(
-                    eyebrow = "THE LITTLE TRACES",
-                    title = "轨迹",
-                    supporting = "${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。",
+                    eyebrow = tr("细小的痕迹", "THE LITTLE TRACES"),
+                    title = localizedText("轨迹"),
+                    supporting = tr("${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。", "${summary.dateRangeLabel()}\nNotice how your mood changes. There is no rush to find causes."),
                 )
             }
             item(key = "insights-period") {
@@ -131,7 +131,7 @@ fun JournalInsightsScreen(
                     summary = summary,
                     onClick = {
                         drilldown = InsightDrilldown(
-                            title = "${selectedPeriod.contextName}的记录",
+                            title = tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
                             subtitle = summary.dateRangeLabel(),
                             entryIds = summary.entryIds,
                         )
@@ -140,14 +140,14 @@ fun JournalInsightsScreen(
             }
             item(key = "insights-section-label") {
                 InsightsSectionLabel(
-                    title = "细看这段时间",
-                    supporting = "每一项都可以回到原始记录",
+                    title = localizedText("细看这段时间"),
+                    supporting = localizedText("每一项都可以回到原始记录"),
                 )
             }
             item(key = "insights-trend") {
                 TrendCard(summary = summary, today = today) { point ->
                     drilldown = InsightDrilldown(
-                        title = "${point.label} · ${point.entryCount} 条",
+                        title = tr("${point.label} · ${point.entryCount} 条", "${point.label} · ${point.entryCount} entries"),
                         subtitle = point.dateRangeLabel(),
                         entryIds = point.entryIds,
                     )
@@ -156,8 +156,8 @@ fun JournalInsightsScreen(
             item(key = "insights-distribution") {
                 MoodDistributionCard(summary.moodDistribution) { item ->
                     drilldown = InsightDrilldown(
-                        title = "${item.mood.label} · ${item.entryCount} 条",
-                        subtitle = "${selectedPeriod.contextName}的心情分布",
+                        title = tr("${item.mood.label} · ${item.entryCount} 条", "${item.mood.label} · ${item.entryCount} entries"),
+                        subtitle = tr("${selectedPeriod.contextName}的心情分布", "Mood distribution: ${selectedPeriod.contextName}"),
                         entryIds = item.entryIds,
                     )
                 }
@@ -165,7 +165,7 @@ fun JournalInsightsScreen(
             item(key = "insights-comparison") {
                 PeriodComparisonCard(summary.comparison) { previous ->
                     drilldown = InsightDrilldown(
-                        title = if (previous) "前一周期的记录" else "${selectedPeriod.contextName}的记录",
+                        title = if (previous) localizedText("前一周期的记录") else tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
                         subtitle = if (previous) summary.comparison.dateRangeLabel() else summary.dateRangeLabel(),
                         entryIds = if (previous) summary.comparison.entryIds else summary.entryIds,
                     )
@@ -174,8 +174,8 @@ fun JournalInsightsScreen(
             item(key = "insights-tags") {
                 TagTrendsCard(summary.topTags, summary.evidence) { tag ->
                     drilldown = InsightDrilldown(
-                        title = "${tag.tag} · ${tag.entryCount} 条",
-                        subtitle = "${selectedPeriod.contextName}的主题",
+                        title = tr("${tag.tag} · ${tag.entryCount} 条", "${localizedText(tag.tag)} · ${tag.entryCount} entries"),
+                        subtitle = tr("${selectedPeriod.contextName}的主题", "Topics: ${selectedPeriod.contextName}"),
                         entryIds = tag.entryIds,
                     )
                 }
@@ -186,8 +186,8 @@ fun JournalInsightsScreen(
                     weekend = summary.weekendInsight,
                     onClick = { insight ->
                         drilldown = InsightDrilldown(
-                            title = "${insight.type.label} · ${insight.entryCount} 条",
-                            subtitle = "${selectedPeriod.contextName}的记录",
+                            title = tr("${insight.type.label} · ${insight.entryCount} 条", "${insight.type.label} · ${insight.entryCount} entries"),
+                            subtitle = tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
                             entryIds = insight.entryIds,
                         )
                     },
@@ -226,9 +226,9 @@ fun JournalInsightsScreen(
 private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> Unit) {
     val stackContent = LocalDensity.current.fontScale >= 1.5f
     val headline = when {
-        summary.entryCount == 0 -> "等待第一条心情记录"
-        !summary.evidence.canDescribePatterns -> "已留下 ${summary.entryCount} 条心情记录"
-        else -> summary.averageScore?.let(::moodBandLabel) ?: "等待第一条心情记录"
+        summary.entryCount == 0 -> localizedText("等待第一条心情记录")
+        !summary.evidence.canDescribePatterns -> tr("已留下 ${summary.entryCount} 条心情记录", "${summary.entryCount} mood entries kept")
+        else -> summary.averageScore?.let(::moodBandLabel) ?: localizedText("等待第一条心情记录")
     }
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
@@ -240,7 +240,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             if (stackContent) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${summary.period.contextName} · 心情",
+                        tr("${summary.period.contextName} · 心情", "${summary.period.contextName} · Mood"),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
@@ -258,7 +258,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "${summary.period.contextName} · 心情",
+                            tr("${summary.period.contextName} · 心情", "${summary.period.contextName} · Mood"),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -276,9 +276,9 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             Spacer(Modifier.height(12.dp))
             Text(
                 when {
-                    summary.entryCount == 0 -> "记录此刻的心情，让轨迹从这里开始。"
-                    !summary.evidence.canDescribePatterns -> "先看看留下的记录，积累更多片段后再回顾变化。"
-                    else -> summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让轨迹从这里开始。"
+                    summary.entryCount == 0 -> localizedText("记录此刻的心情，让轨迹从这里开始。")
+                    !summary.evidence.canDescribePatterns -> localizedText("先看看留下的记录，积累更多片段后再回顾变化。")
+                    else -> summary.averageScore?.let(::moodSummary) ?: localizedText("记录此刻的心情，让轨迹从这里开始。")
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
@@ -286,20 +286,20 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             Spacer(Modifier.height(18.dp))
             if (stackContent) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverviewMetric("记录", "${summary.entryCount} 次", Modifier.fillMaxWidth())
-                    OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.fillMaxWidth())
+                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.fillMaxWidth())
+                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.fillMaxWidth())
                     OverviewMetric(
-                        "日期覆盖",
+                        localizedText("日期覆盖"),
                         "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
                         Modifier.fillMaxWidth(),
                     )
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverviewMetric("记录", "${summary.entryCount} 次", Modifier.weight(1f))
-                    OverviewMetric("留下痕迹", "${summary.recordedDayCount} 天", Modifier.weight(1f))
+                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.weight(1f))
+                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.weight(1f))
                     OverviewMetric(
-                        "日期覆盖",
+                        localizedText("日期覆盖"),
                         "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
                         Modifier.weight(1f),
                     )
@@ -308,7 +308,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
             Spacer(Modifier.height(14.dp))
             RatioBar(
                 ratio = summary.evidence.coverageRatio,
-                description = "数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录",
+                description = tr("数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录", "Data coverage: entries on ${summary.evidence.recordedDayCount} of ${summary.evidence.elapsedDayCount} days"),
             )
             Spacer(Modifier.height(9.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -330,7 +330,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 if (summary.entryCount > 0) {
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = "查看这段时间的记录",
+                        contentDescription = localizedText("查看这段时间的记录"),
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
@@ -391,7 +391,7 @@ private fun InsightsSectionLabel(title: String, supporting: String) {
 private fun EvidenceCard(evidence: InsightEvidence) {
     InsightSectionCard(
         icon = Icons.Outlined.DataUsage,
-        index = "依据",
+        index = localizedText("依据"),
         title = evidence.level.label,
     ) {
         Text(
@@ -402,10 +402,10 @@ private fun EvidenceCard(evidence: InsightEvidence) {
         Spacer(Modifier.height(12.dp))
         val percent = (evidence.coverageRatio * 100).roundToInt()
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("有记录的日期", style = MaterialTheme.typography.labelLarge)
+            Text(localizedText("有记录的日期"), style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.weight(1f))
             Text(
-                "${evidence.recordedDayCount} / ${evidence.elapsedDayCount} 天 · $percent%",
+                tr("${evidence.recordedDayCount} / ${evidence.elapsedDayCount} 天 · $percent%", "${evidence.recordedDayCount} / ${evidence.elapsedDayCount} days · $percent%"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -413,11 +413,11 @@ private fun EvidenceCard(evidence: InsightEvidence) {
         Spacer(Modifier.height(7.dp))
         RatioBar(
             ratio = evidence.coverageRatio,
-            description = "数据覆盖：${evidence.elapsedDayCount} 天中有 ${evidence.recordedDayCount} 天存在记录",
+            description = tr("数据覆盖：${evidence.elapsedDayCount} 天中有 ${evidence.recordedDayCount} 天存在记录", "Data coverage: entries on ${evidence.recordedDayCount} of ${evidence.elapsedDayCount} days"),
         )
         Spacer(Modifier.height(7.dp))
         Text(
-            "覆盖比例只说明哪些日期有记录，不是完成率，也不要求每天记录。",
+            localizedText("覆盖比例只说明哪些日期有记录，不是完成率，也不要求每天记录。"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -432,9 +432,9 @@ private fun TrendCard(
 ) {
     InsightSectionCard(
         icon = Icons.AutoMirrored.Outlined.ShowChart,
-        index = "趋势",
+        index = localizedText("趋势"),
         title = summary.period.trendTitle,
-        trailing = if (summary.period == InsightsPeriod.YEAR) "按月" else null,
+        trailing = if (summary.period == InsightsPeriod.YEAR) localizedText("按月") else null,
     ) {
         if (!summary.evidence.canDescribePatterns) {
             InsufficientDataNote(summary.evidence.level.description)
@@ -448,7 +448,7 @@ private fun TrendCard(
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            "折线表示五档心情的平均位置；没有记录的时段会断开。点按时间段可查看原始记录。",
+            localizedText("折线表示五档心情的平均位置；没有记录的时段会断开。点按时间段可查看原始记录。"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -471,7 +471,7 @@ private fun MoodTrendChart(
                 modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                listOf("愉悦", "平静", "低落").forEach { label ->
+                listOf(localizedText("愉悦"), localizedText("平静"), localizedText("低落")).forEach { label ->
                     Text(
                         label,
                         style = MaterialTheme.typography.labelSmall,
@@ -540,8 +540,8 @@ private fun MoodTrendChart(
                     points.forEach { point ->
                         val description = buildString {
                             append(point.dateRangeLabel())
-                            append("，${point.entryCount} 条记录")
-                            point.averageScore?.let { append("，心情平均位置 ${it.oneDecimal()}") }
+                            append(tr("，${point.entryCount} 条记录", ", ${point.entryCount} entries"))
+                            point.averageScore?.let { append(tr("，心情平均位置 ${it.oneDecimal()}", ", average mood position ${it.oneDecimal()}")) }
                         }
                         Box(
                             Modifier.weight(1f).fillMaxSize()
@@ -579,8 +579,8 @@ private fun MoodDistributionCard(
 ) {
     InsightSectionCard(
         icon = Icons.Outlined.DataUsage,
-        index = "分布",
-        title = "心情出现次数",
+        index = localizedText("分布"),
+        title = localizedText("心情出现次数"),
     ) {
         distribution.sortedByDescending { it.mood.score }.forEach { item ->
             Row(
@@ -598,13 +598,13 @@ private fun MoodDistributionCard(
                         Text(item.mood.label, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.weight(1f))
                         Text(
-                            "${item.entryCount} 次 · ${(item.ratio * 100).roundToInt()}%",
+                            tr("${item.entryCount} 次 · ${(item.ratio * 100).roundToInt()}%", "${item.entryCount} entries · ${(item.ratio * 100).roundToInt()}%"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Spacer(Modifier.height(7.dp))
-                    RatioBar(item.ratio, "${item.mood.label}占 ${(item.ratio * 100).roundToInt()}%，共 ${item.entryCount} 条")
+                    RatioBar(item.ratio, tr("${item.mood.label}占 ${(item.ratio * 100).roundToInt()}%，共 ${item.entryCount} 条", "${item.mood.label}: ${(item.ratio * 100).roundToInt()}%, ${item.entryCount} entries"))
                 }
                 if (item.entryCount > 0) {
                     Spacer(Modifier.width(7.dp))
@@ -625,20 +625,20 @@ private fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previou
     val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     InsightSectionCard(
         icon = Icons.AutoMirrored.Outlined.CompareArrows,
-        index = "对比",
-        title = "与前一周期",
+        index = localizedText("对比"),
+        title = localizedText("与前一周期"),
     ) {
         if (stackMetrics) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ComparisonMetric(
-                    "当前",
+                    localizedText("当前"),
                     comparison.currentEntryCount,
                     comparison.currentRecordedDayCount,
                     comparison.currentAverageScore,
                     Modifier.fillMaxWidth(),
                 ) { onClick(false) }
                 ComparisonMetric(
-                    "前期",
+                    localizedText("前期"),
                     comparison.entryCount,
                     comparison.recordedDayCount,
                     comparison.averageScore,
@@ -648,14 +648,14 @@ private fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previou
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ComparisonMetric(
-                    "当前",
+                    localizedText("当前"),
                     comparison.currentEntryCount,
                     comparison.currentRecordedDayCount,
                     comparison.currentAverageScore,
                     Modifier.weight(1f),
                 ) { onClick(false) }
                 ComparisonMetric(
-                    "前期",
+                    localizedText("前期"),
                     comparison.entryCount,
                     comparison.recordedDayCount,
                     comparison.averageScore,
@@ -666,7 +666,7 @@ private fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previou
         Spacer(Modifier.height(12.dp))
         Text(
             if (comparison.hasEnoughSamples) comparisonDescription(comparison)
-            else "两段都至少有 3 条记录后，才描述变化；目前只展示实际计数。",
+            else localizedText("两段都至少有 3 条记录后，才描述变化；目前只展示实际计数。"),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -690,8 +690,8 @@ private fun ComparisonMetric(
         Column(Modifier.padding(14.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
-            Text("$count 次", style = MaterialTheme.typography.titleLarge)
-            Text("$days 天 · 均值 ${average?.oneDecimal() ?: "—"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("$count 次", "$count entries"), style = MaterialTheme.typography.titleLarge)
+            Text(tr("$days 天 · 均值 ${average?.oneDecimal() ?: "—"}", "$days days · Average ${average?.oneDecimal() ?: "—"}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -704,11 +704,11 @@ private fun TagTrendsCard(
 ) {
     InsightSectionCard(
         icon = XikeIcons.Archive,
-        index = "主题",
-        title = "反复出现的主题",
+        index = localizedText("主题"),
+        title = localizedText("反复出现的主题"),
     ) {
         if (tags.isEmpty()) {
-            InsufficientDataNote("添加主题后，这里会显示实际出现次数。")
+            InsufficientDataNote(localizedText("添加主题后，这里会显示实际出现次数。"))
         } else {
             tags.forEach { tag ->
                 Row(
@@ -716,9 +716,9 @@ private fun TagTrendsCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(tag.tag, style = MaterialTheme.typography.titleSmall)
+                        Text(localizedText(tag.tag), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次",
+                            tr("当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次", "Current ${tag.entryCount} · Previous ${tag.previousEntryCount}"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -734,7 +734,7 @@ private fun TagTrendsCard(
             }
             if (!evidence.canDescribePatterns) {
                 Text(
-                    "样本较少，主题仅按次数排序，不解释其意义。",
+                    localizedText("样本较少，主题仅按次数排序，不解释其意义。"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -752,8 +752,8 @@ private fun DayTypeCard(
     val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     InsightSectionCard(
         icon = Icons.Outlined.CalendarMonth,
-        index = "节奏",
-        title = "工作日与周末",
+        index = localizedText("节奏"),
+        title = localizedText("工作日与周末"),
     ) {
         if (stackMetrics) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -770,9 +770,9 @@ private fun DayTypeCard(
         val enough = weekday.entryCount >= 3 && weekend.entryCount >= 3
         Text(
             if (enough) {
-                "这里只呈现两类日期的心情位置差异，不说明工作日或周末造成了变化。"
+                localizedText("这里只呈现两类日期的心情位置差异，不说明工作日或周末造成了变化。")
             } else {
-                "两类日期分别至少有 3 条记录后，才适合比较均值；目前只展示计数。"
+                localizedText("两类日期分别至少有 3 条记录后，才适合比较均值；目前只展示计数。")
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -790,9 +790,9 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
         Column(Modifier.padding(14.dp)) {
             Text(insight.type.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
-            Text("${insight.entryCount} 次", style = MaterialTheme.typography.titleLarge)
+            Text(tr("${insight.entryCount} 次", "${insight.entryCount} entries"), style = MaterialTheme.typography.titleLarge)
             Text(
-                "${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}",
+                tr("${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}", "${insight.recordedDayCount} / ${insight.elapsedDayCount} days · Average ${insight.averageScore?.oneDecimal() ?: "—"}"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
             )
@@ -826,12 +826,12 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
-                        "在设备内，读一遍${periodName}",
+                        tr("在设备内，读一遍${periodName}", "Review ${periodName} on your device"),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                     Text(
-                        "不上传，不评判",
+                        localizedText("不上传，不评判"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                     )
@@ -839,7 +839,7 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
             }
             Spacer(Modifier.height(13.dp))
             Text(
-                "把计数、分布和样本限制整理成一段克制的文字，留给你自己回看。",
+                localizedText("把计数、分布和样本限制整理成一段克制的文字，留给你自己回看。"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
             )
@@ -856,7 +856,7 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
                 ),
                 elevation = xikeButtonElevation(),
             ) {
-                Text(if (enabled) "查看本地回顾" else "有记录后可生成")
+                Text(if (enabled) localizedText("查看本地回顾") else localizedText("有记录后可生成"))
             }
         }
     }
@@ -981,12 +981,12 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("本地回顾") },
+        title = { Text(localizedText("本地回顾")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(reviewText, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "分享会把以上文字交给你下一步选择的应用。息刻不会自动上传。",
+                    localizedText("分享会把以上文字交给你下一步选择的应用。息刻不会自动上传。"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -998,17 +998,17 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                     val shareIntent = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
                         .putExtra(Intent.EXTRA_TEXT, reviewText)
-                    context.startActivity(Intent.createChooser(shareIntent, "分享息刻回顾"))
+                    context.startActivity(Intent.createChooser(shareIntent, localizedText("分享息刻回顾")))
                 },
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
             ) {
                 Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                 Spacer(Modifier.width(XikeInlineActionGap))
-                Text("选择分享应用", maxLines = 1)
+                Text(localizedText("选择分享应用"), maxLines = 1)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("关闭")) } },
     )
 }
 
@@ -1042,13 +1042,13 @@ private fun InsightDrilldownDialog(
                             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Outlined.Close, contentDescription = "关闭原始记录")
+                            Icon(Icons.Outlined.Close, contentDescription = localizedText("关闭原始记录"))
                         }
                     }
                 }
                 if (entries.isEmpty()) {
                     item(key = "drilldown-empty") {
-                        InsufficientDataNote("这个统计项没有对应记录。")
+                        InsufficientDataNote(localizedText("这个统计项没有对应记录。"))
                     }
                 } else {
                     items(entries, key = JournalEntry::id) { entry ->
@@ -1092,19 +1092,25 @@ private fun PeriodComparison.dateRangeLabel(): String = startDate.asDateRange(en
 private fun MoodTrendPoint.dateRangeLabel(): String = startDate.asDateRange(endDateExclusive.minusDays(1))
 
 private fun LocalDate.asDateRange(end: LocalDate): String = if (this == end) {
-    format(DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA))
+    format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale))
 } else if (year == end.year) {
-    "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日"
+    tr(
+        "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日",
+        "${format(DateTimeFormatter.ofPattern("MMM d", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+    )
 } else {
-    "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日"
+    tr(
+        "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日",
+        "${format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+    )
 }
 
 private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> "愉悦时刻更多"
-    average >= 3.5 -> "整体更轻松"
-    average >= 2.5 -> "大多比较平静"
-    average >= 1.5 -> "疲惫感停留较多"
-    else -> "低落时刻较多"
+    average >= 4.5 -> localizedText("愉悦时刻更多")
+    average >= 3.5 -> localizedText("整体更轻松")
+    average >= 2.5 -> localizedText("大多比较平静")
+    average >= 1.5 -> localizedText("疲惫感停留较多")
+    else -> localizedText("低落时刻较多")
 }
 
 private fun Double.averageMood(): Mood = when {
@@ -1116,31 +1122,31 @@ private fun Double.averageMood(): Mood = when {
 }
 
 private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> "记录里较多是开心而舒展的时刻。"
-    average >= 3.5 -> "记录里轻松的时刻更多。"
-    average >= 2.5 -> "记录里平静与起伏都曾出现。"
-    average >= 1.5 -> "记录里疲惫和低落停留得更多。"
-    else -> "记录里低落时刻较多，记得照顾自己。"
+    average >= 4.5 -> localizedText("记录里较多是开心而舒展的时刻。")
+    average >= 3.5 -> localizedText("记录里轻松的时刻更多。")
+    average >= 2.5 -> localizedText("记录里平静与起伏都曾出现。")
+    average >= 1.5 -> localizedText("记录里疲惫和低落停留得更多。")
+    else -> localizedText("记录里低落时刻较多，记得照顾自己。")
 }
 
 private fun comparisonDescription(comparison: PeriodComparison): String = buildString {
-    append("记录次数${comparison.entryCountDelta.deltaPhrase()}，记录天数${comparison.recordedDayDelta.deltaPhrase()}")
-    comparison.averageScoreDelta?.let { delta -> append("，均值${delta.oneDecimalSigned()}") }
-    append("。这些是描述性差异，不代表原因。")
+    append(tr("记录次数${comparison.entryCountDelta.deltaPhrase()}，记录天数${comparison.recordedDayDelta.deltaPhrase()}", "Entries ${comparison.entryCountDelta.deltaPhrase()}, days recorded ${comparison.recordedDayDelta.deltaPhrase()}"))
+    comparison.averageScoreDelta?.let { delta -> append(tr("，均值${delta.oneDecimalSigned()}", ", average ${delta.oneDecimalSigned()}")) }
+    append(localizedText("。这些是描述性差异，不代表原因。"))
 }
 
 private fun Int.deltaPhrase(): String = when {
-    this > 0 -> "增加 $this"
-    this < 0 -> "减少 ${-this}"
-    else -> "相同"
+    this > 0 -> tr("增加 $this", "increased by $this")
+    this < 0 -> tr("减少 ${-this}", "decreased by ${-this}")
+    else -> localizedText("相同")
 }
 
 private fun Int.deltaLabel(): String = when {
     this > 0 -> "+$this"
     this < 0 -> toString()
-    else -> "持平"
+    else -> localizedText("持平")
 }
 
-private fun Double.oneDecimal(): String = String.format(Locale.CHINA, "%.1f", this)
+private fun Double.oneDecimal(): String = String.format(AppLocale.locale, "%.1f", this)
 
-private fun Double.oneDecimalSigned(): String = String.format(Locale.CHINA, "%+.1f", this)
+private fun Double.oneDecimalSigned(): String = String.format(AppLocale.locale, "%+.1f", this)

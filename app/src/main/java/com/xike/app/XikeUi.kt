@@ -175,16 +175,18 @@ internal data class SystemActivityCallbacks(
 
 internal val LocalSystemActivityCallbacks = staticCompositionLocalOf { SystemActivityCallbacks() }
 
-enum class AppScreen(val title: String) {
+enum class AppScreen(private val sourceTitle: String) {
     HOME("此刻"),
     INSIGHTS("轨迹"),
     ARCHIVE("回望"),
-    SETTINGS("设置"),
+    SETTINGS("设置");
+
+    val title: String get() = localizedText(sourceTitle)
 }
 
 enum class AppTheme(
-    val title: String,
-    val subtitle: String,
+    private val sourceTitle: String,
+    private val sourceSubtitle: String,
     val primary: Color,
     val accent: Color,
     val secondary: Color,
@@ -194,16 +196,22 @@ enum class AppTheme(
     OCEAN("潮汐", "雾蓝绿", Color(0xFF355E5B), Color(0xFFDFECE8), Color(0xFFF0E5D6)),
     TERRA("陶日", "赤陶色", Color(0xFF925B49), Color(0xFFF2E3DC), Color(0xFFE8EBDD)),
     AMBER("麦芒", "琥珀金", Color(0xFF82611E), Color(0xFFF4E8C8), Color(0xFFE5ECE5)),
-    ROSE("山茶", "柔雾红", Color(0xFF8B5360), Color(0xFFF3E0E4), Color(0xFFE8E8F0)),
+    ROSE("山茶", "柔雾红", Color(0xFF8B5360), Color(0xFFF3E0E4), Color(0xFFE8E8F0));
+
+    val title: String get() = localizedText(sourceTitle)
+    val subtitle: String get() = localizedText(sourceSubtitle)
 }
 
 enum class AppStyle(
-    val title: String,
-    val subtitle: String,
+    private val sourceTitle: String,
+    private val sourceSubtitle: String,
 ) {
     BREATHE("呼吸", "圆润留白，像一段缓慢的停顿"),
     PAPER("纸页", "克制线条，像翻开一册手记"),
-    FOCUS("专注", "紧凑清晰，让内容更快抵达"),
+    FOCUS("专注", "紧凑清晰，让内容更快抵达");
+
+    val title: String get() = localizedText(sourceTitle)
+    val subtitle: String get() = localizedText(sourceSubtitle)
 }
 
 private enum class XikeNavigationTreatment { CAPSULE, UNDERLINE, SOLID }
@@ -793,15 +801,15 @@ fun AppLockScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Text("A SPACE OF YOUR OWN", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                Text(tr("只属于你的空间", "A SPACE OF YOUR OWN"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(9.dp))
-                Text("息刻已锁定", style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
+                Text(localizedText("息刻已锁定"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                 Spacer(Modifier.height(8.dp))
                 Text(
                     if (authenticationAvailable) {
-                        "验证身份后，回到只属于你的留白。"
+                        localizedText("验证身份后，回到只属于你的留白。")
                     } else {
-                        "需要先在系统中设置屏幕锁，才能继续验证身份。"
+                        localizedText("需要先在系统中设置屏幕锁，才能继续验证身份。")
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -819,12 +827,12 @@ fun AppLockScreen(
                         modifier = Modifier.xikeInlineActionIcon(),
                     )
                     Spacer(Modifier.width(XikeInlineActionGap))
-                    Text(if (authenticationAvailable) "解锁息刻" else "设置设备锁屏", maxLines = 1)
+                    Text(if (authenticationAvailable) localizedText("解锁息刻") else localizedText("设置设备锁屏"), maxLines = 1)
                 }
             }
 
             Text(
-                "身份信息仅由 Android 系统验证，息刻不会读取或保存。",
+                localizedText("身份信息仅由 Android 系统验证，息刻不会读取或保存。"),
                 modifier = Modifier.align(Alignment.BottomCenter),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -856,10 +864,10 @@ fun MomentScreen(
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
-        Result.failure(IllegalStateException("窗外天气暂时不可用。"))
+        Result.failure(IllegalStateException(localizedText("窗外天气暂时不可用。")))
     },
     onAttachOutdoorForCity: suspend (String) -> Result<Unit> = {
-        Result.failure(IllegalStateException("城市天气暂时不可用。"))
+        Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
     },
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
@@ -889,7 +897,7 @@ fun MomentScreen(
             scope.launch {
                 onAttachCurrentOutdoor()
                     .onSuccess { outdoorPermissionDenied = false }
-                    .onFailure { error -> outdoorError = error.message ?: "暂时无法获取地点与天气。" }
+                    .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。") }
                 isOutdoorLoading = false
             }
         }
@@ -917,7 +925,7 @@ fun MomentScreen(
             scope.launch {
                 onAttachOutdoorForCity(city)
                     .onSuccess { outdoorPermissionDenied = false }
-                    .onFailure { error -> outdoorError = error.message ?: "暂时无法获取这个城市的天气。" }
+                    .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。") }
                 isOutdoorLoading = false
             }
         }
@@ -961,10 +969,10 @@ fun MomentScreen(
         pendingCameraUriString = null
         if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, "照片已添加并保存到系统相册", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, localizedText("照片已添加并保存到系统相册"), Toast.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
-            if (captured) Toast.makeText(context, "照片保存失败，请重试", Toast.LENGTH_SHORT).show()
+            if (captured) Toast.makeText(context, localizedText("照片保存失败，请重试"), Toast.LENGTH_SHORT).show()
         }
     }
     val openPhotoPicker = {
@@ -1002,7 +1010,7 @@ fun MomentScreen(
             }.getOrDefault(false)
         }
         if (!opened) {
-            Toast.makeText(context, "无法打开系统照片选择器", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, localizedText("无法打开系统照片选择器"), Toast.LENGTH_LONG).show()
         }
     }
     val launchSystemCamera = {
@@ -1016,12 +1024,12 @@ fun MomentScreen(
                         pendingCameraUriString = null
                         deleteCameraCapture(context, captureUri)
                         Log.w("XikeCamera", "Camera launch failed", error)
-                        Toast.makeText(context, "无法打开系统相机", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, localizedText("无法打开系统相机"), Toast.LENGTH_LONG).show()
                     }
             }
             .onFailure { error ->
                 Log.w("XikeCamera", "Camera capture file creation failed", error)
-                Toast.makeText(context, "无法准备拍照，请重试", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, localizedText("无法准备拍照，请重试"), Toast.LENGTH_LONG).show()
             }
     }
     val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
@@ -1030,7 +1038,7 @@ fun MomentScreen(
         if (granted) {
             launchSystemCamera()
         } else {
-            Toast.makeText(context, "需要存储权限才能把照片保存到系统相册", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), Toast.LENGTH_LONG).show()
         }
     }
     val openCamera = {
@@ -1046,7 +1054,7 @@ fun MomentScreen(
         if (granted) {
             showVoiceCapture = true
         } else {
-            Toast.makeText(context, "没有麦克风权限，仍可使用文字和照片记录", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), Toast.LENGTH_LONG).show()
         }
     }
     val beginVoiceCapture = {
@@ -1083,19 +1091,19 @@ fun MomentScreen(
             BrandHeader(today)
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)) {
                 Text(
-                    "A MOMENT FOR YOURSELF",
+                    tr("留一刻给自己", "A MOMENT FOR YOURSELF"),
                     style = XikeEyebrowStyle,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(9.dp))
                 Text(
-                    "给这一刻，\n留个位置。",
+                    tr("给这一刻，\n留个位置。", "Make room\nfor this moment."),
                     style = XikePageTitleStyle,
                 )
                 Spacer(Modifier.height(7.dp))
                 Text(
-                    if (todayEntryCount == 0) "不用解释，先感受自己。"
-                    else "今天已经停下来听见自己 $todayEntryCount 次。",
+                    if (todayEntryCount == 0) localizedText("不用解释，先感受自己。")
+                    else tr("今天已经停下来听见自己 $todayEntryCount 次。", "You have paused to listen to yourself $todayEntryCount times today."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1113,7 +1121,7 @@ fun MomentScreen(
 
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("写下一点点", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                     Text("02 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(16.dp))
@@ -1123,7 +1131,7 @@ fun MomentScreen(
                     enabled = !isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "此刻的注脚" }
+                        .semantics { contentDescription = localizedText("此刻的注脚") }
                         .onFocusChanged { isNoteFocused = it.isFocused },
                     minLines = 2,
                     maxLines = 5,
@@ -1133,7 +1141,7 @@ fun MomentScreen(
                         Box(modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
                             if (draft.note.isEmpty()) {
                                 Text(
-                                    "这一刻，有什么想留下？",
+                                    localizedText("这一刻，有什么想留下？"),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                 )
@@ -1158,13 +1166,13 @@ fun MomentScreen(
                             TextButton(onClick = dismissKeyboard) {
                                 Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                                 Spacer(Modifier.width(XikeInlineActionGap))
-                                Text("完成", maxLines = 1)
+                                Text(localizedText("完成"), maxLines = 1)
                             }
                         }
                     }
                 }
                 Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
-                Text("添加内容 · 可选", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(localizedText("添加内容 · 可选"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(7.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1172,14 +1180,14 @@ fun MomentScreen(
                 ) {
                     MomentQuickAction(
                         icon = Icons.Outlined.MicNone,
-                        label = "语音",
+                        label = localizedText("语音"),
                         enabled = !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
                         modifier = Modifier.weight(1f),
                         onClick = beginVoiceCapture,
                     )
                     MomentQuickAction(
                         icon = Icons.Outlined.AddPhotoAlternate,
-                        label = "照片",
+                        label = localizedText("照片"),
                         enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
                         modifier = Modifier.weight(1f),
                         onClick = {
@@ -1189,7 +1197,7 @@ fun MomentScreen(
                     )
                     MomentQuickAction(
                         icon = Icons.Outlined.History,
-                        label = "补记",
+                        label = localizedText("补记"),
                         enabled = !isSaving,
                         modifier = Modifier.weight(1f),
                         onClick = {
@@ -1216,8 +1224,8 @@ fun MomentScreen(
                     enabled = !isSaving && !showVoiceCapture && pendingDraftAudio == null,
                     onDiscard = { showDiscardConfirmation = true },
                     statusText = when {
-                        showVoiceCapture -> "录音结束后将加密保存"
-                        pendingDraftAudio != null -> "录音仍待加密保存"
+                        showVoiceCapture -> localizedText("录音结束后将加密保存")
+                        pendingDraftAudio != null -> localizedText("录音仍待加密保存")
                         else -> null
                     },
                 )
@@ -1230,23 +1238,23 @@ fun MomentScreen(
                     voiceAnchor.bringIntoView()
                 }
                 Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor).padding(horizontal = 3.dp)) {
-                    Text("VOICE NOTE", style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                    Text(tr("声音片段", "VOICE NOTE"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(7.dp))
                     Text(
                         when {
-                            showVoiceCapture -> "录下这一刻"
-                            pendingDraftAudio != null -> "收好这段声音"
-                            else -> "这一刻的声音"
+                            showVoiceCapture -> localizedText("录下这一刻")
+                            pendingDraftAudio != null -> localizedText("收好这段声音")
+                            else -> localizedText("这一刻的声音")
                         },
                         style = XikeSectionTitleStyle,
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
                         when {
-                            showVoiceCapture -> "正在记录这一刻的声音"
-                            pendingDraftAudio != null && isDraftAudioSaving -> "正在加密保存到草稿"
-                            pendingDraftAudio != null -> "保存失败，录音仍暂存在本机"
-                            else -> "录音已加密保存在本机"
+                            showVoiceCapture -> localizedText("正在记录这一刻的声音")
+                            pendingDraftAudio != null && isDraftAudioSaving -> localizedText("正在加密保存到草稿")
+                            pendingDraftAudio != null -> localizedText("保存失败，录音仍暂存在本机")
+                            else -> localizedText("录音已加密保存在本机")
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1309,7 +1317,7 @@ fun MomentScreen(
                 isBackdated = draft.recordedAt != null,
                 isLoading = isOutdoorLoading,
                 errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
-                    "没有位置权限，也可以只选择城市。"
+                    localizedText("没有位置权限，也可以只选择城市。")
                 } else {
                     null
                 },
@@ -1334,7 +1342,7 @@ fun MomentScreen(
                             .fillMaxWidth()
                             .clickable(
                                 enabled = !isSaving,
-                                onClickLabel = if (showDetails) "收起主题" else "展开主题",
+                                onClickLabel = if (showDetails) localizedText("收起主题") else localizedText("展开主题"),
                                 role = Role.Button,
                             ) {
                                 if (showDetails) dismissKeyboard()
@@ -1345,10 +1353,10 @@ fun MomentScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("再留下一点", style = MaterialTheme.typography.titleSmall)
+                            Text(localizedText("再留下一点"), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                if (draft.tags.isEmpty()) "选主题 · 可选"
-                                else "已选 ${draft.tags.size} 个主题",
+                                if (draft.tags.isEmpty()) localizedText("选主题 · 可选")
+                                else tr("已选 ${draft.tags.size} 个主题", "${draft.tags.size} topics selected"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1368,16 +1376,16 @@ fun MomentScreen(
                         Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(horizontal = 18.dp, vertical = 12.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column {
-                                    Text("主题", style = MaterialTheme.typography.titleSmall)
+                                    Text(localizedText("主题"), style = MaterialTheme.typography.titleSmall)
                                     Text(
-                                        "这一刻与什么有关？",
+                                        localizedText("这一刻与什么有关？"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 Spacer(Modifier.weight(1f))
                                 Text(
-                                    if (draft.tags.isEmpty()) "可多选" else "已选 ${draft.tags.size}",
+                                    if (draft.tags.isEmpty()) localizedText("可多选") else tr("已选 ${draft.tags.size}", "${draft.tags.size} selected"),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                                 )
@@ -1433,11 +1441,11 @@ fun MomentScreen(
                             showDetails = false
                             Toast.makeText(
                                 context,
-                                if (draft.recordedAt == null) "这一刻，已经好好收下了" else "那一刻，已经好好收下了",
+                                if (draft.recordedAt == null) localizedText("这一刻，已经好好收下了") else localizedText("那一刻，已经好好收下了"),
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }.onFailure { error ->
-                            Toast.makeText(context, error.message ?: "保存失败，请重试", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, error.message ?: localizedText("保存失败，请重试"), Toast.LENGTH_LONG).show()
                         }
                         isSaving = false
                     }
@@ -1458,12 +1466,12 @@ fun MomentScreen(
             ) {
                 Text(
                     when {
-                        isSaving -> "正在收下…"
-                        showVoiceCapture -> "请先完成录音"
-                        pendingDraftAudio != null -> if (isDraftAudioSaving) "正在保存语音…" else "请先处理录音"
-                        draft.mood == null -> "先选择一种心情"
-                        draft.recordedAt != null -> "补记这一刻"
-                        else -> "记下此刻"
+                        isSaving -> localizedText("正在收下…")
+                        showVoiceCapture -> localizedText("请先完成录音")
+                        pendingDraftAudio != null -> if (isDraftAudioSaving) localizedText("正在保存语音…") else localizedText("请先处理录音")
+                        draft.mood == null -> localizedText("先选择一种心情")
+                        draft.recordedAt != null -> localizedText("补记这一刻")
+                        else -> localizedText("记下此刻")
                     },
                     style = MaterialTheme.typography.labelLarge,
                 )
@@ -1505,15 +1513,15 @@ fun MomentScreen(
         AlertDialog(
             onDismissRequest = { showDiscardConfirmation = false },
             shape = XikeShapes.dialog,
-            title = { Text("放弃这份草稿？") },
+            title = { Text(localizedText("放弃这份草稿？")) },
             text = {
                 Text(
-                    "将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。",
+                    localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             dismissButton = {
-                TextButton(onClick = { showDiscardConfirmation = false }) { Text("继续保留") }
+                TextButton(onClick = { showDiscardConfirmation = false }) { Text(localizedText("继续保留")) }
             },
             confirmButton = {
                 TextButton(
@@ -1522,7 +1530,7 @@ fun MomentScreen(
                         showDiscardConfirmation = false
                         showDetails = false
                     },
-                ) { Text("放弃草稿") }
+                ) { Text(localizedText("放弃草稿")) }
             },
         )
     }
@@ -1531,11 +1539,11 @@ fun MomentScreen(
         AlertDialog(
             onDismissRequest = { showOutdoorDisclosure = false },
             shape = XikeShapes.dialog,
-            title = { Text("添加此刻窗外？") },
+            title = { Text(localizedText("添加此刻窗外？")) },
             text = {
                 Text(
-                    "息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。" +
-                        "经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。",
+                    localizedText("息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。") +
+                        localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -1545,7 +1553,7 @@ fun MomentScreen(
                         showOutdoorDisclosure = false
                         showOutdoorCityDialog = true
                     },
-                ) { Text("手动选城市") }
+                ) { Text(localizedText("手动选城市")) }
             },
             confirmButton = {
                 TextButton(
@@ -1553,7 +1561,7 @@ fun MomentScreen(
                         showOutdoorDisclosure = false
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
                     },
-                ) { Text("允许粗略定位") }
+                ) { Text(localizedText("允许粗略定位")) }
             },
         )
     }
@@ -1704,11 +1712,11 @@ private fun OutdoorContextCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         when {
-                            snapshot != null -> "此刻窗外 · ${snapshot.placeName}"
-                            isLoading -> "正在获取地点与天气"
-                            isBackdated -> "补记不使用今天的天气"
-                            errorMessage != null -> "暂时无法添加地点与天气"
-                            else -> "此刻窗外"
+                            snapshot != null -> tr("此刻窗外 · ${snapshot.placeName}", "Outside now · ${snapshot.placeName}")
+                            isLoading -> localizedText("正在获取地点与天气")
+                            isBackdated -> localizedText("补记不使用今天的天气")
+                            errorMessage != null -> localizedText("暂时无法添加地点与天气")
+                            else -> localizedText("此刻窗外")
                         },
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
@@ -1716,11 +1724,11 @@ private fun OutdoorContextCard(
                     )
                     Text(
                         when {
-                            snapshot != null -> "获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}"
-                            isLoading -> "只获取一次，不会在后台持续定位"
-                            isBackdated -> "避免把现在的环境误记到过去"
+                            snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
+                            isLoading -> localizedText("只获取一次，不会在后台持续定位")
+                            isBackdated -> localizedText("避免把现在的环境误记到过去")
                             errorMessage != null -> errorMessage
-                            else -> "地点与天气 · 可选"
+                            else -> localizedText("地点与天气 · 可选")
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (snapshot != null) {
@@ -1747,7 +1755,7 @@ private fun OutdoorContextCard(
                 } else if (isEmpty) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "添加",
+                            localizedText("添加"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1771,13 +1779,13 @@ private fun OutdoorContextCard(
                     ) {
                         OutdoorCardAction(
                             icon = Icons.Outlined.Close,
-                            label = "移除",
+                            label = localizedText("移除"),
                             enabled = enabled,
                             onClick = onRemove,
                         )
                         OutdoorCardAction(
                             icon = Icons.Outlined.Refresh,
-                            label = "刷新",
+                            label = localizedText("刷新"),
                             enabled = enabled && !isLoading,
                             onClick = onRefresh,
                         )
@@ -1788,8 +1796,8 @@ private fun OutdoorContextCard(
                         modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(onClick = onChooseCity, enabled = enabled) { Text("手动选城市") }
-                        TextButton(onClick = onAdd, enabled = enabled && !isLoading) { Text("重新尝试") }
+                        TextButton(onClick = onChooseCity, enabled = enabled) { Text(localizedText("手动选城市")) }
+                        TextButton(onClick = onAdd, enabled = enabled && !isLoading) { Text(localizedText("重新尝试")) }
                     }
                 }
             }
@@ -1820,11 +1828,11 @@ private fun OutdoorCityDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("选择城市") },
+        title = { Text(localizedText("选择城市")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "不用提供位置权限。城市名称会发送给 Open-Meteo，用于查找城市和天气。",
+                    localizedText("不用提供位置权限。城市名称会发送给 Open-Meteo，用于查找城市和天气。"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1833,22 +1841,22 @@ private fun OutdoorCityDialog(
                     onValueChange = { city = it.take(40) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("例如：上海、杭州") },
+                    placeholder = { Text(localizedText("例如：上海、杭州")) },
                     shape = XikeShapes.inner,
                 )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(city.trim()) },
                 enabled = city.isNotBlank(),
-            ) { Text("获取天气") }
+            ) { Text(localizedText("获取天气")) }
         },
     )
 }
 
-private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA)
+private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
     .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))
 
 @Composable
@@ -1870,13 +1878,13 @@ private fun DraftSecurityRow(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            statusText ?: "草稿自动加密保存在本机",
+            statusText ?: localizedText("草稿自动加密保存在本机"),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (hasDraft) {
-            TextButton(onClick = onDiscard, enabled = enabled) { Text("清空") }
+            TextButton(onClick = onDiscard, enabled = enabled) { Text(localizedText("清空")) }
         }
     }
 }
@@ -1888,7 +1896,7 @@ private fun RecordedAtSelector(
     onChoose: () -> Unit,
     onReset: () -> Unit,
 ) {
-    Text("记录时间", style = MaterialTheme.typography.titleMedium)
+    Text(localizedText("记录时间"), style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(8.dp))
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onChoose),
@@ -1908,11 +1916,11 @@ private fun RecordedAtSelector(
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    recordedAt?.asDraftMomentLabel() ?: "就在此刻",
+                    recordedAt?.asDraftMomentLabel() ?: localizedText("就在此刻"),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
-                    if (recordedAt == null) "保存时使用当前时间 · 点按可补记" else "将归入所选日期 · 点按可修改",
+                    if (recordedAt == null) localizedText("保存时使用当前时间 · 点按可补记") else localizedText("将归入所选日期 · 点按可修改"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1928,12 +1936,12 @@ private fun RecordedAtSelector(
     if (recordedAt != null) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "补记也会参与对应日期的回望与轨迹",
+                localizedText("补记也会参与对应日期的回望与轨迹"),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onReset, enabled = enabled) { Text("改为现在") }
+            TextButton(onClick = onReset, enabled = enabled) { Text(localizedText("改为现在")) }
         }
     }
 }
@@ -1960,7 +1968,7 @@ internal fun showRecordedAtPicker(
                 { _, hour, minute ->
                     val selected = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
                     if (selected > System.currentTimeMillis()) {
-                        Toast.makeText(context, "记录时间不能晚于现在", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, localizedText("记录时间不能晚于现在"), Toast.LENGTH_SHORT).show()
                     } else {
                         onSelected(selected)
                     }
@@ -1982,14 +1990,14 @@ private fun Long.asDraftMomentLabel(zoneId: ZoneId = ZoneId.systemDefault()): St
     val moment = Instant.ofEpochMilli(this).atZone(zoneId)
     val today = LocalDate.now(zoneId)
     val dateLabel = when (moment.toLocalDate()) {
-        today -> "今天"
-        today.minusDays(1) -> "昨天"
+        today -> localizedText("今天")
+        today.minusDays(1) -> localizedText("昨天")
         else -> DateTimeFormatter.ofPattern(
-            if (moment.year == today.year) "M月d日 EEEE" else "yyyy年M月d日 EEEE",
-            Locale.CHINA,
+            if (moment.year == today.year) tr("M月d日 EEEE", "EEEE, MMM d") else tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"),
+            AppLocale.locale,
         ).format(moment)
     }
-    return "$dateLabel ${DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA).format(moment)}"
+    return "$dateLabel ${DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale).format(moment)}"
 }
 
 @Composable
@@ -2006,10 +2014,10 @@ private fun BrandHeader(today: LocalDate) {
             }
         }
         Spacer(Modifier.width(9.dp))
-        Text("息刻", style = MaterialTheme.typography.titleSmall)
+        Text(localizedText("息刻"), style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.weight(1f))
         Text(
-            today.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
+            today.format(DateTimeFormatter.ofPattern(tr("M月d日 · E", "MMM d · E"), AppLocale.locale)),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -2031,12 +2039,12 @@ private fun MoodPicker(
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("此刻的心情", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "选最接近的感受，没有标准答案",
+                    localizedText("选最接近的感受，没有标准答案"),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2044,7 +2052,7 @@ private fun MoodPicker(
                 TextButton(
                     onClick = { showGuide = true },
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                ) { Text("选择参考", style = MaterialTheme.typography.labelSmall) }
+                ) { Text(localizedText("选择参考"), style = MaterialTheme.typography.labelSmall) }
             }
             Spacer(Modifier.height(12.dp))
             Row(
@@ -2092,11 +2100,11 @@ private fun MoodPicker(
 }
 
 private fun Mood.momentAffirmation(): String = when (this) {
-    Mood.LOW -> "低落，也值得被好好看见。"
-    Mood.TIRED -> "疲惫时，可以慢一点。"
-    Mood.CALM -> "平静，也是一种很好的答案。"
-    Mood.GOOD -> "轻松，就记住这一刻。"
-    Mood.JOYFUL -> "愉悦，和自己分享一下。"
+    Mood.LOW -> localizedText("低落，也值得被好好看见。")
+    Mood.TIRED -> localizedText("疲惫时，可以慢一点。")
+    Mood.CALM -> localizedText("平静，也是一种很好的答案。")
+    Mood.GOOD -> localizedText("轻松，就记住这一刻。")
+    Mood.JOYFUL -> localizedText("愉悦，和自己分享一下。")
 }
 
 @Composable
@@ -2104,14 +2112,14 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("五种心情，怎么选？") },
+        title = { Text(localizedText("五种心情，怎么选？")) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "选择最接近此刻的一种即可，不必把复杂的感受说得很准确。",
+                    localizedText("选择最接近此刻的一种即可，不必把复杂的感受说得很准确。"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2142,7 +2150,7 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(localizedText("知道了")) } },
     )
 }
 
@@ -2239,7 +2247,7 @@ internal fun TopicChip(
             )
             Spacer(Modifier.width(XikeInlineActionGap))
             Text(
-                topic.label,
+                localizedText(topic.label),
                 maxLines = 1,
                 style = MaterialTheme.typography.labelLarge,
                 color = when {
@@ -2275,8 +2283,8 @@ private fun MultiImagePicker(
                 }
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("添加照片", style = MaterialTheme.typography.titleSmall)
-                    Text("最多 $MAX_IMAGES_PER_ENTRY 张 · 仅保存在本机", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(localizedText("添加照片"), style = MaterialTheme.typography.titleSmall)
+                    Text(tr("最多 $MAX_IMAGES_PER_ENTRY 张 · 仅保存在本机", "Up to $MAX_IMAGES_PER_ENTRY photos · Stored only on this device"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
@@ -2284,8 +2292,8 @@ private fun MultiImagePicker(
     } else {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("照片", style = MaterialTheme.typography.titleSmall)
-                Text("加密保存在本机", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(localizedText("照片"), style = MaterialTheme.typography.titleSmall)
+                Text(localizedText("加密保存在本机"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.weight(1f))
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -2309,7 +2317,7 @@ private fun MultiImagePicker(
                         if (tile == ADD_PHOTO_TILE) {
                             AddPhotoTile(
                                 modifier = Modifier.weight(1f).aspectRatio(1f),
-                                label = "继续添加",
+                                label = localizedText("继续添加"),
                                 onClick = onPick,
                             )
                         } else {
@@ -2361,8 +2369,8 @@ private fun SelectedPhotoTile(
     Box(
         modifier = modifier.clip(XikeShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClickLabel = "预览照片", onClick = onPreview)
-            .semantics { contentDescription = "待保存的第 $order 张照片" },
+            .clickable(onClickLabel = localizedText("预览照片"), onClick = onPreview)
+            .semantics { contentDescription = tr("待保存的第 $order 张照片", "Unsaved photo $order") },
     ) {
         if (bitmap != null) {
             Image(
@@ -2390,7 +2398,7 @@ private fun SelectedPhotoTile(
                 .align(Alignment.TopEnd)
                 .padding(2.dp)
                 .size(48.dp)
-                .semantics { contentDescription = "移除第 $order 张照片" },
+                .semantics { contentDescription = tr("移除第 $order 张照片", "Remove photo $order") },
         ) {
             Surface(
                 modifier = Modifier.size(32.dp),
@@ -2417,7 +2425,7 @@ private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
             Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(11.dp))
             Column {
-                Text("今日一刻", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(localizedText("今日一刻"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
                 Text(dailyQuestion(today, style), style = MaterialTheme.typography.bodyMedium)
             }
@@ -2430,15 +2438,15 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
     var selectedPeriodName by rememberSaveable { mutableStateOf(InsightsPeriod.WEEK.name) }
     val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName } ?: InsightsPeriod.WEEK
     val today = LocalDate.now()
-    val summary = remember(entries, selectedPeriod, today) {
+    val summary = remember(entries, selectedPeriod, today, AppLocale.language) {
         journalPeriodSummary(entries, selectedPeriod, today)
     }
 
     ScreenColumn(padding) {
         ScreenHeader(
             eyebrow = summary.startDate.asDateRange(summary.endDate),
-            title = "洞察",
-            supporting = "看见变化，而不是评判自己。",
+            title = localizedText("洞察"),
+            supporting = localizedText("看见变化，而不是评判自己。"),
         )
 
         InsightsPeriodSelector(
@@ -2450,14 +2458,14 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
             Column(Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${selectedPeriod.contextName}概览",
+                        tr("${selectedPeriod.contextName}概览", "${selectedPeriod.contextName} overview"),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
                     )
                     Spacer(Modifier.weight(1f))
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.13f)) {
                         Text(
-                            "${summary.entryCount} 次 · ${summary.recordedDayCount} 天",
+                            tr("${summary.entryCount} 次 · ${summary.recordedDayCount} 天", "${summary.entryCount} entries · ${summary.recordedDayCount} days"),
                             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
@@ -2466,20 +2474,20 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    summary.averageScore?.let(::moodBandLabel) ?: "等待第一条记录",
+                    summary.averageScore?.let(::moodBandLabel) ?: localizedText("等待第一条记录"),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    summary.averageScore?.let(::moodSummary) ?: "记录此刻的心情，让趋势从这里开始。",
+                    summary.averageScore?.let(::moodSummary) ?: localizedText("记录此刻的心情，让趋势从这里开始。"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
                 )
                 summary.averageScore?.let { average ->
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "心情平均位置 ${String.format(Locale.CHINA, "%.1f", average)} / 5",
+                        tr("心情平均位置 ${String.format(AppLocale.locale, "%.1f", average)} / 5", "Average mood position ${String.format(AppLocale.locale, "%.1f", average)} / 5"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.68f),
                     )
@@ -2489,9 +2497,9 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
 
         PaperCard {
             SectionTitle(
-                index = "趋势",
+                index = localizedText("趋势"),
                 title = selectedPeriod.trendTitle,
-                trailing = if (selectedPeriod == InsightsPeriod.YEAR) "按月" else null,
+                trailing = if (selectedPeriod == InsightsPeriod.YEAR) localizedText("按月") else null,
             )
             Spacer(Modifier.height(14.dp))
             if (summary.entryCount < 3) {
@@ -2504,11 +2512,11 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                         Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("还需要一点时间", style = MaterialTheme.typography.titleSmall)
+                            Text(localizedText("还需要一点时间"), style = MaterialTheme.typography.titleSmall)
                             Text(
                                 when (summary.entryCount) {
-                                    0 -> "记录第一刻后，这里会开始描出变化。"
-                                    else -> "再记录 ${3 - summary.entryCount} 次，就能看到更清晰的趋势。"
+                                    0 -> localizedText("记录第一刻后，这里会开始描出变化。")
+                                    else -> tr("再记录 ${3 - summary.entryCount} 次，就能看到更清晰的趋势。", "Add ${3 - summary.entryCount} more entries to see a clearer trend.")
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2562,9 +2570,9 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
         if (summary.entryCount > 0) {
             InsightCard(
                 icon = Icons.Outlined.LocalOffer,
-                label = summary.mostUsedTag ?: "还没有常见主题",
-                content = if (summary.mostUsedTag == null) "添加主题后，这里会帮你发现反复出现的线索。"
-                else "“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的主题，或许值得多留意一点。",
+                label = summary.mostUsedTag ?: localizedText("还没有常见主题"),
+                content = if (summary.mostUsedTag == null) localizedText("添加主题后，这里会帮你发现反复出现的线索。")
+                else tr("“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的主题，或许值得多留意一点。", "“${localizedText(summary.mostUsedTag.orEmpty())}” is the most frequent topic for ${selectedPeriod.contextName}. It may be worth a closer look."),
             )
         }
     }
@@ -2643,7 +2651,7 @@ internal fun DateSectionHeader(date: LocalDate, count: Int) {
     ) {
         Surface(shape = XikeShapes.button, color = MaterialTheme.colorScheme.primaryContainer) {
             Text(
-                date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)),
+                date.format(DateTimeFormatter.ofPattern(tr("M月d日", "MMM d"), AppLocale.locale)),
                 modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
@@ -2652,7 +2660,7 @@ internal fun DateSectionHeader(date: LocalDate, count: Int) {
         Spacer(Modifier.width(10.dp))
         Text(date.asFullWeekday(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.weight(1f))
-        Text("$count 条", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("$count 条", "$count entries"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -2688,7 +2696,7 @@ internal fun JournalEntryCard(
                     }
                     if (entry.tags.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
-                        Text(entry.tags.joinToString("  ·  "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(entry.tags.joinToString("  ·  ") { localizedText(it) }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                     entry.outdoor?.let { outdoor ->
                         Spacer(Modifier.height(7.dp))
@@ -2724,7 +2732,7 @@ internal fun JournalEntryCard(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                "语音 · ${formatAudioDuration(audio.durationMillis)}",
+                                tr("语音 · ${formatAudioDuration(audio.durationMillis)}", "Audio · ${formatAudioDuration(audio.durationMillis)}"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -2821,7 +2829,7 @@ private fun SavedJournalImage(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = "日记第 $order 张照片",
+                contentDescription = tr("日记第 $order 张照片", "Journal photo $order"),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
             )
@@ -2883,7 +2891,7 @@ internal fun PhotoGalleryDialog(
                     Spacer(Modifier.weight(1f))
                     Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.56f)) {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Outlined.Close, contentDescription = "关闭图片查看", tint = Color.White)
+                            Icon(Icons.Outlined.Close, contentDescription = localizedText("关闭图片查看"), tint = Color.White)
                         }
                     }
                 }
@@ -2919,12 +2927,14 @@ fun ProfileSettingsScreen(
     var showTimeoutDialog by rememberSaveable { mutableStateOf(false) }
     var showReminderDialog by rememberSaveable { mutableStateOf(false) }
     var showPromptStyleDialog by rememberSaveable { mutableStateOf(false) }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+    val onLanguageChange = LocalLanguageChange.current
 
     ScreenColumn(padding) {
         ScreenHeader(
-            eyebrow = "A SPACE OF YOUR OWN",
-            title = "设置",
-            supporting = "让记录保持你的节奏。",
+            eyebrow = tr("只属于你的空间", "A SPACE OF YOUR OWN"),
+            title = localizedText("设置"),
+            supporting = localizedText("让记录保持你的节奏。"),
         )
 
         Surface(
@@ -2936,9 +2946,9 @@ fun ProfileSettingsScreen(
                 Icon(Icons.Outlined.Shield, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("核心记录离线且加密", style = MaterialTheme.typography.titleSmall)
+                    Text(localizedText("核心记录离线且加密"), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "无需账号；窗外天气仅在主动添加时联网",
+                        localizedText("无需账号；窗外天气仅在主动添加时联网"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
                     )
@@ -2946,8 +2956,17 @@ fun ProfileSettingsScreen(
             }
         }
 
+        Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+            SettingsAction(
+                icon = XikeIcons.Settings,
+                title = localizedText("应用语言"),
+                subtitle = AppLocale.language.nativeName,
+                onClick = { showLanguageDialog = true },
+            )
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "隐私", title = "应用锁")
+            SectionTitle(index = localizedText("隐私"), title = localizedText("应用锁"))
             Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     AppLockToggleRow(
@@ -2959,15 +2978,15 @@ fun ProfileSettingsScreen(
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Timer,
-                            title = "自动锁定",
+                            title = localizedText("自动锁定"),
                             subtitle = appLockTimeout.label,
                             onClick = { showTimeoutDialog = true },
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Lock,
-                            title = "立即锁定",
-                            subtitle = "隐藏当前内容并返回锁定页",
+                            title = localizedText("立即锁定"),
+                            subtitle = localizedText("隐藏当前内容并返回锁定页"),
                             onClick = onLockNow,
                         )
                     }
@@ -2976,16 +2995,16 @@ fun ProfileSettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "节奏", title = "温和陪伴")
+            SectionTitle(index = localizedText("节奏"), title = localizedText("温和陪伴"))
             Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     SettingsToggleRow(
                         icon = Icons.Outlined.NotificationsNone,
-                        title = "记录提醒",
+                        title = localizedText("记录提醒"),
                         subtitle = when {
-                            reminderSettings.enabled && !notificationPermissionGranted -> "系统通知已关闭；记录功能不受影响"
+                            reminderSettings.enabled && !notificationPermissionGranted -> localizedText("系统通知已关闭；记录功能不受影响")
                             reminderSettings.enabled -> reminderSettings.pauseLabel() ?: reminderSettings.summary()
-                            else -> "默认关闭，仅在选定的本地时间提醒"
+                            else -> localizedText("默认关闭，仅在选定的本地时间提醒")
                         },
                         enabled = reminderSettings.enabled,
                         onEnabledChange = onReminderEnabledChange,
@@ -2994,7 +3013,7 @@ fun ProfileSettingsScreen(
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Timer,
-                            title = "提醒时间",
+                            title = localizedText("提醒时间"),
                             subtitle = reminderSettings.summary(),
                             onClick = { showReminderDialog = true },
                         )
@@ -3002,8 +3021,8 @@ fun ProfileSettingsScreen(
                         val pauseLabel = reminderSettings.pauseLabel()
                         SettingsAction(
                             icon = Icons.Outlined.PauseCircle,
-                            title = if (pauseLabel == null) "暂停一周" else "继续提醒",
-                            subtitle = pauseLabel ?: "临时安静下来，不改变原来的时间",
+                            title = if (pauseLabel == null) localizedText("暂停一周") else localizedText("继续提醒"),
+                            subtitle = pauseLabel ?: localizedText("临时安静下来，不改变原来的时间"),
                             onClick = {
                                 onReminderSettingsChange(
                                     reminderSettings.copy(
@@ -3020,11 +3039,11 @@ fun ProfileSettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsToggleRow(
                         icon = XikeIcons.Mark,
-                        title = "每日一问",
+                        title = localizedText("每日一问"),
                         subtitle = if (dailyPromptSettings.enabled) {
                             dailyPromptSettings.style.label
                         } else {
-                            "默认关闭，问题全部来自本地题库"
+                            localizedText("默认关闭，问题全部来自本地题库")
                         },
                         enabled = dailyPromptSettings.enabled,
                         onEnabledChange = { enabled ->
@@ -3035,7 +3054,7 @@ fun ProfileSettingsScreen(
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = XikeIcons.Mark,
-                            title = "本地问题库",
+                            title = localizedText("本地问题库"),
                             subtitle = dailyPromptSettings.style.description,
                             onClick = { showPromptStyleDialog = true },
                         )
@@ -3045,7 +3064,7 @@ fun ProfileSettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionTitle(index = "外观", title = "界面风格", trailing = "布局与质感")
+            SectionTitle(index = localizedText("外观"), title = localizedText("界面风格"), trailing = localizedText("布局与质感"))
             AppStyle.entries.forEach { style ->
                 StyleTile(
                     style = style,
@@ -3056,7 +3075,7 @@ fun ProfileSettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "主色", title = "强调色", trailing = "可自由搭配")
+            SectionTitle(index = localizedText("主色"), title = localizedText("强调色"), trailing = localizedText("可自由搭配"))
             AppTheme.entries.chunked(3).forEach { themes ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     themes.forEach { theme ->
@@ -3072,28 +3091,28 @@ fun ProfileSettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionTitle(index = "数据", title = "备份与迁移")
+            SectionTitle(index = localizedText("数据"), title = localizedText("备份与迁移"))
             Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     SettingsAction(
                         icon = Icons.Outlined.CloudUpload,
-                        title = "导出日记备份",
-                        subtitle = "可选密码加密，附离线阅读页",
+                        title = localizedText("导出日记备份"),
+                        subtitle = localizedText("可选密码加密，附离线阅读页"),
                         onClick = onExport,
                     )
                     HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsAction(
                         icon = Icons.Outlined.Restore,
-                        title = "从备份恢复",
-                        subtitle = "支持加密和未加密备份",
+                        title = localizedText("从备份恢复"),
+                        subtitle = localizedText("支持加密和未加密备份"),
                         onClick = onImport,
                     )
                     if (canUndoRestore) {
                         HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Restore,
-                            title = "撤销上次恢复",
-                            subtitle = "找回恢复前的设备内容，仅可撤销一次",
+                            title = localizedText("撤销上次恢复"),
+                            subtitle = localizedText("找回恢复前的设备内容，仅可撤销一次"),
                             onClick = onUndoRestore,
                         )
                     }
@@ -3102,10 +3121,43 @@ fun ProfileSettingsScreen(
         }
 
         Text(
-            "息刻 · ${BuildConfig.VERSION_NAME}",
+            tr("息刻 · ${BuildConfig.VERSION_NAME}", "Xike · ${BuildConfig.VERSION_NAME}"),
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            shape = XikeShapes.dialog,
+            title = { Text(localizedText("应用语言")) },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    AppLanguage.entries.forEach { language ->
+                        Row(
+                            Modifier.fillMaxWidth().selectable(
+                                selected = AppLocale.language == language,
+                                role = Role.RadioButton,
+                                onClick = {
+                                    onLanguageChange(language)
+                                    showLanguageDialog = false
+                                },
+                            ).padding(vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = AppLocale.language == language, onClick = null)
+                            Spacer(Modifier.width(10.dp))
+                            Text(language.nativeName)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) { Text(localizedText("取消")) }
+            },
         )
     }
 
@@ -3190,7 +3242,7 @@ private fun ReminderScheduleDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("提醒时间") },
+        title = { Text(localizedText("提醒时间")) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -3220,16 +3272,16 @@ private fun ReminderScheduleDialog(
                             style = MaterialTheme.typography.headlineSmall,
                         )
                         Spacer(Modifier.weight(1f))
-                        Text("修改", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(localizedText("修改"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Text(
-                    "为减少耗电，系统可能稍后送达，但不会早于所选时间。",
+                    localizedText("为减少耗电，系统可能稍后送达，但不会早于所选时间。"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("提醒星期", style = MaterialTheme.typography.titleSmall)
+                    Text(localizedText("提醒星期"), style = MaterialTheme.typography.titleSmall)
                     DayOfWeek.entries.chunked(4).forEach { days ->
                         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                             days.forEach { day ->
@@ -3249,7 +3301,7 @@ private fun ReminderScheduleDialog(
                                     },
                                 ) {
                                     Text(
-                                        day.getDisplayName(DateTextStyle.NARROW, Locale.CHINA),
+                                        day.getDisplayName(DateTextStyle.NARROW, AppLocale.locale),
                                         modifier = Modifier.padding(vertical = 10.dp),
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         style = MaterialTheme.typography.labelLarge,
@@ -3261,7 +3313,7 @@ private fun ReminderScheduleDialog(
                         }
                     }
                     if (selectedDays.isEmpty()) {
-                        Text("至少选择一天", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        Text(localizedText("至少选择一天"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
                 Row(
@@ -3271,9 +3323,9 @@ private fun ReminderScheduleDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("夜间勿扰", style = MaterialTheme.typography.titleSmall)
+                        Text(localizedText("夜间勿扰"), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "%02d:00–%02d:00 内的提醒会延后".format(
+                            localizedText("%02d:00–%02d:00 内的提醒会延后").format(
                                 Locale.ROOT,
                                 settings.quietHoursStart,
                                 settings.quietHoursEnd,
@@ -3300,9 +3352,9 @@ private fun ReminderScheduleDialog(
                 },
                 enabled = selectedDays.isNotEmpty(),
                 elevation = xikeButtonElevation(),
-            ) { Text("保存") }
+            ) { Text(localizedText("保存")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
     )
 }
 
@@ -3315,7 +3367,7 @@ private fun DailyPromptStyleDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("本地问题库") },
+        title = { Text(localizedText("本地问题库")) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                 DailyPromptStyle.entries.forEach { style ->
@@ -3341,7 +3393,7 @@ private fun DailyPromptStyleDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
     )
 }
 
@@ -3370,13 +3422,13 @@ private fun AppLockToggleRow(
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text("应用锁", style = MaterialTheme.typography.titleSmall)
+            Text(localizedText("应用锁"), style = MaterialTheme.typography.titleSmall)
             Text(
                 when {
-                    enabled && authenticationAvailable -> "离开后使用系统身份验证解锁"
-                    enabled -> "设备验证不可用，请恢复系统屏幕锁"
-                    authenticationAvailable -> "使用面容、指纹或设备密码保护"
-                    else -> "开启时需要先设置设备屏幕锁"
+                    enabled && authenticationAvailable -> localizedText("离开后使用系统身份验证解锁")
+                    enabled -> localizedText("设备验证不可用，请恢复系统屏幕锁")
+                    authenticationAvailable -> localizedText("使用面容、指纹或设备密码保护")
+                    else -> localizedText("开启时需要先设置设备屏幕锁")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -3396,7 +3448,7 @@ private fun AppLockTimeoutDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("自动锁定") },
+        title = { Text(localizedText("自动锁定")) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                 AppLockTimeout.entries.forEach { timeout ->
@@ -3420,7 +3472,7 @@ private fun AppLockTimeoutDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(localizedText("取消")) }
         },
     )
 }
@@ -3706,19 +3758,19 @@ private fun decodeScaledPreview(openStream: () -> InputStream?, maxDimension: In
 }
 
 private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> "愉悦时刻更多"
-    average >= 3.5 -> "整体更轻松"
-    average >= 2.5 -> "大多比较平静"
-    average >= 1.5 -> "疲惫感停留较多"
-    else -> "低落时刻较多"
+    average >= 4.5 -> localizedText("愉悦时刻更多")
+    average >= 3.5 -> localizedText("整体更轻松")
+    average >= 2.5 -> localizedText("大多比较平静")
+    average >= 1.5 -> localizedText("疲惫感停留较多")
+    else -> localizedText("低落时刻较多")
 }
 
 private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> "这段时间里，有不少开心而舒展的时刻。"
-    average >= 3.5 -> "轻松的时刻更多，也允许自己偶尔停一停。"
-    average >= 2.5 -> "平静与起伏都曾出现，慢慢看见就好。"
-    average >= 1.5 -> "疲惫和低落停留得更多，记得给自己留一点余地。"
-    else -> "低落似乎停留了一阵，请更温柔地照顾自己。"
+    average >= 4.5 -> localizedText("这段时间里，有不少开心而舒展的时刻。")
+    average >= 3.5 -> localizedText("轻松的时刻更多，也允许自己偶尔停一停。")
+    average >= 2.5 -> localizedText("平静与起伏都曾出现，慢慢看见就好。")
+    average >= 1.5 -> localizedText("疲惫和低落停留得更多，记得给自己留一点余地。")
+    else -> localizedText("低落似乎停留了一阵，请更温柔地照顾自己。")
 }
 
 private data class MoodVisualStyle(val accent: Color, val container: Color)
@@ -3746,25 +3798,31 @@ private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
     )
 }
 
-private fun LocalDate.asChineseDay(): String = DateTimeFormatter.ofPattern("EEEE · M月d日", Locale.CHINA).format(this)
+private fun LocalDate.asChineseDay(): String = DateTimeFormatter.ofPattern(tr("EEEE · M月d日", "EEEE · MMM d"), AppLocale.locale).format(this)
 
 private fun LocalDate.asDateRange(end: LocalDate): String = if (year == end.year) {
-    "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日"
+    tr(
+        "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日",
+        "${format(DateTimeFormatter.ofPattern("MMM d", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+    )
 } else {
-    "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日"
+    tr(
+        "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日",
+        "${format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+    )
 }
 
 private fun LocalDate.asWeekday(): String = when (dayOfWeek) {
-    java.time.DayOfWeek.MONDAY -> "一"
-    java.time.DayOfWeek.TUESDAY -> "二"
-    java.time.DayOfWeek.WEDNESDAY -> "三"
-    java.time.DayOfWeek.THURSDAY -> "四"
-    java.time.DayOfWeek.FRIDAY -> "五"
-    java.time.DayOfWeek.SATURDAY -> "六"
-    java.time.DayOfWeek.SUNDAY -> "日"
+    java.time.DayOfWeek.MONDAY -> localizedText("一")
+    java.time.DayOfWeek.TUESDAY -> localizedText("二")
+    java.time.DayOfWeek.WEDNESDAY -> localizedText("三")
+    java.time.DayOfWeek.THURSDAY -> localizedText("四")
+    java.time.DayOfWeek.FRIDAY -> localizedText("五")
+    java.time.DayOfWeek.SATURDAY -> localizedText("六")
+    java.time.DayOfWeek.SUNDAY -> localizedText("日")
 }
 
-private fun LocalDate.asFullWeekday(): String = dayOfWeek.getDisplayName(DateTextStyle.FULL, Locale.CHINA)
+private fun LocalDate.asFullWeekday(): String = dayOfWeek.getDisplayName(DateTextStyle.FULL, AppLocale.locale)
 
-private fun Long.asChineseTime(): String = DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA)
+private fun Long.asChineseTime(): String = DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
     .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))

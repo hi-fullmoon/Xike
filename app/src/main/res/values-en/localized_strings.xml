@@ -1,0 +1,764 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="text_now" formatted="false">"Now"</string>
+    <string name="text_patterns" formatted="false">"Patterns"</string>
+    <string name="text_memories" formatted="false">"Memories"</string>
+    <string name="text_settings" formatted="false">"Settings"</string>
+    <string name="text_pine" formatted="false">"Pine"</string>
+    <string name="text_forest_green" formatted="false">"Forest green"</string>
+    <string name="text_violet" formatted="false">"Violet"</string>
+    <string name="text_dusk_purple" formatted="false">"Dusk purple"</string>
+    <string name="text_ocean" formatted="false">"Ocean"</string>
+    <string name="text_misty_teal" formatted="false">"Misty teal"</string>
+    <string name="text_terra" formatted="false">"Terra"</string>
+    <string name="text_terracotta" formatted="false">"Terracotta"</string>
+    <string name="text_amber" formatted="false">"Amber"</string>
+    <string name="text_amber_gold" formatted="false">"Amber gold"</string>
+    <string name="text_rose" formatted="false">"Rose"</string>
+    <string name="text_soft_rose" formatted="false">"Soft rose"</string>
+    <string name="text_breathe" formatted="false">"Breathe"</string>
+    <string name="text_soft_curves_and_space_for_a_gentle" formatted="false">"Soft curves and space for a gentle pause"</string>
+    <string name="text_paper" formatted="false">"Paper"</string>
+    <string name="text_quiet_lines_like_opening_a_journal" formatted="false">"Quiet lines, like opening a journal"</string>
+    <string name="text_focus" formatted="false">"Focus"</string>
+    <string name="text_compact_and_clear_with_content_close_at" formatted="false">"Compact and clear, with content close at hand"</string>
+    <string name="text_work" formatted="false">"Work"</string>
+    <string name="text_learning" formatted="false">"Learning"</string>
+    <string name="text_relationships" formatted="false">"Relationships"</string>
+    <string name="text_family" formatted="false">"Family"</string>
+    <string name="text_body" formatted="false">"Body"</string>
+    <string name="text_sleep" formatted="false">"Sleep"</string>
+    <string name="text_food" formatted="false">"Food"</string>
+    <string name="text_money" formatted="false">"Money"</string>
+    <string name="text_self" formatted="false">"Self"</string>
+    <string name="text_interests" formatted="false">"Interests"</string>
+    <string name="text_travel" formatted="false">"Travel"</string>
+    <string name="text_home" formatted="false">"Home"</string>
+    <string name="text_other" formatted="false">"Other"</string>
+    <string name="text_xike_is_locked" formatted="false">"Xike is locked"</string>
+    <string name="text_verify_your_identity_to_return_to_your" formatted="false">"Verify your identity to return to your own space."</string>
+    <string name="text_set_up_a_device_screen_lock_to" formatted="false">"Set up a device screen lock to verify your identity."</string>
+    <string name="text_unlock_xike" formatted="false">"Unlock Xike"</string>
+    <string name="text_set_up_screen_lock" formatted="false">"Set up screen lock"</string>
+    <string name="text_android_verifies_your_identity_xike_does_not" formatted="false">"Android verifies your identity. Xike does not access or store it."</string>
+    <string name="text_weather_is_temporarily_unavailable" formatted="false">"Weather is temporarily unavailable."</string>
+    <string name="text_city_weather_is_temporarily_unavailable" formatted="false">"City weather is temporarily unavailable."</string>
+    <string name="text_unable_to_get_location_and_weather" formatted="false">"Unable to get location and weather."</string>
+    <string name="text_unable_to_get_weather_for_this_city" formatted="false">"Unable to get weather for this city."</string>
+    <string name="text_photo_added_and_saved_to_the_system" formatted="false">"Photo added and saved to the system gallery"</string>
+    <string name="text_unable_to_save_the_photo_please_try" formatted="false">"Unable to save the photo. Please try again"</string>
+    <string name="text_unable_to_open_the_system_photo_picker" formatted="false">"Unable to open the system photo picker"</string>
+    <string name="text_unable_to_open_the_system_camera" formatted="false">"Unable to open the system camera"</string>
+    <string name="text_unable_to_prepare_the_camera_please_try" formatted="false">"Unable to prepare the camera. Please try again"</string>
+    <string name="text_storage_permission_is_required_to_save_photos" formatted="false">"Storage permission is required to save photos to the system gallery"</string>
+    <string name="text_microphone_access_is_unavailable_you_can_still" formatted="false">"Microphone access is unavailable. You can still use text and photos"</string>
+    <string name="text_make_room_nfor_this_moment" formatted="false">"Make room\\nfor this moment."</string>
+    <string name="text_no_explanation_needed_just_notice_how_you" formatted="false">"No explanation needed. Just notice how you feel."</string>
+    <string name="text_write_a_little" formatted="false">"Write a little"</string>
+    <string name="text_a_note_for_this_moment" formatted="false">"A note for this moment"</string>
+    <string name="text_what_would_you_like_to_keep_from" formatted="false">"What would you like to keep from this moment?"</string>
+    <string name="text_done" formatted="false">"Done"</string>
+    <string name="text_add_something_optional" formatted="false">"Add something · Optional"</string>
+    <string name="text_audio" formatted="false">"Audio"</string>
+    <string name="text_photos" formatted="false">"Photos"</string>
+    <string name="text_backdate" formatted="false">"Backdate"</string>
+    <string name="text_the_recording_will_be_encrypted_when_finished" formatted="false">"The recording will be encrypted when finished"</string>
+    <string name="text_the_recording_still_needs_to_be_encrypted" formatted="false">"The recording still needs to be encrypted and saved"</string>
+    <string name="text_record_this_moment" formatted="false">"Record this moment"</string>
+    <string name="text_keep_this_voice_note" formatted="false">"Keep this voice note"</string>
+    <string name="text_the_sound_of_this_moment" formatted="false">"The sound of this moment"</string>
+    <string name="text_recording_this_moment" formatted="false">"Recording this moment"</string>
+    <string name="text_encrypting_and_saving_to_the_draft" formatted="false">"Encrypting and saving to the draft"</string>
+    <string name="text_save_failed_the_recording_is_still_on" formatted="false">"Save failed. The recording is still on this device"</string>
+    <string name="text_recording_encrypted_and_saved_on_this_device" formatted="false">"Recording encrypted and saved on this device"</string>
+    <string name="text_you_can_choose_a_city_without_location" formatted="false">"You can choose a city without location permission."</string>
+    <string name="text_collapse_topics" formatted="false">"Collapse topics"</string>
+    <string name="text_expand_topics" formatted="false">"Expand topics"</string>
+    <string name="text_keep_a_little_more" formatted="false">"Keep a little more"</string>
+    <string name="text_choose_topics_optional" formatted="false">"Choose topics · Optional"</string>
+    <string name="text_topics" formatted="false">"Topics"</string>
+    <string name="text_what_is_this_moment_about" formatted="false">"What is this moment about?"</string>
+    <string name="text_choose_several" formatted="false">"Choose several"</string>
+    <string name="text_this_moment_is_safely_kept" formatted="false">"This moment is safely kept"</string>
+    <string name="text_that_moment_is_safely_kept" formatted="false">"That moment is safely kept"</string>
+    <string name="text_save_failed_please_try_again" formatted="false">"Save failed. Please try again"</string>
+    <string name="text_saving" formatted="false">"Saving…"</string>
+    <string name="text_finish_recording_first" formatted="false">"Finish recording first"</string>
+    <string name="text_saving_audio" formatted="false">"Saving audio…"</string>
+    <string name="text_save_or_discard_the_recording_first" formatted="false">"Save or discard the recording first"</string>
+    <string name="text_choose_a_mood_first" formatted="false">"Choose a mood first"</string>
+    <string name="text_save_this_past_moment" formatted="false">"Save this past moment"</string>
+    <string name="text_keep_this_moment" formatted="false">"Keep this moment"</string>
+    <string name="text_discard_this_draft" formatted="false">"Discard this draft?"</string>
+    <string name="text_this_clears_the_unsaved_mood_weather_note" formatted="false">"This clears the unsaved mood, weather, note, topics, photos, audio and backdated time. Saved entries are unaffected."</string>
+    <string name="text_keep_draft" formatted="false">"Keep draft"</string>
+    <string name="text_discard_draft" formatted="false">"Discard draft"</string>
+    <string name="text_add_weather_for_this_moment" formatted="false">"Add weather for this moment?"</string>
+    <string name="text_xike_uses_your_approximate_location_once_after" formatted="false">"Xike uses your approximate location once after you tap and sends approximate coordinates to Open-Meteo to request weather. "</string>
+    <string name="text_coordinates_are_not_saved_and_journal_content" formatted="false">"Coordinates are not saved and journal content is not uploaded. The place and weather snapshot are encrypted with your draft and journal on this device."</string>
+    <string name="text_choose_a_city" formatted="false">"Choose a city"</string>
+    <string name="text_allow_approximate_location" formatted="false">"Allow approximate location"</string>
+    <string name="text_getting_location_and_weather" formatted="false">"Getting location and weather"</string>
+    <string name="text_past_entries_do_not_use_today_s" formatted="false">"Past entries do not use today\'s weather"</string>
+    <string name="text_unable_to_add_location_and_weather" formatted="false">"Unable to add location and weather"</string>
+    <string name="text_outside_now" formatted="false">"Outside now"</string>
+    <string name="text_requested_once_no_ongoing_background_tracking" formatted="false">"Requested once; no ongoing background tracking"</string>
+    <string name="text_keeps_current_conditions_out_of_past_entries" formatted="false">"Keeps current conditions out of past entries"</string>
+    <string name="text_place_and_weather_optional" formatted="false">"Place and weather · Optional"</string>
+    <string name="text_add" formatted="false">"Add"</string>
+    <string name="text_remove" formatted="false">"Remove"</string>
+    <string name="text_refresh" formatted="false">"Refresh"</string>
+    <string name="text_try_again" formatted="false">"Try again"</string>
+    <string name="text_choose_a_city_2" formatted="false">"Choose a city"</string>
+    <string name="text_no_location_permission_is_needed_the_city" formatted="false">"No location permission is needed. The city name is sent to Open-Meteo to look up the place and weather."</string>
+    <string name="text_for_example_shanghai_london" formatted="false">"For example: Shanghai, London"</string>
+    <string name="text_cancel" formatted="false">"Cancel"</string>
+    <string name="text_get_weather" formatted="false">"Get weather"</string>
+    <string name="text_drafts_are_automatically_encrypted_on_this_device" formatted="false">"Drafts are automatically encrypted on this device"</string>
+    <string name="text_clear" formatted="false">"Clear"</string>
+    <string name="text_entry_time" formatted="false">"Entry time"</string>
+    <string name="text_right_now" formatted="false">"Right now"</string>
+    <string name="text_uses_the_time_when_saved_tap_to" formatted="false">"Uses the time when saved · Tap to backdate"</string>
+    <string name="text_assigned_to_the_selected_date_tap_to" formatted="false">"Assigned to the selected date · Tap to change"</string>
+    <string name="text_backdated_entries_appear_in_memories_and_patterns" formatted="false">"Backdated entries appear in memories and patterns for that date"</string>
+    <string name="text_use_current_time" formatted="false">"Use current time"</string>
+    <string name="text_entry_time_cannot_be_in_the_future" formatted="false">"Entry time cannot be in the future"</string>
+    <string name="text_today" formatted="false">"Today"</string>
+    <string name="text_yesterday" formatted="false">"Yesterday"</string>
+    <string name="text_xike" formatted="false">"Xike"</string>
+    <string name="text_how_you_feel_now" formatted="false">"How you feel now"</string>
+    <string name="text_choose_the_closest_feeling_there_is_no" formatted="false">"Choose the closest feeling. There is no right answer"</string>
+    <string name="text_mood_guide" formatted="false">"Mood guide"</string>
+    <string name="text_feeling_low_deserves_to_be_heard_too" formatted="false">"Feeling low deserves to be heard, too."</string>
+    <string name="text_when_tired_it_is_okay_to_slow" formatted="false">"When tired, it is okay to slow down."</string>
+    <string name="text_calm_is_a_welcome_answer_too" formatted="false">"Calm is a welcome answer, too."</string>
+    <string name="text_feeling_good_keep_this_moment" formatted="false">"Feeling good? Keep this moment."</string>
+    <string name="text_share_a_little_joy_with_yourself" formatted="false">"Share a little joy with yourself."</string>
+    <string name="text_how_do_i_choose_a_mood" formatted="false">"How do I choose a mood?"</string>
+    <string name="text_choose_the_mood_closest_to_this_moment" formatted="false">"Choose the mood closest to this moment. You do not have to describe every feeling precisely."</string>
+    <string name="text_got_it" formatted="false">"Got it"</string>
+    <string name="text_add_photos" formatted="false">"Add photos"</string>
+    <string name="text_encrypted_on_this_device" formatted="false">"Encrypted on this device"</string>
+    <string name="text_add_more" formatted="false">"Add more"</string>
+    <string name="text_preview_photo" formatted="false">"Preview photo"</string>
+    <string name="text_today_s_moment" formatted="false">"Today\'s moment"</string>
+    <string name="text_insights" formatted="false">"Insights"</string>
+    <string name="text_notice_changes_without_judging_yourself" formatted="false">"Notice changes without judging yourself."</string>
+    <string name="text_waiting_for_your_first_entry" formatted="false">"Waiting for your first entry"</string>
+    <string name="text_record_how_you_feel_now_and_let" formatted="false">"Record how you feel now and let patterns begin here."</string>
+    <string name="text_trend" formatted="false">"Trend"</string>
+    <string name="text_by_month" formatted="false">"By month"</string>
+    <string name="text_a_little_more_time" formatted="false">"A little more time"</string>
+    <string name="text_changes_will_start_to_appear_after_your" formatted="false">"Changes will start to appear after your first entry."</string>
+    <string name="text_no_recurring_topics_yet" formatted="false">"No recurring topics yet"</string>
+    <string name="text_add_topics_to_discover_recurring_threads" formatted="false">"Add topics to discover recurring threads."</string>
+    <string name="text_close_photo_viewer" formatted="false">"Close photo viewer"</string>
+    <string name="text_let_journaling_follow_your_rhythm" formatted="false">"Let journaling follow your rhythm."</string>
+    <string name="text_your_journal_is_offline_and_encrypted" formatted="false">"Your journal is offline and encrypted"</string>
+    <string name="text_no_account_needed_weather_connects_only_when" formatted="false">"No account needed; weather connects only when you add it"</string>
+    <string name="text_privacy" formatted="false">"Privacy"</string>
+    <string name="text_app_lock" formatted="false">"App lock"</string>
+    <string name="text_auto_lock" formatted="false">"Auto-lock"</string>
+    <string name="text_lock_now" formatted="false">"Lock now"</string>
+    <string name="text_hide_content_and_return_to_the_lock" formatted="false">"Hide content and return to the lock screen"</string>
+    <string name="text_rhythm" formatted="false">"Rhythm"</string>
+    <string name="text_gentle_company" formatted="false">"Gentle company"</string>
+    <string name="text_journal_reminders" formatted="false">"Journal reminders"</string>
+    <string name="text_system_notifications_are_off_journaling_still_works" formatted="false">"System notifications are off; journaling still works"</string>
+    <string name="text_off_by_default_reminds_you_at_your" formatted="false">"Off by default; reminds you at your chosen local time"</string>
+    <string name="text_reminder_schedule" formatted="false">"Reminder schedule"</string>
+    <string name="text_pause_for_a_week" formatted="false">"Pause for a week"</string>
+    <string name="text_resume_reminders" formatted="false">"Resume reminders"</string>
+    <string name="text_take_a_quiet_break_while_keeping_your" formatted="false">"Take a quiet break while keeping your schedule"</string>
+    <string name="text_daily_question" formatted="false">"Daily question"</string>
+    <string name="text_off_by_default_all_questions_come_from" formatted="false">"Off by default; all questions come from the local collection"</string>
+    <string name="text_question_collection" formatted="false">"Question collection"</string>
+    <string name="text_appearance" formatted="false">"Appearance"</string>
+    <string name="text_interface_style" formatted="false">"Interface style"</string>
+    <string name="text_layout_and_feel" formatted="false">"Layout and feel"</string>
+    <string name="text_color" formatted="false">"Color"</string>
+    <string name="text_accent_color" formatted="false">"Accent color"</string>
+    <string name="text_choose_any_combination" formatted="false">"Choose any combination"</string>
+    <string name="text_data" formatted="false">"Data"</string>
+    <string name="text_backup_and_transfer" formatted="false">"Backup and transfer"</string>
+    <string name="text_export_journal_backup" formatted="false">"Export journal backup"</string>
+    <string name="text_optional_password_encryption_and_an_offline_reading" formatted="false">"Optional password encryption and an offline reading page"</string>
+    <string name="text_restore_from_backup" formatted="false">"Restore from backup"</string>
+    <string name="text_supports_encrypted_and_unencrypted_backups" formatted="false">"Supports encrypted and unencrypted backups"</string>
+    <string name="text_undo_last_restore" formatted="false">"Undo last restore"</string>
+    <string name="text_recover_the_previous_device_content_can_be" formatted="false">"Recover the previous device content; can be undone once"</string>
+    <string name="text_change" formatted="false">"Change"</string>
+    <string name="text_to_save_battery_android_may_deliver_reminders" formatted="false">"To save battery, Android may deliver reminders later, but never before your chosen time."</string>
+    <string name="text_days_of_the_week" formatted="false">"Days of the week"</string>
+    <string name="text_choose_at_least_one_day" formatted="false">"Choose at least one day"</string>
+    <string name="text_quiet_hours" formatted="false">"Quiet hours"</string>
+    <string name="text_reminders_between_02d_00_and_02d_00" formatted="false">"Reminders between %02d:00 and %02d:00 are delayed"</string>
+    <string name="text_save" formatted="false">"Save"</string>
+    <string name="text_verify_with_android_when_you_return" formatted="false">"Verify with Android when you return"</string>
+    <string name="text_device_verification_unavailable_restore_your_screen_lock" formatted="false">"Device verification unavailable; restore your screen lock"</string>
+    <string name="text_protect_with_face_fingerprint_or_device_pin" formatted="false">"Protect with face, fingerprint or device PIN"</string>
+    <string name="text_set_up_a_device_screen_lock_to_2" formatted="false">"Set up a device screen lock to enable this"</string>
+    <string name="text_more_joyful_moments" formatted="false">"More joyful moments"</string>
+    <string name="text_generally_feeling_better" formatted="false">"Generally feeling better"</string>
+    <string name="text_mostly_calm" formatted="false">"Mostly calm"</string>
+    <string name="text_more_tired_moments" formatted="false">"More tired moments"</string>
+    <string name="text_more_low_moments" formatted="false">"More low moments"</string>
+    <string name="text_there_have_been_many_happy_open_moments" formatted="false">"There have been many happy, open moments in this period."</string>
+    <string name="text_there_are_more_good_moments_you_can" formatted="false">"There are more good moments. You can still take a break."</string>
+    <string name="text_both_calm_and_changes_have_appeared_take" formatted="false">"Both calm and changes have appeared. Take your time noticing them."</string>
+    <string name="text_tired_and_low_feelings_have_stayed_longer" formatted="false">"Tired and low feelings have stayed longer. Leave yourself some room."</string>
+    <string name="text_low_feelings_seem_to_have_lingered_be" formatted="false">"Low feelings seem to have lingered. Be gentle with yourself."</string>
+    <string name="text_mon" formatted="false">"Mon"</string>
+    <string name="text_tue" formatted="false">"Tue"</string>
+    <string name="text_wed" formatted="false">"Wed"</string>
+    <string name="text_thu" formatted="false">"Thu"</string>
+    <string name="text_fri" formatted="false">"Fri"</string>
+    <string name="text_sat" formatted="false">"Sat"</string>
+    <string name="text_sun" formatted="false">"Sun"</string>
+    <string name="text_low" formatted="false">"Low"</string>
+    <string name="text_tired" formatted="false">"Tired"</string>
+    <string name="text_calm" formatted="false">"Calm"</string>
+    <string name="text_good" formatted="false">"Good"</string>
+    <string name="text_joyful" formatted="false">"Joyful"</string>
+    <string name="text_this_week" formatted="false">"This week"</string>
+    <string name="text_entries_this_week" formatted="false">"Entries this week"</string>
+    <string name="text_changes_this_week" formatted="false">"Changes this week"</string>
+    <string name="text_last_30_days" formatted="false">"Last 30 days"</string>
+    <string name="text_entries_over_30_days" formatted="false">"Entries over 30 days"</string>
+    <string name="text_the_last_month" formatted="false">"The last month"</string>
+    <string name="text_last_90_days" formatted="false">"Last 90 days"</string>
+    <string name="text_entries_over_90_days" formatted="false">"Entries over 90 days"</string>
+    <string name="text_the_last_three_months" formatted="false">"The last three months"</string>
+    <string name="text_this_year" formatted="false">"This year"</string>
+    <string name="text_entries_this_year" formatted="false">"Entries this year"</string>
+    <string name="text_changes_this_year" formatted="false">"Changes this year"</string>
+    <string name="text_weekdays" formatted="false">"Weekdays"</string>
+    <string name="text_weekends" formatted="false">"Weekends"</string>
+    <string name="text_no_entries" formatted="false">"No entries"</string>
+    <string name="text_there_are_no_entries_yet_so_no" formatted="false">"There are no entries yet, so no trend is described."</string>
+    <string name="text_few_entries" formatted="false">"Few entries"</string>
+    <string name="text_only_facts_are_shown_changes_and_differences" formatted="false">"Only facts are shown; changes and differences are not interpreted."</string>
+    <string name="text_early_patterns" formatted="false">"Early patterns"</string>
+    <string name="text_you_can_observe_distributions_but_cannot_infer" formatted="false">"You can observe distributions, but cannot infer causes."</string>
+    <string name="text_ready_to_review" formatted="false">"Ready to review"</string>
+    <string name="text_there_are_enough_entries_to_describe_this" formatted="false">"There are enough entries to describe this period, but not to infer causes or diagnoses."</string>
+    <string name="text_immediately" formatted="false">"Immediately"</string>
+    <string name="text_after_1_minute" formatted="false">"After 1 minute"</string>
+    <string name="text_after_5_minutes" formatted="false">"After 5 minutes"</string>
+    <string name="text_after_30_minutes" formatted="false">"After 30 minutes"</string>
+    <string name="text_all_dates" formatted="false">"All dates"</string>
+    <string name="text_last_7_days" formatted="false">"Last 7 days"</string>
+    <string name="text_last_30_days_2" formatted="false">"Last 30 days"</string>
+    <string name="text_search_is_temporarily_unavailable" formatted="false">"Search is temporarily unavailable"</string>
+    <string name="text_it_is_quiet_here" formatted="false">"It is quiet here"</string>
+    <string name="text_your_first_entry_need_not_be_complete" formatted="false">"Your first entry need not be complete. A mood is enough."</string>
+    <string name="text_no_matching_moments" formatted="false">"No matching moments"</string>
+    <string name="text_try_fewer_filters_or_another_topic" formatted="false">"Try fewer filters or another topic."</string>
+    <string name="text_unable_to_load_more_entries" formatted="false">"Unable to load more entries"</string>
+    <string name="text_loading" formatted="false">"Loading…"</string>
+    <string name="text_load_more_entries" formatted="false">"Load more entries"</string>
+    <string name="text_delete_failed_please_try_again" formatted="false">"Delete failed. Please try again."</string>
+    <string name="text_entry_deleted" formatted="false">"Entry deleted"</string>
+    <string name="text_undo" formatted="false">"Undo"</string>
+    <string name="text_entry_restored" formatted="false">"Entry restored"</string>
+    <string name="text_unable_to_undo_deletion" formatted="false">"Unable to undo deletion"</string>
+    <string name="text_look_through_past_days_and_meet_who" formatted="false">"Look through past days and meet who you were then."</string>
+    <string name="text_search_notes_or_topics" formatted="false">"Search notes or topics"</string>
+    <string name="text_clear_search" formatted="false">"Clear search"</string>
+    <string name="text_calendar" formatted="false">"Calendar"</string>
+    <string name="text_timeline" formatted="false">"Timeline"</string>
+    <string name="text_open_filters" formatted="false">"Open filters"</string>
+    <string name="text_filter_these_memories" formatted="false">"Filter these memories"</string>
+    <string name="text_you_can_combine_filters" formatted="false">"You can combine filters"</string>
+    <string name="text_clear_all" formatted="false">"Clear all"</string>
+    <string name="text_mood" formatted="false">"Mood"</string>
+    <string name="text_date" formatted="false">"Date"</string>
+    <string name="text_clear_selected_date" formatted="false">"Clear selected date"</string>
+    <string name="text_no_entries_this_month" formatted="false">"No entries this month"</string>
+    <string name="text_previous_month" formatted="false">"Previous month"</string>
+    <string name="text_next_month" formatted="false">"Next month"</string>
+    <string name="text_no_entries_2" formatted="false">"No entries"</string>
+    <string name="text_recent_moments" formatted="false">"Recent moments"</string>
+    <string name="text_newest_first" formatted="false">"Newest first"</string>
+    <string name="text_only_moments_from_this_day" formatted="false">"Only moments from this day"</string>
+    <string name="text_this_moment" formatted="false">"This moment"</string>
+    <string name="text_edit_entry" formatted="false">"Edit entry"</string>
+    <string name="text_close_entry_details" formatted="false">"Close entry details"</string>
+    <string name="text_entries" formatted="false">"Entries"</string>
+    <string name="text_a_voice_note_was_kept_from_this" formatted="false">"A voice note was kept from this moment."</string>
+    <string name="text_only_a_mood_was_kept_from_this" formatted="false">"Only a mood was kept from this moment."</string>
+    <string name="text_close" formatted="false">"Close"</string>
+    <string name="text_delete_entry" formatted="false">"Delete entry"</string>
+    <string name="text_cancel_editing" formatted="false">"Cancel editing"</string>
+    <string name="text_edit_this_moment" formatted="false">"Edit this moment"</string>
+    <string name="text_changes_also_update_memories_search_and_patterns" formatted="false">"Changes also update memories, search and patterns"</string>
+    <string name="text_changes_saved" formatted="false">"Changes saved"</string>
+    <string name="text_unable_to_save_changes_please_try_again" formatted="false">"Unable to save changes. Please try again."</string>
+    <string name="text_saving_2" formatted="false">"Saving"</string>
+    <string name="text_choose_the_feeling_closest_to_that_moment" formatted="false">"Choose the feeling closest to that moment"</string>
+    <string name="text_adjust_the_date_and_time_of_a" formatted="false">"Adjust the date and time of a past entry"</string>
+    <string name="text_the_date_has_changed_saving_removes_the" formatted="false">"The date has changed. Saving removes the original weather to avoid assigning it to another day."</string>
+    <string name="text_what_happened_in_this_moment" formatted="false">"What happened in this moment?"</string>
+    <string name="text_removal_only_affects_the_encrypted_copy_in" formatted="false">"Removal only affects the encrypted copy in Xike"</string>
+    <string name="text_discard_unsaved_changes" formatted="false">"Discard unsaved changes?"</string>
+    <string name="text_changes_to_the_mood_time_note_topics" formatted="false">"Changes to the mood, time, note, topics and attachments will not be saved."</string>
+    <string name="text_keep_editing" formatted="false">"Keep editing"</string>
+    <string name="text_discard_changes" formatted="false">"Discard changes"</string>
+    <string name="text_delete_this_entry" formatted="false">"Delete this entry?"</string>
+    <string name="text_you_can_undo_deletion_before_the_message" formatted="false">"You can undo deletion before the message at the bottom disappears. Please check before proceeding."</string>
+    <string name="text_1_voice_note" formatted="false">"1 voice note"</string>
+    <string name="text_and" formatted="false">" and "</string>
+    <string name="text_deleting" formatted="false">"Deleting…"</string>
+    <string name="text_delete" formatted="false">"Delete"</string>
+    <string name="text_look_closer_at_this_period" formatted="false">"Look closer at this period"</string>
+    <string name="text_every_item_links_back_to_its_original" formatted="false">"Every item links back to its original entries"</string>
+    <string name="text_entries_from_the_previous_period" formatted="false">"Entries from the previous period"</string>
+    <string name="text_waiting_for_your_first_mood_entry" formatted="false">"Waiting for your first mood entry"</string>
+    <string name="text_record_how_you_feel_now_and_let_2" formatted="false">"Record how you feel now and let patterns start here."</string>
+    <string name="text_look_at_your_entries_first_review_changes" formatted="false">"Look at your entries first. Review changes when you have more moments."</string>
+    <string name="text_days_recorded" formatted="false">"Days recorded"</string>
+    <string name="text_date_coverage" formatted="false">"Date coverage"</string>
+    <string name="text_view_entries_for_this_period" formatted="false">"View entries for this period"</string>
+    <string name="text_evidence" formatted="false">"Evidence"</string>
+    <string name="text_dates_with_entries" formatted="false">"Dates with entries"</string>
+    <string name="text_coverage_only_describes_which_dates_have_entries" formatted="false">"Coverage only describes which dates have entries. It is not a completion rate, and daily entries are not required."</string>
+    <string name="text_the_line_shows_the_average_position_on" formatted="false">"The line shows the average position on the five mood levels. Periods without entries leave gaps. Tap a period to see its entries."</string>
+    <string name="text_distribution" formatted="false">"Distribution"</string>
+    <string name="text_mood_frequency" formatted="false">"Mood frequency"</string>
+    <string name="text_comparison" formatted="false">"Comparison"</string>
+    <string name="text_previous_period" formatted="false">"Previous period"</string>
+    <string name="text_current" formatted="false">"Current"</string>
+    <string name="text_previous" formatted="false">"Previous"</string>
+    <string name="text_changes_are_described_only_when_both_periods" formatted="false">"Changes are described only when both periods have at least 3 entries. Only actual counts are shown for now."</string>
+    <string name="text_recurring_topics" formatted="false">"Recurring topics"</string>
+    <string name="text_add_topics_to_see_their_actual_frequency" formatted="false">"Add topics to see their actual frequency here."</string>
+    <string name="text_there_are_few_entries_topics_are_ranked" formatted="false">"There are few entries. Topics are ranked by frequency without interpretation."</string>
+    <string name="text_weekdays_and_weekends" formatted="false">"Weekdays and weekends"</string>
+    <string name="text_this_shows_mood_differences_between_the_two" formatted="false">"This shows mood differences between the two types of days. It does not show that either caused a change."</string>
+    <string name="text_each_day_type_needs_at_least_3" formatted="false">"Each day type needs at least 3 entries to compare averages. Only counts are shown for now."</string>
+    <string name="text_private_without_judgment" formatted="false">"Private, without judgment"</string>
+    <string name="text_a_simple_account_of_counts_distributions_and" formatted="false">"A simple account of counts, distributions and sample limits for your own review."</string>
+    <string name="text_view_local_review" formatted="false">"View local review"</string>
+    <string name="text_available_after_your_first_entry" formatted="false">"Available after your first entry"</string>
+    <string name="text_local_review" formatted="false">"Local review"</string>
+    <string name="text_sharing_sends_the_text_above_to_the" formatted="false">"Sharing sends the text above to the app you choose next. Xike does not upload it automatically."</string>
+    <string name="text_share_xike_review" formatted="false">"Share Xike review"</string>
+    <string name="text_choose_an_app_to_share" formatted="false">"Choose an app to share"</string>
+    <string name="text_close_original_entries" formatted="false">"Close original entries"</string>
+    <string name="text_no_entries_are_associated_with_this_statistic" formatted="false">"No entries are associated with this statistic."</string>
+    <string name="text_many_entries_describe_happy_open_moments" formatted="false">"Many entries describe happy, open moments."</string>
+    <string name="text_there_are_more_good_moments_in_your" formatted="false">"There are more good moments in your entries."</string>
+    <string name="text_both_calm_and_changes_appear_in_your" formatted="false">"Both calm and changes appear in your entries."</string>
+    <string name="text_tired_and_low_feelings_appear_more_often" formatted="false">"Tired and low feelings appear more often."</string>
+    <string name="text_low_moments_appear_more_often_remember_to" formatted="false">"Low moments appear more often. Remember to care for yourself."</string>
+    <string name="text_these_differences_are_descriptive_and_do_not" formatted="false">". These differences are descriptive and do not indicate causes."</string>
+    <string name="text_unchanged" formatted="false">"unchanged"</string>
+    <string name="text_unchanged_2" formatted="false">"unchanged"</string>
+    <string name="text_notifications_are_off_journaling_still_works" formatted="false">"Notifications are off. Journaling still works"</string>
+    <string name="text_reading_encrypted_journal" formatted="false">"Reading encrypted journal…"</string>
+    <string name="text_enable_app_lock" formatted="false">"Enable app lock"</string>
+    <string name="text_disable_app_lock" formatted="false">"Disable app lock"</string>
+    <string name="text_verify_with_face_fingerprint_or_device_pin" formatted="false">"Verify with face, fingerprint or device PIN"</string>
+    <string name="text_app_lock_enabled" formatted="false">"App lock enabled"</string>
+    <string name="text_app_lock_disabled" formatted="false">"App lock disabled"</string>
+    <string name="text_unable_to_save_app_lock_settings" formatted="false">"Unable to save app lock settings"</string>
+    <string name="text_unable_to_save_auto_lock_settings" formatted="false">"Unable to save auto-lock settings"</string>
+    <string name="text_unable_to_save_reminder_settings" formatted="false">"Unable to save reminder settings"</string>
+    <string name="text_unable_to_save_daily_question_settings" formatted="false">"Unable to save daily question settings"</string>
+    <string name="text_unable_to_open_system_security_settings" formatted="false">"Unable to open system security settings"</string>
+    <string name="text_undoing_last_restore" formatted="false">"Undoing last restore…"</string>
+    <string name="text_unable_to_undo_restore" formatted="false">"Unable to undo restore"</string>
+    <string name="text_verifying_backup" formatted="false">"Verifying backup…"</string>
+    <string name="text_backup_verification_failed" formatted="false">"Backup verification failed"</string>
+    <string name="text_creating_backup" formatted="false">"Creating backup…"</string>
+    <string name="text_backup_saved" formatted="false">"Backup saved"</string>
+    <string name="text_backup_failed" formatted="false">"Backup failed"</string>
+    <string name="text_identifying_backup" formatted="false">"Identifying backup…"</string>
+    <string name="text_unable_to_identify_backup" formatted="false">"Unable to identify backup"</string>
+    <string name="text_finish_or_cancel_recording_first" formatted="false">"Finish or cancel recording first"</string>
+    <string name="text_unlock_backup" formatted="false">"Unlock backup"</string>
+    <string name="text_view_backup_summary" formatted="false">"View backup summary"</string>
+    <string name="text_enter_the_password_used_to_create_this" formatted="false">"Enter the password used to create this backup. The app verifies its contents before making any changes to your journal."</string>
+    <string name="text_creating_a_safety_snapshot_and_restoring" formatted="false">"Creating a safety snapshot and restoring…"</string>
+    <string name="text_restore_failed" formatted="false">"Restore failed"</string>
+    <string name="text_no_entry_dates" formatted="false">"No entry dates"</string>
+    <string name="text_replace_content_on_this_device" formatted="false">"Replace content on this device?"</string>
+    <string name="text_label" formatted="false">"."</string>
+    <string name="text_replace_and_restore" formatted="false">"Replace and restore"</string>
+    <string name="text_the_backup_includes_all_entries_photos_and" formatted="false">"The backup includes all entries, photos and recordings."</string>
+    <string name="text_encrypt_with_a_password" formatted="false">"Encrypt with a password"</string>
+    <string name="text_recommended_the_password_is_not_stored_in" formatted="false">"Recommended; the password is not stored in the app"</string>
+    <string name="text_backup_password_at_least_8_characters" formatted="false">"Backup password (at least 8 characters)"</string>
+    <string name="text_hide_password" formatted="false">"Hide password"</string>
+    <string name="text_show_password" formatted="false">"Show password"</string>
+    <string name="text_confirm_backup_password" formatted="false">"Confirm backup password"</string>
+    <string name="text_encrypted_backups_use_xike_restore_them_in" formatted="false">"Encrypted backups use .xike. Restore them in the app with the password; their HTML cannot be opened directly in a browser."</string>
+    <string name="text_unencrypted_backups_use_zip_extract_and_open" formatted="false">"Unencrypted backups use .zip. Extract and open index.html to read offline. Anyone with the file can see all its contents."</string>
+    <string name="text_choose_save_location" formatted="false">"Choose save location"</string>
+    <string name="text_passwords_do_not_match" formatted="false">"Passwords do not match"</string>
+    <string name="text_data_needs_attention" formatted="false">"Data needs attention"</string>
+    <string name="text_got_it_2" formatted="false">"Got it"</string>
+    <string name="text_recording_has_already_started" formatted="false">"Recording has already started."</string>
+    <string name="text_no_recording_is_active" formatted="false">"No recording is active."</string>
+    <string name="text_the_recording_is_too_short_please_speak" formatted="false">"The recording is too short. Please speak a little longer."</string>
+    <string name="text_recording_did_not_finish_please_record_again" formatted="false">"Recording did not finish. Please record again."</string>
+    <string name="text_unable_to_start_recording_please_check_the" formatted="false">"Unable to start recording. Please check the microphone."</string>
+    <string name="text_finishing_recording" formatted="false">"Finishing recording"</string>
+    <string name="text_recording_paused" formatted="false">"Recording paused"</string>
+    <string name="text_recording" formatted="false">"Recording"</string>
+    <string name="text_recording_has_not_started" formatted="false">"Recording has not started"</string>
+    <string name="text_up_to_5_minutes_ends_automatically_when" formatted="false">"Up to 5 minutes · Ends automatically when you leave the app"</string>
+    <string name="text_unable_to_change_recording_state" formatted="false">"Unable to change recording state."</string>
+    <string name="text_resume" formatted="false">"Resume"</string>
+    <string name="text_pause" formatted="false">"Pause"</string>
+    <string name="text_finish_recording" formatted="false">"Finish recording"</string>
+    <string name="text_start_recording" formatted="false">"Start recording"</string>
+    <string name="text_encrypting_and_saving_recording" formatted="false">"Encrypting and saving recording"</string>
+    <string name="text_recording_not_yet_saved" formatted="false">"Recording not yet saved"</string>
+    <string name="text_the_recording_is_on_this_device_you" formatted="false">"The recording is on this device. You can try saving again."</string>
+    <string name="text_discard_recording" formatted="false">"Discard recording"</string>
+    <string name="text_retry_save" formatted="false">"Retry save"</string>
+    <string name="text_discard_this_recording" formatted="false">"Discard this recording?"</string>
+    <string name="text_the_unsaved_recording_will_be_deleted_and" formatted="false">"The unsaved recording will be deleted and cannot be recovered."</string>
+    <string name="text_keep_saving" formatted="false">"Keep saving"</string>
+    <string name="text_the_recording_file_is_unavailable" formatted="false">"The recording file is unavailable."</string>
+    <string name="text_unable_to_play_this_recording" formatted="false">"Unable to play this recording."</string>
+    <string name="text_voice_note" formatted="false">"Voice note"</string>
+    <string name="text_pause_audio" formatted="false">"Pause audio"</string>
+    <string name="text_play_audio" formatted="false">"Play audio"</string>
+    <string name="text_audio_playback_progress" formatted="false">"Audio playback progress"</string>
+    <string name="text_remove_audio" formatted="false">"Remove audio"</string>
+    <string name="text_record_again" formatted="false">"Record again"</string>
+    <string name="text_clear_2" formatted="false">"Clear"</string>
+    <string name="text_partly_cloudy" formatted="false">"Partly cloudy"</string>
+    <string name="text_overcast" formatted="false">"Overcast"</string>
+    <string name="text_fog" formatted="false">"Fog"</string>
+    <string name="text_drizzle" formatted="false">"Drizzle"</string>
+    <string name="text_freezing_rain" formatted="false">"Freezing rain"</string>
+    <string name="text_rain" formatted="false">"Rain"</string>
+    <string name="text_snow" formatted="false">"Snow"</string>
+    <string name="text_rain_showers" formatted="false">"Rain showers"</string>
+    <string name="text_snow_showers" formatted="false">"Snow showers"</string>
+    <string name="text_thunderstorm" formatted="false">"Thunderstorm"</string>
+    <string name="text_thunderstorm_with_hail" formatted="false">"Thunderstorm with hail"</string>
+    <string name="text_unknown_weather" formatted="false">"Unknown weather"</string>
+    <string name="text_current_location" formatted="false">"Current location"</string>
+    <string name="text_enter_a_city_name" formatted="false">"Enter a city name."</string>
+    <string name="text_approximate_location_permission_is_required_to_get" formatted="false">"Approximate location permission is required to get your location."</string>
+    <string name="text_location_is_turned_off_you_can_choose" formatted="false">"Location is turned off. You can choose a city manually."</string>
+    <string name="text_no_location_service_is_available_you_can" formatted="false">"No location service is available. You can choose a city manually."</string>
+    <string name="text_unable_to_get_your_location_try_again" formatted="false">"Unable to get your location. Try again later or choose a city."</string>
+    <string name="text_the_weather_service_did_not_return_current" formatted="false">"The weather service did not return current conditions."</string>
+    <string name="text_the_weather_service_returned_unrecognized_data" formatted="false">"The weather service returned unrecognized data."</string>
+    <string name="text_city_not_found_try_another_spelling" formatted="false">"City not found. Try another spelling."</string>
+    <string name="text_the_city_service_returned_an_unrecognized_location" formatted="false">"The city service returned an unrecognized location."</string>
+    <string name="text_weather_service_unavailable_please_try_again_later" formatted="false">"Weather service unavailable. Please try again later."</string>
+    <string name="text_unable_to_connect_to_the_weather_service" formatted="false">"Unable to connect to the weather service. Check your network and try again."</string>
+    <string name="text_keep_a_moment_from_today" formatted="false">"Keep a moment from today"</string>
+    <string name="text_if_you_feel_like_it_notice_your" formatted="false">"If you feel like it, notice your mood now. No streaks and no pressure."</string>
+    <string name="text_a_gentle_reminder_to_journal_at_your" formatted="false">"A gentle reminder to journal at your chosen local time."</string>
+    <string name="text_every_day" formatted="false">"Every day"</string>
+    <string name="text_gentle_company_2" formatted="false">"Gentle company"</string>
+    <string name="text_notice_care_and_what_you_need" formatted="false">"Notice care and what you need"</string>
+    <string name="text_body_awareness" formatted="false">"Body awareness"</string>
+    <string name="text_notice_your_body_mood_and_feelings_now" formatted="false">"Notice your body, mood and feelings now"</string>
+    <string name="text_language" formatted="false">"Language"</string>
+    <string name="text_app_language" formatted="false">"App language"</string>
+    <string name="text_chinese" formatted="false">"Chinese"</string>
+    <string name="text_english" formatted="false">"中文 / English"</string>
+    <string name="text_no_mood_distribution_yet" formatted="false">"No mood distribution yet"</string>
+    <string name="text_no_topics_yet" formatted="false">"No topics yet"</string>
+    <string name="text_these_are_descriptive_statistics_of_entries_on" formatted="false">"These are descriptive statistics of entries on this device. They do not indicate causes, diagnoses or advice."</string>
+    <string name="text_what_made_you_feel_well_cared_for" formatted="false">"What made you feel well cared for?"</string>
+    <string name="text_which_moment_today_made_you_want_to" formatted="false">"Which moment today made you want to slow down?"</string>
+    <string name="text_if_you_did_not_have_to_be" formatted="false">"If you did not have to be strong, what would you say?"</string>
+    <string name="text_what_deserves_a_quiet_thank_you_right" formatted="false">"What deserves a quiet thank-you right now?"</string>
+    <string name="text_what_kind_of_company_do_you_need" formatted="false">"What kind of company do you need most today?"</string>
+    <string name="text_did_someone_bring_you_a_little_warmth" formatted="false">"Did someone bring you a little warmth today?"</string>
+    <string name="text_which_words_helped_your_heart_relax" formatted="false">"Which words helped your heart relax?"</string>
+    <string name="text_what_small_thing_lightened_your_load_today" formatted="false">"What small thing lightened your load today?"</string>
+    <string name="text_if_you_left_yourself_a_message_what" formatted="false">"If you left yourself a message, what would it say?"</string>
+    <string name="text_was_there_a_place_that_felt_safe" formatted="false">"Was there a place that felt safe today?"</string>
+    <string name="text_what_response_would_you_most_like_to" formatted="false">"What response would you most like to hear right now?"</string>
+    <string name="text_who_helped_you_feel_less_alone_today" formatted="false">"Who helped you feel less alone today?"</string>
+    <string name="text_what_tiny_joy_would_you_like_to" formatted="false">"What tiny joy would you like to keep?"</string>
+    <string name="text_how_did_you_care_for_yourself_today" formatted="false">"How did you care for yourself today?"</string>
+    <string name="text_what_need_could_you_listen_to_in" formatted="false">"What need could you listen to in yourself first?"</string>
+    <string name="text_when_did_you_allow_yourself_to_rest" formatted="false">"When did you allow yourself to rest?"</string>
+    <string name="text_how_would_you_like_to_be_understood" formatted="false">"How would you like to be understood today?"</string>
+    <string name="text_what_does_not_need_to_be_solved" formatted="false">"What does not need to be solved today?"</string>
+    <string name="text_what_kindness_stayed_with_you_today" formatted="false">"What kindness stayed with you today?"</string>
+    <string name="text_if_you_could_have_a_hug_now" formatted="false">"If you could have a hug now, what would you say?"</string>
+    <string name="text_what_gentleness_did_you_offer_yourself_today" formatted="false">"What gentleness did you offer yourself today?"</string>
+    <string name="text_what_familiar_thing_helped_you_feel_grounded" formatted="false">"What familiar thing helped you feel grounded?"</string>
+    <string name="text_what_is_one_small_wish_you_have" formatted="false">"What is one small wish you have today?"</string>
+    <string name="text_when_did_you_feel_understood" formatted="false">"When did you feel understood?"</string>
+    <string name="text_what_space_would_you_like_to_give" formatted="false">"What space would you like to give yourself now?"</string>
+    <string name="text_what_sound_felt_comforting_today" formatted="false">"What sound felt comforting today?"</string>
+    <string name="text_what_scent_brought_a_moment_of_calm" formatted="false">"What scent brought a moment of calm?"</string>
+    <string name="text_what_would_you_most_like_to_thank" formatted="false">"What would you most like to thank yourself for today?"</string>
+    <string name="text_whose_care_would_you_like_to_quietly" formatted="false">"Whose care would you like to quietly remember?"</string>
+    <string name="text_what_ordinary_thing_gave_you_a_little" formatted="false">"What ordinary thing gave you a little strength today?"</string>
+    <string name="text_if_you_slowed_down_what_would_you" formatted="false">"If you slowed down, what would you notice first?"</string>
+    <string name="text_what_did_you_protect_for_yourself_today" formatted="false">"What did you protect for yourself today?"</string>
+    <string name="text_what_words_would_suit_who_you_are" formatted="false">"What words would suit who you are right now?"</string>
+    <string name="text_which_moment_made_you_feel_supported" formatted="false">"Which moment made you feel supported?"</string>
+    <string name="text_was_something_easier_today_than_you_expected" formatted="false">"Was something easier today than you expected?"</string>
+    <string name="text_how_would_you_like_to_care_for" formatted="false">"How would you like to care for yourself tonight?"</string>
+    <string name="text_what_can_you_allow_yourself_not_to" formatted="false">"What can you allow yourself not to know yet?"</string>
+    <string name="text_whose_smile_stayed_in_your_memory_today" formatted="false">"Whose smile stayed in your memory today?"</string>
+    <string name="text_what_warmth_would_you_like_to_take" formatted="false">"What warmth would you like to take into tomorrow?"</string>
+    <string name="text_what_small_hope_is_beginning_to_grow" formatted="false">"What small hope is beginning to grow?"</string>
+    <string name="text_who_did_you_offer_a_little_gentleness" formatted="false">"Who did you offer a little gentleness to today?"</string>
+    <string name="text_what_reminded_you_there_was_no_need" formatted="false">"What reminded you there was no need to hurry?"</string>
+    <string name="text_if_your_tiredness_could_speak_what_would" formatted="false">"If your tiredness could speak, what would it ask?"</string>
+    <string name="text_what_made_you_willing_to_try_again" formatted="false">"What made you willing to try again today?"</string>
+    <string name="text_what_kind_of_light_would_you_leave" formatted="false">"What kind of light would you leave for yourself today?"</string>
+    <string name="text_what_worry_deserves_to_be_heard_gently" formatted="false">"What worry deserves to be heard gently?"</string>
+    <string name="text_when_were_you_more_forgiving_toward_yourself" formatted="false">"When were you more forgiving toward yourself today?"</string>
+    <string name="text_what_small_thing_quieted_your_heart_for" formatted="false">"What small thing quieted your heart for a moment?"</string>
+    <string name="text_what_kind_of_company_do_you_want" formatted="false">"What kind of company do you want right now?"</string>
+    <string name="text_what_surprise_appeared_today_however_small" formatted="false">"What surprise appeared today, however small?"</string>
+    <string name="text_what_could_make_you_a_little_more" formatted="false">"What could make you a little more comfortable now?"</string>
+    <string name="text_what_small_act_by_someone_stayed_with" formatted="false">"What small act by someone stayed with you today?"</string>
+    <string name="text_what_would_you_say_to_yourself_after" formatted="false">"What would you say to yourself after a day of effort?"</string>
+    <string name="text_what_could_be_done_just_well_enough" formatted="false">"What could be done just well enough?"</string>
+    <string name="text_what_was_the_softest_moment_today" formatted="false">"What was the softest moment today?"</string>
+    <string name="text_when_did_you_feel_you_could_stop" formatted="false">"When did you feel you could stop?"</string>
+    <string name="text_what_deserves_a_quiet_celebration_today" formatted="false">"What deserves a quiet celebration today?"</string>
+    <string name="text_what_would_you_like_your_tomorrow_self" formatted="false">"What would you like your tomorrow self to remember?"</string>
+    <string name="text_what_could_bring_you_a_little_steadiness" formatted="false">"What could bring you a little steadiness now?"</string>
+    <string name="text_what_would_you_like_to_cherish_from" formatted="false">"What would you like to cherish from today?"</string>
+    <string name="text_where_does_your_body_most_need_to" formatted="false">"Where does your body most need to relax right now?"</string>
+    <string name="text_which_mood_stayed_the_longest_today" formatted="false">"Which mood stayed the longest today?"</string>
+    <string name="text_what_do_you_notice_as_you_breathe" formatted="false">"What do you notice as you breathe now?"</string>
+    <string name="text_when_did_you_feel_most_like_yourself" formatted="false">"When did you feel most like yourself today?"</string>
+    <string name="text_what_feeling_is_waiting_to_be_noticed" formatted="false">"What feeling is waiting to be noticed?"</string>
+    <string name="text_how_do_your_shoulders_feel_right_now" formatted="false">"How do your shoulders feel right now?"</string>
+    <string name="text_when_did_your_body_remind_you_to" formatted="false">"When did your body remind you to rest today?"</string>
+    <string name="text_what_does_the_ground_beneath_your_feet" formatted="false">"What does the ground beneath your feet feel like?"</string>
+    <string name="text_is_your_breathing_fast_or_slow_right" formatted="false">"Is your breathing fast or slow right now?"</string>
+    <string name="text_when_did_you_feel_a_little_more" formatted="false">"When did you feel a little more at ease today?"</string>
+    <string name="text_are_your_hands_warm_or_cool_now" formatted="false">"Are your hands warm or cool now?"</string>
+    <string name="text_what_weather_would_describe_your_mood_today" formatted="false">"What weather would describe your mood today?"</string>
+    <string name="text_what_sound_around_you_do_you_notice" formatted="false">"What sound around you do you notice first?"</string>
+    <string name="text_what_made_you_smile_without_thinking_today" formatted="false">"What made you smile without thinking today?"</string>
+    <string name="text_where_would_your_body_like_to_stretch" formatted="false">"Where would your body like to stretch now?"</string>
+    <string name="text_when_did_you_feel_a_little_tense" formatted="false">"When did you feel a little tense today?"</string>
+    <string name="text_what_color_can_you_see_right_now" formatted="false">"What color can you see right now?"</string>
+    <string name="text_what_scent_made_you_pause_for_a" formatted="false">"What scent made you pause for a second today?"</string>
+    <string name="text_where_do_you_feel_supported_as_you" formatted="false">"Where do you feel supported as you sit or stand?"</string>
+    <string name="text_what_feeling_came_and_slowly_went_today" formatted="false">"What feeling came and slowly went today?"</string>
+    <string name="text_does_your_mood_feel_like_moving_closer" formatted="false">"Does your mood feel like moving closer or stepping back?"</string>
+    <string name="text_when_did_you_want_to_be_quiet" formatted="false">"When did you want to be quiet today?"</string>
+    <string name="text_do_you_need_water_fresh_air_or" formatted="false">"Do you need water, fresh air or rest now?"</string>
+    <string name="text_what_image_from_today_is_still_on" formatted="false">"What image from today is still on your mind?"</string>
+    <string name="text_which_part_of_your_body_is_most" formatted="false">"Which part of your body is most relaxed now?"</string>
+    <string name="text_when_did_time_seem_to_pass_quickly" formatted="false">"When did time seem to pass quickly today?"</string>
+    <string name="text_how_far_away_can_you_hear_sounds" formatted="false">"How far away can you hear sounds right now?"</string>
+    <string name="text_was_there_a_moment_when_you_wanted" formatted="false">"Was there a moment when you wanted a deep breath?"</string>
+    <string name="text_how_does_the_light_feel_to_you" formatted="false">"How does the light feel to you now?"</string>
+    <string name="text_what_small_signal_did_your_body_give" formatted="false">"What small signal did your body give you today?"</string>
+    <string name="text_is_your_brow_relaxed_right_now" formatted="false">"Is your brow relaxed right now?"</string>
+    <string name="text_when_did_things_feel_a_little_brighter" formatted="false">"When did things feel a little brighter inside today?"</string>
+    <string name="text_what_would_you_like_to_move_closer" formatted="false">"What would you like to move closer to now?"</string>
+    <string name="text_what_sound_from_today_is_still_in" formatted="false">"What sound from today is still in your ears?"</string>
+    <string name="text_does_your_pace_feel_more_like_walking" formatted="false">"Does your pace feel more like walking or running now?"</string>
+    <string name="text_when_did_you_notice_your_breathing_today" formatted="false">"When did you notice your breathing today?"</string>
+    <string name="text_does_your_body_want_movement_or_stillness" formatted="false">"Does your body want movement or stillness now?"</string>
+    <string name="text_when_did_you_feel_comfortable_being_yourself" formatted="false">"When did you feel comfortable being yourself today?"</string>
+    <string name="text_what_feeling_is_hard_to_name_right" formatted="false">"What feeling is hard to name right now?"</string>
+    <string name="text_which_feeling_was_stronger_than_you_expected" formatted="false">"Which feeling was stronger than you expected today?"</string>
+    <string name="text_is_your_jaw_relaxed_right_now" formatted="false">"Is your jaw relaxed right now?"</string>
+    <string name="text_when_did_you_want_to_step_away" formatted="false">"When did you want to step away from the crowd today?"</string>
+    <string name="text_can_you_feel_your_clothes_against_your" formatted="false">"Can you feel your clothes against your skin now?"</string>
+    <string name="text_what_small_thing_changed_your_mood_today" formatted="false">"What small thing changed your mood today?"</string>
+    <string name="text_what_do_you_notice_about_the_temperature" formatted="false">"What do you notice about the temperature now?"</string>
+    <string name="text_which_moment_gave_you_energy_today" formatted="false">"Which moment gave you energy today?"</string>
+    <string name="text_does_your_heart_feel_full_or_empty" formatted="false">"Does your heart feel full or empty right now?"</string>
+    <string name="text_is_there_a_feeling_you_have_not" formatted="false">"Is there a feeling you have not had time to care for today?"</string>
+    <string name="text_where_would_you_most_like_to_place" formatted="false">"Where would you most like to place your attention now?"</string>
+    <string name="text_when_did_your_body_feel_strong_today" formatted="false">"When did your body feel strong today?"</string>
+    <string name="text_what_is_making_you_comfortable_right_now" formatted="false">"What is making you comfortable right now?"</string>
+    <string name="text_when_did_your_mood_take_a_turn" formatted="false">"When did your mood take a turn today?"</string>
+    <string name="text_would_your_eyes_like_to_look_far" formatted="false">"Would your eyes like to look far away or close by now?"</string>
+    <string name="text_what_touch_or_texture_stayed_with_you" formatted="false">"What touch or texture stayed with you today?"</string>
+    <string name="text_what_would_you_like_to_give_your" formatted="false">"What would you like to give your body more of now?"</string>
+    <string name="text_when_did_you_realize_you_were_tired" formatted="false">"When did you realize you were tired today?"</string>
+    <string name="text_what_color_would_express_your_mood_now" formatted="false">"What color would express your mood now?"</string>
+    <string name="text_was_there_a_moment_when_you_simply" formatted="false">"Was there a moment when you simply felt today?"</string>
+    <string name="text_what_is_quiet_around_you_now" formatted="false">"What is quiet around you now?"</string>
+    <string name="text_when_did_your_breathing_feel_easy_today" formatted="false">"When did your breathing feel easy today?"</string>
+    <string name="text_what_small_thing_you_did_today_is" formatted="false">"What small thing you did today is worth recording?"</string>
+    <string name="text_what_decision_brought_you_closer_to_yourself" formatted="false">"What decision brought you closer to yourself?"</string>
+    <string name="text_what_did_you_learn_today_that_is" formatted="false">"What did you learn today that is worth keeping?"</string>
+    <string name="text_if_you_could_try_again_where_would" formatted="false">"If you could try again, where would you be kinder to yourself?"</string>
+    <string name="text_what_could_you_set_down_before_today" formatted="false">"What could you set down before today ends?"</string>
+    <string name="text_what_do_you_understand_a_little_better" formatted="false">"What do you understand a little better than yesterday?"</string>
+    <string name="text_what_choice_did_you_make_thoughtfully" formatted="false">"What choice did you make thoughtfully?"</string>
+    <string name="text_what_did_you_give_your_time_to" formatted="false">"What did you give your time to today?"</string>
+    <string name="text_what_small_thing_brought_an_unexpected_change" formatted="false">"What small thing brought an unexpected change?"</string>
+    <string name="text_was_there_a_thought_today_worth_revisiting" formatted="false">"Was there a thought today worth revisiting?"</string>
+    <string name="text_what_has_been_enough_for_today" formatted="false">"What has been enough for today?"</string>
+    <string name="text_what_turned_out_differently_from_your_expectations" formatted="false">"What turned out differently from your expectations?"</string>
+    <string name="text_what_unfinished_thing_could_you_leave_here" formatted="false">"What unfinished thing could you leave here for now?"</string>
+    <string name="text_did_you_try_a_new_approach_today" formatted="false">"Did you try a new approach today?"</string>
+    <string name="text_when_did_you_change_your_mind" formatted="false">"When did you change your mind?"</string>
+    <string name="text_what_would_you_like_to_say_next" formatted="false">"What would you like to say next time?"</string>
+    <string name="text_what_deserves_a_look_from_another_angle" formatted="false">"What deserves a look from another angle?"</string>
+    <string name="text_what_habit_of_yours_did_you_notice" formatted="false">"What habit of yours did you notice today?"</string>
+    <string name="text_what_would_you_like_to_keep_doing" formatted="false">"What would you like to keep doing?"</string>
+    <string name="text_what_helped_you_understand_someone_differently_today" formatted="false">"What helped you understand someone differently today?"</string>
+    <string name="text_what_choice_made_you_feel_more_at" formatted="false">"What choice made you feel more at ease?"</string>
+    <string name="text_how_much_room_did_you_give_to" formatted="false">"How much room did you give to what matters today?"</string>
+    <string name="text_what_could_feel_lighter_next_time" formatted="false">"What could feel lighter next time?"</string>
+    <string name="text_when_did_you_decide_to_wait_today" formatted="false">"When did you decide to wait today?"</string>
+    <string name="text_what_thought_has_changed_since_this_morning" formatted="false">"What thought has changed since this morning?"</string>
+    <string name="text_what_did_you_discover_you_care_about" formatted="false">"What did you discover you care about today?"</string>
+    <string name="text_what_reminded_you_that_things_can_take" formatted="false">"What reminded you that things can take time?"</string>
+    <string name="text_what_did_you_say_no_to_and" formatted="false">"What did you say no to, and what did you keep?"</string>
+    <string name="text_what_small_progress_did_you_almost_miss" formatted="false">"What small progress did you almost miss?"</string>
+    <string name="text_what_pause_helped_you_today" formatted="false">"What pause helped you today?"</string>
+    <string name="text_what_would_you_like_to_finish_at" formatted="false">"What would you like to finish at your own pace?"</string>
+    <string name="text_where_did_you_change_a_little_today" formatted="false">"Where did you change a little today?"</string>
+    <string name="text_what_happened_to_something_you_had_worried" formatted="false">"What happened to something you had worried about?"</string>
+    <string name="text_what_words_stayed_on_your_mind_today" formatted="false">"What words stayed on your mind today?"</string>
+    <string name="text_if_you_named_today_what_would_you" formatted="false">"If you named today, what would you call it?"</string>
+    <string name="text_what_did_you_take_away_from_a" formatted="false">"What did you take away from a conversation today?"</string>
+    <string name="text_what_would_you_like_to_think_about" formatted="false">"What would you like to think about tomorrow?"</string>
+    <string name="text_did_you_discover_a_new_possibility_today" formatted="false">"Did you discover a new possibility today?"</string>
+    <string name="text_what_helped_you_understand_your_boundaries" formatted="false">"What helped you understand your boundaries?"</string>
+    <string name="text_what_deserves_a_closer_look_from_today" formatted="false">"What deserves a closer look from today?"</string>
+    <string name="text_what_decision_would_you_like_more_time" formatted="false">"What decision would you like more time for?"</string>
+    <string name="text_when_did_you_notice_a_change_today" formatted="false">"When did you notice a change today?"</string>
+    <string name="text_what_hope_became_clearer_today" formatted="false">"What hope became clearer today?"</string>
+    <string name="text_what_did_you_do_for_yourself_today" formatted="false">"What did you do for yourself today?"</string>
+    <string name="text_what_question_does_not_need_an_answer" formatted="false">"What question does not need an answer yet?"</string>
+    <string name="text_what_tiny_discovery_would_you_like_to" formatted="false">"What tiny discovery would you like to record today?"</string>
+    <string name="text_what_showed_you_that_you_need_help" formatted="false">"What showed you that you need help?"</string>
+    <string name="text_what_arrangement_suited_your_energy_best_today" formatted="false">"What arrangement suited your energy best today?"</string>
+    <string name="text_what_old_idea_loosened_a_little_today" formatted="false">"What old idea loosened a little today?"</string>
+    <string name="text_what_clue_did_you_leave_for_your" formatted="false">"What clue did you leave for your next step?"</string>
+    <string name="text_what_could_you_try_doing_another_way" formatted="false">"What could you try doing another way?"</string>
+    <string name="text_what_did_you_learn_about_yourself_today" formatted="false">"What did you learn about yourself today?"</string>
+    <string name="text_what_commitment_deserves_another_look" formatted="false">"What commitment deserves another look?"</string>
+    <string name="text_what_choice_brought_a_sigh_of_relief" formatted="false">"What choice brought a sigh of relief today?"</string>
+    <string name="text_what_would_you_like_to_keep_observing" formatted="false">"What would you like to keep observing?"</string>
+    <string name="text_what_did_you_leave_in_the_past" formatted="false">"What did you leave in the past today?"</string>
+    <string name="text_in_a_week_what_would_you_want" formatted="false">"In a week, what would you want to remember about today?"</string>
+    <string name="text_what_ordinary_thing_shows_that_life_is" formatted="false">"What ordinary thing shows that life is moving forward?"</string>
+    <string name="text_what_experience_would_you_like_time_to" formatted="false">"What experience would you like time to absorb?"</string>
+    <string name="text_what_room_would_you_like_to_leave" formatted="false">"What room would you like to leave yourself tomorrow?"</string>
+    <string name="text_gentle_reflection" formatted="false">"Gentle reflection"</string>
+    <string name="text_notice_today_s_choices_and_small_changes" formatted="false">"Notice today\'s choices and small changes"</string>
+    <string name="text_all" formatted="false">"All"</string>
+    <string name="text_with_photos" formatted="false">"With photos"</string>
+    <string name="text_without_photos" formatted="false">"Without photos"</string>
+    <string name="text_take_photo" formatted="false">"Take photo"</string>
+    <string name="text_saved_to_the_system_gallery_after_capture" formatted="false">"Saved to the system gallery after capture"</string>
+    <string name="text_no_camera_is_available_on_this_device" formatted="false">"No camera is available on this device"</string>
+    <string name="text_choose_from_gallery" formatted="false">"Choose from gallery"</string>
+    <string name="text_choose_several_photos_at_once" formatted="false">"Choose several photos at once"</string>
+    <string name="text_no_permission_to_save_to_the_system" formatted="false">"No permission to save to the system gallery"</string>
+    <string name="text_unable_to_create_system_gallery_folder" formatted="false">"Unable to create system gallery folder"</string>
+    <string name="text_unable_to_create_a_photo_in_the" formatted="false">"Unable to create a photo in the system gallery"</string>
+    <string name="text_unable_to_create_photo_storage" formatted="false">"Unable to create photo storage."</string>
+    <string name="text_unable_to_create_audio_storage" formatted="false">"Unable to create audio storage."</string>
+    <string name="text_unable_to_read_previous_appearance_settings_original" formatted="false">"Unable to read previous appearance settings. Original data is preserved."</string>
+    <string name="text_encrypted_database_initialization_failed_original_data_is" formatted="false">"Encrypted database initialization failed. Original data is preserved."</string>
+    <string name="text_search_offset_cannot_be_negative" formatted="false">"Search offset cannot be negative."</string>
+    <string name="text_search_page_size_must_be_between_1" formatted="false">"Search page size must be between 1 and 200."</string>
+    <string name="text_journal_search_is_unavailable_please_try_again" formatted="false">"Journal search is unavailable. Please try again."</string>
+    <string name="text_unable_to_save_journal_please_try_again" formatted="false">"Unable to save journal. Please try again."</string>
+    <string name="text_entry_id_cannot_be_empty" formatted="false">"Entry ID cannot be empty."</string>
+    <string name="text_entry_not_found_or_already_deleted" formatted="false">"Entry not found or already deleted."</string>
+    <string name="text_the_entry_has_an_invalid_photo_reference" formatted="false">"The entry has an invalid photo reference."</string>
+    <string name="text_each_entry_supports_up_to_9_photos" formatted="false">"Each entry supports up to 9 photos."</string>
+    <string name="text_unable_to_update_entry_please_try_again" formatted="false">"Unable to update entry. Please try again."</string>
+    <string name="text_unable_to_delete_entry_please_try_again" formatted="false">"Unable to delete entry. Please try again."</string>
+    <string name="text_the_undo_period_for_this_entry_has" formatted="false">"The undo period for this entry has expired."</string>
+    <string name="text_entry_photos_have_been_removed_deletion_cannot" formatted="false">"Entry photos have been removed. Deletion cannot be undone."</string>
+    <string name="text_entry_audio_has_been_removed_deletion_cannot" formatted="false">"Entry audio has been removed. Deletion cannot be undone."</string>
+    <string name="text_unable_to_undo_deletion_please_try_again" formatted="false">"Unable to undo deletion. Please try again."</string>
+    <string name="text_unable_to_save_appearance_settings_please_try" formatted="false">"Unable to save appearance settings. Please try again."</string>
+    <string name="text_unable_to_save_interface_style_please_try" formatted="false">"Unable to save interface style. Please try again."</string>
+    <string name="text_unable_to_read_the_selected_photo" formatted="false">"Unable to read the selected photo"</string>
+    <string name="text_recordings_must_be_no_longer_than_5" formatted="false">"Recordings must be no longer than 5 minutes."</string>
+    <string name="text_recording_2" formatted="false">"Recording"</string>
+    <string name="text_backup_recordings" formatted="false">"Backup recordings"</string>
+    <string name="text_invalid_draft_audio_reference_original_data_is" formatted="false">"Invalid draft audio reference. Original data is preserved."</string>
+    <string name="text_draft_audio_is_unavailable_the_original_reference" formatted="false">"Draft audio is unavailable. The original reference is preserved."</string>
+    <string name="text_backup_passwords_need_at_least_8_characters" formatted="false">"Backup passwords need at least 8 characters."</string>
+    <string name="text_journal_content_exceeds_the_backup_size_limit" formatted="false">"Journal content exceeds the backup size limit."</string>
+    <string name="text_this_is_not_a_xike_backup" formatted="false">"This is not a Xike backup."</string>
+    <string name="text_there_is_no_restore_to_undo" formatted="false">"There is no restore to undo."</string>
+    <string name="text_enter_the_backup_password" formatted="false">"Enter the backup password."</string>
+    <string name="text_the_backup_manifest_is_missing_or_out" formatted="false">"The backup manifest is missing or out of order."</string>
+    <string name="text_this_version_of_xike_backup_is_not" formatted="false">"This version of Xike backup is not supported."</string>
+    <string name="text_this_unencrypted_backup_format_is_not_supported" formatted="false">"This unencrypted backup format is not supported."</string>
+    <string name="text_the_backup_contains_too_many_photos" formatted="false">"The backup contains too many photos."</string>
+    <string name="text_the_backup_contains_too_many_recordings" formatted="false">"The backup contains too many recordings."</string>
+    <string name="text_photo_and_recording_names_in_the_backup" formatted="false">"Photo and recording names in the backup are duplicated."</string>
+    <string name="text_the_backup_contains_unknown_content" formatted="false">"The backup contains unknown content."</string>
+    <string name="text_the_backup_contains_duplicate_html" formatted="false">"The backup contains duplicate HTML."</string>
+    <string name="text_the_backup_contains_duplicate_completion_markers" formatted="false">"The backup contains duplicate completion markers."</string>
+    <string name="text_the_backup_is_incomplete" formatted="false">"The backup is incomplete."</string>
+    <string name="text_the_backup_contains_unreferenced_photos" formatted="false">"The backup contains unreferenced photos."</string>
+    <string name="text_the_backup_contains_duplicate_photos" formatted="false">"The backup contains duplicate photos."</string>
+    <string name="text_the_backup_contains_unreferenced_recordings" formatted="false">"The backup contains unreferenced recordings."</string>
+    <string name="text_the_backup_contains_duplicate_recordings" formatted="false">"The backup contains duplicate recordings."</string>
+    <string name="text_the_backup_contains_content_after_its_completion" formatted="false">"The backup contains content after its completion marker."</string>
+    <string name="text_the_backup_is_missing_photos_or_recordings" formatted="false">"The backup is missing photos or recordings."</string>
+    <string name="text_the_backup_manifest_is_missing" formatted="false">"The backup manifest is missing."</string>
+    <string name="text_incorrect_password_or_damaged_backup" formatted="false">"Incorrect password or damaged backup."</string>
+    <string name="text_the_backup_contains_too_many_entries" formatted="false">"The backup contains too many entries."</string>
+    <string name="text_photo" formatted="false">"Photo"</string>
+    <string name="text_backup_photos" formatted="false">"Backup photos"</string>
+    <string name="text_unable_to_create_restore_staging_folder" formatted="false">"Unable to create restore staging folder."</string>
+    <string name="text_unable_to_save_undo_snapshot_information" formatted="false">"Unable to save undo snapshot information."</string>
+    <string name="text_unable_to_create_an_undo_snapshot_device" formatted="false">"Unable to create an undo snapshot. Device content was not replaced."</string>
+    <string name="text_unable_to_read_the_journal_database_original" formatted="false">"Unable to read the journal database. Original data is preserved."</string>
+    <string name="text_unable_to_read_the_previous_journal_data" formatted="false">"Unable to read the previous journal data. Original data is preserved."</string>
+    <string name="text_unable_to_write_restored_content_original_data" formatted="false">"Unable to write restored content. Original data is preserved."</string>
+    <string name="text_the_backup_is_too_large" formatted="false">"The backup is too large."</string>
+    <string name="text_the_backup_header_is_incomplete" formatted="false">"The backup header is incomplete."</string>
+    <string name="text_the_backup_is_unencrypted_or_has_an" formatted="false">"The backup is unencrypted or has an invalid format."</string>
+    <string name="text_unable_to_read_the_database_key_original" formatted="false">"Unable to read the database key. Original data is preserved."</string>
+    <string name="text_the_database_key_is_missing_opening_stopped" formatted="false">"The database key is missing. Opening stopped to protect original data."</string>
+    <string name="text_unable_to_save_the_database_key" formatted="false">"Unable to save the database key."</string>
+    <string name="text_database_key_initialization_failed_no_database_was" formatted="false">"Database key initialization failed. No database was created."</string>
+    <string name="text_unable_to_create_temporary_audio_storage" formatted="false">"Unable to create temporary audio storage."</string>
+    <string name="text_temporary_audio_information_does_not_match" formatted="false">"Temporary audio information does not match."</string>
+    <string name="text_temporary_audio_duration_is_invalid" formatted="false">"Temporary audio duration is invalid."</string>
+    <string name="text_recording_exceeds_the_size_limit" formatted="false">"Recording exceeds the size limit."</string>
+    <string name="text_temporary_audio_filename_is_invalid" formatted="false">"Temporary audio filename is invalid."</string>
+    <string name="text_the_draft_session_has_changed_please_reopen" formatted="false">"The draft session has changed. Please reopen the recording page."</string>
+    <string name="text_unable_to_save_the_current_draft" formatted="false">"Unable to save the current draft."</string>
+    <string name="text_unable_to_read_the_temporary_recording" formatted="false">"Unable to read the temporary recording."</string>
+    <string name="text_unable_to_save_draft_please_try_again" formatted="false">"Unable to save draft. Please try again."</string>
+    <string name="text_past_entries_do_not_attach_today_s" formatted="false">"Past entries do not attach today\'s weather."</string>
+    <string name="text_location_and_weather_were_received_but_the" formatted="false">"Location and weather were received, but the draft could not be saved."</string>
+    <string name="text_city_weather_was_received_but_the_draft" formatted="false">"City weather was received, but the draft could not be saved."</string>
+    <string name="text_long_term_access_to_the_selected_photo" formatted="false">"Long-term access to the selected photo was unavailable. Please select it again."</string>
+    <string name="text_some_photos_cannot_be_read_long_term" formatted="false">"Some photos cannot be read long term. Recoverable photos were kept."</string>
+    <string name="text_the_recording_could_not_be_encrypted_for" formatted="false">"The recording could not be encrypted for temporary storage. Please record again."</string>
+    <string name="text_this_recording_was_cancelled" formatted="false">"This recording was cancelled."</string>
+    <string name="text_recording_finished_but_the_draft_could_not" formatted="false">"Recording finished, but the draft could not be saved."</string>
+    <string name="text_recording_saved_but_temporary_files_could_not" formatted="false">"Recording saved, but temporary files could not be removed. Please try again."</string>
+    <string name="text_unable_to_save_recording_please_try_again" formatted="false">"Unable to save recording. Please try again."</string>
+    <string name="text_unable_to_remove_the_temporary_recording_please" formatted="false">"Unable to remove the temporary recording. Please try again."</string>
+    <string name="text_unable_to_write_the_backup_file" formatted="false">"Unable to write the backup file"</string>
+    <string name="text_unable_to_read_the_backup_file" formatted="false">"Unable to read the backup file"</string>
+    <string name="text_entry_saved_but_the_draft_could_not" formatted="false">"Entry saved, but the draft could not be cleared."</string>
+    <string name="text_reminder_hour_must_be_between_0_and" formatted="false">"Reminder hour must be between 0 and 23."</string>
+    <string name="text_reminder_minute_must_be_between_0_and" formatted="false">"Reminder minute must be between 0 and 59."</string>
+    <string name="text_quiet_hours_start_must_be_between_0" formatted="false">"Quiet hours start must be between 0 and 23."</string>
+    <string name="text_quiet_hours_end_must_be_between_0" formatted="false">"Quiet hours end must be between 0 and 23."</string>
+    <string name="text_unable_to_save_daily_question_settings_2" formatted="false">"Unable to save daily question settings."</string>
+    <string name="text_unable_to_save_reminder_settings_2" formatted="false">"Unable to save reminder settings."</string>
+    <string name="text_unable_to_save_app_lock_settings_2" formatted="false">"Unable to save app lock settings."</string>
+    <string name="text_unable_to_save_auto_lock_time" formatted="false">"Unable to save auto-lock time."</string>
+    <string name="text_social">Social</string>
+    <string name="text_exercise">Exercise</string>
+    <string name="text_creating">Creating</string>
+</resources>

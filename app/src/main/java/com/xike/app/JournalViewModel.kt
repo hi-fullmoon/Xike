@@ -11,9 +11,13 @@ import androidx.lifecycle.viewModelScope
 import java.io.InputStream
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -30,6 +34,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val outdoorRepository = OutdoorContextRepository(application)
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
+    private var noteSaveJob: Job? = null
+    private val noteSaveScopeJob = SupervisorJob()
+    private val noteSaveScope = CoroutineScope(noteSaveScopeJob + Dispatchers.IO)
+    private var observationFailureReported = false
 
     var entries by mutableStateOf(emptyList<JournalEntry>())
         private set
@@ -62,9 +70,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     init {
+        draftStore.nextRevision()
         pruneVoiceTemporaryFiles(application)
         viewModelScope.launch {
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
+            val draftFlushResult = withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
             val pendingResult = withContext(Dispatchers.IO) { runCatching(pendingAudioStore::recover) }
             result.onSuccess { snapshot ->
@@ -77,26 +87,52 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 selectedStyle = appearance.style
                 canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
                 draftResult.onSuccess { draft = it }
-                dataError = draftResult.exceptionOrNull()?.message
+                dataError = draftResult.exceptionOrNull()?.message ?: draftFlushResult.exceptionOrNull()?.message
                 pendingResult.onSuccess { staged ->
                     pendingDraftAudio = staged?.let {
                         PendingDraftAudio(it.durationMillis, draftGeneration, it.fileName)
                     }
                 }.onFailure { error ->
-                    dataError = error.message ?: "录音暂存文件暂时无法读取。"
+                    dataError = error.message ?: localizedText("录音暂存文件暂时无法读取。")
                 }
-                withContext(Dispatchers.IO) {
-                    runCatching { store.removeOrphanedMedia(draft.audio?.fileName) }
+                val audioResult = withContext(Dispatchers.IO) {
+                    runCatching { draft.audio?.let { store.requireReadableAudio(it.fileName) } }
+                }
+                audioResult.onFailure {
+                    dataError = it.message ?: tr("草稿录音暂时无法读取，原文件已保留。", "Draft audio cannot be read. The original file is preserved.")
+                }
+                val imageResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        draft.imageUriStrings.forEach { uriString ->
+                            getApplication<Application>().contentResolver
+                                .openAssetFileDescriptor(Uri.parse(uriString), "r")?.use { }
+                                ?: error("草稿照片暂时无法读取，原引用已保留。")
+                        }
+                    }
+                }
+                imageResult.onFailure { dataError = "草稿照片暂时无法读取，原引用已保留。" }
+                if (draftResult.isSuccess && audioResult.isSuccess && imageResult.isSuccess) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { store.removeOrphanedMedia(draft.audio?.fileName) }
+                    }
                 }
                 viewModelScope.launch {
                     store.observeEntries()
-                        .catch { error ->
-                            dataError = error.message ?: "日记数据库暂时无法读取，原数据未被覆盖。"
+                        .retryWhen { error, attempt ->
+                            if (!observationFailureReported) {
+                                observationFailureReported = true
+                                dataError = error.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
+                            }
+                            delay((1_000L * (attempt.coerceAtMost(4L) + 1L)))
+                            true
                         }
-                        .collect { latestEntries -> entries = latestEntries }
+                        .collect { latestEntries ->
+                            observationFailureReported = false
+                            entries = latestEntries
+                        }
                 }
             }.onFailure { error ->
-                dataError = error.message ?: "日记数据库暂时无法读取，原数据未被覆盖。"
+                dataError = error.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
             }
             isLoading = false
             if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
@@ -113,7 +149,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { runCatching { store.saveThemeName(theme.name) } }
                 .onFailure { error ->
-                    dataError = error.message ?: "外观设置保存失败，请重试。"
+                    dataError = error.message ?: localizedText("外观设置保存失败，请重试。")
                 }
         }
     }
@@ -124,7 +160,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { runCatching { store.saveStyleName(style.name) } }
                 .onFailure { error ->
-                    dataError = error.message ?: "界面风格保存失败，请重试。"
+                    dataError = error.message ?: localizedText("界面风格保存失败，请重试。")
                 }
         }
     }
@@ -134,7 +170,31 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateDraftNote(note: String) {
-        persistDraft(draft.copy(note = note.take(MAX_DRAFT_NOTE_LENGTH)))
+        draft = draft.copy(note = note.take(MAX_DRAFT_NOTE_LENGTH), updatedAt = System.currentTimeMillis()).normalized()
+        scheduleNoteSave(250L)
+    }
+
+    fun flushDraft() {
+        if (noteSaveJob != null && draftStore.hasPendingWrite) scheduleNoteSave(0L)
+    }
+
+    private fun scheduleNoteSave(delayMillis: Long) {
+        noteSaveJob?.cancel()
+        val snapshot = draft
+        val revision = draftStore.queue(snapshot)
+        noteSaveJob = noteSaveScope.launch {
+            delay(delayMillis)
+            runCatching { draftStore.saveIfCurrent(snapshot, revision) }
+                .onFailure { error ->
+                    viewModelScope.launch { dataError = error.message ?: localizedText("草稿保存失败，请重试。") }
+                }
+        }
+    }
+
+    override fun onCleared() {
+        flushDraft()
+        noteSaveScopeJob.complete()
+        super.onCleared()
     }
 
     fun toggleDraftTag(tag: String) {
@@ -159,9 +219,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val requestGeneration = draftGeneration
         return runOutdoorRequest(outdoorRepository::current).mapCatching { snapshot ->
             if (requestGeneration != draftGeneration) return@mapCatching
-            check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
+            check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
             check(persistDraft(draft.copy(outdoor = snapshot))) {
-                "地点与天气已取得，但草稿保存失败。"
+                localizedText("地点与天气已取得，但草稿保存失败。")
             }
         }
     }
@@ -170,9 +230,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val requestGeneration = draftGeneration
         return runOutdoorRequest { outdoorRepository.city(city) }.mapCatching { snapshot ->
             if (requestGeneration != draftGeneration) return@mapCatching
-            check(draft.recordedAt == null) { "补记过去时不会附加今天的天气。" }
+            check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
             check(persistDraft(draft.copy(outdoor = snapshot))) {
-                "城市天气已取得，但草稿保存失败。"
+                localizedText("城市天气已取得，但草稿保存失败。")
             }
         }
     }
@@ -207,7 +267,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         if (grantedUris.isEmpty()) {
-            dataError = "所选照片无法获得长期读取权限，请重新选择。"
+            dataError = localizedText("所选照片无法获得长期读取权限，请重新选择。")
             return
         }
 
@@ -217,7 +277,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (!persistDraft(updated)) {
             grantedUris.forEach(::releaseDraftImageAccess)
         } else if (grantedUris.size < newUris.size) {
-            dataError = "部分照片无法长期读取，已保留可以恢复的照片。"
+            dataError = localizedText("部分照片无法长期读取，已保留可以恢复的照片。")
         }
     }
 
@@ -251,7 +311,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             } catch (error: Throwable) {
                 if (pending === pendingDraftAudio) {
                     pendingDraftAudio = null
-                    dataError = error.message ?: "录音未能加密暂存，请重新录制。"
+                    dataError = error.message ?: localizedText("录音未能加密暂存，请重新录制。")
                 }
                 isDraftAudioSaving = false
                 return@launch
@@ -288,11 +348,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 }
                 val result = imported.mapCatching { audio ->
                     check(pending === pendingDraftAudio && pending.draftGeneration == draftGeneration) {
-                        "这段录音已经取消。"
+                        localizedText("这段录音已经取消。")
                     }
                     val previousAudio = draft.audio
                     check(persistDraft(draft.copy(audio = audio), reportError = false)) {
-                        "录音已经完成，但草稿保存失败。"
+                        localizedText("录音已经完成，但草稿保存失败。")
                     }
                     if (previousAudio != null && previousAudio.fileName != audio.fileName) {
                         viewModelScope.launch(Dispatchers.IO) {
@@ -308,18 +368,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 if (pending === pendingDraftAudio) {
                     result.onSuccess {
                         check(withContext(Dispatchers.IO) { pendingAudioStore.delete(staged) }) {
-                            "录音已保存，但暂存文件清理失败，请重试。"
+                            localizedText("录音已保存，但暂存文件清理失败，请重试。")
                         }
                         pendingDraftAudio = null
                     }.onFailure { error ->
-                        draftAudioSaveError = error.message ?: "录音保存失败，请重试。"
+                        draftAudioSaveError = error.message ?: localizedText("录音保存失败，请重试。")
                     }
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 if (pending === pendingDraftAudio) {
-                    draftAudioSaveError = error.message ?: "录音保存失败，请重试。"
+                    draftAudioSaveError = error.message ?: localizedText("录音保存失败，请重试。")
                 }
             } finally {
                 isDraftAudioSaving = false
@@ -332,7 +392,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val pending = pendingDraftAudio ?: return
         val staged = pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
         if (!pendingAudioStore.delete(staged)) {
-            draftAudioSaveError = "录音暂存文件暂时无法删除，请重试。"
+            draftAudioSaveError = localizedText("录音暂存文件暂时无法删除，请重试。")
             return
         }
         pendingDraftAudio = null
@@ -363,10 +423,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = viewModelScope.async {
         val savedDraft = draft
         val result = withContext(Dispatchers.IO) {
-            runCatching { store.add(entry, imageUris) }
+            runCatching { store.add(entry, imageUris, refreshEntries = false) }
         }
-        result.onSuccess { restoredEntries ->
-            entries = restoredEntries
+        result.onSuccess {
             clearDraftAfterSave(savedDraft)
         }
         result.map { }
@@ -378,10 +437,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         newImageUris: List<Uri>,
     ): Result<JournalEntry> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
-            runCatching { store.update(entry, retainedImageFileNames, newImageUris) }
+            runCatching { store.update(entry, retainedImageFileNames, newImageUris, refreshEntries = false) }
         }
-        result.onSuccess { updatedEntries ->
-            entries = updatedEntries
+        result.onSuccess {
             dataError = null
         }
         result.mapCatching { updatedEntries ->
@@ -391,10 +449,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun delete(entry: JournalEntry): Result<Unit> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
-            runCatching { store.delete(entry.id) }
+            runCatching { store.delete(entry.id, refreshEntries = false) }
         }
-        result.onSuccess { remainingEntries ->
-            entries = remainingEntries
+        result.onSuccess {
             dataError = null
         }
         result.map { }
@@ -402,10 +459,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun undoDelete(entryId: String): Result<Unit> = viewModelScope.async {
         val result = withContext(Dispatchers.IO) {
-            runCatching { store.undoDelete(entryId) }
+            runCatching { store.undoDelete(entryId, refreshEntries = false) }
         }
-        result.onSuccess { restoredEntries ->
-            entries = restoredEntries
+        result.onSuccess {
             dataError = null
         }
         result.map { }
@@ -427,14 +483,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching {
             getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
                 store.writeBackup(output, password)
-            } ?: error("无法写入备份文件")
+            } ?: error(localizedText("无法写入备份文件"))
         }
     }.await()
 
     suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> = viewModelScope.async(Dispatchers.IO) {
         runCatching {
             getApplication<Application>().contentResolver.openInputStream(uri)?.use(store::backupRequiresPassword)
-                ?: error("无法读取备份文件")
+                ?: error(localizedText("无法读取备份文件"))
         }
     }.await()
 
@@ -442,7 +498,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching {
             getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
                 store.inspectBackup(input, password)
-            } ?: error("无法读取备份文件")
+            } ?: error(localizedText("无法读取备份文件"))
         }
     }.await()
 
@@ -451,7 +507,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
                     store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName))
-                } ?: error("无法读取备份文件")
+                } ?: error(localizedText("无法读取备份文件"))
             }
         }
         result.onSuccess {
@@ -482,10 +538,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
         return runCatching { draftStore.save(normalized) }
             .onSuccess {
+                noteSaveJob?.cancel()
+                noteSaveJob = null
                 draft = normalized
             }
             .onFailure { error ->
-                if (reportError) dataError = error.message ?: "草稿保存失败，请重试。"
+                if (reportError) dataError = error.message ?: localizedText("草稿保存失败，请重试。")
             }
             .isSuccess
     }
@@ -504,8 +562,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (currentDraft == savedDraft) {
             draft = JournalDraft()
             runCatching { draftStore.save(draft) }
+                .onSuccess {
+                    noteSaveJob?.cancel()
+                    noteSaveJob = null
+                }
                 .onFailure { error ->
-                    dataError = error.message ?: "记录已保存，但草稿清理失败。"
+                    dataError = error.message ?: localizedText("记录已保存，但草稿清理失败。")
                 }
         }
         savedDraft.imageUriStrings
@@ -531,36 +593,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private fun loadAccessibleDraft(): JournalDraft {
         val loaded = draftStore.load()
         val application = getApplication<Application>()
-        val loadedWithAccessibleAudio = if (loaded.audio == null || store.openAudio(loaded.audio.fileName)?.use { true } == true) {
-            loaded
-        } else {
-            loaded.copy(audio = null).also(draftStore::save)
-        }
-        if (loadedWithAccessibleAudio.imageUriStrings.isEmpty()) {
-            pruneCameraCaptures(application)
-            return loadedWithAccessibleAudio
-        }
-        val contentResolver = application.contentResolver
-        val readableUris = contentResolver.persistedUriPermissions
-            .filter { it.isReadPermission }
-            .map { it.uri.toString() }
-            .toSet()
-        val accessible = loadedWithAccessibleAudio.copy(
-            imageUriStrings = loadedWithAccessibleAudio.imageUriStrings.filter { uriString ->
-                val uri = Uri.parse(uriString)
-                (isCameraCaptureUri(application, uri) || uriString in readableUris) && runCatching {
-                    contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true
-                }.getOrDefault(false)
-            },
-        )
-        if (accessible != loadedWithAccessibleAudio) {
-            draftStore.save(accessible)
-            loadedWithAccessibleAudio.imageUriStrings
-                .filterNot { it in accessible.imageUriStrings }
-                .map(Uri::parse)
-                .forEach(::releaseDraftImageAccess)
-        }
         pruneCameraCaptures(application)
-        return accessible
+        return loaded
     }
 }

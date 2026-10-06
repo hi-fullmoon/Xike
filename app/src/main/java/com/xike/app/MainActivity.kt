@@ -13,7 +13,6 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -76,6 +75,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     private val lockSession: AppLockSessionState by viewModels()
+    private var openedJournalViewModel: JournalViewModel? = null
     private lateinit var lockPreferences: AppLockPreferences
     private lateinit var appearancePreferences: AppearancePreferences
     private lateinit var biometricPrompt: BiometricPrompt
@@ -92,6 +92,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLocale.initialize(this)
         lockPreferences = AppLockPreferences(this)
         appearancePreferences = AppearancePreferences(this)
         appearancePreferences.current().let { appearance ->
@@ -118,7 +119,7 @@ class MainActivity : FragmentActivity() {
             statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
         )
-        setContent {
+        setLocalizedContent {
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) { granted ->
@@ -126,7 +127,7 @@ class MainActivity : FragmentActivity() {
                 if (granted) {
                     persistReminderSettings(reminderSettings.copy(enabled = true))
                 } else {
-                    Toast.makeText(this, "没有开启通知，记录功能仍可正常使用", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, localizedText("没有开启通知，记录功能仍可正常使用"), Toast.LENGTH_LONG).show()
                 }
             }
             if (!lockSession.journalSessionOpened) {
@@ -141,6 +142,7 @@ class MainActivity : FragmentActivity() {
                 }
             } else {
                 val journalViewModel: JournalViewModel = viewModel()
+                openedJournalViewModel = journalViewModel
                 LaunchedEffect(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
                     lockScreenTheme = journalViewModel.selectedTheme
                     lockScreenStyle = journalViewModel.selectedStyle
@@ -218,7 +220,7 @@ class MainActivity : FragmentActivity() {
                         }
 
                         if (journalViewModel.isLoading) {
-                            ProcessingDialog("正在读取加密日记…")
+                            ProcessingDialog(localizedText("正在读取加密日记…"))
                         }
 
                         if (appLockEnabled && lockSession.isAppLocked) {
@@ -234,7 +236,6 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
-
     }
 
     override fun onStart() {
@@ -286,6 +287,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onStop() {
+        openedJournalViewModel?.flushDraft()
         if (appLockEnabled && !isChangingConfigurations) {
             lockSession.recordBackgrounded(SystemClock.elapsedRealtime())
         }
@@ -355,12 +357,12 @@ class MainActivity : FragmentActivity() {
             BiometricPrompt.PromptInfo.Builder()
                 .setTitle(
                     when (action) {
-                        LockAuthentication.UNLOCK -> "解锁息刻"
-                        LockAuthentication.ENABLE -> "开启应用锁"
-                        LockAuthentication.DISABLE -> "关闭应用锁"
+                        LockAuthentication.UNLOCK -> localizedText("解锁息刻")
+                        LockAuthentication.ENABLE -> localizedText("开启应用锁")
+                        LockAuthentication.DISABLE -> localizedText("关闭应用锁")
                     },
                 )
-                .setSubtitle("使用面容、指纹或设备密码验证身份")
+                .setSubtitle(localizedText("使用面容、指纹或设备密码验证身份"))
                 .setAllowedAuthenticators(allowedAuthenticators)
                 .build(),
         )
@@ -382,12 +384,12 @@ class MainActivity : FragmentActivity() {
                 lockSession.backgroundedAtMillis = null
                 Toast.makeText(
                     this,
-                    if (enabled) "应用锁已开启" else "应用锁已关闭",
+                    if (enabled) localizedText("应用锁已开启") else localizedText("应用锁已关闭"),
                     Toast.LENGTH_SHORT,
                 ).show()
             }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: "应用锁设置保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, error.message ?: localizedText("应用锁设置保存失败"), Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -395,7 +397,7 @@ class MainActivity : FragmentActivity() {
         runCatching { lockPreferences.timeout = timeout }
             .onSuccess { appLockTimeout = timeout }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: "自动锁定设置保存失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, error.message ?: localizedText("自动锁定设置保存失败"), Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -427,7 +429,7 @@ class MainActivity : FragmentActivity() {
                 ReminderScheduler.reconcile(this, settings)
             }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: "提醒设置保存失败", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, error.message ?: localizedText("提醒设置保存失败"), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -435,7 +437,7 @@ class MainActivity : FragmentActivity() {
         runCatching { habitPreferences.dailyPrompt = settings }
             .onSuccess { dailyPromptSettings = settings }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: "每日一问设置保存失败", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, error.message ?: localizedText("每日一问设置保存失败"), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -468,7 +470,7 @@ class MainActivity : FragmentActivity() {
         runCatching { startActivity(intent) }
             .onFailure {
                 lockSession.pendingAuthenticationAfterEnrollment = null
-                Toast.makeText(this, "无法打开系统安全设置", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, localizedText("无法打开系统安全设置"), Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -591,22 +593,22 @@ private fun XikeApp(
 
     suspend fun runUndoRestore() {
         snackbarHostState.currentSnackbarData?.dismiss()
-        busyMessage = "正在撤销上次恢复…"
+        busyMessage = localizedText("正在撤销上次恢复…")
         onUndoRestore()
             .onSuccess { count ->
-                Toast.makeText(context, "已撤销恢复，找回 $count 条日记", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, tr("已撤销恢复，找回 $count 条日记", "Restore undone. Recovered $count entries"), Toast.LENGTH_SHORT).show()
             }
             .onFailure {
-                Toast.makeText(context, it.message ?: "撤销恢复失败", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, it.message ?: localizedText("撤销恢复失败"), Toast.LENGTH_LONG).show()
             }
         busyMessage = null
     }
 
     suspend fun inspectSelectedBackup(uri: Uri, password: String?) {
-        busyMessage = "正在验证备份…"
+        busyMessage = localizedText("正在验证备份…")
         onInspectBackup(uri, password)
             .onSuccess { summary -> pendingRestore = PendingRestore(uri, password, summary) }
-            .onFailure { Toast.makeText(context, it.message ?: "备份验证失败", Toast.LENGTH_LONG).show() }
+            .onFailure { Toast.makeText(context, it.message ?: localizedText("备份验证失败"), Toast.LENGTH_LONG).show() }
         busyMessage = null
     }
 
@@ -615,13 +617,13 @@ private fun XikeApp(
         pendingExport = null
         if (uri != null && export != null) {
             scope.launch {
-                busyMessage = "正在创建备份…"
+                busyMessage = localizedText("正在创建备份…")
                 onExportBackup(uri, export.password)
                     .onSuccess {
-                        Toast.makeText(context, "备份已保存", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, localizedText("备份已保存"), Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
-                        Toast.makeText(context, it.message ?: "备份失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, it.message ?: localizedText("备份失败"), Toast.LENGTH_SHORT).show()
                     }
                 busyMessage = null
             }
@@ -640,7 +642,7 @@ private fun XikeApp(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
-                busyMessage = "正在识别备份…"
+                busyMessage = localizedText("正在识别备份…")
                 onBackupRequiresPassword(uri)
                     .onSuccess { requiresPassword ->
                         busyMessage = null
@@ -653,7 +655,7 @@ private fun XikeApp(
                     }
                     .onFailure {
                         busyMessage = null
-                        Toast.makeText(context, it.message ?: "无法识别备份", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, it.message ?: localizedText("无法识别备份"), Toast.LENGTH_LONG).show()
                     }
             }
         }
@@ -667,7 +669,7 @@ private fun XikeApp(
                 selected = screen,
                 onSelected = { selected ->
                     if (isVoiceCaptureActive && selected != AppScreen.HOME) {
-                        Toast.makeText(context, "请先完成或取消录音", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, localizedText("请先完成或取消录音"), Toast.LENGTH_SHORT).show()
                     } else {
                         screen = selected
                     }
@@ -757,9 +759,9 @@ private fun XikeApp(
 
     if (backupAction == BackupAction.IMPORT) {
         BackupPasswordDialog(
-            title = "解锁备份",
-            confirm = "查看备份摘要",
-            description = "输入创建备份时设置的密码。应用会先完整验证内容，不会修改设备上的日记。",
+            title = localizedText("解锁备份"),
+            confirm = localizedText("查看备份摘要"),
+            description = localizedText("输入创建备份时设置的密码。应用会先完整验证内容，不会修改设备上的日记。"),
             onDismiss = {
                 backupAction = null
                 pendingImportUri = null
@@ -783,20 +785,20 @@ private fun XikeApp(
             onConfirm = {
                 pendingRestore = null
                 scope.launch {
-                    busyMessage = "正在创建安全快照并恢复…"
+                    busyMessage = localizedText("正在创建安全快照并恢复…")
                     onRestoreBackup(request.uri, request.password)
                         .onSuccess { count ->
                             busyMessage = null
                             val result = snackbarHostState.showSnackbar(
-                                message = "已恢复 $count 条日记",
-                                actionLabel = "撤销",
+                                message = tr("已恢复 $count 条日记", "Restored $count entries"),
+                                actionLabel = localizedText("撤销"),
                                 withDismissAction = true,
                                 duration = SnackbarDuration.Long,
                             )
                             if (result == SnackbarResult.ActionPerformed) runUndoRestore()
                         }
                         .onFailure {
-                            Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, it.message ?: localizedText("恢复失败"), Toast.LENGTH_LONG).show()
                             busyMessage = null
                         }
                 }
@@ -814,11 +816,13 @@ private fun RestoreConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年M月d日") }
+    val formatter = remember(AppLocale.language) {
+        DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
+    }
     val oldestCreatedAt = summary.oldestCreatedAt
     val newestCreatedAt = summary.newestCreatedAt
     val dateRange = if (oldestCreatedAt == null || newestCreatedAt == null) {
-        "无记录日期"
+        localizedText("无记录日期")
     } else {
         val zone = java.time.ZoneId.systemDefault()
         val oldest = java.time.Instant.ofEpochMilli(oldestCreatedAt).atZone(zone).toLocalDate()
@@ -833,19 +837,19 @@ private fun RestoreConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("确认替换设备内容？") },
+        title = { Text(localizedText("确认替换设备内容？")) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片" +
-                        if (summary.audioCount > 0) "、${summary.audioCount} 段语音。" else "。",
+                    tr("备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片", "The backup contains ${summary.entryCount} entries and ${summary.imageCount} photos") +
+                        if (summary.audioCount > 0) tr("、${summary.audioCount} 段语音。", ", and ${summary.audioCount} voice notes.") else localizedText("。"),
                 )
                 Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。",
+                    tr("当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。", "The $localEntryCount entries on this device will be replaced. An encrypted safety snapshot is created first, allowing one undo."),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -854,10 +858,10 @@ private fun RestoreConfirmationDialog(
             TextButton(
                 onClick = onConfirm,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text("替换并恢复") }
+            ) { Text(localizedText("替换并恢复")) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(localizedText("取消")) }
         },
     )
 }
@@ -874,17 +878,17 @@ private fun BackupExportDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("导出日记备份", style = MaterialTheme.typography.headlineSmall) },
+        title = { Text(localizedText("导出日记备份"), style = MaterialTheme.typography.headlineSmall) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("备份包含全部日记、照片和录音。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(localizedText("备份包含全部日记、照片和录音。"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("使用密码加密", style = MaterialTheme.typography.titleSmall)
-                        Text("建议开启；密码不会保存在应用中", style = MaterialTheme.typography.bodySmall)
+                        Text(localizedText("使用密码加密"), style = MaterialTheme.typography.titleSmall)
+                        Text(localizedText("建议开启；密码不会保存在应用中"), style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = encrypted, onCheckedChange = { encrypted = it })
                 }
@@ -892,14 +896,14 @@ private fun BackupExportDialog(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("备份密码（至少 8 位）") },
+                        label = { Text(localizedText("备份密码（至少 8 位）")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
+                                    contentDescription = if (passwordVisible) localizedText("隐藏密码") else localizedText("显示密码"),
                                 )
                             }
                         },
@@ -908,16 +912,16 @@ private fun BackupExportDialog(
                     OutlinedTextField(
                         value = confirmation,
                         onValueChange = { confirmation = it },
-                        label = { Text("再次输入备份密码") },
+                        label = { Text(localizedText("再次输入备份密码")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         isError = confirmation.isNotEmpty() && confirmation != password,
                         singleLine = true,
                     )
-                    Text("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。", style = MaterialTheme.typography.bodySmall)
+                    Text(localizedText("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。"), style = MaterialTheme.typography.bodySmall)
                 } else {
                     Text(
-                        "未加密文件保存为 .zip。解压后打开 index.html 即可离线查看；拿到文件的人也能看到全部内容。",
+                        localizedText("未加密文件保存为 .zip。解压后打开 index.html 即可离线查看；拿到文件的人也能看到全部内容。"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -928,9 +932,9 @@ private fun BackupExportDialog(
             TextButton(
                 enabled = !encrypted || (password.length >= 8 && confirmation == password),
                 onClick = { onConfirm(password.takeIf { encrypted }) },
-            ) { Text("选择保存位置") }
+            ) { Text(localizedText("选择保存位置")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
     )
 }
 
@@ -963,14 +967,14 @@ private fun BackupPasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("备份密码（至少 8 位）") },
+                    label = { Text(localizedText("备份密码（至少 8 位）")) },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
                                 if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
+                                contentDescription = if (passwordVisible) localizedText("隐藏密码") else localizedText("显示密码"),
                             )
                         }
                     },
@@ -980,12 +984,12 @@ private fun BackupPasswordDialog(
                     OutlinedTextField(
                         value = confirmation,
                         onValueChange = { confirmation = it },
-                        label = { Text("再次输入备份密码") },
+                        label = { Text(localizedText("再次输入备份密码")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         isError = confirmation.isNotEmpty() && confirmation != password,
                         supportingText = if (confirmation.isNotEmpty() && confirmation != password) {
-                            { Text("两次密码不一致") }
+                            { Text(localizedText("两次密码不一致")) }
                         } else null,
                         singleLine = true,
                     )
@@ -999,7 +1003,7 @@ private fun BackupPasswordDialog(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             ) { Text(confirm) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
     )
 }
 
@@ -1024,10 +1028,10 @@ private fun DataErrorDialog(message: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
-        title = { Text("数据需要检查") },
+        title = { Text(localizedText("数据需要检查")) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("我知道了") }
+            TextButton(onClick = onDismiss) { Text(localizedText("我知道了")) }
         },
     )
 }

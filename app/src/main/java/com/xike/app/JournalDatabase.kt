@@ -360,14 +360,14 @@ internal abstract class JournalDao {
     open fun deleteJournal(entryId: String): List<String> {
         val images = imageFileNames(entryId)
         deleteSearchEntry(entryId)
-        check(deleteEntry(entryId) == 1) { "记录不存在或已经删除。" }
+        check(deleteEntry(entryId) == 1) { localizedText("记录不存在或已经删除。") }
         return images
     }
 
     @Transaction
     open fun updateJournal(bundle: JournalBundle): List<String> {
         val previousImages = imageFileNames(bundle.entry.id)
-        check(updateEntry(bundle.entry) == 1) { "记录不存在或已经删除。" }
+        check(updateEntry(bundle.entry) == 1) { localizedText("记录不存在或已经删除。") }
         deleteEntryTags(bundle.entry.id)
         deleteEntryImages(bundle.entry.id)
         deleteEntryAudio(bundle.entry.id)

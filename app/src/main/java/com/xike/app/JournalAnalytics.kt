@@ -24,15 +24,20 @@ data class WeeklyJournalSummary(
 )
 
 enum class InsightsPeriod(
-    val label: String,
-    val metricLabel: String,
-    val trendTitle: String,
-    val contextName: String,
+    private val sourceLabel: String,
+    private val sourceMetricLabel: String,
+    private val sourceTrendTitle: String,
+    private val sourceContextName: String,
 ) {
     WEEK("本周", "本周记录", "一周的起伏", "本周"),
     DAYS_30("近30天", "30天记录", "最近一个月", "近30天"),
     DAYS_90("近90天", "90天记录", "最近三个月", "近90天"),
-    YEAR("今年", "今年记录", "今年的变化", "今年"),
+    YEAR("今年", "今年记录", "今年的变化", "今年");
+
+    val label: String get() = localizedText(sourceLabel)
+    val metricLabel: String get() = localizedText(sourceMetricLabel)
+    val trendTitle: String get() = localizedText(sourceTrendTitle)
+    val contextName: String get() = localizedText(sourceContextName)
 }
 
 data class MoodTrendPoint(
@@ -63,9 +68,11 @@ data class TagTrendItem(
         get() = entryCount - previousEntryCount
 }
 
-enum class DayType(val label: String) {
+enum class DayType(private val sourceLabel: String) {
     WEEKDAY("工作日"),
-    WEEKEND("周末"),
+    WEEKEND("周末");
+
+    val label: String get() = localizedText(sourceLabel)
 }
 
 data class DayTypeInsight(
@@ -81,13 +88,16 @@ data class DayTypeInsight(
 }
 
 enum class InsightEvidenceLevel(
-    val label: String,
-    val description: String,
+    private val sourceLabel: String,
+    private val sourceDescription: String,
 ) {
     NONE("暂无样本", "还没有记录，因此不生成趋势判断。"),
     LIMITED("样本很少", "当前只展示事实，不解读变化或差异。"),
     DEVELOPING("初步线索", "可以观察分布，但仍不适合归因。"),
-    ESTABLISHED("可供回顾", "样本足以描述这段记录，仍不代表原因或诊断。"),
+    ESTABLISHED("可供回顾", "样本足以描述这段记录，仍不代表原因或诊断。");
+
+    val label: String get() = localizedText(sourceLabel)
+    val description: String get() = localizedText(sourceDescription)
 }
 
 data class InsightEvidence(
@@ -294,28 +304,28 @@ internal fun entriesWithIds(entries: List<JournalEntry>, entryIds: Collection<St
 }
 
 internal fun localReviewText(summary: JournalPeriodSummary): String {
-    val dateFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
+    val dateFormatter = DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
     val moodLine = summary.moodDistribution
         .filter { it.entryCount > 0 }
         .sortedByDescending(MoodDistributionItem::entryCount)
-        .joinToString("、") { "${it.mood.label} ${it.entryCount} 次" }
-        .ifBlank { "暂无心情分布" }
+        .joinToString("、") { tr("${it.mood.label} ${it.entryCount} 次", "${it.mood.label} ${it.entryCount} entries") }
+        .ifBlank { localizedText("暂无心情分布") }
     val tagLine = summary.topTags.take(3)
-        .joinToString("、") { "${it.tag} ${it.entryCount} 次" }
-        .ifBlank { "暂无主题" }
+        .joinToString("、") { tr("${it.tag} ${it.entryCount} 次", "${localizedText(it.tag)} ${it.entryCount} entries") }
+        .ifBlank { localizedText("暂无主题") }
     val comparisonLine = if (summary.comparison.hasEnoughSamples) {
-        "相比前一周期，记录次数${summary.comparison.entryCountDelta.signedCount()}，记录天数${summary.comparison.recordedDayDelta.signedCount()}。"
+        tr("相比前一周期，记录次数${summary.comparison.entryCountDelta.signedCount()}，记录天数${summary.comparison.recordedDayDelta.signedCount()}。", "Compared with the previous period, entries ${summary.comparison.entryCountDelta.signedCount()} and days recorded ${summary.comparison.recordedDayDelta.signedCount()}.")
     } else {
-        "当前或前一周期样本少于 $MIN_COMPARISON_ENTRIES 条，因此不解读周期变化。"
+        tr("当前或前一周期样本少于 $MIN_COMPARISON_ENTRIES 条，因此不解读周期变化。", "The current or previous period has fewer than $MIN_COMPARISON_ENTRIES entries, so changes are not interpreted.")
     }
     return buildString {
-        appendLine("息刻 · ${summary.period.contextName}本地回顾")
+        appendLine(tr("息刻 · ${summary.period.contextName}本地回顾", "Xike · Local review: ${summary.period.contextName}"))
         appendLine("${summary.startDate.format(dateFormatter)} — ${summary.endDate.format(dateFormatter)}")
-        appendLine("记录 ${summary.entryCount} 次，分布在 ${summary.recordedDayCount} 天。")
-        appendLine("心情分布：$moodLine。")
-        appendLine("常见主题：$tagLine。")
+        appendLine(tr("记录 ${summary.entryCount} 次，分布在 ${summary.recordedDayCount} 天。", "${summary.entryCount} entries across ${summary.recordedDayCount} days."))
+        appendLine(tr("心情分布：$moodLine。", "Mood distribution: $moodLine."))
+        appendLine(tr("常见主题：$tagLine。", "Common topics: $tagLine."))
         appendLine(comparisonLine)
-        append("这些是本机记录的描述性统计，不代表原因、诊断或建议。")
+        append(localizedText("这些是本机记录的描述性统计，不代表原因、诊断或建议。"))
     }
 }
 
@@ -430,19 +440,19 @@ private fun List<JournalEntry>.tagCounts(): Map<String, Int> = flatMap { entry -
     .eachCount()
 
 private fun LocalDate.weekdayLabel(): String = when (dayOfWeek) {
-    DayOfWeek.MONDAY -> "一"
-    DayOfWeek.TUESDAY -> "二"
-    DayOfWeek.WEDNESDAY -> "三"
-    DayOfWeek.THURSDAY -> "四"
-    DayOfWeek.FRIDAY -> "五"
-    DayOfWeek.SATURDAY -> "六"
-    DayOfWeek.SUNDAY -> "日"
+    DayOfWeek.MONDAY -> localizedText("一")
+    DayOfWeek.TUESDAY -> localizedText("二")
+    DayOfWeek.WEDNESDAY -> localizedText("三")
+    DayOfWeek.THURSDAY -> localizedText("四")
+    DayOfWeek.FRIDAY -> localizedText("五")
+    DayOfWeek.SATURDAY -> localizedText("六")
+    DayOfWeek.SUNDAY -> localizedText("日")
 }
 
 private fun Int.signedCount(): String = when {
-    this > 0 -> "增加 $this"
-    this < 0 -> "减少 ${-this}"
-    else -> "相同"
+    this > 0 -> tr("增加 $this", "increased by $this")
+    this < 0 -> tr("减少 ${-this}", "decreased by ${-this}")
+    else -> localizedText("相同")
 }
 
 fun entriesOnDate(

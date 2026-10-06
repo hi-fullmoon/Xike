@@ -75,7 +75,7 @@ internal class XikeAudioRecorder(private val context: Context) {
         private set
 
     fun start(onLimitReached: () -> Unit): File {
-        check(recorder == null) { "录音已经开始。" }
+        check(recorder == null) { localizedText("录音已经开始。") }
         val target = File.createTempFile("xike-recording-", ".m4a", context.cacheDir)
         val mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
@@ -123,7 +123,7 @@ internal class XikeAudioRecorder(private val context: Context) {
     fun maxAmplitude(): Int = runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
 
     fun stop(): File {
-        val activeRecorder = checkNotNull(recorder) { "当前没有录音。" }
+        val activeRecorder = checkNotNull(recorder) { localizedText("当前没有录音。") }
         val target = checkNotNull(output)
         recorder = null
         output = null
@@ -188,7 +188,7 @@ internal fun VoiceCaptureCard(
         if (duration < 500L) {
             recorder.cancel()
             isRecording = false
-            errorMessage = "录音太短了，请再说一会儿。"
+            errorMessage = localizedText("录音太短了，请再说一会儿。")
         } else {
             runCatching { recorder.stop() }
                 .onSuccess { file ->
@@ -198,7 +198,7 @@ internal fun VoiceCaptureCard(
                 }
                 .onFailure { error ->
                     isRecording = false
-                    errorMessage = error.message ?: "录音没有完成，请重新录制。"
+                    errorMessage = error.message ?: localizedText("录音没有完成，请重新录制。")
                 }
         }
         isStopping = false
@@ -219,7 +219,7 @@ internal fun VoiceCaptureCard(
             isPaused = false
             isRecording = true
         }.onFailure { error ->
-            errorMessage = error.message ?: "无法开始录音，请检查麦克风。"
+            errorMessage = error.message ?: localizedText("无法开始录音，请检查麦克风。")
         }
     }
 
@@ -281,10 +281,10 @@ internal fun VoiceCaptureCard(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     when {
-                        isStopping -> "正在结束录音"
-                        isPaused -> "录音已暂停"
-                        isRecording -> "正在录音"
-                        else -> "录音未开始"
+                        isStopping -> localizedText("正在结束录音")
+                        isPaused -> localizedText("录音已暂停")
+                        isRecording -> localizedText("正在录音")
+                        else -> localizedText("录音未开始")
                     },
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall,
@@ -304,7 +304,7 @@ internal fun VoiceCaptureCard(
                     VoiceWaveform(amplitudes, isPaused)
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "最长 5 分钟 · 离开应用时自动结束",
+                        localizedText("最长 5 分钟 · 离开应用时自动结束"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -333,7 +333,7 @@ internal fun VoiceCaptureCard(
                         modifier = Modifier.xikeInlineActionIcon(),
                     )
                     Spacer(Modifier.width(XikeInlineActionGap))
-                    Text("取消", maxLines = 1)
+                    Text(localizedText("取消"), maxLines = 1)
                 }
                 OutlinedButton(
                     enabled = isRecording && !isStopping,
@@ -352,7 +352,7 @@ internal fun VoiceCaptureCard(
                                 pausedAt = SystemClock.elapsedRealtime()
                                 isPaused = true
                             }
-                        }.onFailure { errorMessage = "暂时无法切换录音状态。" }
+                        }.onFailure { errorMessage = localizedText("暂时无法切换录音状态。") }
                     },
                 ) {
                     Icon(
@@ -361,7 +361,7 @@ internal fun VoiceCaptureCard(
                         modifier = Modifier.xikeInlineActionIcon(),
                     )
                     Spacer(Modifier.width(XikeInlineActionGap))
-                    Text(if (isPaused) "继续" else "暂停", maxLines = 1)
+                    Text(if (isPaused) localizedText("继续") else localizedText("暂停"), maxLines = 1)
                 }
             }
             Button(
@@ -380,7 +380,7 @@ internal fun VoiceCaptureCard(
                     )
                 }
                 Spacer(Modifier.width(XikeInlineActionGap))
-                Text(if (isRecording) "结束录音" else "开始录音", maxLines = 1)
+                Text(if (isRecording) localizedText("结束录音") else localizedText("开始录音"), maxLines = 1)
             }
         }
     }
@@ -410,7 +410,7 @@ internal fun VoicePendingSaveCard(
                     Spacer(Modifier.width(10.dp))
                 }
                 Text(
-                    if (isSaving) "正在加密保存录音" else "录音尚未保存",
+                    if (isSaving) localizedText("正在加密保存录音") else localizedText("录音尚未保存"),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall,
                 )
@@ -426,7 +426,7 @@ internal fun VoicePendingSaveCard(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
                 ) {
                     Text(
-                        errorMessage ?: "录音暂存在本机，可以重试保存。",
+                        errorMessage ?: localizedText("录音暂存在本机，可以重试保存。"),
                         modifier = Modifier.fillMaxWidth().padding(13.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (errorMessage != null) MaterialTheme.colorScheme.error
@@ -440,10 +440,10 @@ internal fun VoicePendingSaveCard(
                         shape = XikeShapes.button,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
-                        Text("放弃录音")
+                        Text(localizedText("放弃录音"))
                     }
                     Button(onClick = onRetry, modifier = Modifier.weight(1f), shape = XikeShapes.button) {
-                        Text("重试保存")
+                        Text(localizedText("重试保存"))
                     }
                 }
             }
@@ -452,16 +452,16 @@ internal fun VoicePendingSaveCard(
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text("放弃这段录音？") },
-            text = { Text("尚未保存的录音会被删除，无法恢复。") },
+            title = { Text(localizedText("放弃这段录音？")) },
+            text = { Text(localizedText("尚未保存的录音会被删除，无法恢复。")) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDiscard = false
                     onDiscard()
-                }) { Text("放弃录音") }
+                }) { Text(localizedText("放弃录音")) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDiscard = false }) { Text("继续保存") }
+                TextButton(onClick = { confirmDiscard = false }) { Text(localizedText("继续保存")) }
             },
         )
     }
@@ -515,7 +515,7 @@ internal fun VoicePlaybackCard(
                     val target = File.createTempFile("xike-playback-", ".m4a", context.cacheDir)
                     try {
                         openAudio(audio.fileName)?.use { input -> target.outputStream().use(input::copyTo) }
-                            ?: error("录音文件不可用。")
+                            ?: error(localizedText("录音文件不可用。"))
                         target
                     } catch (error: Throwable) {
                         target.delete()
@@ -543,7 +543,7 @@ internal fun VoicePlaybackCard(
                 }
             }.onFailure { error ->
                 releasePlayer()
-                playbackError = error.message ?: "暂时无法播放这段录音。"
+                playbackError = error.message ?: localizedText("暂时无法播放这段录音。")
             }
             isPreparing = false
         }
@@ -567,7 +567,7 @@ internal fun VoicePlaybackCard(
     ) {
         Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("声音片段", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Text(localizedText("声音片段"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                 Text(
                     formatAudioDuration(audio.durationMillis),
                     style = MaterialTheme.typography.labelMedium,
@@ -589,7 +589,7 @@ internal fun VoicePlaybackCard(
                     } else {
                         Icon(
                             if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停语音" else "播放语音",
+                            contentDescription = if (isPlaying) localizedText("暂停语音") else localizedText("播放语音"),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -609,7 +609,7 @@ internal fun VoicePlaybackCard(
                         },
                         valueRange = 0f..audio.durationMillis.coerceAtLeast(1L).toFloat(),
                         enabled = !isPreparing,
-                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "语音播放进度" },
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = localizedText("语音播放进度") },
                         colors = SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -632,7 +632,7 @@ internal fun VoicePlaybackCard(
                     ) {
                         Icon(
                             Icons.Outlined.DeleteOutline,
-                            contentDescription = "删除语音",
+                            contentDescription = localizedText("删除语音"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -652,7 +652,7 @@ internal fun VoicePlaybackCard(
                         modifier = Modifier.xikeInlineActionIcon(),
                     )
                     Spacer(Modifier.width(XikeInlineActionGap))
-                    Text("重新录制", maxLines = 1)
+                    Text(localizedText("重新录制"), maxLines = 1)
                 }
             }
         }

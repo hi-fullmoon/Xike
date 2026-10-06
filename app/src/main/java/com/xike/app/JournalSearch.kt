@@ -5,10 +5,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
-enum class JournalImageFilter(val label: String) {
+enum class JournalImageFilter(private val sourceLabel: String) {
     ANY("全部"),
     WITH_IMAGES("有照片"),
-    WITHOUT_IMAGES("无照片"),
+    WITHOUT_IMAGES("无照片");
+
+    val label: String get() = localizedText(sourceLabel)
 }
 
 data class JournalSearchQuery(
@@ -60,7 +62,7 @@ fun filterJournalEntries(
     val text = query.normalizedText
     val textTerms = SEARCH_TERM.findAll(text)
         .map { it.value }
-        .map { term -> term to expandedTopicLabels(listOf(term)) }
+        .map { term -> term to searchTopicLabels(term) }
         .toList()
     val selectedTopics = query.tags.canonicalTopics().toSet()
     return entries.filter { entry ->
@@ -109,7 +111,7 @@ internal fun journalFtsQuery(text: String): String {
     val terms = SEARCH_TERM.findAll(text.trim())
         .map { match ->
             val term = match.value
-            val topicTerms = expandedTopicLabels(listOf(term))
+            val topicTerms = searchTopicLabels(term)
             when {
                 topicTerms.size > 1 -> topicTerms.joinToString(" OR ", "(", ")") { quoteFtsTerm(it) }
                 term.all(::isCjkCharacter) && term.length > 2 ->

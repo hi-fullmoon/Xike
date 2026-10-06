@@ -23,6 +23,7 @@ internal object ReminderScheduler {
         settings: ReminderSettings = HabitPreferences(context).reminder,
         now: ZonedDateTime = ZonedDateTime.now(),
     ) {
+        AppLocale.initialize(context)
         val appContext = context.applicationContext
         setRescheduleReceiverEnabled(appContext, settings.enabled)
         cancelPendingAlarm(appContext)
@@ -45,6 +46,7 @@ internal object ReminderScheduler {
     }
 
     fun showReminder(context: Context) {
+        AppLocale.initialize(context)
         if (!canPostNotifications(context)) return
         createNotificationChannel(context)
         val openApp = PendingIntent.getActivity(
@@ -57,8 +59,8 @@ internal object ReminderScheduler {
         )
         val notification = android.app.Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("给今天留一刻")
-            .setContentText("如果愿意，看看此刻的心情。没有连续打卡，也不会催促你。")
+            .setContentTitle(localizedText("给今天留一刻"))
+            .setContentText(localizedText("如果愿意，看看此刻的心情。没有连续打卡，也不会催促你。"))
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .setCategory(android.app.Notification.CATEGORY_REMINDER)
@@ -79,10 +81,10 @@ internal object ReminderScheduler {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "记录提醒",
+                localizedText("记录提醒"),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "仅按你选择的本地时间，温和提醒你记录此刻。"
+                description = localizedText("仅按你选择的本地时间，温和提醒你记录此刻。")
             },
         )
     }
