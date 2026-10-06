@@ -4,6 +4,26 @@
 
 息刻是一款离线优先的 Android 个人感受日记。选一种最接近当下的心情，就能记下一刻；文字、主题、照片、语音和窗外天气都可以按需添加。应用不需要账号，记录默认只留在本机。
 
+**不想写长篇日记，也能留住今天的心情。**
+
+[下载 Android APK](https://github.com/hi-fullmoon/Xike/releases/latest) · [查看更新记录](https://github.com/hi-fullmoon/Xike/releases) · [反馈问题与建议](https://github.com/hi-fullmoon/Xike/issues)
+
+- **无需注册，离线可用**：打开就能记录；主动查询天气时才会联网。
+- **按自己的方式表达**：只选一个心情也可以，文字、照片和语音按需添加。
+- **随时回望，也能带走**：通过月历、时间流和心情轨迹回看记录，支持备份导出与恢复。
+
+## 下载与安装
+
+支持 **Android 8.0 及以上**。
+
+1. 打开[最新版本发布页](https://github.com/hi-fullmoon/Xike/releases/latest)，在 **Assets** 中下载以 `.apk` 结尾的文件。
+2. 在手机上打开下载的 APK。如果系统提示，请为下载时使用的浏览器或文件管理器允许“安装未知应用”，安装完成后可关闭该权限。
+3. 打开息刻，选择最接近当下的心情，按需添加内容并保存第一条记录。
+
+`.aab` 用于应用商店分发，不能直接点击安装；`Source code` 是源码压缩包。发布页同时提供 `SHA256SUMS.txt`，可用于核对下载文件的完整性。
+
+更新时下载新版 APK 并覆盖安装。卸载、清除应用数据或更换手机前，请先在设置中导出备份，并妥善保管加密备份的密码。
+
 ## 应用预览
 
 以下画面来自 1440 × 3200 的 Android 模拟器，记录内容为虚构演示数据。点击图片可查看原图。
@@ -27,7 +47,7 @@
 - **温和的轨迹**：查看心情分布、记录覆盖度、前一周期对比、主题变化和工作日／周末对照。统计会显示样本范围与限制，可回到对应原始记录。本地回望文字在设备内生成。
 - **自主节奏**：可按星期和时间设置提醒、夜间勿扰或暂停一周，也可启用本地“每日一问”。两者默认关闭；长按桌面图标可直接“记录此刻”。
 
-## 运行
+## 开发与运行
 
 使用 Android Studio 打开本目录，准备 Android SDK Platform 36、Build Tools 36.1.0 和 JDK 17（Android Studio 自带的 JBR 也可以）。最低支持 Android 8.0（API 26）。
 
@@ -48,6 +68,12 @@ Windows 使用 `gradlew.bat` 执行相同任务；也可以在 Android Studio �
 
 备份通过系统文件选择器导出到用户选定的位置，包含全部记录、照片和语音。默认使用用户密码进行 AES-GCM 加密，保存为 `.xike`；也可关闭加密，保存为 `.zip`。两种格式都包含离线阅读页 `index.html`：未加密 ZIP 解压后可直接用浏览器打开；加密备份必须先在应用内输入密码，不能直接用浏览器查看。未加密文件及解压出的内容应只放在自己信任的位置。只有用户主动分享内容时，本地回望文字才会离开息刻。
 
+## 反馈与参与
+
+欢迎通过 [GitHub Issues](https://github.com/hi-fullmoon/Xike/issues) 报告问题或提出建议。报告问题时，请附上应用版本、手机型号、Android 版本、复现步骤和实际表现；截图或录屏请先遮盖日记内容、照片、地点等私人信息。
+
+如果你愿意参与开发，可以先在 Issue 中说明想解决的问题或改进方向，再提交 Pull Request。也欢迎分享使用体验，帮助息刻变得更顺手。
+
 ## 更多文档
 
 - [产品 Roadmap](docs/roadmap.md)：后续功能规划。
@@ -57,3 +83,7 @@ Windows 使用 `gradlew.bat` 执行相同任务；也可以在 Android Studio �
 - [GitHub Release 流水线](docs/github-release-pipeline.md)：发布签名与自动构建。
 
 推送 `vMAJOR.MINOR.PATCH` 标签后，GitHub Actions 会执行测试、Lint、签名构建，并把 APK、AAB 和 SHA-256 校验文件发布到 GitHub Release；首次发布需要先配置签名。
+
+## 开源许可
+
+息刻采用 [MIT License](LICENSE) 开源。
