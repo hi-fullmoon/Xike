@@ -80,8 +80,8 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("此刻窗外 · 上海 · 浦东").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("27°").assertIsDisplayed()
-        composeRule.onNodeWithText("晴间多云").assertIsDisplayed()
+        composeRule.onNodeWithText("27°").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("晴间多云").performScrollTo().assertIsDisplayed()
     }
 
     @Test

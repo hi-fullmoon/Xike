@@ -212,7 +212,10 @@ internal fun PhotoSourceDialog(
                         onClick = onTakePhoto,
                     )
                     HorizontalDivider(
-                        Modifier.padding(start = 72.dp, end = 16.dp),
+                        Modifier.padding(
+                            start = XikeInnerCardPadding + 44.dp + 12.dp,
+                            end = XikeInnerCardPadding,
+                        ),
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
                     PhotoSourceOption(
@@ -249,7 +252,7 @@ private fun PhotoSourceOption(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(XikeInnerCardPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(

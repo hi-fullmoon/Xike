@@ -237,7 +237,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
         color = MaterialTheme.colorScheme.primaryContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
     ) {
-        Column(Modifier.padding(22.dp)) {
+        Column(Modifier.padding(XikeCardPadding)) {
             if (stackContent) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -366,7 +366,7 @@ private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
     ) {
         Column(
-            Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+            Modifier.padding(XikeInnerCardPadding),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -469,7 +469,7 @@ private fun MoodTrendChart(
     val guide = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
     val emptyPoint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
     val axisWidth = if (LocalDensity.current.fontScale >= 1.5f) 52.dp else 36.dp
-    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp)) {
+    Column(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
         Box(Modifier.fillMaxWidth().height(142.dp)) {
             Column(
                 modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
@@ -650,20 +650,20 @@ private fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previou
                 ) { onClick(true) }
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ComparisonMetric(
                     localizedText("当前"),
                     comparison.currentEntryCount,
                     comparison.currentRecordedDayCount,
                     comparison.currentAverageScore,
-                    Modifier.weight(1f),
+                    Modifier.weight(1f).fillMaxHeight(),
                 ) { onClick(false) }
                 ComparisonMetric(
                     localizedText("前期"),
                     comparison.entryCount,
                     comparison.recordedDayCount,
                     comparison.averageScore,
-                    Modifier.weight(1f),
+                    Modifier.weight(1f).fillMaxHeight(),
                 ) { onClick(true) }
             }
         }
@@ -691,7 +691,7 @@ private fun ComparisonMetric(
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(XikeInnerCardPadding)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
             Text(tr("$count 次", "$count entries"), style = MaterialTheme.typography.titleLarge)
@@ -765,9 +765,9 @@ private fun DayTypeCard(
                 DayTypeMetric(weekend, Modifier.fillMaxWidth()) { onClick(weekend) }
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DayTypeMetric(weekday, Modifier.weight(1f)) { onClick(weekday) }
-                DayTypeMetric(weekend, Modifier.weight(1f)) { onClick(weekend) }
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DayTypeMetric(weekday, Modifier.weight(1f).fillMaxHeight()) { onClick(weekday) }
+                DayTypeMetric(weekend, Modifier.weight(1f).fillMaxHeight()) { onClick(weekend) }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -791,7 +791,7 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(XikeInnerCardPadding)) {
             Text(insight.type.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
             Text(tr("${insight.entryCount} 次", "${insight.entryCount} entries"), style = MaterialTheme.typography.titleLarge)
@@ -811,7 +811,7 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.primary,
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(XikeCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(42.dp),
@@ -879,7 +879,7 @@ private fun InsightSectionCard(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(XikeCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
@@ -928,7 +928,7 @@ private fun InsufficientDataNote(message: String) {
     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)) {
         Text(
             message,
-            modifier = Modifier.fillMaxWidth().padding(13.dp),
+            modifier = Modifier.fillMaxWidth().padding(XikeInnerCardPadding),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
         )

@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
@@ -360,6 +361,10 @@ private fun AppStyle.spec(): XikeStyleSpec = when (this) {
 }
 
 private val LocalXikeStyle = staticCompositionLocalOf { BreatheStyleSpec }
+
+internal val XikeCardPadding = 14.dp
+internal val XikeInnerCardPadding = 10.dp
+private val XikeSettingsRowPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 
 object XikeShapes {
     val card: RoundedCornerShape
@@ -1248,9 +1253,9 @@ fun MomentScreen(
                 )
             }
 
-            if (showVoiceCapture || pendingDraftAudio != null || draft.audio != null) {
+            if (pendingDraftAudio != null || draft.audio != null) {
                 val voiceAnchor = remember { BringIntoViewRequester() }
-                LaunchedEffect(showVoiceCapture, draft.audio?.fileName) {
+                LaunchedEffect(draft.audio?.fileName) {
                     withFrameNanos { }
                     voiceAnchor.bringIntoView()
                 }
@@ -1259,7 +1264,6 @@ fun MomentScreen(
                     Spacer(Modifier.height(7.dp))
                     Text(
                         when {
-                            showVoiceCapture -> localizedText("录下这一刻")
                             pendingDraftAudio != null -> localizedText("收好这段声音")
                             else -> localizedText("这一刻的声音")
                         },
@@ -1268,7 +1272,6 @@ fun MomentScreen(
                     Spacer(Modifier.height(3.dp))
                     Text(
                         when {
-                            showVoiceCapture -> localizedText("正在记录这一刻的声音")
                             pendingDraftAudio != null && isDraftAudioSaving -> localizedText("正在加密保存到草稿")
                             pendingDraftAudio != null -> localizedText("保存失败，录音仍暂存在本机")
                             else -> localizedText("录音已加密保存在本机")
@@ -1277,13 +1280,7 @@ fun MomentScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(14.dp))
-                    if (showVoiceCapture) {
-                        VoiceCaptureCard(
-                            enabled = !isSaving,
-                            onRecorded = onDraftAudioRecorded,
-                            onClosed = { showVoiceCapture = false },
-                        )
-                    } else if (pendingDraftAudio != null) {
+                    if (pendingDraftAudio != null) {
                         VoicePendingSaveCard(
                             durationMillis = pendingDraftAudio.durationMillis,
                             isSaving = isDraftAudioSaving,
@@ -1366,7 +1363,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                            .padding(XikeCardPadding),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1387,10 +1384,10 @@ fun MomentScreen(
 
                     if (showDetails) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 18.dp),
+                            modifier = Modifier.padding(horizontal = XikeCardPadding),
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
-                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(horizontal = 18.dp, vertical = 12.dp)) {
+                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(XikeCardPadding)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column {
                                     Text(localizedText("主题"), style = MaterialTheme.typography.titleSmall)
@@ -1498,6 +1495,14 @@ fun MomentScreen(
                 }
             }
         }
+    }
+
+    if (showVoiceCapture) {
+        VoiceCaptureSheet(
+            enabled = !isSaving,
+            onRecorded = onDraftAudioRecorded,
+            onClosed = { showVoiceCapture = false },
+        )
     }
 
     previewUri?.let { uri ->
@@ -1681,7 +1686,7 @@ private fun OutdoorContextCard(
         shape = XikeShapes.card,
         color = containerColor,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(42.dp),
@@ -1813,8 +1818,8 @@ private fun OutdoorContextCard(
                         modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(onClick = onChooseCity, enabled = enabled) { Text(localizedText("手动选城市")) }
-                        TextButton(onClick = onAdd, enabled = enabled && !isLoading) { Text(localizedText("重新尝试")) }
+                        TextButton(onClick = onChooseCity, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text(localizedText("手动选城市")) }
+                        TextButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.heightIn(min = 48.dp)) { Text(localizedText("重新尝试")) }
                     }
                 }
             }
@@ -1829,7 +1834,7 @@ private fun OutdoorCardAction(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) {
         Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
         Spacer(Modifier.width(XikeInlineActionGap))
         Text(label, maxLines = 1)
@@ -1921,7 +1926,7 @@ private fun RecordedAtSelector(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(XikeInnerCardPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -2054,7 +2059,7 @@ private fun MoodPicker(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
+        Column(Modifier.padding(XikeCardPadding)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2095,7 +2100,7 @@ private fun MoodPicker(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(XikeInnerCardPadding),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MoodEmoji(selectedMood, size = 20.dp)
@@ -2149,7 +2154,7 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                         color = visual.container.copy(alpha = if (isDark) 0.16f else 0.58f),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(XikeInnerCardPadding),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             MoodEmoji(mood, size = 24.dp)
@@ -2292,7 +2297,7 @@ private fun MultiImagePicker(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         ) {
-            Row(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(XikeInnerCardPadding), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -2438,7 +2443,7 @@ private fun SelectedPhotoTile(
 @Composable
 private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
             Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(11.dp))
             Column {
@@ -2472,7 +2477,7 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
         )
 
         Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.primary) {
-            Column(Modifier.padding(20.dp)) {
+            Column(Modifier.padding(XikeCardPadding)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         tr("${selectedPeriod.contextName}概览", "${selectedPeriod.contextName} overview"),
@@ -2525,7 +2530,7 @@ fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
                     shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                 ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(XikeInnerCardPadding), verticalAlignment = Alignment.CenterVertically) {
                         Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column {
@@ -2644,7 +2649,7 @@ private fun InsightsPeriodSelector(
 @Composable
 private fun InsightCard(icon: ImageVector, label: String, content: String) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
             Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -2698,7 +2703,7 @@ internal fun JournalEntryCard(
             if (entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
             }
-            Row(Modifier.padding(18.dp), verticalAlignment = Alignment.Top) {
+            Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
                 Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f)) {
                     Box(contentAlignment = Alignment.Center) {
                         MoodEmoji(entry.mood, size = 24.dp)
@@ -2967,7 +2972,7 @@ fun ProfileSettingsScreen(
             shape = XikeShapes.card,
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
         ) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Shield, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -3000,14 +3005,14 @@ fun ProfileSettingsScreen(
                         onEnabledChange = onAppLockChange,
                     )
                     if (appLockEnabled) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Timer,
                             title = localizedText("自动锁定"),
                             subtitle = appLockTimeout.label,
                             onClick = { showTimeoutDialog = true },
                         )
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Lock,
                             title = localizedText("立即锁定"),
@@ -3035,14 +3040,14 @@ fun ProfileSettingsScreen(
                         onEnabledChange = onReminderEnabledChange,
                     )
                     if (reminderSettings.enabled) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Timer,
                             title = localizedText("提醒时间"),
                             subtitle = reminderSettings.summary(),
                             onClick = { showReminderDialog = true },
                         )
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         val pauseLabel = reminderSettings.pauseLabel()
                         SettingsAction(
                             icon = Icons.Outlined.PauseCircle,
@@ -3061,7 +3066,7 @@ fun ProfileSettingsScreen(
                             },
                         )
                     }
-                    HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsToggleRow(
                         icon = XikeIcons.Mark,
                         title = localizedText("每日一问"),
@@ -3076,7 +3081,7 @@ fun ProfileSettingsScreen(
                         },
                     )
                     if (dailyPromptSettings.enabled) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = XikeIcons.Mark,
                             title = localizedText("本地问题库"),
@@ -3101,15 +3106,32 @@ fun ProfileSettingsScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionTitle(index = localizedText("主色"), title = localizedText("强调色"), trailing = localizedText("可自由搭配"))
-            AppTheme.entries.chunked(3).forEach { themes ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    themes.forEach { theme ->
-                        ThemeTile(
-                            theme = theme,
-                            selected = selectedTheme == theme,
-                            onClick = { onThemeChange(theme) },
-                            modifier = Modifier.weight(1f),
-                        )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val textMeasurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val titleStyle = MaterialTheme.typography.titleSmall
+                val subtitleStyle = MaterialTheme.typography.labelSmall
+                val textWidth = AppTheme.entries.maxOf { theme ->
+                    maxOf(
+                        textMeasurer.measure(theme.title, titleStyle, softWrap = false).size.width,
+                        textMeasurer.measure(theme.subtitle, subtitleStyle, softWrap = false).size.width,
+                    )
+                }
+                val minTileWidth = maxOf(80.dp, with(density) { textWidth.toDp() } + XikeInnerCardPadding * 2)
+                val columns = ((maxWidth + 8.dp) / (minTileWidth + 8.dp)).toInt().coerceIn(1, 3)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AppTheme.entries.chunked(columns).forEach { themes ->
+                        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            themes.forEach { theme ->
+                                ThemeTile(
+                                    theme = theme,
+                                    selected = selectedTheme == theme,
+                                    onClick = { onThemeChange(theme) },
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                )
+                            }
+                            repeat(columns - themes.size) { Spacer(Modifier.weight(1f)) }
+                        }
                     }
                 }
             }
@@ -3125,7 +3147,7 @@ fun ProfileSettingsScreen(
                         subtitle = localizedText("可选密码加密，附离线阅读页"),
                         onClick = onExport,
                     )
-                    HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsAction(
                         icon = Icons.Outlined.Restore,
                         title = localizedText("从备份恢复"),
@@ -3133,7 +3155,7 @@ fun ProfileSettingsScreen(
                         onClick = onImport,
                     )
                     if (canUndoRestore) {
-                        HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
                             icon = Icons.Outlined.Restore,
                             title = localizedText("撤销上次恢复"),
@@ -3232,7 +3254,7 @@ private fun SettingsToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(XikeSettingsRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -3289,7 +3311,7 @@ private fun ReminderScheduleDialog(
                     shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                 ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(XikeInnerCardPadding), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Text(
@@ -3432,7 +3454,7 @@ private fun AppLockToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(XikeSettingsRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -3517,7 +3539,7 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
-        Column(Modifier.padding(horizontal = 11.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(XikeInnerCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(20.dp).clip(CircleShape).background(theme.primary))
                 Spacer(Modifier.weight(1f))
@@ -3527,8 +3549,6 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
             Text(theme.title, style = MaterialTheme.typography.titleSmall)
             Text(
                 theme.subtitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -3560,7 +3580,7 @@ private fun StyleTile(style: AppStyle, selected: Boolean, onClick: () -> Unit) {
         ),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(XikeCardPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StylePreview(style = style, corner = innerCorner)
@@ -3666,7 +3686,7 @@ private fun StylePreview(style: AppStyle, corner: Dp) {
 @Composable
 private fun SettingsAction(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(XikeSettingsRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -3718,7 +3738,7 @@ internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: St
 @Composable
 private fun PaperCard(
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(18.dp),
+    contentPadding: PaddingValues = PaddingValues(XikeCardPadding),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(modifier = modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {

@@ -8,10 +8,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -62,6 +65,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +95,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -567,61 +573,71 @@ private fun ArchiveToolbox(
     onViewModeChange: (ArchiveViewMode) -> Unit,
     onToggleFilters: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = XikeShapes.card,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            ArchiveSearchBar(
-                value = queryText,
-                onValueChange = onQueryChange,
-                onClear = onClearQuery,
-            )
-            ArchiveControls(
-                viewMode = viewMode,
-                activeFilterCount = activeFilterCount,
-                showFilters = showFilters,
-                onViewModeChange = onViewModeChange,
-                onToggleFilters = onToggleFilters,
-            )
-        }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        ArchiveSearchBar(
+            value = queryText,
+            onValueChange = onQueryChange,
+            onClear = onClearQuery,
+        )
+        ArchiveControls(
+            viewMode = viewMode,
+            activeFilterCount = activeFilterCount,
+            showFilters = showFilters,
+            onViewModeChange = onViewModeChange,
+            onToggleFilters = onToggleFilters,
+        )
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun ArchiveSearchBar(
     value: String,
     onValueChange: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    TextField(
+    val interactionSource = remember { MutableInteractionSource() }
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), XikeShapes.inner),
         singleLine = true,
-        shape = XikeShapes.inner,
-        textStyle = MaterialTheme.typography.bodyMedium,
-        placeholder = { Text(localizedText("搜索注脚或主题"), style = MaterialTheme.typography.bodyMedium) },
-        prefix = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(4.dp))
-            }
+        interactionSource = interactionSource,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        decorationBox = { innerTextField ->
+            TextFieldDefaults.DecorationBox(
+                value = value,
+                innerTextField = innerTextField,
+                enabled = true,
+                singleLine = true,
+                visualTransformation = VisualTransformation.None,
+                interactionSource = interactionSource,
+                shape = XikeShapes.inner,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                placeholder = { Text(localizedText("搜索注脚或主题"), style = MaterialTheme.typography.bodyMedium) },
+                prefix = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(4.dp))
+                    }
+                },
+                trailingIcon = {
+                    if (value.isNotEmpty()) {
+                        IconButton(onClick = onClear) {
+                            Icon(Icons.Outlined.Close, contentDescription = localizedText("清空搜索"), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
         },
-        trailingIcon = {
-            if (value.isNotEmpty()) {
-                IconButton(onClick = onClear) {
-                    Icon(Icons.Outlined.Close, contentDescription = localizedText("清空搜索"), modifier = Modifier.size(18.dp))
-                }
-            }
-        },
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-        ),
     )
 }
 
@@ -641,10 +657,10 @@ private fun ArchiveControls(
         Surface(
             modifier = Modifier.weight(1f),
             shape = XikeShapes.inner,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         ) {
             Row(
-                Modifier.padding(3.dp).selectableGroup(),
+                Modifier.padding(4.dp).selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 ArchiveModeButton(
@@ -667,11 +683,12 @@ private fun ArchiveControls(
             modifier = Modifier
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clickable(onClick = onToggleFilters),
-            shape = XikeShapes.button,
+            shape = XikeShapes.inner,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
             color = if (showFilters || activeFilterCount > 0) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+                MaterialTheme.colorScheme.surface
             },
         ) {
             Row(
@@ -712,7 +729,7 @@ private fun ArchiveModeButton(
     onClick: () -> Unit,
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelLarge
+    val labelStyle = MaterialTheme.typography.labelMedium
     val labelWidth = with(LocalDensity.current) {
         maxOf(
             textMeasurer.measure(localizedText("月历"), labelStyle, softWrap = false).size.width,
@@ -728,10 +745,10 @@ private fun ArchiveModeButton(
                 onClick = onClick,
             ),
         shape = XikeShapes.button,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent,
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
     ) {
         BoxWithConstraints(
-            Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
             val iconContent: @Composable () -> Unit = {
@@ -739,14 +756,15 @@ private fun ArchiveModeButton(
                     icon,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             val labelContent: @Composable () -> Unit = {
                 Text(
                     label,
                     style = labelStyle,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
@@ -794,11 +812,11 @@ private fun ArchiveFilters(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = XikeCardPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -813,7 +831,7 @@ private fun ArchiveFilters(
             }
             FilterTitle(localizedText("心情"))
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = XikeCardPadding),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(Mood.entries, key = Mood::name) { mood ->
@@ -831,7 +849,7 @@ private fun ArchiveFilters(
             if (availableTags.isNotEmpty()) {
                 FilterTitle(localizedText("主题"))
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = XikeCardPadding),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(availableTags, key = { it }) { tag ->
@@ -846,7 +864,7 @@ private fun ArchiveFilters(
 
             FilterTitle(localizedText("日期"))
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = XikeCardPadding),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (selectedDate != null) {
@@ -870,7 +888,7 @@ private fun ArchiveFilters(
 
             FilterTitle(localizedText("照片"))
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = XikeCardPadding),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(JournalImageFilter.entries, key = JournalImageFilter::name) { option ->
@@ -889,7 +907,7 @@ private fun ArchiveFilters(
 private fun FilterTitle(title: String) {
     Text(
         title,
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = XikeCardPadding),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -916,7 +934,7 @@ private fun JournalMonthCalendar(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1161,7 +1179,7 @@ private fun ArchiveTimelineEntry(
 private fun ArchiveEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, description: String) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
         Column(
-            Modifier.padding(horizontal = 26.dp, vertical = 36.dp),
+            Modifier.padding(XikeCardPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Surface(modifier = Modifier.size(58.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -1215,7 +1233,7 @@ internal fun JournalEntryDetailDialog(
 
                 Surface(shape = XikeShapes.card, color = MaterialTheme.colorScheme.primaryContainer) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(XikeCardPadding),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Surface(
@@ -1247,7 +1265,7 @@ internal fun JournalEntryDetailDialog(
                 entry.outdoor?.let { outdoor ->
                     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(XikeInnerCardPadding),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -1552,7 +1570,7 @@ private fun JournalEntryEditDialog(
                 EditSectionCard(
                     title = localizedText("心情"),
                     supporting = localizedText("重新选择最接近那一刻的感受"),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 18.dp),
+                    contentPadding = PaddingValues(XikeCardPadding),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().selectableGroup(),
@@ -1580,7 +1598,7 @@ private fun JournalEntryEditDialog(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                            modifier = Modifier.padding(XikeInnerCardPadding),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -1701,7 +1719,7 @@ private fun JournalEntryEditDialog(
                     ) {
                         Text(
                             error,
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(XikeInnerCardPadding),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     }
@@ -1765,7 +1783,7 @@ private fun JournalEntryEditDialog(
 private fun EditSectionCard(
     title: String,
     supporting: String,
-    contentPadding: PaddingValues = PaddingValues(18.dp),
+    contentPadding: PaddingValues = PaddingValues(XikeCardPadding),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -1924,7 +1942,7 @@ private fun DeleteJournalDialog(
                     shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
                 ) {
-                    Column(Modifier.padding(14.dp)) {
+                    Column(Modifier.padding(XikeInnerCardPadding)) {
                         Text(entry.mood.label, style = MaterialTheme.typography.titleSmall)
                         Text(
                             entry.createdAt.asDetailChineseDateTime(),
