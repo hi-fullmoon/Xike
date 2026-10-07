@@ -5,13 +5,14 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -133,7 +134,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -166,9 +167,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private const val ADD_PHOTO_TILE = "__add_photo__"
 
@@ -466,6 +465,7 @@ fun XikeTheme(
     content: @Composable () -> Unit,
 ) {
     val styleSpec = style.spec()
+    val previewBitmapCache = remember { PreviewBitmapCache() }
     val colors: ColorScheme = if (isSystemInDarkTheme()) {
         darkColorScheme(
             primary = theme.accent,
@@ -627,7 +627,10 @@ fun XikeTheme(
             },
         )
     }
-    CompositionLocalProvider(LocalXikeStyle provides styleSpec) {
+    CompositionLocalProvider(
+        LocalXikeStyle provides styleSpec,
+        LocalPreviewBitmapCache provides previewBitmapCache,
+    ) {
         MaterialTheme(
             colorScheme = colors,
             typography = typographyFor(style),
@@ -2835,6 +2838,14 @@ private fun SavedJournalImage(
     maxDimension: Int = 960,
 ) {
     val bitmap = rememberPreviewBitmap(fileName, maxDimension, openStream)
+    val imageAlpha = remember(fileName, maxDimension) {
+        Animatable(if (bitmap != null) 1f else 0f)
+    }
+    LaunchedEffect(bitmap, imageAlpha) {
+        if (bitmap != null && imageAlpha.value < 1f) {
+            imageAlpha.animateTo(1f, animationSpec = tween(durationMillis = 180))
+        }
+    }
     val interactiveModifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
     Box(
         modifier = interactiveModifier.background(MaterialTheme.colorScheme.surfaceVariant),
@@ -2844,7 +2855,7 @@ private fun SavedJournalImage(
             Image(
                 bitmap = bitmap,
                 contentDescription = tr("日记第 $order 张照片", "Journal photo $order"),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = imageAlpha.value },
                 contentScale = contentScale,
             )
         } else {
@@ -3762,30 +3773,17 @@ internal fun rememberPreviewBitmap(
     maxDimension: Int = 720,
     openStream: () -> InputStream?,
 ): ImageBitmap? {
-    var bitmap by remember(key, maxDimension) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(key, maxDimension) {
-        bitmap = withContext(Dispatchers.IO) { decodeScaledPreview(openStream, maxDimension) }
+    val providedCache = LocalPreviewBitmapCache.current
+    val cache = providedCache ?: remember { PreviewBitmapCache() }
+    var bitmap by remember(cache, key, maxDimension) {
+        mutableStateOf(cache.get(key, maxDimension))
+    }
+    LaunchedEffect(cache, key, maxDimension) {
+        if (bitmap == null) {
+            bitmap = cache.load(key, maxDimension, openStream)
+        }
     }
     return bitmap
-}
-
-private fun decodeScaledPreview(openStream: () -> InputStream?, maxDimension: Int): ImageBitmap? {
-    return try {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-        var sampleSize = 1
-        while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
-            sampleSize *= 2
-        }
-        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        openStream()?.use { BitmapFactory.decodeStream(it, null, options)?.asImageBitmap() }
-    } catch (_: Exception) {
-        null
-    } catch (_: OutOfMemoryError) {
-        null
-    }
 }
 
 private fun moodBandLabel(average: Double): String = when {

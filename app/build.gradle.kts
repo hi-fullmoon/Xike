@@ -86,6 +86,7 @@ android {
 
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("androidTest").assets.srcDir("$rootDir/docs/screenshots")
     }
 
     compileOptions {
