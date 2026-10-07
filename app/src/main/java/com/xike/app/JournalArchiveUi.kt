@@ -657,7 +657,7 @@ private fun ArchiveControls(
         Surface(
             modifier = Modifier.weight(1f),
             shape = XikeShapes.inner,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Row(
                 Modifier.padding(4.dp).selectableGroup(),
