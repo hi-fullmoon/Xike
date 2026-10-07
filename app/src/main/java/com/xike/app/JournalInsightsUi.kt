@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -295,13 +296,13 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                     )
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.weight(1f))
-                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.weight(1f))
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.weight(1f).fillMaxHeight())
+                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.weight(1f).fillMaxHeight())
                     OverviewMetric(
                         localizedText("日期覆盖"),
                         "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
-                        Modifier.weight(1f),
+                        Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
             }
@@ -364,7 +365,10 @@ private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
     ) {
-        Column(Modifier.padding(horizontal = 11.dp, vertical = 10.dp)) {
+        Column(
+            Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(2.dp))
             Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)

@@ -869,15 +869,15 @@ private fun ArchiveFilters(
             }
 
             FilterTitle(localizedText("照片"))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                JournalImageFilter.entries.forEach { option ->
+                items(JournalImageFilter.entries, key = JournalImageFilter::name) { option ->
                     FilterChip(
                         selected = imageFilter == option,
                         onClick = { onImageFilterChange(option) },
-                        label = { Text(option.label) },
+                        label = { Text(option.label, maxLines = 1) },
                     )
                 }
             }

@@ -19,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -135,6 +137,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
@@ -1174,37 +1178,47 @@ fun MomentScreen(
                 Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
                 Text(localizedText("添加内容 · 可选"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(7.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    MomentQuickAction(
-                        icon = Icons.Outlined.MicNone,
-                        label = localizedText("语音"),
-                        enabled = !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
-                        modifier = Modifier.weight(1f),
-                        onClick = beginVoiceCapture,
-                    )
-                    MomentQuickAction(
-                        icon = Icons.Outlined.AddPhotoAlternate,
-                        label = localizedText("照片"),
-                        enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            dismissKeyboard()
-                            showPhotoSourceDialog = true
-                        },
-                    )
-                    MomentQuickAction(
-                        icon = Icons.Outlined.History,
-                        label = localizedText("补记"),
-                        enabled = !isSaving,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            dismissKeyboard()
-                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
-                        },
-                    )
+                val actionTextMeasurer = rememberTextMeasurer()
+                val actionLabelStyle = MaterialTheme.typography.labelLarge
+                val actionLabels = listOf(localizedText("语音"), localizedText("照片"), localizedText("补记"))
+                val widestActionWidth = with(LocalDensity.current) {
+                    actionLabels.maxOf { actionTextMeasurer.measure(it, actionLabelStyle, softWrap = false).size.width }.toDp()
+                } + 38.dp
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val useEqualWidths = widestActionWidth <= (maxWidth - 16.dp) / 3
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        MomentQuickAction(
+                            icon = Icons.Outlined.MicNone,
+                            label = actionLabels[0],
+                            enabled = !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
+                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
+                            onClick = beginVoiceCapture,
+                        )
+                        MomentQuickAction(
+                            icon = Icons.Outlined.AddPhotoAlternate,
+                            label = actionLabels[1],
+                            enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
+                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
+                            onClick = {
+                                dismissKeyboard()
+                                showPhotoSourceDialog = true
+                            },
+                        )
+                        MomentQuickAction(
+                            icon = Icons.Outlined.History,
+                            label = actionLabels[2],
+                            enabled = !isSaving,
+                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
+                            onClick = {
+                                dismissKeyboard()
+                                showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                            },
+                        )
+                    }
                 }
                 if (draft.recordedAt != null) {
                     Spacer(Modifier.height(8.dp))
@@ -3703,24 +3717,41 @@ private fun PaperCard(
 
 @Composable
 private fun SectionTitle(index: String, title: String, trailing: String? = null) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            index,
-            modifier = Modifier.alignByBaseline(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(title, modifier = Modifier.weight(1f).alignByBaseline(), style = XikeSectionTitleStyle)
-        if (trailing != null) {
-            Spacer(Modifier.width(8.dp))
-            Text(
-                trailing,
-                modifier = Modifier.alignByBaseline(),
-                maxLines = 1,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val titleStyle = XikeSectionTitleStyle
+    val requiredWidth = with(density) {
+        (textMeasurer.measure(index, labelStyle, softWrap = false).size.width +
+            textMeasurer.measure(title, titleStyle, softWrap = false).size.width +
+            (trailing?.let { textMeasurer.measure(it, labelStyle, softWrap = false).size.width } ?: 0)).toDp()
+    } + 12.dp + if (trailing != null) 8.dp else 0.dp
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stackTrailing = trailing != null && requiredWidth > maxWidth
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    index,
+                    modifier = Modifier.alignByBaseline(),
+                    style = labelStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(title, modifier = Modifier.weight(1f).alignByBaseline(), style = titleStyle)
+                if (trailing != null && !stackTrailing) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        trailing,
+                        modifier = Modifier.alignByBaseline(),
+                        maxLines = 1,
+                        style = labelStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (stackTrailing) {
+                Text(trailing.orEmpty(), style = labelStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
