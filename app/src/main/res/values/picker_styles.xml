@@ -1,0 +1,16 @@
+<resources>
+    <style name="PickerAccent" />
+    <style name="PickerSurface" />
+    <style name="Theme.Xike.Picker" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+    </style>
+    <style name="PickerAccent.Pine"><item name="android:colorAccent">#496738</item></style>
+    <style name="PickerAccent.Violet"><item name="android:colorAccent">#66567E</item></style>
+    <style name="PickerAccent.Ocean"><item name="android:colorAccent">#355E5B</item></style>
+    <style name="PickerAccent.Terra"><item name="android:colorAccent">#925B49</item></style>
+    <style name="PickerAccent.Amber"><item name="android:colorAccent">#82611E</item></style>
+    <style name="PickerAccent.Rose"><item name="android:colorAccent">#8B5360</item></style>
+    <style name="PickerSurface.Breathe"><item name="android:colorBackground">#F8F7F2</item></style>
+    <style name="PickerSurface.Paper"><item name="android:colorBackground">#F3EEE4</item></style>
+    <style name="PickerSurface.Focus"><item name="android:colorBackground">#F3F6F4</item></style>
+</resources>

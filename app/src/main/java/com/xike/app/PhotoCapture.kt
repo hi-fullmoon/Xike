@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -179,7 +178,7 @@ internal fun PhotoSourceDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         sheetMaxWidth = XikeContentMaxWidth,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = XikeShapes.sheet,
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = {
             val safeInsets = WindowInsets.safeDrawing

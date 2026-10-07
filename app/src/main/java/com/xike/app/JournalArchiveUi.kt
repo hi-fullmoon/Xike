@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -1365,6 +1366,7 @@ private fun JournalEntryEditDialog(
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
     var retainedAudio by remember(entry.id) { mutableStateOf(entry.audio) }
     var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
+    val pickerContext = LocalRecordedAtPickerContext.current
     var previewPhoto by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     var retainedImages by rememberSaveable(entry.id) { mutableStateOf(entry.imageFileNames) }
     var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
@@ -1506,26 +1508,23 @@ private fun JournalEntryEditDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .imePadding(),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier = Modifier.widthIn(max = XikeContentMaxWidth)
+                        .fillMaxWidth().align(Alignment.CenterHorizontally)
+                        .padding(horizontal = XikeScreenHorizontalPadding, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(enabled = !isSaving, onClick = dismissEditor) {
                         Icon(Icons.Outlined.Close, contentDescription = localizedText("取消编辑"))
                     }
                     Spacer(Modifier.width(4.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(localizedText("编辑这一刻"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
-                        Text(
-                            localizedText("修改会同步更新回望、搜索与轨迹"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(localizedText("编辑这一刻"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                     Button(
                         enabled = !isSaving,
+                        shape = XikeShapes.button,
                         onClick = {
                             if (isSaving) return@Button
                             isSaving = true
@@ -1538,11 +1537,13 @@ private fun JournalEntryEditDialog(
                                 audio = retainedAudio,
                                 outdoor = editedOutdoor,
                             )
+                            val imagesToRetain = retainedImages.toList()
+                            val imagesToAdd = newImageUriStrings.map(Uri::parse)
                             scope.launch {
                                 onSave(
                                     updatedEntry,
-                                    retainedImages,
-                                    newImageUriStrings.map(Uri::parse),
+                                    imagesToRetain,
+                                    imagesToAdd,
                                 ).onSuccess {
                                     Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
                                 }.onFailure { error ->
@@ -1563,10 +1564,18 @@ private fun JournalEntryEditDialog(
                 Column(
                     modifier = Modifier
                         .weight(1f)
+                        .widthIn(max = XikeContentMaxWidth)
+                        .fillMaxWidth()
+                        .align(Alignment.CenterHorizontally)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 22.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                        .padding(horizontal = XikeScreenHorizontalPadding, vertical = XikeScreenVerticalPadding),
+                    verticalArrangement = Arrangement.spacedBy(XikeContentGap),
                 ) {
+                Text(
+                    localizedText("修改会同步更新回望、搜索与轨迹"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 EditSectionCard(
                     title = localizedText("心情"),
                     supporting = localizedText("重新选择最接近那一刻的感受"),
@@ -1592,7 +1601,7 @@ private fun JournalEntryEditDialog(
                 EditSectionCard(title = localizedText("记录时间"), supporting = localizedText("可修正补记日期与具体时间")) {
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable(enabled = !isSaving) {
-                            showRecordedAtPicker(context, createdAt) { createdAt = it }
+                            showRecordedAtPicker(pickerContext, createdAt) { createdAt = it }
                         },
                         shape = XikeShapes.inner,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
@@ -1635,8 +1644,9 @@ private fun JournalEntryEditDialog(
                         value = note,
                         onValueChange = { note = it.take(MAX_DRAFT_NOTE_LENGTH) },
                         enabled = !isSaving,
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = localizedText("此刻的注脚") },
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        minLines = 3,
                         maxLines = 8,
                         placeholder = { Text(localizedText("这一刻发生了什么？")) },
                         shape = XikeShapes.inner,
@@ -1660,7 +1670,7 @@ private fun JournalEntryEditDialog(
                         VoicePlaybackCard(
                             audio = audio,
                             openAudio = openAudio,
-                            onDelete = { retainedAudio = null },
+                            onDelete = if (isSaving) null else ({ if (!isSaving) retainedAudio = null }),
                         )
                     }
                 }
@@ -1678,6 +1688,8 @@ private fun JournalEntryEditDialog(
                                 rowTopics.forEach { topic ->
                                     TopicChip(
                                         topic = topic,
+                                        minHeight = 36.dp,
+                                        labelMaxLines = 2,
                                         selected = selectedTags.containsTopic(topic.label),
                                         onClick = {
                                             if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
@@ -1701,12 +1713,13 @@ private fun JournalEntryEditDialog(
                         retainedImages = retainedImages,
                         newImageUriStrings = newImageUriStrings,
                         canAdd = availableImageSlots > 0 && !isSaving,
+                        enabled = !isSaving,
                         openImage = openImage,
                         onAdd = { showPhotoSourceDialog = true },
                         onPreview = { previewPhoto = it },
-                        onRemoveRetained = { retainedImages = retainedImages - it },
+                        onRemoveRetained = { if (!isSaving) retainedImages = retainedImages - it },
                         onRemoveNew = { uriString ->
-                            newImageUriStrings = newImageUriStrings - uriString
+                            if (!isSaving) newImageUriStrings = newImageUriStrings - uriString
                         },
                     )
                 }
@@ -1770,10 +1783,13 @@ private fun JournalEntryEditDialog(
                 TextButton(onClick = { showDiscardConfirmation = false }) { Text(localizedText("继续编辑")) }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showDiscardConfirmation = false
-                    discardEditor()
-                }) { Text(localizedText("放弃修改")) }
+                TextButton(
+                    onClick = {
+                        showDiscardConfirmation = false
+                        discardEditor()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(localizedText("放弃修改")) }
             },
         )
     }
@@ -1813,6 +1829,7 @@ private fun EditPhotoStrip(
     retainedImages: List<String>,
     newImageUriStrings: List<String>,
     canAdd: Boolean,
+    enabled: Boolean,
     openImage: (String) -> InputStream?,
     onAdd: () -> Unit,
     onPreview: (String) -> Unit,
@@ -1828,6 +1845,7 @@ private fun EditPhotoStrip(
                     photoDescription = tr("已有照片 ${index + 1}", "Existing photo ${index + 1}"),
                     openStream = { openImage(fileName) },
                     onRemove = { onRemoveRetained(fileName) },
+                    enabled = enabled,
                     onPreview = { onPreview(fileName) },
                 )
             }
@@ -1839,6 +1857,7 @@ private fun EditPhotoStrip(
                     photoDescription = tr("新照片 ${index + 1}", "New photo ${index + 1}"),
                     openStream = { context.contentResolver.openInputStream(Uri.parse(uriString)) },
                     onRemove = { onRemoveNew(uriString) },
+                    enabled = enabled,
                     onPreview = { onPreview(uriString) },
                 )
             }
@@ -1858,6 +1877,7 @@ private fun EditPhotoTile(
     openStream: () -> InputStream?,
     onRemove: () -> Unit,
     onPreview: () -> Unit,
+    enabled: Boolean,
 ) {
     val bitmap = rememberPreviewBitmap(key = key, maxDimension = 360, openStream = openStream)
     val removeDescription = tr("移除$photoDescription", "Remove $photoDescription")
@@ -1885,6 +1905,7 @@ private fun EditPhotoTile(
         }
         IconButton(
             onClick = onRemove,
+            enabled = enabled,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .size(48.dp)

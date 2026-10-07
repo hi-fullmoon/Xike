@@ -890,12 +890,13 @@ private fun BackupExportDialog(
                         Text(localizedText("使用密码加密"), style = MaterialTheme.typography.titleSmall)
                         Text(localizedText("建议开启；密码不会保存在应用中"), style = MaterialTheme.typography.bodySmall)
                     }
-                    Switch(checked = encrypted, onCheckedChange = { encrypted = it })
+                    Switch(checked = encrypted, onCheckedChange = { encrypted = it }, colors = xikeSwitchColors())
                 }
                 if (encrypted) {
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
+                        shape = XikeShapes.inner,
                         label = { Text(localizedText("备份密码（至少 8 位）")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -912,6 +913,7 @@ private fun BackupExportDialog(
                     OutlinedTextField(
                         value = confirmation,
                         onValueChange = { confirmation = it },
+                        shape = XikeShapes.inner,
                         label = { Text(localizedText("再次输入备份密码")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -967,6 +969,7 @@ private fun BackupPasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
+                    shape = XikeShapes.inner,
                     label = { Text(localizedText("备份密码（至少 8 位）")) },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -984,6 +987,7 @@ private fun BackupPasswordDialog(
                     OutlinedTextField(
                         value = confirmation,
                         onValueChange = { confirmation = it },
+                        shape = XikeShapes.inner,
                         label = { Text(localizedText("再次输入备份密码")) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

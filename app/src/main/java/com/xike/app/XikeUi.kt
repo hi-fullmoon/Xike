@@ -7,7 +7,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.view.ContextThemeWrapper
 import android.widget.Toast
+import coil3.compose.AsyncImage
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -117,6 +120,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -361,6 +365,7 @@ private fun AppStyle.spec(): XikeStyleSpec = when (this) {
 }
 
 private val LocalXikeStyle = staticCompositionLocalOf { BreatheStyleSpec }
+internal val LocalRecordedAtPickerContext = staticCompositionLocalOf<Context> { error("Missing picker theme") }
 
 internal val XikeCardPadding = 14.dp
 internal val XikeInnerCardPadding = 10.dp
@@ -375,6 +380,11 @@ object XikeShapes {
         @Composable get() = RoundedCornerShape(LocalXikeStyle.current.buttonCorner)
     val dialog: RoundedCornerShape
         @Composable get() = RoundedCornerShape(LocalXikeStyle.current.dialogCorner)
+    val sheet: RoundedCornerShape
+        @Composable get() = RoundedCornerShape(
+            topStart = LocalXikeStyle.current.cardCorner,
+            topEnd = LocalXikeStyle.current.cardCorner,
+        )
 }
 
 internal val XikeContentMaxWidth: Dp
@@ -470,6 +480,25 @@ fun XikeTheme(
     content: @Composable () -> Unit,
 ) {
     val styleSpec = style.spec()
+    val context = LocalContext.current
+    val selectedTheme = theme
+    val pickerContext = remember(context, theme, style) {
+        ContextThemeWrapper(context, R.style.Theme_Xike_Picker).apply {
+            this.theme.applyStyle(when (selectedTheme) {
+                AppTheme.PINE -> R.style.PickerAccent_Pine
+                AppTheme.VIOLET -> R.style.PickerAccent_Violet
+                AppTheme.OCEAN -> R.style.PickerAccent_Ocean
+                AppTheme.TERRA -> R.style.PickerAccent_Terra
+                AppTheme.AMBER -> R.style.PickerAccent_Amber
+                AppTheme.ROSE -> R.style.PickerAccent_Rose
+            }, true)
+            this.theme.applyStyle(when (style) {
+                AppStyle.BREATHE -> R.style.PickerSurface_Breathe
+                AppStyle.PAPER -> R.style.PickerSurface_Paper
+                AppStyle.FOCUS -> R.style.PickerSurface_Focus
+            }, true)
+        }
+    }
     val previewBitmapCache = remember { PreviewBitmapCache() }
     val colors: ColorScheme = if (isSystemInDarkTheme()) {
         darkColorScheme(
@@ -634,6 +663,7 @@ fun XikeTheme(
     }
     CompositionLocalProvider(
         LocalXikeStyle provides styleSpec,
+        LocalRecordedAtPickerContext provides pickerContext,
         LocalPreviewBitmapCache provides previewBitmapCache,
     ) {
         MaterialTheme(
@@ -898,6 +928,7 @@ fun MomentScreen(
     var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
     var showVoiceCapture by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val pickerContext = LocalRecordedAtPickerContext.current
     val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1223,7 +1254,7 @@ fun MomentScreen(
                             modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
                             onClick = {
                                 dismissKeyboard()
-                                showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                                showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
                             },
                         )
                     }
@@ -1235,7 +1266,7 @@ fun MomentScreen(
                         enabled = !isSaving,
                         onChoose = {
                             dismissKeyboard()
-                            showRecordedAtPicker(context, draft.recordedAt, onDraftRecordedAtChange)
+                            showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
                         },
                         onReset = { onDraftRecordedAtChange(null) },
                     )
@@ -1552,6 +1583,7 @@ fun MomentScreen(
                         showDiscardConfirmation = false
                         showDetails = false
                     },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) { Text(localizedText("放弃草稿")) }
             },
         )
@@ -1983,10 +2015,12 @@ internal fun showRecordedAtPicker(
 
     DatePickerDialog(
         context,
+        R.style.PickerSurface,
         { _, year, month, day ->
             val date = LocalDate.of(year, month + 1, day)
             TimePickerDialog(
                 context,
+                R.style.PickerSurface,
                 { _, hour, minute ->
                     val selected = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
                     if (selected > System.currentTimeMillis()) {
@@ -2241,6 +2275,7 @@ internal fun TopicChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     minHeight: Dp = 48.dp,
+    labelMaxLines: Int = 1,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -2270,7 +2305,7 @@ internal fun TopicChip(
             Spacer(Modifier.width(XikeInlineActionGap))
             Text(
                 localizedText(topic.label),
-                maxLines = 1,
+                maxLines = labelMaxLines,
                 style = MaterialTheme.typography.labelLarge,
                 color = when {
                     selected && isDark -> MaterialTheme.colorScheme.onSurface
@@ -2877,6 +2912,10 @@ internal fun PhotoGalleryDialog(
     onDismiss: () -> Unit,
 ) {
     if (fileNames.isEmpty()) return
+    val context = LocalContext.current
+    val imageLoader = remember(context) { GalleryImageLoader.get(context) }
+    val currentOpenImage by rememberUpdatedState(openImage)
+    val thumbnailCache = LocalPreviewBitmapCache.current
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(0, fileNames.lastIndex),
         pageCount = { fileNames.size },
@@ -2893,17 +2932,41 @@ internal fun PhotoGalleryDialog(
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 HorizontalPager(
                     state = pagerState,
+                    beyondViewportPageCount = 1,
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val fileName = fileNames[page]
-                    SavedJournalImage(
-                        fileName = fileName,
-                        openStream = { openImage(fileName) },
-                        modifier = Modifier.fillMaxSize(),
-                        order = page + 1,
-                        contentScale = ContentScale.Fit,
-                        maxDimension = 2048,
-                    )
+                    val request = remember(context, fileName) {
+                        GalleryImageLoader.request(context, GalleryPhoto(fileName) { currentOpenImage(fileName) })
+                    }
+                    val placeholder = remember(thumbnailCache, fileName) {
+                        thumbnailCache?.get(fileName, 960)?.let { BitmapPainter(it) }
+                    }
+                    var showLoadingIcon by remember(request) { mutableStateOf(placeholder == null) }
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (showLoadingIcon) {
+                            Icon(
+                                Icons.Outlined.AddPhotoAlternate,
+                                contentDescription = null,
+                                modifier = Modifier.testTag("photo-gallery-placeholder-$page"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        AsyncImage(
+                            model = request,
+                            imageLoader = imageLoader,
+                            placeholder = placeholder,
+                            onLoading = { showLoadingIcon = placeholder == null },
+                            onSuccess = { showLoadingIcon = false },
+                            onError = { showLoadingIcon = true },
+                            contentDescription = tr("日记第 ${page + 1} 张照片", "Journal photo ${page + 1}"),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
                 }
 
                 Row(
@@ -3278,7 +3341,7 @@ private fun ReminderScheduleDialog(
     onConfirm: (ReminderSettings) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val context = LocalRecordedAtPickerContext.current
     var selectedHour by rememberSaveable(settings.hour) { mutableStateOf(settings.hour) }
     var selectedMinute by rememberSaveable(settings.minute) { mutableStateOf(settings.minute) }
     var selectedDays by remember(settings.weekdays) { mutableStateOf(settings.weekdays) }
@@ -3299,6 +3362,7 @@ private fun ReminderScheduleDialog(
                     modifier = Modifier.fillMaxWidth().clickable {
                         TimePickerDialog(
                             context,
+                            R.style.PickerSurface,
                             { _, hour, minute ->
                                 selectedHour = hour
                                 selectedMinute = minute
@@ -3398,6 +3462,7 @@ private fun ReminderScheduleDialog(
                     )
                 },
                 enabled = selectedDays.isNotEmpty(),
+                shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
             ) { Text(localizedText("保存")) }
         },
