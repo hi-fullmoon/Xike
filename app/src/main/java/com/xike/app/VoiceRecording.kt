@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -224,7 +225,8 @@ internal fun VoiceCaptureCard(
     var pausedAt by remember { mutableLongStateOf(0L) }
     var totalPaused by remember { mutableLongStateOf(0L) }
     var elapsedMillis by remember { mutableLongStateOf(0L) }
-    var amplitudes by remember { mutableStateOf(List(64) { 0f }) }
+    var waveform by remember { mutableStateOf(VoiceWaveformTimeline()) }
+    var waveformOffset by remember { mutableFloatStateOf(0f) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var limitReached by remember { mutableLongStateOf(0L) }
 
@@ -269,7 +271,8 @@ internal fun VoiceCaptureCard(
             pausedAt = 0L
             totalPaused = 0L
             elapsedMillis = 0L
-            amplitudes = List(64) { 0f }
+            waveform = VoiceWaveformTimeline()
+            waveformOffset = 0f
             limitReached = 0L
             isPaused = false
             isRecording = true
@@ -289,15 +292,25 @@ internal fun VoiceCaptureCard(
     }
 
     LaunchedEffect(isRecording, isPaused) {
-        while (isRecording) {
-            if (!isPaused) {
-                elapsedMillis = currentDuration()
+        while (isRecording && !isPaused) {
+            val duration = currentDuration()
+            elapsedMillis = duration
+            if (waveform.isSampleDue(duration)) {
                 val amplitude = recorder.maxAmplitude().coerceAtLeast(0)
                 val normalized = (amplitude / 32768f).coerceIn(0f, 1f).pow(0.65f)
-                amplitudes = (amplitudes.drop(1) + normalized)
-                if (elapsedMillis >= MAX_AUDIO_DURATION_MILLIS - 150L) finishRecording()
+                waveform = waveform.append(duration, normalized)
             }
-            delay(90)
+            waveformOffset = waveform.offset(duration)
+            if (duration >= MAX_AUDIO_DURATION_MILLIS - 150L) finishRecording()
+            delay(waveform.nextSampleDelay(currentDuration()))
+        }
+    }
+
+    LaunchedEffect(isRecording, isPaused) {
+        while (isRecording && !isPaused) {
+            withFrameNanos {
+                waveformOffset = waveform.offset(currentDuration())
+            }
         }
     }
 
@@ -368,7 +381,7 @@ internal fun VoiceCaptureCard(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
             ) {
                 Column(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
-                    VoiceWaveform(amplitudes, isPaused)
+                    VoiceWaveform(waveform.values) { waveformOffset }
                 }
             }
             Text(
@@ -773,31 +786,27 @@ private fun VoiceProgressSlider(
 }
 
 @Composable
-private fun VoiceWaveform(values: List<Float>, isPaused: Boolean) {
-    val color = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant
-        else MaterialTheme.colorScheme.primary
-    val guideColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+private fun VoiceWaveform(values: List<Float?>, scrollOffset: () -> Float) {
+    val color = MaterialTheme.colorScheme.primary
     Canvas(Modifier.fillMaxWidth().height(56.dp)) {
         val center = size.height / 2f
-        val playheadX = size.width - 2.dp.toPx()
-        val waveformWidth = playheadX - 10.dp.toPx()
-        val step = waveformWidth / values.size
-        drawLine(guideColor, Offset(0f, center), Offset(size.width, center), 1.dp.toPx())
-        values.forEachIndexed { index, value ->
-            val x = step * (index + 0.5f)
-            val halfHeight = 2.dp.toPx() + value.coerceIn(0f, 1f) * (center - 6.dp.toPx())
-            val alpha = if (isPaused) 0.45f else 0.25f + 0.75f * index / values.lastIndex.coerceAtLeast(1)
+        val step = 5.5.dp.toPx()
+        val inset = 2.dp.toPx()
+        val right = size.width - inset
+        val offset = scrollOffset().coerceAtLeast(0f) * step
+        for (age in values.indices) {
+            val x = right - age * step - offset
+            if (x < inset) break
+            val value = values[values.lastIndex - age] ?: continue
+            val halfHeight = 1.dp.toPx() + value.coerceIn(0f, 1f) * (center - 5.dp.toPx())
+            val fade = ((x - inset) / 30.dp.toPx()).coerceIn(0f, 1f)
+            val alpha = (0.38f + 0.55f * (x / size.width.coerceAtLeast(1f))) * fade
             drawLine(
                 color.copy(alpha = alpha),
                 Offset(x, center - halfHeight), Offset(x, center + halfHeight),
-                strokeWidth = minOf(2.dp.toPx(), step * 0.5f), cap = StrokeCap.Round,
+                strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round,
             )
         }
-        drawLine(
-            color.copy(alpha = if (isPaused) 0.45f else 0.8f),
-            Offset(playheadX, 4.dp.toPx()), Offset(playheadX, size.height - 4.dp.toPx()),
-            strokeWidth = 1.5.dp.toPx(), cap = StrokeCap.Round,
-        )
     }
 }
 
