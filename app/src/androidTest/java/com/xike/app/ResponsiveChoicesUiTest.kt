@@ -2,6 +2,8 @@ package com.xike.app
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -14,6 +16,9 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -64,6 +69,91 @@ class ResponsiveChoicesUiTest {
             }
         }
         Mood.entries.forEach { assertCompleteLabel(it.label) }
+    }
+
+    @Test
+    fun largeFontArchiveModesKeepCompleteLabelsBeforeAndAfterSelectionChanges() {
+        val selected = mutableStateOf(ArchiveViewMode.TIMELINE)
+        val viewportWidth = mutableStateOf(320.dp)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                Column(Modifier.width(viewportWidth.value)) {
+                    AppStyle.entries.forEach { style ->
+                        XikeTheme(AppTheme.OCEAN, style) {
+                            Column(Modifier.width(viewportWidth.value)) {
+                                ArchiveControls(selected.value, 1, false, { selected.value = it }, {})
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertCompleteLabel(localizedText("月历"))
+        assertCompleteLabel(localizedText("时间流"))
+        composeRule.runOnIdle { viewportWidth.value = 240.dp }
+        assertCompleteLabel(localizedText("月历"))
+        assertCompleteLabel(localizedText("时间流"))
+        assertSelectedArchiveModeFullyVisible("timeline")
+        composeRule.runOnIdle { selected.value = ArchiveViewMode.CALENDAR }
+        assertCompleteLabel(localizedText("月历"))
+        assertCompleteLabel(localizedText("时间流"))
+        assertSelectedArchiveModeFullyVisible("calendar")
+    }
+
+    @Test
+    fun longSearchResultCountDoesNotSplitArchiveTitleInAnyStyle() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                    AppStyle.entries.forEach { style ->
+                        XikeTheme(AppTheme.OCEAN, style) {
+                            ArchiveHeader(tr("找到 0 条", "0 entries found"))
+                        }
+                    }
+                }
+            }
+        }
+        assertCompleteLabel(localizedText("回望"))
+    }
+
+    @Test
+    fun archiveSearchKeepsItsHeightWhenTextIsEnteredAndCleared() {
+        val selectedStyle = mutableStateOf(AppStyle.BREATHE)
+        val fontScale = mutableStateOf(1f)
+        val query = mutableStateOf("")
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale.value)) {
+                XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
+                    Column(Modifier.width(272.dp)) {
+                        ArchiveSearchBar(query.value, { query.value = it }, { query.value = "" })
+                    }
+                }
+            }
+        }
+        listOf(1f, 2f).forEach { scale ->
+            AppStyle.entries.forEach { style ->
+                composeRule.runOnIdle {
+                    fontScale.value = scale
+                    selectedStyle.value = style
+                }
+                val search = composeRule.onNodeWithTag("archive-search")
+                val emptyBounds = search.getUnclippedBoundsInRoot()
+                val emptyHeight = (emptyBounds.bottom - emptyBounds.top).value
+                search.performTextInput("UI")
+                val filledBounds = search.getUnclippedBoundsInRoot()
+                assertTrue("Search changed height for $style at $scale", kotlin.math.abs(
+                    (filledBounds.bottom - filledBounds.top).value - emptyHeight,
+                ) < 0.5f)
+                search.performTextClearance()
+                val clearedBounds = search.getUnclippedBoundsInRoot()
+                assertTrue("Clearing search changed height for $style at $scale", kotlin.math.abs(
+                    (clearedBounds.bottom - clearedBounds.top).value - emptyHeight,
+                ) < 0.5f)
+            }
+        }
     }
 
     @Test
@@ -126,6 +216,18 @@ class ResponsiveChoicesUiTest {
         assertSelectedNavigationFullyVisible(AppScreen.HOME)
         composeRule.runOnIdle { selected.value = AppScreen.SETTINGS }
         assertSelectedNavigationFullyVisible(AppScreen.SETTINGS)
+    }
+
+    private fun assertSelectedArchiveModeFullyVisible(mode: String) {
+        val nodes = composeRule.onAllNodesWithTag("archive-mode-$mode")
+        assertEquals(3, nodes.fetchSemanticsNodes().size)
+        repeat(3) { index ->
+            val node = nodes[index].assertIsDisplayed().assertIsSelected()
+            val full = node.getUnclippedBoundsInRoot()
+            val visible = node.getBoundsInRoot()
+            assertTrue("Selected $mode is clipped on the left in style $index", full.left >= visible.left - 0.5.dp)
+            assertTrue("Selected $mode is clipped on the right in style $index", full.right <= visible.right + 0.5.dp)
+        }
     }
 
     private fun assertSelectedNavigationFullyVisible(screen: AppScreen) {

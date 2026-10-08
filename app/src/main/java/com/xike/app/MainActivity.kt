@@ -857,11 +857,12 @@ private fun RestoreConfirmationDialog(
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
+                shape = XikeShapes.button,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(localizedText("替换并恢复")) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(localizedText("取消")) }
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
         },
     )
 }
@@ -932,11 +933,12 @@ private fun BackupExportDialog(
         },
         confirmButton = {
             TextButton(
+                shape = XikeShapes.button,
                 enabled = !encrypted || (password.length >= 8 && confirmation == password),
                 onClick = { onConfirm(password.takeIf { encrypted }) },
             ) { Text(localizedText("选择保存位置")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
     )
 }
 
@@ -1002,12 +1004,13 @@ private fun BackupPasswordDialog(
         },
         confirmButton = {
             TextButton(
+                shape = XikeShapes.button,
                 enabled = password.length >= 8 && (!requireConfirmation || confirmation == password),
                 onClick = { onConfirm(password) },
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             ) { Text(confirm) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
     )
 }
 
@@ -1035,7 +1038,7 @@ private fun DataErrorDialog(message: String, onDismiss: () -> Unit) {
         title = { Text(localizedText("数据需要检查")) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(localizedText("我知道了")) }
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("我知道了")) }
         },
     )
 }

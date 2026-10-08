@@ -58,10 +58,11 @@ internal fun DestructiveConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(enabled = !isProcessing, onClick = onDismiss) { Text(dismissText) }
+            TextButton(enabled = !isProcessing, onClick = onDismiss, shape = XikeShapes.button) { Text(dismissText) }
         },
         confirmButton = {
             TextButton(
+                shape = XikeShapes.button,
                 enabled = !isProcessing,
                 onClick = onConfirm,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -1010,7 +1011,7 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                 Text(localizedText("选择分享应用"), maxLines = 1)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("关闭")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("关闭")) } },
     )
 }
 
@@ -1033,8 +1034,10 @@ private fun InsightDrilldownDialog(
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
-                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = XikeContentMaxWidth).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = XikeScreenHorizontalPadding, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item(key = "drilldown-header") {

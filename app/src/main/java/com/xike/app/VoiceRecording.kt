@@ -713,7 +713,7 @@ internal fun VoicePlaybackCard(
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (onReplace != null) {
-                        TextButton(onClick = {
+                        TextButton(shape = XikeShapes.button, onClick = {
                             releasePlayer()
                             onReplace()
                         }) {

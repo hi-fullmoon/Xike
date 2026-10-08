@@ -4,10 +4,13 @@ import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.view.ContextThemeWrapper
+import android.view.View
 import android.widget.Toast
 import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -367,6 +370,46 @@ private fun AppStyle.spec(): XikeStyleSpec = when (this) {
 }
 
 private val LocalXikeStyle = staticCompositionLocalOf { BreatheStyleSpec }
+private class XikePickerContext(context: Context, val cornerRadius: Float, val contentMaxWidth: Int) :
+    ContextThemeWrapper(context, R.style.Theme_Xike_Picker)
+
+private fun android.app.Dialog.showWithXikeShape() {
+    show()
+    var baseContext = context
+    while (baseContext is android.content.ContextWrapper && baseContext !is XikePickerContext) {
+        baseContext = baseContext.baseContext
+    }
+    val pickerContext = baseContext as? XikePickerContext ?: return
+    val background = TypedValue()
+    context.theme.resolveAttribute(android.R.attr.colorBackground, background, true)
+    window?.apply {
+        val metrics = context.resources.displayMetrics
+        val configuration = context.resources.configuration
+        val insets = android.graphics.Rect()
+        decorView.background?.getPadding(insets)
+        val roundedBackground = GradientDrawable().apply {
+            setColor(background.data)
+            cornerRadius = pickerContext.cornerRadius
+        }
+        setBackgroundDrawable(android.graphics.drawable.InsetDrawable(
+            roundedBackground,
+            insets.left,
+            insets.top,
+            insets.right,
+            insets.bottom,
+        ))
+        decorView.clipToOutline = true
+        val availableWidth = minOf((configuration.screenWidthDp * metrics.density).roundToInt(), pickerContext.contentMaxWidth)
+        val availableHeight = (configuration.screenHeightDp * metrics.density).roundToInt()
+        // Resolve the width before the calendar lays out its columns for the first time.
+        decorView.measure(
+            View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(availableHeight, View.MeasureSpec.AT_MOST),
+        )
+        setLayout(minOf(decorView.measuredWidth, availableWidth), attributes.height)
+    }
+}
+
 internal val LocalRecordedAtPickerContext = staticCompositionLocalOf<Context> { error("Missing picker theme") }
 
 internal val XikeCardPadding = 14.dp
@@ -448,6 +491,10 @@ private val BreatheTypography = Typography(
 )
 
 private val PaperTypography = BreatheTypography.copy(
+    displaySmall = BreatheTypography.displaySmall.copy(fontFamily = FontFamily.Serif),
+    headlineLarge = BreatheTypography.headlineLarge.copy(fontFamily = FontFamily.Serif),
+    headlineMedium = BreatheTypography.headlineMedium.copy(fontFamily = FontFamily.Serif),
+    headlineSmall = BreatheTypography.headlineSmall.copy(fontFamily = FontFamily.Serif),
     titleLarge = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 30.sp),
     titleMedium = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 26.sp),
     titleSmall = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 23.sp),
@@ -485,7 +532,11 @@ fun XikeTheme(
     val context = LocalContext.current
     val selectedTheme = theme
     val pickerContext = remember(context, theme, style) {
-        ContextThemeWrapper(context, R.style.Theme_Xike_Picker).apply {
+        XikePickerContext(
+            context,
+            styleSpec.dialogCorner.value * context.resources.displayMetrics.density,
+            (styleSpec.contentMaxWidth.value * context.resources.displayMetrics.density).roundToInt(),
+        ).apply {
             this.theme.applyStyle(when (selectedTheme) {
                 AppTheme.PINE -> R.style.PickerAccent_Pine
                 AppTheme.VIOLET -> R.style.PickerAccent_Violet
@@ -1235,7 +1286,7 @@ fun MomentScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (isNoteFocused) {
-                            TextButton(onClick = dismissKeyboard) {
+                            TextButton(onClick = dismissKeyboard, shape = XikeShapes.button) {
                                 Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                                 Spacer(Modifier.width(XikeInlineActionGap))
                                 Text(localizedText("完成"), maxLines = 1)
@@ -1611,6 +1662,7 @@ fun MomentScreen(
             },
             dismissButton = {
                 TextButton(
+                    shape = XikeShapes.button,
                     onClick = {
                         showOutdoorDisclosure = false
                         showOutdoorCityDialog = true
@@ -1619,6 +1671,7 @@ fun MomentScreen(
             },
             confirmButton = {
                 TextButton(
+                    shape = XikeShapes.button,
                     onClick = {
                         showOutdoorDisclosure = false
                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -1858,8 +1911,8 @@ private fun OutdoorContextCard(
                         modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(onClick = onChooseCity, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text(localizedText("手动选城市")) }
-                        TextButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.heightIn(min = 48.dp)) { Text(localizedText("重新尝试")) }
+                        TextButton(onClick = onChooseCity, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) { Text(localizedText("手动选城市")) }
+                        TextButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) { Text(localizedText("重新尝试")) }
                     }
                 }
             }
@@ -1874,7 +1927,7 @@ private fun OutdoorCardAction(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) {
         Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
         Spacer(Modifier.width(XikeInlineActionGap))
         Text(label, maxLines = 1)
@@ -1908,9 +1961,10 @@ private fun OutdoorCityDialog(
                 )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
         confirmButton = {
             TextButton(
+                shape = XikeShapes.button,
                 onClick = { onConfirm(city.trim()) },
                 enabled = city.isNotBlank(),
             ) { Text(localizedText("获取天气")) }
@@ -1946,7 +2000,7 @@ private fun DraftSecurityRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (hasDraft) {
-            TextButton(onClick = onDiscard, enabled = enabled) { Text(localizedText("清空")) }
+            TextButton(onClick = onDiscard, enabled = enabled, shape = XikeShapes.button) { Text(localizedText("清空")) }
         }
     }
 }
@@ -2003,7 +2057,7 @@ private fun RecordedAtSelector(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onReset, enabled = enabled) { Text(localizedText("改为现在")) }
+            TextButton(onClick = onReset, enabled = enabled, shape = XikeShapes.button) { Text(localizedText("改为现在")) }
         }
     }
 }
@@ -2012,7 +2066,7 @@ internal fun showRecordedAtPicker(
     context: Context,
     recordedAt: Long?,
     onSelected: (Long) -> Unit,
-) {
+): DatePickerDialog {
     val nowMillis = System.currentTimeMillis()
     val zoneId = ZoneId.systemDefault()
     val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
@@ -2021,7 +2075,7 @@ internal fun showRecordedAtPicker(
         ?.let { Instant.ofEpochMilli(it).atZone(zoneId) }
         ?: now
 
-    DatePickerDialog(
+    val dialog = DatePickerDialog(
         context,
         R.style.PickerSurface,
         { _, year, month, day ->
@@ -2040,14 +2094,16 @@ internal fun showRecordedAtPicker(
                 initial.hour,
                 initial.minute,
                 true,
-            ).show()
+            ).showWithXikeShape()
         },
         initial.year,
         initial.monthValue - 1,
         initial.dayOfMonth,
     ).apply {
         datePicker.maxDate = nowMillis
-    }.show()
+    }
+    dialog.showWithXikeShape()
+    return dialog
 }
 
 private fun Long.asDraftMomentLabel(zoneId: ZoneId = ZoneId.systemDefault()): String {
@@ -2118,7 +2174,7 @@ private fun MoodPicker(
                 if (stackGuide) {
                     Column {
                         Text(localizedText("选最接近的感受，没有标准答案"), style = supportingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { showGuide = true }, modifier = Modifier.align(Alignment.End), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                        TextButton(onClick = { showGuide = true }, modifier = Modifier.align(Alignment.End), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), shape = XikeShapes.button) {
                             Text(localizedText("选择参考"), style = guideStyle)
                         }
                     }
@@ -2132,6 +2188,7 @@ private fun MoodPicker(
                         )
                         TextButton(
                             onClick = { showGuide = true },
+                            shape = XikeShapes.button,
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                         ) { Text(localizedText("选择参考"), style = guideStyle) }
                     }
@@ -2219,7 +2276,7 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(localizedText("知道了")) } },
+        confirmButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("知道了")) } },
     )
 }
 
@@ -2377,7 +2434,8 @@ internal fun TopicChip(
                 imageVector = topic.icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = topic.accent.copy(alpha = if (selected) 1f else 0.72f),
+                tint = if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
+                    else topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
             Spacer(Modifier.width(XikeInlineActionGap))
             Text(
@@ -3126,13 +3184,16 @@ fun ProfileSettingsScreen(
             }
         }
 
-        Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-            SettingsAction(
-                icon = XikeIcons.Settings,
-                title = localizedText("应用语言"),
-                subtitle = AppLocale.language.nativeName,
-                onClick = { showLanguageDialog = true },
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionTitle(index = tr("偏好", "Preferences"), title = localizedText("语言"))
+            Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+                SettingsAction(
+                    icon = XikeIcons.Settings,
+                    title = localizedText("应用语言"),
+                    subtitle = AppLocale.language.nativeName,
+                    onClick = { showLanguageDialog = true },
+                )
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3343,7 +3404,7 @@ fun ProfileSettingsScreen(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showLanguageDialog = false }) { Text(localizedText("取消")) }
+                TextButton(onClick = { showLanguageDialog = false }, shape = XikeShapes.button) { Text(localizedText("取消")) }
             },
         )
     }
@@ -3447,7 +3508,7 @@ private fun ReminderScheduleDialog(
                             selectedHour,
                             selectedMinute,
                             true,
-                        ).show()
+                        ).showWithXikeShape()
                     },
                     shape = XikeShapes.inner,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -3543,7 +3604,7 @@ private fun ReminderScheduleDialog(
                 elevation = xikeButtonElevation(),
             ) { Text(localizedText("保存")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
     )
 }
 
@@ -3582,7 +3643,7 @@ private fun DailyPromptStyleDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(localizedText("取消")) } },
+        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
     )
 }
 
@@ -3661,7 +3722,7 @@ private fun AppLockTimeoutDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(localizedText("取消")) }
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
         },
     )
 }

@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -42,6 +43,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -99,11 +102,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -122,7 +127,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val ARCHIVE_PAGE_SIZE = 60
-private enum class ArchiveViewMode { CALENDAR, TIMELINE }
+internal enum class ArchiveViewMode { CALENDAR, TIMELINE }
 
 private enum class ArchiveDatePreset(private val sourceLabel: String) {
     ALL("全部日期"),
@@ -394,6 +399,7 @@ fun JournalArchiveScreen(
             if (hasMoreResults) {
                 item(key = "archive-load-more") {
                     TextButton(
+                        shape = XikeShapes.button,
                         enabled = !isLoadingMore,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
@@ -533,24 +539,44 @@ fun JournalArchiveScreen(
 }
 
 @Composable
-private fun ArchiveHeader(recordLabel: String) {
+internal fun ArchiveHeader(recordLabel: String) {
+    val textMeasurer = rememberTextMeasurer()
+    val title = localizedText("回望")
+    val titleStyle = XikePageTitleStyle
+    val countStyle = MaterialTheme.typography.labelSmall
+    val requiredWidth = with(LocalDensity.current) {
+        (textMeasurer.measure(title, titleStyle, softWrap = false).size.width +
+            textMeasurer.measure(recordLabel, countStyle, softWrap = false).size.width).toDp()
+    } + 22.dp + 12.dp
+    val recordBadge: @Composable () -> Unit = {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+        ) {
+            Text(
+                recordLabel,
+                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                style = countStyle,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 5.dp),
     ) {
         Text(tr("值得记住的时刻", "MOMENTS TO REMEMBER"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(localizedText("回望"), modifier = Modifier.weight(1f), style = XikePageTitleStyle)
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-            ) {
-                Text(
-                    recordLabel,
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (requiredWidth > maxWidth) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(title, style = titleStyle)
+                    recordBadge()
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, modifier = Modifier.weight(1f), style = titleStyle)
+                    recordBadge()
+                }
             }
         }
         Spacer(Modifier.height(7.dp))
@@ -591,7 +617,7 @@ private fun ArchiveToolbox(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun ArchiveSearchBar(
+internal fun ArchiveSearchBar(
     value: String,
     onValueChange: (String) -> Unit,
     onClear: () -> Unit,
@@ -600,7 +626,7 @@ private fun ArchiveSearchBar(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("archive-search")
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), XikeShapes.inner),
         singleLine = true,
         interactionSource = interactionSource,
@@ -616,7 +642,14 @@ private fun ArchiveSearchBar(
                 interactionSource = interactionSource,
                 shape = XikeShapes.inner,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                placeholder = { Text(localizedText("搜索注脚或主题"), style = MaterialTheme.typography.bodyMedium) },
+                placeholder = {
+                    Text(
+                        localizedText("搜索注脚或主题"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 prefix = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -642,79 +675,130 @@ private fun ArchiveSearchBar(
 }
 
 @Composable
-private fun ArchiveControls(
+internal fun ArchiveControls(
     viewMode: ArchiveViewMode,
     activeFilterCount: Int,
     showFilters: Boolean,
     onViewModeChange: (ArchiveViewMode) -> Unit,
     onToggleFilters: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier.weight(1f),
-            shape = XikeShapes.inner,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-        ) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+    val labelWidthPixels = maxOf(
+        textMeasurer.measure(localizedText("月历"), labelStyle, softWrap = false).size.width,
+        textMeasurer.measure(localizedText("时间流"), labelStyle, softWrap = false).size.width,
+    )
+    val minimumModesWidth = with(density) {
+        // Match each padding/gap's pixel rounding when reserving single-line label space.
+        ((labelWidthPixels + 4.dp.roundToPx() * 2) * 2 +
+            4.dp.roundToPx() * 2 + 3.dp.roundToPx()).toDp()
+    }
+    val filterWidth = if (activeFilterCount == 0) 48.dp else {
+        maxOf(48.dp, 40.dp + with(density) {
+            textMeasurer.measure(activeFilterCount.toString(), MaterialTheme.typography.labelSmall, softWrap = false).size.width.toDp()
+        })
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < minimumModesWidth + filterWidth + 6.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ArchiveModeGroup(viewMode, minimumModesWidth, onViewModeChange, Modifier.fillMaxWidth())
+                ArchiveFilterToggle(activeFilterCount, showFilters, onToggleFilters, Modifier.align(Alignment.End))
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ArchiveModeGroup(viewMode, minimumModesWidth, onViewModeChange, Modifier.weight(1f))
+                ArchiveFilterToggle(activeFilterCount, showFilters, onToggleFilters)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchiveModeGroup(
+    viewMode: ArchiveViewMode,
+    minimumWidth: Dp,
+    onViewModeChange: (ArchiveViewMode) -> Unit,
+    modifier: Modifier,
+) {
+    val selectedItemRequester = remember { BringIntoViewRequester() }
+    val density = LocalDensity.current
+    Surface(modifier = modifier, shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        BoxWithConstraints {
+            LaunchedEffect(viewMode, maxWidth, minimumWidth, density) {
+                withFrameNanos { }
+                selectedItemRequester.bringIntoView()
+            }
             Row(
-                Modifier.padding(4.dp).selectableGroup(),
+                Modifier.horizontalScroll(rememberScrollState())
+                    .width(maxOf(maxWidth, minimumWidth)).padding(4.dp).selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 ArchiveModeButton(
                     label = localizedText("月历"),
                     icon = Icons.Outlined.CalendarMonth,
                     selected = viewMode == ArchiveViewMode.CALENDAR,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("archive-mode-calendar").then(
+                        if (viewMode == ArchiveViewMode.CALENDAR) Modifier.bringIntoViewRequester(selectedItemRequester) else Modifier,
+                    ),
                     onClick = { onViewModeChange(ArchiveViewMode.CALENDAR) },
                 )
                 ArchiveModeButton(
                     label = localizedText("时间流"),
                     icon = Icons.Outlined.ViewAgenda,
                     selected = viewMode == ArchiveViewMode.TIMELINE,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("archive-mode-timeline").then(
+                        if (viewMode == ArchiveViewMode.TIMELINE) Modifier.bringIntoViewRequester(selectedItemRequester) else Modifier,
+                    ),
                     onClick = { onViewModeChange(ArchiveViewMode.TIMELINE) },
                 )
             }
         }
-        Surface(
-            modifier = Modifier
-                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                .clickable(onClick = onToggleFilters),
-            shape = XikeShapes.inner,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-            color = if (showFilters || activeFilterCount > 0) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            },
+    }
+}
+
+@Composable
+private fun ArchiveFilterToggle(
+    activeFilterCount: Int,
+    showFilters: Boolean,
+    onToggleFilters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .clickable(onClick = onToggleFilters),
+        shape = XikeShapes.inner,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        color = if (showFilters || activeFilterCount > 0) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Outlined.Tune,
-                    contentDescription = if (activeFilterCount == 0) {
-                        localizedText("打开筛选")
-                    } else {
-                        tr("筛选，已启用 $activeFilterCount 个条件", "Filters: $activeFilterCount active")
-                    },
-                    modifier = Modifier.size(18.dp),
-                    tint = if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+            Icon(
+                Icons.Outlined.Tune,
+                contentDescription = if (activeFilterCount == 0) {
+                    localizedText("打开筛选")
+                } else {
+                    tr("筛选，已启用 $activeFilterCount 个条件", "Filters: $activeFilterCount active")
+                },
+                modifier = Modifier.size(18.dp),
+                tint = if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (activeFilterCount > 0) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    activeFilterCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                if (activeFilterCount > 0) {
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        activeFilterCount.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
             }
         }
     }
@@ -729,7 +813,7 @@ private fun ArchiveModeButton(
     onClick: () -> Unit,
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelMedium
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
     val labelWidth = with(LocalDensity.current) {
         maxOf(
             textMeasurer.measure(localizedText("月历"), labelStyle, softWrap = false).size.width,
@@ -764,8 +848,9 @@ private fun ArchiveModeButton(
                     label,
                     style = labelStyle,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
                     color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
             if (maxWidth < labelWidth + 22.dp) {
@@ -827,7 +912,7 @@ private fun ArchiveFilters(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onClearAll) { Text(localizedText("全部清除")) }
+                TextButton(onClick = onClearAll, shape = XikeShapes.button) { Text(localizedText("全部清除")) }
             }
             FilterTitle(localizedText("心情"))
             LazyRow(
@@ -836,6 +921,7 @@ private fun ArchiveFilters(
             ) {
                 items(Mood.entries, key = Mood::name) { mood ->
                     FilterChip(
+                        shape = XikeShapes.inner,
                         selected = mood.name in selectedMoodNames,
                         onClick = { onToggleMood(mood) },
                         label = { Text(mood.label) },
@@ -854,6 +940,7 @@ private fun ArchiveFilters(
                 ) {
                     items(availableTags, key = { it }) { tag ->
                         FilterChip(
+                            shape = XikeShapes.inner,
                             selected = selectedTags.containsTopic(tag),
                             onClick = { onToggleTag(tag) },
                             label = { Text(localizedText(tag)) },
@@ -870,6 +957,7 @@ private fun ArchiveFilters(
                 if (selectedDate != null) {
                     item(key = "selected-day") {
                         FilterChip(
+                            shape = XikeShapes.inner,
                             selected = true,
                             onClick = onClearDate,
                             label = { Text(selectedDate.asShortChineseDate()) },
@@ -879,6 +967,7 @@ private fun ArchiveFilters(
                 }
                 items(ArchiveDatePreset.entries, key = ArchiveDatePreset::name) { preset ->
                     FilterChip(
+                        shape = XikeShapes.inner,
                         selected = selectedDate == null && datePreset == preset,
                         onClick = { onDatePresetChange(preset) },
                         label = { Text(preset.label) },
@@ -893,6 +982,7 @@ private fun ArchiveFilters(
             ) {
                 items(JournalImageFilter.entries, key = JournalImageFilter::name) { option ->
                     FilterChip(
+                        shape = XikeShapes.inner,
                         selected = imageFilter == option,
                         onClick = { onImageFilterChange(option) },
                         label = { Text(option.label, maxLines = 1) },
@@ -1214,13 +1304,15 @@ internal fun JournalEntryDetailDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(22.dp),
+                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(localizedText("这一刻"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
-                    Spacer(Modifier.weight(1f))
+                    Text(localizedText("这一刻"), modifier = Modifier.weight(1f), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
                     if (onRequestEdit != null) {
                         IconButton(onClick = onRequestEdit) {
                             Icon(Icons.Outlined.Edit, contentDescription = localizedText("编辑记录"))
@@ -1323,6 +1415,7 @@ internal fun JournalEntryDetailDialog(
                         TextButton(
                             onClick = onRequestDelete,
                             modifier = Modifier.weight(1f),
+                            shape = XikeShapes.button,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) {
                             Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
