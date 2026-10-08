@@ -1563,28 +1563,21 @@ fun MomentScreen(
     }
 
     if (showDiscardConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDiscardConfirmation = false },
-            shape = XikeShapes.dialog,
-            title = { Text(localizedText("放弃这份草稿？")) },
+        DestructiveConfirmationDialog(
+            onDismiss = { showDiscardConfirmation = false },
+            title = localizedText("放弃这份草稿？"),
+            dismissText = localizedText("继续保留"),
+            confirmText = localizedText("放弃草稿"),
+            onConfirm = {
+                onDraftDiscard()
+                showDiscardConfirmation = false
+                showDetails = false
+            },
             text = {
                 Text(
                     localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscardConfirmation = false }) { Text(localizedText("继续保留")) }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDraftDiscard()
-                        showDiscardConfirmation = false
-                        showDetails = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(localizedText("放弃草稿")) }
             },
         )
     }

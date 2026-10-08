@@ -30,7 +30,6 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -516,22 +515,15 @@ internal fun VoicePendingSaveCard(
         }
     }
     if (confirmDiscard) {
-        AlertDialog(
-            onDismissRequest = { confirmDiscard = false },
-            shape = XikeShapes.dialog,
-            title = { Text(localizedText("放弃这段录音？")) },
+        DestructiveConfirmationDialog(
+            onDismiss = { confirmDiscard = false },
+            title = localizedText("放弃这段录音？"),
+            confirmText = localizedText("放弃录音"),
+            dismissText = localizedText("继续保存"),
             text = { Text(localizedText("尚未保存的录音会被删除，无法恢复。")) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmDiscard = false
-                        onDiscard()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(localizedText("放弃录音")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDiscard = false }) { Text(localizedText("继续保存")) }
+            onConfirm = {
+                confirmDiscard = false
+                onDiscard()
             },
         )
     }

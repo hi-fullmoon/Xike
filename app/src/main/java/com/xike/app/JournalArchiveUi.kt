@@ -61,7 +61,6 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ViewAgenda
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -1774,22 +1773,15 @@ private fun JournalEntryEditDialog(
     }
 
     if (showDiscardConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDiscardConfirmation = false },
-            shape = XikeShapes.dialog,
-            title = { Text(localizedText("放弃未保存的修改？")) },
+        DestructiveConfirmationDialog(
+            onDismiss = { showDiscardConfirmation = false },
+            title = localizedText("放弃未保存的修改？"),
+            dismissText = localizedText("继续编辑"),
+            confirmText = localizedText("放弃修改"),
             text = { Text(localizedText("心情、时间、注脚、主题和附件的本次修改都不会保存。")) },
-            dismissButton = {
-                TextButton(onClick = { showDiscardConfirmation = false }) { Text(localizedText("继续编辑")) }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDiscardConfirmation = false
-                        discardEditor()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(localizedText("放弃修改")) }
+            onConfirm = {
+                showDiscardConfirmation = false
+                discardEditor()
             },
         )
     }
@@ -1937,25 +1929,13 @@ private fun DeleteJournalDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = XikeShapes.dialog,
-        icon = {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.errorContainer,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Outlined.DeleteOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                }
-            }
-        },
-        title = { Text(localizedText("删除这条记录？")) },
+    DestructiveConfirmationDialog(
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        isProcessing = isDeleting,
+        dismissText = localizedText("取消"),
+        confirmText = localizedText(if (isDeleting) "正在删除…" else "确认删除"),
+        title = localizedText("删除这条记录？"),
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
@@ -1987,24 +1967,6 @@ private fun DeleteJournalDialog(
                 )
                 if (error != null) {
                     Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !isDeleting, onClick = onDismiss) { Text(localizedText("取消")) }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !isDeleting,
-                onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(7.dp))
-                    Text(localizedText("正在删除…"))
-                } else {
-                    Text(localizedText("确认删除"))
                 }
             }
         },
