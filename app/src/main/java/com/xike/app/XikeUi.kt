@@ -20,6 +20,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -56,6 +57,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -713,19 +715,41 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
             if (treatment == XikeNavigationTreatment.UNDERLINE) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
-            Box(Modifier.fillMaxWidth()) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val preferredPadding = if (treatment == XikeNavigationTreatment.SOLID) 10.dp else 14.dp
+                val viewportWidth = minOf(maxWidth, XikeContentMaxWidth)
+                val density = LocalDensity.current
+                val selectedItemRequester = remember { BringIntoViewRequester() }
+                val textMeasurer = rememberTextMeasurer()
+                val labelStyle = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                val itemWidths = with(density) {
+                    AppScreen.entries.map { item ->
+                        maxOf(48.dp, textMeasurer.measure(item.title, labelStyle, softWrap = false).size.width.toDp() + 8.dp)
+                    }
+                }
+                val labelsWidth = itemWidths.fold(0.dp) { total, width -> total + width }
+                val horizontalPadding = minOf(preferredPadding, maxOf(0.dp, (viewportWidth - labelsWidth) / 2))
+                val availableWidth = viewportWidth - horizontalPadding * 2
+                val equalWidths = itemWidths.max() * AppScreen.entries.size <= availableWidth
+                val requiredWidth = labelsWidth + horizontalPadding * 2
+                LaunchedEffect(selected, viewportWidth, itemWidths, horizontalPadding, density, treatment) {
+                    withFrameNanos { }
+                    selectedItemRequester.bringIntoView()
+                }
                 Row(
                     modifier = Modifier
-                        .widthIn(max = XikeContentMaxWidth)
-                        .fillMaxWidth()
+                        .width(viewportWidth)
                         .align(Alignment.Center)
+                        .horizontalScroll(rememberScrollState())
+                        .width(maxOf(viewportWidth, requiredWidth))
+                        .height(IntrinsicSize.Min)
                         .padding(
-                            horizontal = if (treatment == XikeNavigationTreatment.SOLID) 10.dp else 14.dp,
+                            horizontal = horizontalPadding,
                             vertical = if (treatment == XikeNavigationTreatment.UNDERLINE) 4.dp else 6.dp,
                         )
                         .selectableGroup(),
                 ) {
-                    AppScreen.entries.forEach { item ->
+                    AppScreen.entries.forEachIndexed { index, item ->
                         val isSelected = selected == item
                         val selectedBackground = when (treatment) {
                             XikeNavigationTreatment.CAPSULE -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
@@ -739,8 +763,10 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                         }
                         Column(
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(if (equalWidths) 1f else itemWidths[index].value)
+                                .fillMaxHeight()
                                 .testTag("navigation-${item.name.lowercase()}")
+                                .then(if (isSelected) Modifier.bringIntoViewRequester(selectedItemRequester) else Modifier)
                                 .clip(RoundedCornerShape(style.navigationCorner))
                                 .background(if (isSelected) selectedBackground else Color.Transparent)
                                 .selectable(
@@ -766,6 +792,9 @@ fun XikeNavigationBar(selected: AppScreen, onSelected: (AppScreen) -> Unit) {
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 item.title,
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 1,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) selectedForeground
@@ -1436,23 +1465,8 @@ fun MomentScreen(
                                 )
                             }
                             Spacer(Modifier.height(7.dp))
-                            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                journalTopics.chunked(3).forEach { rowTopics ->
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                        rowTopics.forEach { topic ->
-                                            TopicChip(
-                                                topic = topic,
-                                                minHeight = 36.dp,
-                                                selected = draft.tags.containsTopic(topic.label),
-                                                onClick = { if (!isSaving) onDraftTagToggle(topic.label) },
-                                                modifier = Modifier.weight(1f),
-                                            )
-                                        }
-                                        repeat(3 - rowTopics.size) {
-                                            Spacer(Modifier.weight(1f))
-                                        }
-                                    }
-                                }
+                            TopicChoices(draft.tags) { topic ->
+                                if (!isSaving) onDraftTagToggle(topic.label)
                             }
                         }
                     }
@@ -1591,6 +1605,7 @@ fun MomentScreen(
                 Text(
                     localizedText("息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。") +
                         localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -1646,9 +1661,10 @@ private fun MomentQuickAction(
     } else {
         restingContainerColor
     }
-    val actionColor = when {
-        isDark || style != AppStyle.BREATHE -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSecondaryContainer
+    val actionColor = if (isPressed) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
     }
     Surface(
         onClick = onClick,
@@ -1668,7 +1684,6 @@ private fun MomentQuickAction(
                 icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.45f),
             )
             Spacer(Modifier.width(4.dp))
             Text(
@@ -2091,34 +2106,39 @@ private fun MoodPicker(
                 Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    localizedText("选最接近的感受，没有标准答案"),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(
-                    onClick = { showGuide = true },
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                ) { Text(localizedText("选择参考"), style = MaterialTheme.typography.labelSmall) }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Mood.entries.forEach { mood ->
-                    MoodChoice(
-                        mood = mood,
-                        selected = selectedMood == mood,
-                        enabled = enabled,
-                        onClick = { onSelected(mood) },
-                        modifier = Modifier.weight(1f),
-                        quietStyle = true,
-                    )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val textMeasurer = rememberTextMeasurer()
+                val supportingStyle = MaterialTheme.typography.bodySmall
+                val guideStyle = MaterialTheme.typography.labelSmall
+                val requiredWidth = with(LocalDensity.current) {
+                    (textMeasurer.measure(localizedText("选最接近的感受，没有标准答案"), supportingStyle, softWrap = false).size.width +
+                        textMeasurer.measure(localizedText("选择参考"), guideStyle, softWrap = false).size.width).toDp()
+                } + 16.dp
+                val stackGuide = LocalDensity.current.fontScale >= 1.5f && requiredWidth > maxWidth
+                if (stackGuide) {
+                    Column {
+                        Text(localizedText("选最接近的感受，没有标准答案"), style = supportingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { showGuide = true }, modifier = Modifier.align(Alignment.End), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                            Text(localizedText("选择参考"), style = guideStyle)
+                        }
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            localizedText("选最接近的感受，没有标准答案"),
+                            modifier = Modifier.weight(1f),
+                            style = supportingStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(
+                            onClick = { showGuide = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        ) { Text(localizedText("选择参考"), style = guideStyle) }
+                    }
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            MoodChoices(selectedMood, enabled, onSelected, quietStyle = true)
             if (selectedMood != null) {
                 Spacer(Modifier.height(12.dp))
                 Surface(
@@ -2254,10 +2274,74 @@ internal fun MoodChoice(
         Spacer(Modifier.height(4.dp))
         Text(
             mood.label,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = if (selected) moodColor else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+internal fun MoodChoices(
+    selectedMood: Mood?,
+    enabled: Boolean,
+    onSelected: (Mood) -> Unit,
+    quietStyle: Boolean = false,
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+    val minWidth = with(LocalDensity.current) {
+        maxOf(44.dp, Mood.entries.maxOf { textMeasurer.measure(it.label, labelStyle, softWrap = false).size.width }.toDp() + 8.dp)
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val columns = ((maxWidth + 3.dp) / (minWidth + 3.dp)).toInt().coerceIn(1, Mood.entries.size)
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Mood.entries.chunked(columns).forEach { moods ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    moods.forEach { mood ->
+                        MoodChoice(
+                            mood = mood,
+                            selected = selectedMood == mood,
+                            enabled = enabled,
+                            onClick = { onSelected(mood) },
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            quietStyle = quietStyle,
+                        )
+                    }
+                    repeat(columns - moods.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun TopicChoices(selectedTags: Collection<String>, onToggle: (JournalTopic) -> Unit) {
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelLarge
+    val minWidth = with(LocalDensity.current) {
+        journalTopics.maxOf { textMeasurer.measure(localizedText(it.label), labelStyle, softWrap = false).size.width }.toDp() + 42.dp
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val columns = ((maxWidth + 7.dp) / (minWidth + 7.dp)).toInt().coerceIn(1, 3)
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            journalTopics.chunked(columns).forEach { topics ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    topics.forEach { topic ->
+                        TopicChip(
+                            topic = topic,
+                            selected = selectedTags.containsTopic(topic.label),
+                            onClick = { onToggle(topic) },
+                            modifier = Modifier.weight(1f),
+                            minHeight = 36.dp,
+                        )
+                    }
+                    repeat(columns - topics.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
     }
 }
 
@@ -3309,7 +3393,7 @@ private fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
+            .toggleable(value = enabled, role = Role.Switch, onValueChange = onEnabledChange)
             .padding(XikeSettingsRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -3423,7 +3507,7 @@ private fun ReminderScheduleDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(role = Role.Switch) { quietHoursEnabled = !quietHoursEnabled },
+                        .toggleable(value = quietHoursEnabled, role = Role.Switch, onValueChange = { quietHoursEnabled = it }),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -3511,7 +3595,7 @@ private fun AppLockToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Switch) { onEnabledChange(!enabled) }
+            .toggleable(value = enabled, role = Role.Switch, onValueChange = onEnabledChange)
             .padding(XikeSettingsRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {

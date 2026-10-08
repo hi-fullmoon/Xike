@@ -1073,7 +1073,7 @@ private fun CalendarDay(
                             .size(width = if (count > 1) 10.dp else 4.dp, height = 4.dp)
                             .clip(RoundedCornerShape(2.dp))
                             .background(
-                                if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.tertiary,
                             ),
                     )
@@ -1580,21 +1580,7 @@ private fun JournalEntryEditDialog(
                     supporting = localizedText("重新选择最接近那一刻的感受"),
                     contentPadding = PaddingValues(XikeCardPadding),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().selectableGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        Mood.entries.forEach { mood ->
-                            val selected = mood == selectedMood
-                            MoodChoice(
-                                mood = mood,
-                                selected = selected,
-                                enabled = !isSaving,
-                                onClick = { selectedMoodName = mood.name },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    MoodChoices(selectedMood, !isSaving, { selectedMoodName = it.name })
                 }
 
                 EditSectionCard(title = localizedText("记录时间"), supporting = localizedText("可修正补记日期与具体时间")) {
@@ -1678,29 +1664,8 @@ private fun JournalEntryEditDialog(
                     title = localizedText("主题"),
                     supporting = if (selectedTags.isEmpty()) localizedText("可多选") else tr("已选 ${selectedTags.canonicalTopics().size}", "${selectedTags.canonicalTopics().size} selected"),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        journalTopics.chunked(3).forEach { rowTopics ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            ) {
-                                rowTopics.forEach { topic ->
-                                    TopicChip(
-                                        topic = topic,
-                                        minHeight = 36.dp,
-                                        labelMaxLines = 2,
-                                        selected = selectedTags.containsTopic(topic.label),
-                                        onClick = {
-                                            if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                repeat(3 - rowTopics.size) {
-                                    Spacer(Modifier.weight(1f))
-                                }
-                            }
-                        }
+                    TopicChoices(selectedTags) { topic ->
+                        if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
                     }
                 }
 

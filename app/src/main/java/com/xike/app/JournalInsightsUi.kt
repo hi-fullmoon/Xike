@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -467,7 +469,6 @@ private fun MoodTrendChart(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val guide = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
-    val emptyPoint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
     val axisWidth = if (LocalDensity.current.fontScale >= 1.5f) 52.dp else 36.dp
     Column(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
         Box(Modifier.fillMaxWidth().height(142.dp)) {
@@ -527,11 +528,8 @@ private fun MoodTrendChart(
                         runStart = runEnd + 1
                     }
                     points.forEachIndexed { index, point ->
-                        val x = step * (index + 0.5f)
                         val score = point.averageScore
-                        if (score == null) {
-                            drawCircle(emptyPoint, radius = 2.5.dp.toPx(), center = Offset(x, bottom))
-                        } else {
+                        if (score != null) {
                             val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
                             val center = position(index, score)
                             if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
@@ -987,7 +985,7 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
         shape = XikeShapes.dialog,
         title = { Text(localizedText("本地回顾")) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(reviewText, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     localizedText("分享会把以上文字交给你下一步选择的应用。息刻不会自动上传。"),
