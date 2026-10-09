@@ -1364,9 +1364,9 @@ fun MomentScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Row {
-                            TextButton(onClick = { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }, shape = XikeShapes.button) { Text(tr("重试导入", "Retry import")) }
-                            TextButton(onClick = videoServices.removeDraft, shape = XikeShapes.button) { Text(tr("移除视频", "Remove video")) }
+                        FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }
+                            OutdoorCardAction(tr("移除视频", "Remove video"), !isSaving, videoServices.removeDraft)
                         }
                     }
                 }
@@ -1412,6 +1412,8 @@ fun MomentScreen(
                                 onDelete = onDraftAudioRemoved,
                                 onReplace = beginVoiceCapture,
                                 showBorder = false,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                showDeleteLabel = true,
                             )
                         }
                     }
@@ -1593,10 +1595,6 @@ fun MomentScreen(
                     },
                     style = MaterialTheme.typography.labelLarge,
                 )
-                if (draft.mood != null && !isSaving) {
-                    Spacer(Modifier.width(XikeInlineActionGap))
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                }
             }
         }
     }
@@ -1991,18 +1989,17 @@ private fun OutdoorContextCard(
                     }
                     Spacer(Modifier.height(9.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
                         horizontalArrangement = Arrangement.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         OutdoorCardAction(
-                            icon = Icons.Outlined.Close,
                             label = localizedText("移除"),
                             enabled = enabled,
                             onClick = onRemove,
                         )
                         OutdoorCardAction(
-                            icon = Icons.Outlined.Refresh,
                             label = localizedText("刷新"),
                             enabled = enabled && !isLoading,
                             onClick = onRefresh,
@@ -2010,22 +2007,13 @@ private fun OutdoorContextCard(
                     }
                 }
                 errorMessage != null -> {
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                         horizontalArrangement = Arrangement.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        TextButton(
-                            onClick = onChooseCity,
-                            enabled = enabled,
-                            shape = XikeShapes.button,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        ) { Text(localizedText("手动选城市")) }
-                        TextButton(
-                            onClick = onAdd,
-                            enabled = enabled && !isLoading,
-                            shape = XikeShapes.button,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        ) { Text(localizedText("重新尝试")) }
+                        OutdoorCardAction(localizedText("手动选城市"), enabled, onChooseCity)
+                        OutdoorCardAction(localizedText("重新尝试"), enabled && !isLoading, onAdd)
                     }
                 }
             }
@@ -2035,15 +2023,12 @@ private fun OutdoorContextCard(
 
 @Composable
 private fun OutdoorCardAction(
-    icon: ImageVector,
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     TextButton(onClick = onClick, enabled = enabled, shape = XikeShapes.button) {
-        Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-        Spacer(Modifier.width(XikeInlineActionGap))
-        Text(label, maxLines = 1)
+        Text(label)
     }
 }
 
@@ -2097,16 +2082,21 @@ private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("
 private fun DraftSecurityRow(
     statusText: String? = null,
 ) {
+    val firstLineHeight = with(LocalDensity.current) {
+        MaterialTheme.typography.bodySmall.lineHeight.toDp()
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        Icon(
-            Icons.Outlined.Shield,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
+        Box(Modifier.height(firstLineHeight), contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Outlined.Shield,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             statusText ?: localizedText("草稿自动加密保存在本机"),

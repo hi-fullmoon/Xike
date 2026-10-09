@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -709,6 +710,8 @@ internal fun VoicePlaybackCard(
     onDelete: (() -> Unit)? = null,
     onReplace: (() -> Unit)? = null,
     showBorder: Boolean = true,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+    showDeleteLabel: Boolean = false,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -858,7 +861,7 @@ internal fun VoicePlaybackCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = XikeShapes.card,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        color = containerColor,
         border = if (showBorder) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) else null,
     ) {
         Column(Modifier.padding(XikeCardPadding)) {
@@ -928,24 +931,32 @@ internal fun VoicePlaybackCard(
                 Spacer(Modifier.height(14.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(4.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val actions: @Composable () -> Unit = {
                     if (onReplace != null) {
                         TextButton(shape = XikeShapes.button, onClick = {
                             releasePlayer()
                             onReplace()
                         }) {
-                            Icon(
-                                Icons.Outlined.MicNone,
-                                contentDescription = null,
-                                modifier = Modifier.xikeInlineActionIcon(),
-                            )
-                            Spacer(Modifier.width(XikeInlineActionGap))
-                            Text(localizedText("重新录制"), maxLines = 1)
+                            if (!showDeleteLabel) {
+                                Icon(
+                                    Icons.Outlined.MicNone,
+                                    contentDescription = null,
+                                    modifier = Modifier.xikeInlineActionIcon(),
+                                )
+                                Spacer(Modifier.width(XikeInlineActionGap))
+                            }
+                            Text(localizedText("重新录制"), maxLines = if (showDeleteLabel) Int.MAX_VALUE else 1)
                         }
                     }
-                    Spacer(Modifier.weight(1f))
                     if (onDelete != null) {
-                        IconButton(onClick = {
+                        if (showDeleteLabel) {
+                            TextButton(shape = XikeShapes.button, onClick = {
+                                releasePlayer()
+                                onDelete()
+                            }) {
+                                Text(localizedText("删除语音"))
+                            }
+                        } else IconButton(onClick = {
                             releasePlayer()
                             onDelete()
                         }) {
@@ -955,6 +966,19 @@ internal fun VoicePlaybackCard(
                             )
                         }
                     }
+                }
+                if (showDeleteLabel) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) { actions() }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (onReplace == null) Arrangement.End else Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { actions() }
                 }
             }
         }
