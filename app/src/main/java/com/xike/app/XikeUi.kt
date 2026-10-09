@@ -1346,7 +1346,7 @@ fun MomentScreen(
 
             if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(tr("这一刻的视频", "Video of this moment"), style = XikeSectionTitleStyle)
+                    Text(tr("这一刻的视频", "Video of this moment"), style = MaterialTheme.typography.titleSmall)
                     if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
                     draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
@@ -1368,13 +1368,13 @@ fun MomentScreen(
                     withFrameNanos { }
                     voiceAnchor.bringIntoView()
                 }
-                Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor).padding(horizontal = 3.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor)) {
                     Text(
                         when {
                             pendingDraftAudio != null -> localizedText("收好这段声音")
                             else -> localizedText("这一刻的声音")
                         },
-                        style = XikeSectionTitleStyle,
+                        style = MaterialTheme.typography.titleSmall,
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
@@ -1471,7 +1471,8 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(XikeCardPadding),
+                            .padding(XikeCardPadding)
+                            .heightIn(min = 42.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1956,13 +1957,13 @@ private fun OutdoorContextCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             localizedText("添加"),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Icon(
                             Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                             contentDescription = null,
-                            modifier = Modifier.size(17.dp),
+                            modifier = Modifier.size(24.dp).offset(y = 1.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -2136,9 +2137,8 @@ internal fun MomentContentToolbar(
         TextButton(
             onClick = onDone ?: onChooseTime,
             enabled = enabled,
-            modifier = Modifier.offset(x = 4.dp),
             shape = XikeShapes.button,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) {
             if (onDone != null) {
@@ -2267,69 +2267,72 @@ private fun MoodPicker(
     onSelected: (Mood?) -> Unit,
 ) {
     var showGuide by rememberSaveable { mutableStateOf(false) }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = XikeShapes.card,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-    ) {
-        Column(Modifier.padding(XikeCardPadding)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val textMeasurer = rememberTextMeasurer()
-                val supportingStyle = MaterialTheme.typography.bodySmall
-                val guideStyle = MaterialTheme.typography.labelSmall
-                val requiredWidth = with(LocalDensity.current) {
-                    (textMeasurer.measure(localizedText("选最接近的感受，没有标准答案"), supportingStyle, softWrap = false).size.width +
-                        textMeasurer.measure(localizedText("选择参考"), guideStyle, softWrap = false).size.width).toDp()
-                } + 16.dp
-                val stackGuide = LocalDensity.current.fontScale >= 1.5f && requiredWidth > maxWidth
-                if (stackGuide) {
-                    Column {
-                        Text(localizedText("选最接近的感受，没有标准答案"), style = supportingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { showGuide = true }, modifier = Modifier.align(Alignment.End), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), shape = XikeShapes.button) {
-                            Text(localizedText("选择参考"), style = guideStyle)
+    Column(Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(16.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = XikeShapes.card,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+        ) {
+            Column(Modifier.padding(XikeCardPadding)) {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val textMeasurer = rememberTextMeasurer()
+                    val supportingStyle = MaterialTheme.typography.bodySmall
+                    val guideStyle = MaterialTheme.typography.labelSmall
+                    val requiredWidth = with(LocalDensity.current) {
+                        (textMeasurer.measure(localizedText("选最接近的感受，没有标准答案"), supportingStyle, softWrap = false).size.width +
+                            textMeasurer.measure(localizedText("选择参考"), guideStyle, softWrap = false).size.width).toDp()
+                    } + 16.dp
+                    val stackGuide = LocalDensity.current.fontScale >= 1.5f && requiredWidth > maxWidth
+                    if (stackGuide) {
+                        Column {
+                            Text(localizedText("选最接近的感受，没有标准答案"), style = supportingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = { showGuide = true }, modifier = Modifier.align(Alignment.End), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), shape = XikeShapes.button) {
+                                Text(localizedText("选择参考"), style = guideStyle)
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                localizedText("选最接近的感受，没有标准答案"),
+                                modifier = Modifier.weight(1f),
+                                style = supportingStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            TextButton(
+                                onClick = { showGuide = true },
+                                shape = XikeShapes.button,
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            ) { Text(localizedText("选择参考"), style = guideStyle) }
                         }
                     }
-                } else {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            localizedText("选最接近的感受，没有标准答案"),
-                            modifier = Modifier.weight(1f),
-                            style = supportingStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(
-                            onClick = { showGuide = true },
-                            shape = XikeShapes.button,
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        ) { Text(localizedText("选择参考"), style = guideStyle) }
-                    }
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            MoodChoices(selectedMood, enabled, onSelected, quietStyle = true)
-            if (selectedMood != null) {
                 Spacer(Modifier.height(12.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = XikeShapes.inner,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(XikeInnerCardPadding),
-                        verticalAlignment = Alignment.CenterVertically,
+                MoodChoices(selectedMood, enabled, onSelected, quietStyle = true)
+                if (selectedMood != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = XikeShapes.inner,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     ) {
-                        MoodEmoji(selectedMood, size = 20.dp)
-                        Spacer(Modifier.width(9.dp))
-                        Text(
-                            selectedMood.momentAffirmation(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
-                        )
+                        Row(
+                            modifier = Modifier.padding(XikeInnerCardPadding),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            MoodEmoji(selectedMood, size = 20.dp)
+                            Spacer(Modifier.width(9.dp))
+                            Text(
+                                selectedMood.momentAffirmation(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+                            )
+                        }
                     }
                 }
             }
