@@ -401,7 +401,8 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("照片").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription(tr("添加内容", "Add content")).performScrollTo().performClick()
+        composeRule.onNodeWithText("照片").performClick()
         composeRule.onNodeWithText("拍照").assertIsDisplayed()
         composeRule.onNodeWithText("从相册选择").assertIsDisplayed()
     }
@@ -458,9 +459,11 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("昨天 20:15").performScrollTo().assertIsDisplayed()
+        val timeButton = composeRule.onNodeWithText("20:15 · 补记", substring = true)
+        timeButton.performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("补记这一刻").assertIsDisplayed()
-        composeRule.onNodeWithText("改为现在").performScrollTo().performClick()
+        timeButton.performClick()
+        composeRule.onNodeWithText("改为现在").assertIsDisplayed().performClick()
         composeRule.runOnIdle { check(resetValue == null) }
     }
 
