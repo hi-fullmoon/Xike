@@ -996,7 +996,7 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            Button(
+            TextButton(
                 onClick = {
                     val shareIntent = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
@@ -1004,11 +1004,10 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                     context.startActivity(Intent.createChooser(shareIntent, localizedText("分享息刻回顾")))
                 },
                 shape = XikeShapes.button,
-                elevation = xikeButtonElevation(),
             ) {
                 Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
                 Spacer(Modifier.width(XikeInlineActionGap))
-                Text(localizedText("选择分享应用"), maxLines = 1)
+                Text(localizedText("选择分享应用"))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("关闭")) } },

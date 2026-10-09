@@ -20,9 +20,11 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -852,13 +854,14 @@ private fun RestoreConfirmationDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = XikeShapes.dialog,
-        title = { Text(localizedText("确认替换设备内容？")) },
+    DestructiveConfirmationDialog(
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        title = localizedText("确认替换设备内容？"),
+        confirmText = localizedText("替换并恢复"),
+        dismissText = localizedText("取消"),
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
@@ -876,16 +879,6 @@ private fun RestoreConfirmationDialog(
                 )
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                shape = XikeShapes.button,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(localizedText("替换并恢复")) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
-        },
     )
 }
 
@@ -900,6 +893,8 @@ private fun BackupExportDialog(
     var passwordVisible by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         shape = XikeShapes.dialog,
         title = { Text(localizedText("导出日记备份"), style = MaterialTheme.typography.headlineSmall) },
         text = {
@@ -978,6 +973,8 @@ private fun BackupPasswordDialog(
     var passwordVisible by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         shape = XikeShapes.dialog,
         title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
         text = {
@@ -1029,7 +1026,6 @@ private fun BackupPasswordDialog(
                 shape = XikeShapes.button,
                 enabled = password.length >= 8 && (!requireConfirmation || confirmation == password),
                 onClick = { onConfirm(password) },
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             ) { Text(confirm) }
         },
         dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
@@ -1042,7 +1038,10 @@ private fun ProcessingDialog(message: String) {
         onDismissRequest = {},
         shape = XikeShapes.dialog,
         text = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
                 Spacer(Modifier.width(16.dp))
                 Text(message, style = MaterialTheme.typography.bodyLarge)
@@ -1058,7 +1057,7 @@ private fun DataErrorDialog(message: String, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
         title = { Text(localizedText("数据需要检查")) },
-        text = { Text(message) },
+        text = { Text(message, modifier = Modifier.verticalScroll(rememberScrollState())) },
         confirmButton = {
             TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("我知道了")) }
         },

@@ -423,6 +423,8 @@ internal val LocalRecordedAtPickerContext = staticCompositionLocalOf<Context> { 
 
 internal val XikeCardPadding = 14.dp
 internal val XikeInnerCardPadding = 10.dp
+internal val XikeSheetHorizontalPadding = 20.dp
+internal val XikeSheetBottomPadding = 20.dp
 private val XikeSettingsRowPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 
 object XikeShapes {
@@ -1663,16 +1665,13 @@ fun MomentScreen(
             ) {
                 Column(
                     Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp).padding(bottom = 24.dp),
+                        .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         tr("添加内容", "Add content"),
                         modifier = Modifier.padding(bottom = 8.dp),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
+                        style = MaterialTheme.typography.titleLarge,
                     )
                     MomentMediaAction(
                         Icons.Outlined.MicNone, tr("录音", "Record audio"),
@@ -2030,10 +2029,15 @@ private fun OutdoorCityDialog(
     var city by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         shape = XikeShapes.dialog,
         title = { Text(localizedText("选择城市")) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     localizedText("不用提供位置权限。城市名称会发送给 Open-Meteo，用于查找城市和天气。"),
                     style = MaterialTheme.typography.bodyMedium,
@@ -3467,7 +3471,7 @@ fun ProfileSettingsScreen(
             shape = XikeShapes.dialog,
             title = { Text(localizedText("应用语言")) },
             text = {
-                Column(Modifier.selectableGroup()) {
+                Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                     AppLanguage.entries.forEach { language ->
                         Row(
                             Modifier.fillMaxWidth().selectable(
@@ -3482,7 +3486,7 @@ fun ProfileSettingsScreen(
                         ) {
                             RadioButton(selected = AppLocale.language == language, onClick = null)
                             Spacer(Modifier.width(10.dp))
-                            Text(language.nativeName)
+                            Text(language.nativeName, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
@@ -3673,7 +3677,7 @@ private fun ReminderScheduleDialog(
             }
         },
         confirmButton = {
-            Button(
+            TextButton(
                 onClick = {
                     onConfirm(
                         settings.copy(
@@ -3686,7 +3690,6 @@ private fun ReminderScheduleDialog(
                 },
                 enabled = selectedDays.isNotEmpty(),
                 shape = XikeShapes.button,
-                elevation = xikeButtonElevation(),
             ) { Text(localizedText("保存")) }
         },
         dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },

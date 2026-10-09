@@ -225,7 +225,7 @@ internal fun VoiceCaptureSheet(
         VoiceCaptureDismissHandler { closeCapture() }
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
         ) {
             Text(localizedText("录下这一刻"), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(6.dp))

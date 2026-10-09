@@ -18,8 +18,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -80,6 +78,9 @@ internal fun VideoAddButton(
     val system = LocalSystemActivityCallbacks.current
     val scope = rememberCoroutineScope()
     var choosing by rememberSaveable { mutableStateOf(false) }
+    val cameraAvailable = if (choosing) remember(context) {
+        canCaptureMedia(context, MediaStore.ACTION_VIDEO_CAPTURE)
+    } else false
     var captureUri by rememberSaveable { mutableStateOf<String?>(null) }
     fun failure(error: Throwable) { Toast.makeText(context, error.message ?: tr("无法添加视频。", "Unable to add video."), Toast.LENGTH_LONG).show() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -123,19 +124,24 @@ internal fun VideoAddButton(
     if (content != null) content(choose) else {
         MomentQuickAction(icon = Icons.Outlined.Videocam, label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
     }
-    if (choosing) AlertDialog(
-        onDismissRequest = { choosing = false }, shape = XikeShapes.dialog,
-        title = { Text(tr("添加视频", "Add video")) },
-        text = { Column(Modifier.verticalScroll(rememberScrollState())) {
-            Text(tr("每条日记 1 段 · 最长 5 分钟 · 最大 500 MB", "1 video per entry · Up to 5 minutes · Up to 500 MB"))
-            TextButton(onClick = { choosing = false; if (hasGalleryWriteAccess(context)) shoot() else permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) }) { Text(tr("拍摄视频", "Record video")) }
-            TextButton(onClick = {
-                choosing = false
-                runCatching { system.onLaunch(); picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
-                    .onFailure { system.onResult(); failure(it) }
-            }) { Text(tr("从相册选择", "Choose from gallery")) }
-        } },
-        confirmButton = { TextButton(onClick = { choosing = false }) { Text(localizedText("取消")) } },
+    if (choosing) MediaSourceDialog(
+        title = tr("添加视频", "Add video"),
+        description = tr("每条日记 1 段 · 最长 5 分钟 · 最大 500 MB", "1 video per entry · Up to 5 minutes · Up to 500 MB"),
+        captureIcon = Icons.Outlined.Videocam,
+        captureTitle = tr("拍摄视频", "Record video"),
+        cameraAvailable = cameraAvailable,
+        captureSupporting = if (cameraAvailable) null
+            else localizedText("当前设备没有可用的相机"),
+        onCapture = {
+            choosing = false
+            if (hasGalleryWriteAccess(context)) shoot() else permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        },
+        onChooseMedia = {
+            choosing = false
+            runCatching { system.onLaunch(); picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
+                .onFailure { system.onResult(); failure(it) }
+        },
+        onDismiss = { choosing = false },
     )
 }
 

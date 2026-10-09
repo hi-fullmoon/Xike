@@ -58,8 +58,10 @@ private const val CAMERA_CAPTURE_SUFFIX = ".jpg"
 private const val ORPHAN_CAPTURE_MAX_AGE_SECONDS = 24L * 60L * 60L
 private val cameraFileNameFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
 
-internal fun canTakePhoto(context: Context): Boolean {
-    if (Intent(MediaStore.ACTION_IMAGE_CAPTURE).resolveActivity(context.packageManager) == null) return false
+internal fun canTakePhoto(context: Context): Boolean = canCaptureMedia(context, MediaStore.ACTION_IMAGE_CAPTURE)
+
+internal fun canCaptureMedia(context: Context, captureAction: String): Boolean {
+    if (Intent(captureAction).resolveActivity(context.packageManager) == null) return false
     return runCatching {
         context.getSystemService(CameraManager::class.java)?.cameraIdList?.isNotEmpty() == true
     }.getOrDefault(false)
@@ -165,12 +167,38 @@ internal fun pruneCameraCaptures(context: Context) {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun PhotoSourceDialog(
     cameraAvailable: Boolean,
     onTakePhoto: () -> Unit,
     onChoosePhotos: () -> Unit,
     onDismiss: () -> Unit,
+) {
+    MediaSourceDialog(
+        title = localizedText("添加照片"),
+        captureIcon = Icons.Outlined.CameraAlt,
+        captureTitle = localizedText("拍照"),
+        captureSupporting = if (cameraAvailable) localizedText("拍摄后保存到系统相册") else localizedText("当前设备没有可用的相机"),
+        gallerySupporting = localizedText("可一次选择多张照片"),
+        cameraAvailable = cameraAvailable,
+        onCapture = onTakePhoto,
+        onChooseMedia = onChoosePhotos,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun MediaSourceDialog(
+    title: String,
+    captureIcon: ImageVector,
+    captureTitle: String,
+    cameraAvailable: Boolean,
+    onCapture: () -> Unit,
+    onChooseMedia: () -> Unit,
+    onDismiss: () -> Unit,
+    description: String? = null,
+    captureSupporting: String? = null,
+    gallerySupporting: String? = null,
 ) {
     val density = LocalDensity.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -194,21 +222,24 @@ internal fun PhotoSourceDialog(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(localizedText("添加照片"), style = MaterialTheme.typography.titleLarge)
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            description?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Surface(
                 shape = XikeShapes.inner,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 Column {
-                    PhotoSourceOption(
-                        icon = Icons.Outlined.CameraAlt,
-                        title = localizedText("拍照"),
-                        supporting = if (cameraAvailable) localizedText("拍摄后保存到系统相册") else localizedText("当前设备没有可用的相机"),
+                    MediaSourceOption(
+                        icon = captureIcon,
+                        title = captureTitle,
+                        supporting = captureSupporting,
                         enabled = cameraAvailable,
-                        onClick = onTakePhoto,
+                        onClick = onCapture,
                     )
                     HorizontalDivider(
                         Modifier.padding(
@@ -217,12 +248,12 @@ internal fun PhotoSourceDialog(
                         ),
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
-                    PhotoSourceOption(
+                    MediaSourceOption(
                         icon = Icons.Outlined.PhotoLibrary,
                         title = localizedText("从相册选择"),
-                        supporting = localizedText("可一次选择多张照片"),
+                        supporting = gallerySupporting,
                         enabled = true,
-                        onClick = onChoosePhotos,
+                        onClick = onChooseMedia,
                     )
                 }
             }
@@ -236,10 +267,10 @@ internal fun PhotoSourceDialog(
 }
 
 @Composable
-private fun PhotoSourceOption(
+private fun MediaSourceOption(
     icon: ImageVector,
     title: String,
-    supporting: String,
+    supporting: String?,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
@@ -277,11 +308,13 @@ private fun PhotoSourceOption(
                     color = if (enabled) MaterialTheme.colorScheme.onSurface
                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
-                Text(
-                    supporting,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f),
-                )
+                supporting?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f),
+                    )
+                }
             }
         }
     }
