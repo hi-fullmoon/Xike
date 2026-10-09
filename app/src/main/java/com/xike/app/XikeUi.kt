@@ -1997,13 +1997,13 @@ private fun OutdoorContextCard(
                             onClick = onChooseCity,
                             enabled = enabled,
                             shape = XikeShapes.button,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) { Text(localizedText("手动选城市")) }
                         TextButton(
                             onClick = onAdd,
                             enabled = enabled && !isLoading,
                             shape = XikeShapes.button,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) { Text(localizedText("重新尝试")) }
                     }
                 }
@@ -2019,7 +2019,7 @@ private fun OutdoorCardAction(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) {
+    TextButton(onClick = onClick, enabled = enabled, shape = XikeShapes.button) {
         Icon(icon, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
         Spacer(Modifier.width(XikeInlineActionGap))
         Text(label, maxLines = 1)

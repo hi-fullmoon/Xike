@@ -161,11 +161,11 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
     }
     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
-            Box(Modifier.fillMaxWidth().height(180.dp).clickable { if (onOpen != null) onOpen() else playing = true }, contentAlignment = Alignment.Center) {
-                cover?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-                Surface(Modifier.size(56.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clipToBounds().clickable { if (onOpen != null) onOpen() else playing = true }, contentAlignment = Alignment.Center) {
+                cover?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                Surface(Modifier.size(48.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.PlayArrow, tr("播放视频", "Play video"), Modifier.size(36.dp))
+                        Icon(Icons.Outlined.PlayArrow, tr("播放视频", "Play video"), Modifier.size(28.dp))
                     }
                 }
                 Surface(Modifier.align(Alignment.BottomEnd).padding(8.dp), shape = XikeShapes.inner,
