@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -1257,7 +1258,7 @@ fun MomentScreen(
                 onSelected = onDraftMoodChange,
             )
 
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                     Text("02 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1265,7 +1266,7 @@ fun MomentScreen(
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = XikeShapes.inner,
+                    shape = XikeShapes.card,
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
                 ) {
@@ -1286,42 +1287,36 @@ fun MomentScreen(
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             decorationBox = { innerTextField ->
-                                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp)) {
-                                    if (draft.note.isEmpty()) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                    verticalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Box(Modifier.fillMaxWidth()) {
+                                        if (draft.note.isEmpty()) {
+                                            Text(
+                                                localizedText("这一刻，有什么想留下？"),
+                                                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                    if (draft.note.isNotEmpty()) {
                                         Text(
-                                            localizedText("这一刻，有什么想留下？"),
-                                            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                            "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                                            modifier = Modifier.align(Alignment.End).padding(top = 4.dp, bottom = 6.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    innerTextField()
                                 }
                             },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        if (draft.note.isNotEmpty() || isNoteFocused) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (isNoteFocused) {
-                                    TextButton(onClick = dismissKeyboard, shape = XikeShapes.button) {
-                                        Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                                        Spacer(Modifier.width(XikeInlineActionGap))
-                                        Text(localizedText("完成"), maxLines = 1)
-                                    }
-                                }
-                            }
-                        }
                         MomentContentToolbar(
                             recordedAt = draft.recordedAt,
                             enabled = !isSaving,
+                            onDone = dismissKeyboard.takeIf { isNoteFocused },
                             onAdd = {
                                 dismissKeyboard()
                                 showAddContent = true
@@ -2113,32 +2108,42 @@ internal fun MomentContentToolbar(
     enabled: Boolean,
     onAdd: () -> Unit,
     onChooseTime: () -> Unit,
+    onDone: (() -> Unit)? = null,
 ) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        TextButton(
-            onClick = onAdd,
-            enabled = enabled,
-            shape = XikeShapes.button,
-            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
-        ) {
-            Text(
-                tr("添加内容", "Add content"),
-                style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal),
-            )
+        Box(Modifier.offset(x = (-8).dp).size(48.dp), contentAlignment = Alignment.Center) {
+            IconButton(
+                onClick = onAdd,
+                enabled = enabled,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    XikeIcons.Add,
+                    contentDescription = tr("添加内容", "Add content"),
+                    tint = if (enabled) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                )
+            }
         }
         TextButton(
-            onClick = onChooseTime,
+            onClick = onDone ?: onChooseTime,
             enabled = enabled,
+            modifier = Modifier.offset(x = 4.dp),
             shape = XikeShapes.button,
-            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) {
+            if (onDone != null) {
+                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+                Spacer(Modifier.width(XikeInlineActionGap))
+            }
             Text(
-                if (recordedAt == null) tr("今天 · 修改时间", "Today · Change time") else {
+                if (onDone != null) localizedText("完成")
+                else if (recordedAt == null) tr("今天 · 修改时间", "Today · Change time") else {
                     val moment = Instant.ofEpochMilli(recordedAt).atZone(ZoneId.systemDefault())
                     val pattern = if (moment.year == LocalDate.now().year) {
                         tr("M月d日 HH:mm", "MMM d, HH:mm")
@@ -2213,6 +2218,15 @@ internal fun showRecordedAtPicker(
         initial.dayOfMonth,
     ).apply {
         datePicker.maxDate = nowMillis
+        create()
+        datePicker.layoutParams = datePicker.layoutParams.apply {
+            width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        }
+        datePicker.getChildAt(0)?.let { content ->
+            content.layoutParams = content.layoutParams.apply {
+                width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            }
+        }
     }
     dialog.showWithXikeShape()
     return dialog

@@ -12,6 +12,15 @@ import androidx.compose.ui.unit.dp
  * A small, purpose-built icon family for the app navigation and controls.
  */
 object XikeIcons {
+    val Add: ImageVector by lazy {
+        outlineIcon("XikeAdd", strokeWidth = 1.5f) {
+            moveTo(4.75f, 12f)
+            lineTo(19.25f, 12f)
+            moveTo(12f, 4.75f)
+            lineTo(12f, 19.25f)
+        }
+    }
+
     val Mark: ImageVector by lazy {
         outlineIcon("XikeMark") {
             moveTo(17.8f, 6.2f)
@@ -103,6 +112,7 @@ object XikeIcons {
 
     private inline fun outlineIcon(
         name: String,
+        strokeWidth: Float = 1.7f,
         block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
     ): ImageVector = ImageVector.Builder(
         name = name,
@@ -114,7 +124,7 @@ object XikeIcons {
         path(
             fill = null,
             stroke = SolidColor(Color.Black),
-            strokeLineWidth = 1.7f,
+            strokeLineWidth = strokeWidth,
             strokeLineCap = StrokeCap.Round,
             strokeLineJoin = StrokeJoin.Round,
             pathBuilder = block,

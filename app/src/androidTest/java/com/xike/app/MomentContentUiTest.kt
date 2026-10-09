@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -29,7 +30,7 @@ class MomentContentUiTest {
         val originalDraft = viewModel.draft
         rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).performScrollTo().assertIsDisplayed()
         assertCompleteLabel(tr("今天 · 修改时间", "Today · Change time"))
-        assertCompleteLabel(tr("添加内容", "Add content"))
+        rule.onNodeWithContentDescription(tr("添加内容", "Add content")).assertIsDisplayed()
         rule.onNodeWithText(tr("视频", "Video")).assertDoesNotExist()
         openMedia()
         rule.onNodeWithText(tr("录音", "Record audio")).assertIsDisplayed()
@@ -48,7 +49,7 @@ class MomentContentUiTest {
     }
 
     private fun openMedia() {
-        rule.onNodeWithText(tr("添加内容", "Add content")).performScrollTo().performClick()
+        rule.onNodeWithContentDescription(tr("添加内容", "Add content")).performScrollTo().performClick()
         rule.onNodeWithText(tr("视频", "Video")).assertIsDisplayed()
     }
 

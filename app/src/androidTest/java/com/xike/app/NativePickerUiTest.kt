@@ -44,6 +44,11 @@ class NativePickerUiTest {
             composeRule.runOnIdle {
                 val screenWidth = pickerContext.resources.displayMetrics.widthPixels
                 assertViewInsideScreen(dialog.datePicker, screenWidth)
+                val picker = dialog.datePicker
+                val content = picker.getChildAt(0) as android.view.ViewGroup
+                assertEquals("Picker leaves a strip beside the header", (picker.parent as View).width, picker.width)
+                assertEquals("Picker content does not fill its width", picker.width, content.width)
+                assertEquals("Calendar header does not fill its width", content.width, content.getChildAt(0).width)
                 assertViewInsideScreen(dialog.getButton(AlertDialog.BUTTON_POSITIVE), screenWidth)
                 assertViewInsideScreen(dialog.getButton(AlertDialog.BUTTON_NEGATIVE), screenWidth)
             }
