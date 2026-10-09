@@ -79,6 +79,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Commute
 import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.ExpandLess
@@ -97,6 +98,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PauseCircle
@@ -115,6 +117,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1227,7 +1231,15 @@ fun MomentScreen(
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            BrandHeader(today)
+            BrandHeader(
+                today = today,
+                hasDraft = !draft.isEmpty,
+                canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
+                onDiscard = {
+                    dismissKeyboard()
+                    showDiscardConfirmation = true
+                },
+            )
             Column {
                 Text(
                     tr("留一刻给自己", "A MOMENT FOR YOURSELF"),
@@ -1261,22 +1273,6 @@ fun MomentScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                    if (!draft.isEmpty) {
-                        val canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving
-                        Text(
-                            localizedText("清空"),
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = canDiscard,
-                                role = Role.Button,
-                                onClick = { showDiscardConfirmation = true },
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (canDiscard) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                        )
-                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Surface(
@@ -2251,7 +2247,12 @@ internal fun showRecordedAtPicker(
 }
 
 @Composable
-private fun BrandHeader(today: LocalDate) {
+private fun BrandHeader(
+    today: LocalDate,
+    hasDraft: Boolean,
+    canDiscard: Boolean,
+    onDiscard: () -> Unit,
+) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
             Box(contentAlignment = Alignment.Center) {
@@ -2271,6 +2272,53 @@ private fun BrandHeader(today: LocalDate) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (hasDraft) {
+            var menuExpanded by remember { mutableStateOf(false) }
+            Spacer(Modifier.width(8.dp))
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(width = 48.dp, height = 32.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.MoreVert,
+                        contentDescription = tr("草稿操作", "Draft actions"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    shape = XikeShapes.dialog,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                val tint = if (canDiscard) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                Icon(
+                                    Icons.Outlined.DeleteOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = tint,
+                                )
+                                Text(localizedText("放弃草稿"), color = tint)
+                            }
+                        },
+                        enabled = canDiscard,
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        onClick = {
+                            menuExpanded = false
+                            onDiscard()
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 

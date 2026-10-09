@@ -50,6 +50,7 @@ class JournalDraftUiTest {
             }
         }
 
+        composeRule.onNodeWithContentDescription("草稿操作").assertDoesNotExist()
         composeRule.onNodeWithText("此刻窗外").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("地点与天气 · 可选").assertIsDisplayed()
         composeRule.onNodeWithText("添加").assertIsDisplayed().performClick()
@@ -488,12 +489,15 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("清空").performScrollTo().performClick()
+        composeRule.onNodeWithText("清空").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("草稿操作").performScrollTo().performClick()
+        composeRule.onNodeWithText("放弃草稿").performClick()
         composeRule.onNodeWithText("放弃这份草稿？").assertIsDisplayed()
         composeRule.onNodeWithText("继续保留").performClick()
         composeRule.runOnIdle { check(!discarded) }
 
-        composeRule.onNodeWithText("清空").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("草稿操作").performScrollTo().performClick()
+        composeRule.onNodeWithText("放弃草稿").performClick()
         composeRule.onNodeWithText("放弃草稿").performClick()
         composeRule.runOnIdle { check(discarded) }
     }
