@@ -1941,7 +1941,7 @@ private fun OutdoorContextCard(
                             isLoading -> localizedText("只获取一次，不会在后台持续定位")
                             snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
                             isBackdated -> localizedText("避免把现在的环境误记到过去")
-                            errorMessage != null -> errorMessage
+                            errorMessage != null -> localizedText(errorMessage)
                             else -> localizedText("地点与天气 · 可选")
                         },
                         style = MaterialTheme.typography.bodySmall,
