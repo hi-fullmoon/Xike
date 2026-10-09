@@ -1739,7 +1739,7 @@ fun MomentScreen(
             },
             text = {
                 Text(
-                    localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。"),
+                    localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音、视频和补记时间。已保存的记录不会受影响。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -1938,8 +1938,8 @@ private fun OutdoorContextCard(
                     )
                     Text(
                         when {
-                            snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
                             isLoading -> localizedText("只获取一次，不会在后台持续定位")
+                            snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
                             isBackdated -> localizedText("避免把现在的环境误记到过去")
                             errorMessage != null -> errorMessage
                             else -> localizedText("地点与天气 · 可选")
@@ -1985,6 +1985,14 @@ private fun OutdoorContextCard(
 
             when {
                 snapshot != null -> {
+                    if (!isLoading && errorMessage != null) {
+                        Text(
+                            errorMessage,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Spacer(Modifier.height(9.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
                     Row(

@@ -90,7 +90,7 @@
     <string name="text_save_this_past_moment" formatted="false">"Save this past moment"</string>
     <string name="text_keep_this_moment" formatted="false">"Keep this moment"</string>
     <string name="text_discard_this_draft" formatted="false">"Discard this draft?"</string>
-    <string name="text_this_clears_the_unsaved_mood_weather_note" formatted="false">"This clears the unsaved mood, weather, note, topics, photos, audio and backdated time. Saved entries are unaffected."</string>
+    <string name="text_this_clears_the_unsaved_mood_weather_note" formatted="false">"This clears the unsaved mood, weather, note, topics, photos, audio, video and backdated time. Saved entries are unaffected."</string>
     <string name="text_keep_draft" formatted="false">"Keep draft"</string>
     <string name="text_discard_draft" formatted="false">"Discard draft"</string>
     <string name="text_add_weather_for_this_moment" formatted="false">"Add weather for this moment?"</string>

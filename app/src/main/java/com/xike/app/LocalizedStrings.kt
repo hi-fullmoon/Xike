@@ -92,7 +92,7 @@ internal val localizedStringIds: Map<String, Int> = mapOf(
     "补记这一刻" to R.string.text_save_this_past_moment,
     "记下此刻" to R.string.text_keep_this_moment,
     "放弃这份草稿？" to R.string.text_discard_this_draft,
-    "将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音和补记时间。已保存的记录不会受影响。" to R.string.text_this_clears_the_unsaved_mood_weather_note,
+    "将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音、视频和补记时间。已保存的记录不会受影响。" to R.string.text_this_clears_the_unsaved_mood_weather_note,
     "继续保留" to R.string.text_keep_draft,
     "放弃草稿" to R.string.text_discard_draft,
     "添加此刻窗外？" to R.string.text_add_weather_for_this_moment,
