@@ -42,7 +42,6 @@ import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DataUsage
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -1031,8 +1030,6 @@ private fun LocalReviewDialog(review: LocalJournalReview, scrollState: ScrollSta
                 },
                 shape = XikeShapes.button,
             ) {
-                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                Spacer(Modifier.width(XikeInlineActionGap))
                 Text(localizedText("选择分享应用"))
             }
         },
