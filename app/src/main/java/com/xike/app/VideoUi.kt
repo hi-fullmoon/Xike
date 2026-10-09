@@ -178,7 +178,13 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                     )
                 }
             }
-            if (onRemove != null) TextButton(onClick = onRemove, modifier = Modifier.align(Alignment.End), shape = XikeShapes.button) { Text(tr("移除视频", "Remove video")) }
+            if (onRemove != null) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)) {
+                    TextButton(onClick = onRemove, shape = XikeShapes.button) {
+                        Text(tr("移除视频", "Remove video"))
+                    }
+                }
+            }
         }
     }
     if (playing && !previewOnly) VideoPlayerDialog(video) { playing = false }
