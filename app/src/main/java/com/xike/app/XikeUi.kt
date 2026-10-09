@@ -1365,8 +1365,6 @@ fun MomentScreen(
                     voiceAnchor.bringIntoView()
                 }
                 Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor).padding(horizontal = 3.dp)) {
-                    Text(tr("声音片段", "VOICE NOTE"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(7.dp))
                     Text(
                         when {
                             pendingDraftAudio != null -> localizedText("收好这段声音")
@@ -1400,6 +1398,7 @@ fun MomentScreen(
                                 openAudio = openAudio,
                                 onDelete = onDraftAudioRemoved,
                                 onReplace = beginVoiceCapture,
+                                showBorder = false,
                             )
                         }
                     }
@@ -1490,7 +1489,7 @@ fun MomentScreen(
                     if (showDetails) {
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = XikeCardPadding),
-                            color = MaterialTheme.colorScheme.outlineVariant,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
                         )
                         Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(XikeCardPadding)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

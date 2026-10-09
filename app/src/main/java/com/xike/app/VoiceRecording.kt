@@ -708,6 +708,7 @@ internal fun VoicePlaybackCard(
     modifier: Modifier = Modifier,
     onDelete: (() -> Unit)? = null,
     onReplace: (() -> Unit)? = null,
+    showBorder: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -858,7 +859,7 @@ internal fun VoicePlaybackCard(
         modifier = modifier.fillMaxWidth(),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+        border = if (showBorder) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) else null,
     ) {
         Column(Modifier.padding(XikeCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
