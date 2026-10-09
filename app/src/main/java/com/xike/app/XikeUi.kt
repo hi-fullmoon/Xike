@@ -1000,6 +1000,7 @@ fun MomentScreen(
     onDraftDiscard: () -> Unit = {},
 ) {
     var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val videoServices = LocalVideoServices.current
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var revealDetailsRequest by remember { mutableIntStateOf(0) }
     val detailsAnchor = remember { BringIntoViewRequester() }
@@ -1304,12 +1305,12 @@ fun MomentScreen(
                 Spacer(Modifier.height(7.dp))
                 val actionTextMeasurer = rememberTextMeasurer()
                 val actionLabelStyle = MaterialTheme.typography.labelLarge
-                val actionLabels = listOf(localizedText("语音"), localizedText("照片"), localizedText("补记"))
+                val actionLabels = listOf(localizedText("语音"), localizedText("照片"), localizedText("补记"), tr("视频", "Video"))
                 val widestActionWidth = with(LocalDensity.current) {
                     actionLabels.maxOf { actionTextMeasurer.measure(it, actionLabelStyle, softWrap = false).size.width }.toDp()
                 } + 38.dp
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val useEqualWidths = widestActionWidth <= (maxWidth - 16.dp) / 3
+                    val useEqualWidths = widestActionWidth <= (maxWidth - 24.dp) / 4
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1331,6 +1332,11 @@ fun MomentScreen(
                                 dismissKeyboard()
                                 showPhotoSourceDialog = true
                             },
+                        )
+                        VideoAddButton(
+                            enabled = !isSaving && !videoServices.draftSaving,
+                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
+                            onPicked = videoServices.addDraft,
                         )
                         MomentQuickAction(
                             icon = Icons.Outlined.History,
@@ -1359,7 +1365,7 @@ fun MomentScreen(
                 }
                 DraftSecurityRow(
                     hasDraft = !draft.isEmpty,
-                    enabled = !isSaving && !showVoiceCapture && pendingDraftAudio == null,
+                    enabled = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
                     onDiscard = { showDiscardConfirmation = true },
                     statusText = when {
                         showVoiceCapture -> localizedText("录音结束后将加密保存")
@@ -1369,6 +1375,20 @@ fun MomentScreen(
                 )
             }
 
+            if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tr("这一刻的视频", "Video of this moment"), style = XikeSectionTitleStyle)
+                    if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
+                    draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
+                    if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
+                        Text(tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."))
+                        Row {
+                            TextButton(onClick = { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }) { Text(tr("重试导入", "Retry import")) }
+                            TextButton(onClick = videoServices.removeDraft) { Text(tr("移除视频", "Remove video")) }
+                        }
+                    }
+                }
+            }
             if (pendingDraftAudio != null || draft.audio != null) {
                 val voiceAnchor = remember { BringIntoViewRequester() }
                 LaunchedEffect(draft.audio?.fileName) {
@@ -1538,7 +1558,7 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving || showVoiceCapture || pendingDraftAudio != null) return@Button
+                    if (isSaving || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
                     dismissKeyboard()
                     isSaving = true
                     scope.launch {
@@ -1549,6 +1569,7 @@ fun MomentScreen(
                                 tags = draft.tags.toList(),
                                 note = draft.note.trim(),
                                 audio = draft.audio,
+                                video = draft.video,
                                 outdoor = draft.outdoor,
                             ),
                             draft.imageUriStrings.map(Uri::parse),
@@ -1565,7 +1586,7 @@ fun MomentScreen(
                         isSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null,
+                enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
                 modifier = Modifier
                     .widthIn(max = XikeContentMaxWidth)
                     .fillMaxWidth()
@@ -1698,7 +1719,7 @@ fun MomentScreen(
 }
 
 @Composable
-private fun MomentQuickAction(
+internal fun MomentQuickAction(
     icon: ImageVector,
     label: String,
     enabled: Boolean,
@@ -2875,6 +2896,7 @@ internal fun JournalEntryCard(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
+            entry.video?.let { VideoCard(it, previewOnly = true, onOpen = onClick) }
             if (entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
             }

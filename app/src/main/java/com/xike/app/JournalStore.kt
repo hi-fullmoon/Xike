@@ -80,6 +80,7 @@ data class JournalEntry(
     val note: String,
     val imageFileNames: List<String> = emptyList(),
     val audio: JournalAudio? = null,
+    val video: JournalVideo? = null,
     val outdoor: OutdoorSnapshot? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
@@ -90,6 +91,7 @@ data class JournalEntry(
         .put("note", note)
         .put("imageFileNames", JSONArray(imageFileNames))
         .put("audio", audio?.toJson() ?: JSONObject.NULL)
+        .put("video", video?.toJson() ?: JSONObject.NULL)
         .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
 
     companion object {
@@ -105,6 +107,7 @@ data class JournalEntry(
                 List(values.length()) { index -> values.getString(index) }
             } ?: listOfNotNull(json.optString("imageFileName").takeIf { it.isNotBlank() }),
             audio = JournalAudio.fromJson(json.optJSONObject("audio")),
+            video = JournalVideo.fromJson(json.optJSONObject("video")),
             outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
         )
     }
@@ -114,10 +117,12 @@ internal fun normalizeRestoredEntries(
     entries: List<JournalEntry>,
     availableImages: Set<String>,
     availableAudios: Set<String> = emptySet(),
+    availableVideos: Set<String> = emptySet(),
 ): List<JournalEntry> = entries
     .distinctBy { it.id }
     .map { entry ->
         entry.copy(
+            video = entry.video?.takeIf { it.fileName in availableVideos && it.coverFileName in availableVideos },
             imageFileNames = entry.imageFileNames
                 .distinct()
                 .filter { it in availableImages }
@@ -141,6 +146,8 @@ data class BackupSummary(
     val entryCount: Int,
     val imageCount: Int,
     val audioCount: Int = 0,
+    val videoCount: Int = 0,
+    val videoBytes: Long = 0,
     val oldestCreatedAt: Long?,
     val newestCreatedAt: Long?,
 )
@@ -162,6 +169,8 @@ private data class UndoSnapshotSwap(
 
 class JournalStore(context: Context) {
     private val appContext = context.applicationContext
+    private val videos = JournalVideoStore(appContext)
+    private val videoDraftStore by lazy { JournalDraftStore(appContext) }
     private val imagesDirectory = File(appContext.filesDir, IMAGES_DIRECTORY)
     private val audiosDirectory = File(appContext.filesDir, AUDIOS_DIRECTORY)
     private val masterKey = MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -272,6 +281,7 @@ class JournalStore(context: Context) {
         return runCatching {
             val storedEntry = entry.copy(imageFileNames = imported)
             validateAudioReference(storedEntry.audio)
+            videos.requireReadable(storedEntry.video)
             dao.insertJournal(storedEntry.toBundle())
             storedEntry
         }.onFailure {
@@ -302,6 +312,7 @@ class JournalStore(context: Context) {
         val storedEntry = entry.copy(imageFileNames = retainedImages + imported)
         val previousImages = runCatching {
             validateAudioReference(storedEntry.audio)
+            videos.requireReadable(storedEntry.video)
             dao.updateJournal(storedEntry.toBundle())
         }
             .onFailure { imported.forEach(::deleteImage) }
@@ -316,6 +327,7 @@ class JournalStore(context: Context) {
         original.audio?.fileName
             ?.takeIf { it != storedEntry.audio?.fileName && it !in referencedAudioFileNames() }
             ?.let(::deleteAudio)
+        original.video?.let { deleteUnreferencedVideo(it) }
         return if (refreshEntries) readEntries() else listOf(storedEntry)
     }
 
@@ -344,6 +356,7 @@ class JournalStore(context: Context) {
         check(missingImage == null) { localizedText("记录照片已经清理，无法撤销删除。") }
         val missingAudio = deletedEntry.audio?.fileName?.takeIf { !File(audiosDirectory, it).isFile }
         check(missingAudio == null) { localizedText("记录语音已经清理，无法撤销删除。") }
+        videos.requireReadable(deletedEntry.video)
         dao.insertJournal(deletedEntry.toBundle())
         pendingDeletedEntry = null
         if (refreshEntries) readEntries() else listOf(deletedEntry)
@@ -453,10 +466,12 @@ class JournalStore(context: Context) {
     }
 
     @Synchronized
-    fun removeOrphanedMedia(activeDraftAudioFileName: String? = null) {
+    fun removeOrphanedMedia(activeDraftAudioFileName: String? = null, activeDraftVideo: JournalVideo? = null) {
+        cleanupStaleVideoEdits()
         val referencedImages = referencedImageFileNames()
         val referencedAudios = referencedAudioFileNames() + listOfNotNull(activeDraftAudioFileName)
         val activeUndoFileName = currentUndoSnapshot()?.file?.name
+        videos.prune(referencedVideoFiles() + activeDraftVideo.files())
         imagesDirectory.listFiles()
             ?.filter { it.name !in referencedImages }
             ?.forEach(File::delete)
@@ -487,6 +502,10 @@ class JournalStore(context: Context) {
         val currentEntries = readEntries()
         val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
         val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
+        val videoNames = currentEntries.flatMap { it.video.files() }.distinct()
+        require(currentEntries.mapNotNull { it.video }.distinctBy { it.fileName }.sumOf { it.sizeBytes } <= MAX_BACKUP_VIDEO_BYTES) {
+            tr("备份视频超过 10 GB。", "Backup videos exceed 10 GB.")
+        }
         val imageExportNames = imageNames.associateWith { name ->
             val extension = openImage(name)?.use(::imageExtension) ?: error(tr("备份图片无法读取：$name", "Unable to read backup photo: $name"))
             "${name.removeSuffix(".xike-image")}.$extension"
@@ -537,6 +556,21 @@ class JournalStore(context: Context) {
                     archive.closeEntry()
                 }
             }
+            val videoArchive = object : java.io.FilterOutputStream(archive) {
+                private var totalBytes = 0L
+                override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                    totalBytes += length
+                    require(totalBytes <= MAX_BACKUP_VIDEO_BYTES) { tr("备份视频超过 10 GB。", "Backup videos exceed 10 GB.") }
+                    out.write(bytes, offset, length)
+                }
+            }
+            videoNames.forEach { fileName ->
+                videos.open(fileName).use { input ->
+                    archive.putNextEntry(ZipEntry("videos/$fileName"))
+                    input.copyTo(videoArchive)
+                    archive.closeEntry()
+                }
+            }
             archive.putNextEntry(ZipEntry(COMPLETION_ENTRY))
             archive.write(COMPLETION_MARKER.toByteArray(Charsets.US_ASCII))
             archive.closeEntry()
@@ -567,6 +601,8 @@ class JournalStore(context: Context) {
                 entryCount = prepared.entries.size,
                 imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
                 audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
+                videoCount = prepared.entries.count { it.video != null },
+                videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
                 oldestCreatedAt = createdAtValues.minOrNull(),
                 newestCreatedAt = createdAtValues.maxOrNull(),
             )
@@ -587,12 +623,13 @@ class JournalStore(context: Context) {
         input: InputStream,
         password: String?,
         retainedAudioFileNames: Set<String> = emptySet(),
+        retainedVideo: JournalVideo? = null,
     ): List<JournalEntry> {
         val prepared = readBackup(input, password)
         return try {
             val snapshotSwap = createUndoSnapshot()
             try {
-                installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames).also {
+                installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames, retainedVideo).also {
                     commitUndoSnapshot(snapshotSwap)
                 }
             } catch (error: Throwable) {
@@ -608,13 +645,13 @@ class JournalStore(context: Context) {
     fun canUndoLastRestore(): Boolean = currentUndoSnapshot() != null
 
     @Synchronized
-    fun undoLastRestore(retainedAudioFileNames: Set<String> = emptySet()): List<JournalEntry> {
+    fun undoLastRestore(retainedAudioFileNames: Set<String> = emptySet(), retainedVideo: JournalVideo? = null): List<JournalEntry> {
         val snapshot = currentUndoSnapshot() ?: error(localizedText("没有可撤销的恢复操作。"))
         val prepared = snapshot.file.inputStream().use { input ->
             readBackup(input, snapshot.password)
         }
         return try {
-            installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames).also {
+            installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames, retainedVideo).also {
                 clearUndoSnapshot(snapshot)
             }
         } finally {
@@ -647,8 +684,11 @@ class JournalStore(context: Context) {
             var parsedEntries: List<JournalEntry>? = null
             val restoredImages = linkedSetOf<String>()
             val restoredAudios = linkedSetOf<String>()
+            val restoredVideos = linkedSetOf<String>()
             var referencedImages = emptySet<String>()
             var referencedAudios = emptySet<String>()
+            var referencedVideos = emptySet<String>()
+            val totalVideoBytes = longArrayOf(0L)
             val totalBytes = longArrayOf(0L)
             val totalAudioBytes = longArrayOf(0L)
             var version = 0
@@ -685,6 +725,9 @@ class JournalStore(context: Context) {
                     localizedText("备份中的图片和录音文件名重复。")
                 }
 
+                referencedVideos = requireNotNull(parsedEntries).flatMap { it.video.files() }.toSet()
+                validateBackup(version >= 8 || referencedVideos.isEmpty()) { tr("备份视频版本无效。", "Invalid video backup version.") }
+                validateBackup((referencedImages + referencedAudios).intersect(referencedVideos).isEmpty()) { tr("备份附件文件名重复。", "Duplicate attachment names.") }
                 var entry = archive.nextEntry
                 while (entry != null) {
                     validateBackup(!entry.isDirectory) { localizedText("备份中包含未知内容。") }
@@ -721,6 +764,11 @@ class JournalStore(context: Context) {
                             )
                             restoredAudios += fileName
                         }
+                        entry.name.startsWith("videos/") && version >= 8 -> {
+                            val fileName = entry.name.removePrefix("videos/")
+                            validateBackup(fileName in referencedVideos && restoredVideos.add(fileName)) { tr("备份视频引用无效或重复。", "Invalid or duplicate backup video.") }
+                            videos.stageBackup(File(stagingDirectory, fileName), archive, totalVideoBytes)
+                        }
                         else -> validateBackup(false) { localizedText("备份中包含未知内容。") }
                     }
                     archive.closeEntry()
@@ -740,7 +788,10 @@ class JournalStore(context: Context) {
                 requireNotNull(parsedEntries) { localizedText("备份清单缺失。") },
                 restoredImages,
                 restoredAudios,
+                restoredVideos,
             )
+            validateBackup(restoredVideos == referencedVideos) { tr("备份缺少视频或封面。", "Backup video or cover is missing.") }
+            restored.forEach { it.video?.let { video -> videos.validateStaged(stagingDirectory, video) } }
             PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
@@ -801,6 +852,7 @@ class JournalStore(context: Context) {
         validateBackup(values.length() <= MAX_BACKUP_ENTRIES) { localizedText("备份包含过多日记。") }
         return List(values.length()) { index ->
             val entry = JournalEntry.fromJson(values.getJSONObject(index))
+            entry.video?.let { validateBackup(it.isValid()) { tr("备份视频信息无效。", "Invalid backup video metadata.") } }
             entry.copy(
                 imageFileNames = entry.imageFileNames
                     .filter(::isSafeImageFileName)
@@ -933,6 +985,7 @@ class JournalStore(context: Context) {
         stagingDirectory: File,
         restoredEntries: List<JournalEntry>,
         retainedAudioFileNames: Set<String>,
+        retainedVideo: JournalVideo? = null,
     ): List<JournalEntry> {
         val installedFiles = mutableListOf<File>()
         return try {
@@ -970,8 +1023,12 @@ class JournalStore(context: Context) {
                 installedFiles += installedFile
                 stagedFile.name to newName
             }
+            val renamedVideos = restoredEntries.mapNotNull { it.video }.associateWith { video ->
+                videos.install(stagingDirectory, video).also { installedFiles.addAll(videos.filesOnDisk(it)) }
+            }
             val installedEntries = restoredEntries.map { entry ->
                 entry.copy(
+                    video = entry.video?.let(renamedVideos::getValue),
                     imageFileNames = entry.imageFileNames.mapNotNull(renamedImages::get),
                     audio = entry.audio?.let { audio ->
                         renamedAudios[audio.fileName]?.let { audio.copy(fileName = it) }
@@ -979,7 +1036,10 @@ class JournalStore(context: Context) {
                 )
             }
 
+            val protectedVideos = retainedVideo.files() + videoDraftStore.load().video.files() + videos.editReferences()
             writeEntries(installedEntries)
+            runCatching { cleanupStaleVideoEdits() }
+            videos.prune(installedEntries.flatMap { it.video.files() }.toSet() + protectedVideos)
             val referencedFiles = installedEntries.flatMap { it.imageFileNames }.toSet()
             imagesDirectory.listFiles()
                 ?.filter { it.name !in referencedFiles }
@@ -1033,9 +1093,30 @@ class JournalStore(context: Context) {
         pendingDeletedEntry?.audio?.fileName?.let(::add)
     }
 
+    private fun referencedVideoFiles(): Set<String> =
+        dao.records().flatMap { it.toJournalEntry().video.files() }.toSet() + pendingDeletedEntry?.video.files() + videoDraftStore.load().video.files() + videos.editReferences()
+
+    private fun cleanupStaleVideoEdits() {
+        val entries = dao.records().map(JournalEntryRecord::toJournalEntry) + listOfNotNull(pendingDeletedEntry)
+        videos.discardStaleEdits(entries).forEach(::deleteUnreferencedVideo)
+    }
+
+    @Synchronized
+    fun importVideo(uri: Uri, onProgress: (Float) -> Unit = {}): JournalVideo = videos.import(uri, onProgress)
+
+    @Synchronized
+    fun deleteUnreferencedVideo(video: JournalVideo) {
+        // A failed reference read must never turn into an empty reference set.
+        val references = runCatching(::referencedVideoFiles).getOrNull() ?: return
+        videos.deleteExcept(video, references)
+    }
+
+    internal fun requireReadableVideo(video: JournalVideo?) = videos.requireReadable(video)
+
     private fun finalizePendingDelete() {
         val deletedEntry = pendingDeletedEntry ?: return
         pendingDeletedEntry = null
+        runCatching { cleanupStaleVideoEdits() }
         val referencedImages = dao.imageFileNames().toSet()
         deletedEntry.imageFileNames
             .filterNot { it in referencedImages }
@@ -1043,6 +1124,7 @@ class JournalStore(context: Context) {
         deletedEntry.audio?.fileName
             ?.takeIf { it !in referencedAudioFileNames() }
             ?.let(::deleteAudio)
+        deletedEntry.video?.let(::deleteUnreferencedVideo)
     }
 
     private fun isSafeImageFileName(fileName: String): Boolean =
@@ -1123,7 +1205,7 @@ class JournalStore(context: Context) {
         const val IMAGES_PREFIX = "images/"
         const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
-        const val STREAMING_BACKUP_VERSION = 7
+        const val STREAMING_BACKUP_VERSION = 8
         const val MAX_FILE_NAME_LENGTH = 160
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000

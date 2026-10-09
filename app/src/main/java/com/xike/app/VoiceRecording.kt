@@ -2,6 +2,7 @@ package com.xike.app
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.media.AudioAttributes
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.SystemClock
@@ -708,9 +709,32 @@ internal fun VoicePlaybackCard(
     var isSeeking by remember(audio.fileName) { mutableStateOf(false) }
     var seekPosition by remember(audio.fileName) { mutableFloatStateOf(0f) }
     var playbackError by remember(audio.fileName) { mutableStateOf<String?>(null) }
+    val playbackOwner = remember(audio.fileName) { Any() }
+    val disposed = remember(audio.fileName) { java.util.concurrent.atomic.AtomicBoolean(false) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+
+    val playbackAttributes = remember(audio.fileName) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_SPEECH) }
+
+    fun pausePlayback() {
+        player?.let { active ->
+            if (isPlaying) runCatching {
+                active.pause()
+                position = active.currentPosition.toLong()
+            }
+        }
+        isPlaying = false
+        journalPlayback.release(playbackOwner)
+    }
+
+    fun claimPlayback(): Boolean {
+        val granted = claimPlaybackFocus(context, playbackOwner, playbackAttributes, ::pausePlayback)
+        if (!granted) playbackError = tr("暂时无法播放，请稍后再试。", "Unable to play right now. Please try again shortly.")
+        return granted
+    }
 
     fun releasePlayer() {
         player?.release()
+        journalPlayback.release(playbackOwner)
         player = null
         isPlaying = false
         tempFile?.delete()
@@ -720,22 +744,29 @@ internal fun VoicePlaybackCard(
     fun togglePlayback() {
         val active = player
         if (active != null) {
-            if (active.isPlaying) {
-                active.pause()
-                isPlaying = false
-            } else {
-                active.start()
-                isPlaying = true
+            runCatching {
+                if (isPlaying) pausePlayback() else {
+                    if (!claimPlayback()) return@runCatching
+                    playbackError = null
+                    active.start()
+                    isPlaying = true
+                }
+            }.onFailure {
+                releasePlayer()
+                playbackError = localizedText("暂时无法播放这段录音。")
             }
             return
         }
         if (isPreparing) return
+        if (!claimPlayback()) return
         isPreparing = true
         playbackError = null
         scope.launch {
+            var openedFile: File? = null
             runCatching {
                 val preparedFile = withContext(Dispatchers.IO) {
                     val target = File.createTempFile("xike-playback-", ".m4a", context.cacheDir)
+                    openedFile = target
                     try {
                         openAudio(audio.fileName)?.use { input -> target.outputStream().use(input::copyTo) }
                             ?: error(localizedText("录音文件不可用。"))
@@ -745,30 +776,51 @@ internal fun VoicePlaybackCard(
                         throw error
                     }
                 }
+                if (disposed.get()) return@runCatching
                 tempFile = preparedFile
-                MediaPlayer().apply {
+                val preparedPlayer = MediaPlayer()
+                player = preparedPlayer
+                preparedPlayer.apply {
+                    setAudioAttributes(playbackAttributes)
                     FileInputStream(preparedFile).use { source ->
                         setDataSource(source.fd)
-                        prepare()
                     }
-                    preparedFile.delete()
-                    tempFile = null
-                    if (position > 0L) seekTo(position.coerceAtMost(duration.toLong()).toInt())
+                    setOnPreparedListener {
+                        preparedFile.delete()
+                        tempFile = null
+                        isPreparing = false
+                        runCatching {
+                            if (position > 0L) seekTo(position.coerceAtMost(duration.toLong()).toInt())
+                            if (journalPlayback.owns(playbackOwner) &&
+                                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                                start()
+                                isPlaying = true
+                            }
+                        }.onFailure {
+                            releasePlayer()
+                            playbackError = localizedText("暂时无法播放这段录音。")
+                        }
+                    }
                     setOnCompletionListener {
                         isPlaying = false
                         position = 0L
+                        journalPlayback.release(playbackOwner)
                         seekTo(0)
                     }
-                    start()
-                }.also {
-                    player = it
-                    isPlaying = true
+                    setOnErrorListener { _, _, _ ->
+                        releasePlayer()
+                        isPreparing = false
+                        playbackError = localizedText("暂时无法播放这段录音。")
+                        true
+                    }
+                    prepareAsync()
                 }
-            }.onFailure { error ->
+            }.onFailure {
                 releasePlayer()
-                playbackError = error.message ?: localizedText("暂时无法播放这段录音。")
+                if (!disposed.get()) playbackError = localizedText("暂时无法播放这段录音。")
+                isPreparing = false
             }
-            isPreparing = false
+            if (tempFile !== openedFile) openedFile?.delete()
         }
     }
 
@@ -779,14 +831,24 @@ internal fun VoicePlaybackCard(
         }
     }
 
-    DisposableEffect(audio.fileName) {
-        onDispose { releasePlayer() }
+    val currentPause by rememberUpdatedState(::pausePlayback)
+    DisposableEffect(audio.fileName, lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) currentPause()
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            disposed.set(true)
+            lifecycle.removeObserver(observer)
+            releasePlayer()
+        }
     }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = XikeShapes.card,
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
     ) {
         Column(Modifier.padding(XikeCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -812,17 +874,13 @@ internal fun VoicePlaybackCard(
                 Column(Modifier.weight(1f)) {
                     Text(localizedText("声音片段"), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        formatAudioDuration(audio.durationMillis),
-                        style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    VoicePlaybackIndicator(isPlaying, position)
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth()) {
-                    VoiceProgressSlider(
+                    PlaybackProgressSlider(
                         value = (if (isSeeking) seekPosition else position.toFloat())
                             .coerceIn(0f, audio.durationMillis.coerceAtLeast(1L).toFloat()),
                         onValueChange = {
@@ -845,7 +903,7 @@ internal fun VoicePlaybackCard(
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
-                            "−${formatAudioDuration((audio.durationMillis - (if (isSeeking) seekPosition.toLong() else position)).coerceAtLeast(0L))}",
+                            formatAudioDuration(audio.durationMillis),
                             style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -893,14 +951,31 @@ internal fun VoicePlaybackCard(
 }
 
 @Composable
+private fun VoicePlaybackIndicator(isPlaying: Boolean, position: Long) {
+    val color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    // A playback activity indicator, not an invented recording waveform.
+    Canvas(Modifier.size(64.dp, 16.dp)) {
+        repeat(12) { index ->
+            val phase = if (isPlaying) ((position / 200 + index) % 4).toInt() else index % 4
+            val height = size.height * (0.3f + phase * 0.2f)
+            val x = size.width * (index + 0.5f) / 12
+            drawLine(color, Offset(x, (size.height - height) / 2), Offset(x, (size.height + height) / 2),
+                strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun VoiceProgressSlider(
+internal fun PlaybackProgressSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    activeColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+    inactiveColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
 ) {
     Slider(
         value = value,
@@ -912,7 +987,7 @@ private fun VoiceProgressSlider(
         thumb = {
             Box(Modifier.size(width = 12.dp, height = 16.dp), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(12.dp).background(
-                    if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    if (enabled) activeColor else inactiveColor,
                     CircleShape,
                 ))
             }
@@ -922,10 +997,10 @@ private fun VoiceProgressSlider(
                 (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
             Box(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.CenterStart) {
                 Box(Modifier.fillMaxWidth().height(4.dp).background(
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape,
+                    inactiveColor, CircleShape,
                 ))
                 Box(Modifier.fillMaxWidth(fraction).height(4.dp).background(
-                    if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    if (enabled) activeColor else inactiveColor,
                     CircleShape,
                 ))
             }

@@ -44,6 +44,7 @@ internal data class JournalEntryEntity(
     @ColumnInfo(name = "outdoor_weather_code") val outdoorWeatherCode: Int? = null,
     @ColumnInfo(name = "outdoor_captured_at") val outdoorCapturedAt: Long? = null,
     @ColumnInfo(name = "outdoor_source") val outdoorSource: String? = null,
+    @ColumnInfo(name = "video_json") val videoJson: String? = null,
 )
 
 @Entity(
@@ -150,6 +151,7 @@ internal fun JournalEntry.toBundle(): JournalBundle = JournalBundle(
         outdoorWeatherCode = outdoor?.weatherCode,
         outdoorCapturedAt = outdoor?.capturedAt,
         outdoorSource = outdoor?.source,
+        videoJson = video?.toJson()?.toString(),
     ),
     tags = tags.mapIndexed { position, tag -> JournalTagEntity(id, position, tag) },
     images = imageFileNames.mapIndexed { position, fileName -> JournalImageEntity(id, position, fileName) },
@@ -170,6 +172,7 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry = JournalEntry(
     tags = tags.sortedBy { it.position }.map { it.tag },
     note = entry.note,
     imageFileNames = images.sortedBy { it.position }.map { it.fileName },
+    video = entry.videoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) },
     audio = audios.firstOrNull()?.let {
         JournalAudio(
             fileName = it.fileName,
@@ -416,7 +419,7 @@ internal abstract class JournalDao {
         AppSettingEntity::class,
         JournalSearchEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -437,8 +440,14 @@ internal abstract class JournalDatabase : RoomDatabase() {
             val factory = SupportOpenHelperFactory(DatabaseKeyManager(context).getOrCreatePassphrase())
             return Room.databaseBuilder(context, JournalDatabase::class.java, DATABASE_NAME)
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+        }
+
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN video_json TEXT")
+            }
         }
 
         internal val MIGRATION_1_2 = object : Migration(1, 2) {

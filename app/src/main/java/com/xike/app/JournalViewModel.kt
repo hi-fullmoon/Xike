@@ -29,6 +29,11 @@ data class PendingDraftAudio(
 
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
+    private val videoStore = JournalVideoStore(application)
+    var isDraftVideoSaving by mutableStateOf(false)
+        private set
+    var draftVideoProgress by mutableStateOf<Float?>(null)
+        private set
     private val draftStore = JournalDraftStore(application)
     private val pendingAudioStore = PendingDraftAudioStore(application)
     private val outdoorRepository = OutdoorContextRepository(application)
@@ -111,9 +116,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
                 imageResult.onFailure { dataError = "草稿照片暂时无法读取，原引用已保留。" }
-                if (draftResult.isSuccess && audioResult.isSuccess && imageResult.isSuccess) {
+                val videoResult = withContext(Dispatchers.IO) { runCatching { store.requireReadableVideo(draft.video) } }
+                videoResult.onFailure { dataError = tr("草稿视频暂时无法读取，原引用已保留。", "Draft video cannot be read. Its reference is preserved.") }
+                if (draftResult.isSuccess && audioResult.isSuccess && imageResult.isSuccess && videoResult.isSuccess) {
                     withContext(Dispatchers.IO) {
-                        runCatching { store.removeOrphanedMedia(draft.audio?.fileName) }
+                        runCatching { store.removeOrphanedMedia(draft.audio?.fileName, draft.video) }
                     }
                 }
                 viewModelScope.launch {
@@ -136,6 +143,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }
             isLoading = false
             if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
+            draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
         }
     }
 
@@ -407,7 +415,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun discardDraft() {
-        if (pendingDraftAudio != null) return
+        if (pendingDraftAudio != null || isDraftVideoSaving) return
         val discardedDraft = draft
         if (persistDraft(JournalDraft())) {
             draftGeneration++
@@ -417,10 +425,13 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             discardedDraft.audio?.fileName?.let { fileName ->
                 viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(fileName) }
             }
+            discardedDraft.video?.let { video -> viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedVideo(video) } }
+            discardedDraft.pendingVideoUri?.let { releaseVideoAccess(Uri.parse(it)) }
         }
     }
 
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = viewModelScope.async {
+        if (isDraftVideoSaving || draft.pendingVideoUri != null) return@async Result.failure(IllegalStateException(tr("请先完成视频导入。", "Please finish importing the video first.")))
         val savedDraft = draft
         val result = withContext(Dispatchers.IO) {
             runCatching { store.add(entry, imageUris, refreshEntries = false) }
@@ -503,10 +514,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }.await()
 
     suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = viewModelScope.async {
+        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再恢复备份。", "Wait for video import to finish before restoring a backup.")))
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                    store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName))
+                    store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName), draft.video)
                 } ?: error(localizedText("无法读取备份文件"))
             }
         }
@@ -519,8 +531,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }.await()
 
     suspend fun undoRestore(): Result<Int> = viewModelScope.async {
+        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再撤销恢复。", "Wait for video import to finish before undoing a restore.")))
         val result = withContext(Dispatchers.IO) {
-            runCatching { store.undoLastRestore(setOfNotNull(draft.audio?.fileName)) }
+            runCatching { store.undoLastRestore(setOfNotNull(draft.audio?.fileName), draft.video) }
         }
         result.onSuccess {
             entries = it
@@ -533,6 +546,56 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     fun openImage(fileName: String): InputStream? = store.openImage(fileName)
 
     fun openAudio(fileName: String): InputStream? = store.openAudio(fileName)
+
+    fun videoDataSource(video: JournalVideo) = videoStore.dataSource(video)
+    internal fun videoEditDraft(entry: JournalEntry): VideoEditDraft? = runCatching { videoStore.editDraft(entry) }
+        .onFailure { dataError = tr("视频编辑草稿暂时无法读取，原文件已保留。", "Unable to read the video edit draft. The original files are preserved.") }.getOrNull()
+    internal suspend fun saveVideoEditDraft(entry: JournalEntry, video: JournalVideo?): Result<Unit> = withContext(Dispatchers.IO) { runCatching { videoStore.saveEdit(entry, video) } }
+    internal suspend fun clearVideoEditDraft(entryId: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { videoStore.clearEdit(entryId) } }
+    fun openVideoCover(name: String): InputStream? = runCatching { videoStore.open(name) }.getOrNull()
+
+    suspend fun importVideo(uri: Uri, progress: (Float) -> Unit): Result<JournalVideo> = withContext(Dispatchers.IO) {
+        runCatching { store.importVideo(uri, progress) }
+    }
+
+    fun releaseVideo(video: JournalVideo) {
+        viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedVideo(video) }
+    }
+
+    private fun releaseVideoAccess(uri: Uri) {
+        runCatching { getApplication<Application>().contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    }
+
+    fun queueDraftVideo(uri: Uri) {
+        if (isDraftVideoSaving) return
+        runCatching { getApplication<Application>().contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        if (!persistDraft(draft.copy(pendingVideoUri = uri.toString()))) return
+        val generation = draftGeneration
+        isDraftVideoSaving = true
+        draftVideoProgress = null
+        viewModelScope.launch {
+            try {
+                importVideo(uri) { progress -> viewModelScope.launch { draftVideoProgress = progress } }
+                    .onSuccess { video ->
+                        val previous = draft.video
+                        if (generation == draftGeneration && persistDraft(draft.copy(video = video, pendingVideoUri = null))) {
+                            previous?.let(::releaseVideo)
+                            releaseVideoAccess(uri)
+                        } else releaseVideo(video)
+                    }.onFailure { error -> dataError = error.message ?: tr("视频导入失败，请重试或移除。", "Video import failed. Retry or remove it.") }
+            } finally { isDraftVideoSaving = false; draftVideoProgress = null }
+        }
+    }
+
+    fun removeDraftVideo() {
+        if (isDraftVideoSaving) return
+        val previous = draft.video
+        val pending = draft.pendingVideoUri
+        if (persistDraft(draft.copy(video = null, pendingVideoUri = null))) {
+            previous?.let(::releaseVideo)
+            pending?.let { releaseVideoAccess(Uri.parse(it)) }
+        }
+    }
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()

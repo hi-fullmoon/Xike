@@ -29,6 +29,7 @@ class JournalDatabaseMigrationTest {
         context.deleteDatabase(TEST_DATABASE)
         context.deleteDatabase(TEST_DATABASE_V2)
         context.deleteDatabase(TEST_DATABASE_V3)
+        context.deleteDatabase(TEST_DATABASE_V4)
     }
 
     @Test
@@ -106,9 +107,22 @@ class JournalDatabaseMigrationTest {
             cursor.getInt(0)
         }
 
+    @Test
+    fun migrationFrom4To5PreservesEntriesAndAudio() {
+        helper.createDatabase(TEST_DATABASE_V4, 4).use { db ->
+            db.execSQL("INSERT INTO journal_entries(id, created_at, mood, note) VALUES('existing-v4', 400, 'CALM', '')")
+            db.execSQL("INSERT INTO journal_audios(entry_id, file_name, duration_millis, mime_type) VALUES('existing-v4', 'existing.m4a', 1000, 'audio/mp4')")
+        }
+        helper.runMigrationsAndValidate(TEST_DATABASE_V4, 5, true, JournalDatabase.MIGRATION_4_5).use { db ->
+            assertEquals(1, db.singleInt("SELECT COUNT(*) FROM journal_entries WHERE video_json IS NULL"))
+            assertEquals(1, db.singleInt("SELECT COUNT(*) FROM journal_audios"))
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE = "xike-migration-v1-v2"
         const val TEST_DATABASE_V2 = "xike-migration-v2-v3"
         const val TEST_DATABASE_V3 = "xike-migration-v3-v4"
+        const val TEST_DATABASE_V4 = "xike-migration-v4-v5"
     }
 }

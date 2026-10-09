@@ -1381,7 +1381,11 @@ internal fun JournalEntryDetailDialog(
                 Text(localizedText("记录"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Text(
                     entry.note.ifBlank {
-                        if (entry.audio != null) localizedText("这一刻还留下了一段声音。") else localizedText("这一刻只留下了一种心情。")
+                        when {
+                            entry.audio != null -> localizedText("这一刻还留下了一段声音。")
+                            entry.video != null -> tr("这一刻还留下了一段视频。", "A video was kept from this moment.")
+                            else -> localizedText("这一刻只留下了一种心情。")
+                        }
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
@@ -1392,6 +1396,7 @@ internal fun JournalEntryDetailDialog(
                     Text(localizedText("这一刻的声音"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     VoicePlaybackCard(audio = audio, openAudio = openAudio)
                 }
+                entry.video?.let { VideoCard(it) }
 
                 if (entry.imageFileNames.isNotEmpty()) {
                     Text(tr("照片 · ${entry.imageFileNames.size} 张", "Photos · ${entry.imageFileNames.size}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -1457,6 +1462,15 @@ private fun JournalEntryEditDialog(
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
     var retainedAudio by remember(entry.id) { mutableStateOf(entry.audio) }
+    val videoServices = LocalVideoServices.current
+    var retainedVideoJson by rememberSaveable(entry.id) {
+        val recovered = videoServices.editDraft(entry)
+        mutableStateOf((if (recovered != null) recovered.video else entry.video)?.toJson()?.toString())
+    }
+    val retainedVideo = retainedVideoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) }
+    var isVideoImporting by remember { mutableStateOf(false) }
+    var videoProgress by remember { mutableStateOf<Float?>(null) }
+    val importedVideos = remember { mutableListOf<JournalVideo>() }
     var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
     val pickerContext = LocalRecordedAtPickerContext.current
     var previewPhoto by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
@@ -1581,19 +1595,27 @@ private fun JournalEntryEditDialog(
         note != entry.note ||
         selectedTags != entry.tags ||
         retainedAudio != entry.audio ||
+        retainedVideo != entry.video ||
         retainedImages != entry.imageFileNames ||
         newImageUriStrings.isNotEmpty()
-    val discardEditor = {
-        pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
-        pendingCameraUriString = null
-        onDismiss()
+    val discardEditor: () -> Unit = {
+        scope.launch {
+            val cleared = if (entry.video != null || retainedVideo != null || importedVideos.isNotEmpty()) videoServices.clearEdit(entry.id) else Result.success(Unit)
+            cleared.onSuccess {
+                importedVideos.forEach(videoServices.release)
+                retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
+                pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
+                pendingCameraUriString = null
+                onDismiss()
+            }.onFailure { saveError = it.message }
+        }
     }
     val dismissEditor = {
         if (hasUnsavedChanges) showDiscardConfirmation = true else discardEditor()
     }
 
     Dialog(
-        onDismissRequest = { if (!isSaving) dismissEditor() },
+        onDismissRequest = { if (!isSaving && !isVideoImporting) dismissEditor() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -1609,16 +1631,16 @@ private fun JournalEntryEditDialog(
                         .padding(horizontal = XikeScreenHorizontalPadding, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(enabled = !isSaving, onClick = dismissEditor) {
+                    IconButton(enabled = !isSaving && !isVideoImporting, onClick = dismissEditor) {
                         Icon(Icons.Outlined.Close, contentDescription = localizedText("取消编辑"))
                     }
                     Spacer(Modifier.width(4.dp))
                     Text(localizedText("编辑这一刻"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                     Button(
-                        enabled = !isSaving,
+                        enabled = !isSaving && !isVideoImporting,
                         shape = XikeShapes.button,
                         onClick = {
-                            if (isSaving) return@Button
+                            if (isSaving || isVideoImporting) return@Button
                             isSaving = true
                             saveError = null
                             val updatedEntry = entry.copy(
@@ -1627,6 +1649,7 @@ private fun JournalEntryEditDialog(
                                 tags = selectedTags,
                                 note = note.trim(),
                                 audio = retainedAudio,
+                                video = retainedVideo,
                                 outdoor = editedOutdoor,
                             )
                             val imagesToRetain = retainedImages.toList()
@@ -1637,6 +1660,9 @@ private fun JournalEntryEditDialog(
                                     imagesToRetain,
                                     imagesToAdd,
                                 ).onSuccess {
+                                    videoServices.clearEdit(entry.id)
+                                    importedVideos.forEach(videoServices.release)
+                                    importedVideos.clear()
                                     Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
                                 }.onFailure { error ->
                                     saveError = error.message ?: localizedText("修改保存失败，请重试。")
@@ -1751,6 +1777,27 @@ private fun JournalEntryEditDialog(
                             onDelete = if (isSaving) null else ({ if (!isSaving) retainedAudio = null }),
                         )
                     }
+                }
+                EditSectionCard(title = tr("视频", "Video"), supporting = tr("最长 5 分钟 · 最大 500 MB · 移除只影响息刻副本", "Up to 5 minutes · 500 MB · Removal only affects the Xike copy")) {
+                    retainedVideo?.let { VideoCard(it, if (isSaving || isVideoImporting) null else ({
+                        scope.launch { videoServices.saveEdit(entry, null).onSuccess { retainedVideoJson = null }.onFailure { saveError = it.message } }
+                    })) }
+                    if (isVideoImporting) VideoImportStatus(videoProgress)
+                    VideoAddButton(enabled = !isSaving && !isVideoImporting, onPicked = { uri ->
+                        isVideoImporting = true
+                        scope.launch {
+                            try {
+                                videoServices.import(uri) { progress -> scope.launch { videoProgress = progress } }
+                                    .onSuccess { video ->
+                                        videoServices.saveEdit(entry, video).onSuccess {
+                                            retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
+                                            importedVideos += video; retainedVideoJson = video.toJson().toString()
+                                        }.onFailure { videoServices.release(video); saveError = it.message }
+                                    }
+                                    .onFailure { saveError = it.message ?: tr("视频导入失败。", "Video import failed.") }
+                            } finally { isVideoImporting = false; videoProgress = null }
+                        }
+                    })
                 }
 
                 EditSectionCard(
@@ -2011,12 +2058,13 @@ private fun DeleteJournalDialog(
                     }
                 }
                 Text(
-                    if (entry.imageFileNames.isEmpty() && entry.audio == null) {
+                    if (entry.imageFileNames.isEmpty() && entry.audio == null && entry.video == null) {
                         localizedText("删除后可在底部提示消失前撤销。请确认这不是误操作。")
                     } else {
                         val attachments = buildList {
                             if (entry.imageFileNames.isNotEmpty()) add(tr("${entry.imageFileNames.size} 张照片", "${entry.imageFileNames.size} photos"))
                             if (entry.audio != null) add(localizedText("1 段语音"))
+                            if (entry.video != null) add(tr("1 段视频", "1 video"))
                         }.joinToString(localizedText("和"))
                         tr("删除后可在底部提示消失前撤销。期限结束后，记录和息刻内保存的${attachments}会一并清理；系统相册中的原图不会受影响。", "You can undo deletion before the message at the bottom disappears. After that, the entry and its ${attachments} in Xike are removed. Originals in the system gallery are unaffected.")
                     },

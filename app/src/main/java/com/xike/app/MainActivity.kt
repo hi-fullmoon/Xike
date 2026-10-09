@@ -120,6 +120,7 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
         )
         setLocalizedContent {
+            PlaybackOutputGuard()
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) { granted ->
@@ -157,7 +158,22 @@ class MainActivity : FragmentActivity() {
                 }
 
                 XikeTheme(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
-                    CompositionLocalProvider(LocalSystemActivityCallbacks provides systemActivityCallbacks) {
+                    CompositionLocalProvider(
+                        LocalSystemActivityCallbacks provides systemActivityCallbacks,
+                        LocalVideoServices provides VideoServices(
+                            import = journalViewModel::importVideo,
+                            release = journalViewModel::releaseVideo,
+                            source = journalViewModel::videoDataSource,
+                            cover = journalViewModel::openVideoCover,
+                            addDraft = journalViewModel::queueDraftVideo,
+                            removeDraft = journalViewModel::removeDraftVideo,
+                            draftSaving = journalViewModel.isDraftVideoSaving,
+                            draftProgress = journalViewModel.draftVideoProgress,
+                            editDraft = journalViewModel::videoEditDraft,
+                            saveEdit = journalViewModel::saveVideoEditDraft,
+                            clearEdit = journalViewModel::clearVideoEditDraft,
+                        ),
+                    ) {
                         XikeApp(
                             entries = journalViewModel.entries,
                             draft = journalViewModel.draft,
@@ -278,6 +294,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onPause() {
+        journalPlayback.pauseActive()
         if (appLockEnabled) {
             // Keep journal content out of the system's recent-apps snapshot without blocking
             // screenshots while the user is actively using the app.
@@ -403,6 +420,7 @@ class MainActivity : FragmentActivity() {
 
     private fun lockNow() {
         if (!appLockEnabled) return
+        journalPlayback.pauseActive()
         lockSession.isAppLocked = true
         window.decorView.post { requestAuthentication(LockAuthentication.UNLOCK) }
     }
@@ -848,6 +866,10 @@ private fun RestoreConfirmationDialog(
                         if (summary.audioCount > 0) tr("、${summary.audioCount} 段语音。", ", and ${summary.audioCount} voice notes.") else localizedText("。"),
                 )
                 Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (summary.videoCount > 0) {
+                    val videoSize = android.text.format.Formatter.formatShortFileSize(LocalContext.current, summary.videoBytes)
+                    Text(tr("${summary.videoCount} 段视频 · $videoSize", "${summary.videoCount} videos · $videoSize"))
+                }
                 Text(
                     tr("当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。", "The $localEntryCount entries on this device will be replaced. An encrypted safety snapshot is created first, allowing one undo."),
                     color = MaterialTheme.colorScheme.error,
@@ -885,7 +907,7 @@ private fun BackupExportDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(localizedText("备份包含全部日记、照片和录音。"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("备份包含全部日记、照片、录音和视频。", "The backup includes all entries, photos, recordings and videos."), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(localizedText("使用密码加密"), style = MaterialTheme.typography.titleSmall)

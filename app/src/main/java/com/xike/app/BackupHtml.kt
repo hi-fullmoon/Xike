@@ -105,9 +105,15 @@ internal object BackupHtml {
                 append(mediaUrl("audios", audio.fileName))
                 append("\">${tr("浏览器无法播放这段录音。", "Your browser cannot play this recording.")}</audio>")
             }
+            entry.video?.let { video ->
+                val url = mediaUrl("videos", video.fileName)
+                append("<video controls preload=\"none\" style=\"width:100%;max-height:480px\" poster=\"")
+                append(mediaUrl("videos", video.coverFileName))
+                append("\" src=\"$url\"></video><a href=\"$url\">${tr("打开视频原文件", "Open original video")}</a>")
+            }
             append("</article></section>")
         }
-        append("<footer>${tr("此页面保存在本地。未加密备份中的文字、照片和录音可被拿到文件的人直接查看。", "This page is stored locally. Anyone with an unencrypted backup can view its text, photos and recordings.")}</footer></main>")
+        append("<footer>${tr("此页面保存在本地。未加密备份中的文字、照片、录音和视频可被拿到文件的人直接查看。", "This page is stored locally. Anyone with an unencrypted backup can view its text, photos, recordings and videos.")}</footer></main>")
         append("""<dialog class="viewer" aria-label="${tr("图片预览", "Photo preview")}"><div class="viewer-bar"><span class="viewer-count" aria-live="polite"></span><button class="viewer-close" autofocus>${tr("关闭", "Close")} ×</button></div><img class="viewer-image" alt=""><p class="viewer-error" role="status" hidden>${tr("图片无法显示，文件可能缺失或浏览器不支持此格式。", "Unable to display this photo. The file may be missing or its format unsupported.")} <a target="_blank" rel="noopener">${tr("打开原文件", "Open original file")}</a></p><div class="viewer-nav"><button class="viewer-prev" aria-label="${tr("上一张", "Previous photo")}">←</button><button class="viewer-next" aria-label="${tr("下一张", "Next photo")}">→</button></div></dialog>""")
         append("""<script nonce="$scriptNonce">
             (() => {
