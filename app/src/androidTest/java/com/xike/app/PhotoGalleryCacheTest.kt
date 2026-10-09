@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -33,6 +34,52 @@ class PhotoGalleryCacheTest {
     @get:Rule val composeRule = createComposeRule()
     private val photos = listOf("moment.png", "archive.png", "insights.png")
     private val assets get() = InstrumentationRegistry.getInstrumentation().context.assets
+
+    @Test
+    fun unavailablePhotoShowsFailureAndRetryLoadsRestoredFile() = checkPhotoRetry(AppLanguage.CHINESE)
+
+    @Test
+    fun unavailablePhotoCanRetryInEnglish() = checkPhotoRetry(AppLanguage.ENGLISH)
+
+    private fun checkPhotoRetry(language: AppLanguage) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val originalLanguage = AppLocale.language
+        val file = File(context.cacheDir, "gallery-retry-${System.nanoTime()}.png")
+        val heldFile = File(context.cacheDir, "${file.name}.held")
+        val loader = GalleryImageLoader.get(context)
+        context.resources.openRawResource(android.R.drawable.ic_menu_crop).use { input ->
+            file.outputStream().use { input.copyTo(it) }
+        }
+        assertTrue(file.renameTo(heldFile))
+        try {
+            composeRule.runOnUiThread { AppLocale.select(context, language) }
+            composeRule.setContent {
+                XikeTheme(AppTheme.OCEAN) {
+                    PhotoGalleryDialog(listOf(file.name), 0, { file.inputStream() }, {})
+                }
+            }
+            composeRule.waitUntil(10_000) {
+                composeRule.onAllNodesWithTag("photo-gallery-error-0").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("photo-gallery-error-0").assertIsDisplayed()
+            composeRule.onNodeWithTag("photo-gallery-pager").captureToImage().asAndroidBitmap().let { bitmap ->
+                File(context.cacheDir, "gallery-retry-error-${language.tag}.png").outputStream().use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+            }
+            assertTrue(heldFile.renameTo(file))
+            composeRule.onNodeWithText(if (language == AppLanguage.CHINESE) "重试" else "Retry").performClick()
+            composeRule.waitUntil(10_000) {
+                loader.memoryCache?.keys?.any { it.key == "gallery:${file.name}" } == true &&
+                    composeRule.onAllNodesWithTag("photo-gallery-error-0").fetchSemanticsNodes().isEmpty() &&
+                    composeRule.onAllNodesWithTag("photo-gallery-placeholder-0").fetchSemanticsNodes().isEmpty()
+            }
+        } finally {
+            file.delete()
+            heldFile.delete()
+            composeRule.runOnUiThread { AppLocale.select(context, originalLanguage) }
+        }
+    }
 
     @Test
     fun highResolutionPhotosStayCachedAfterGarbageCollection() = runBlocking {

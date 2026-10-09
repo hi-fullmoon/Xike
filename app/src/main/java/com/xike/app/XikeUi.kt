@@ -3196,36 +3196,76 @@ internal fun PhotoGalleryDialog(
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val fileName = fileNames[page]
-                    val request = remember(context, fileName) {
+                    var retryAttempt by remember(fileName) { mutableIntStateOf(0) }
+                    val request = remember(context, fileName, retryAttempt) {
                         GalleryImageLoader.request(context, GalleryPhoto(fileName) { currentOpenImage(fileName) })
                     }
                     val placeholder = remember(thumbnailCache, fileName) {
                         thumbnailCache?.get(fileName, 960)?.let { BitmapPainter(it) }
                     }
                     var showLoadingIcon by remember(request) { mutableStateOf(placeholder == null) }
+                    var loadFailed by remember(request) { mutableStateOf(false) }
+                    var isLoading by remember(request) { mutableStateOf(true) }
                     Box(
                         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (showLoadingIcon) {
-                            Icon(
-                                Icons.Outlined.AddPhotoAlternate,
-                                contentDescription = null,
-                                modifier = Modifier.testTag("photo-gallery-placeholder-$page"),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                         AsyncImage(
                             model = request,
                             imageLoader = imageLoader,
                             placeholder = placeholder,
-                            onLoading = { showLoadingIcon = placeholder == null },
-                            onSuccess = { showLoadingIcon = false },
-                            onError = { showLoadingIcon = true },
+                            onLoading = {
+                                showLoadingIcon = placeholder == null
+                                isLoading = true
+                                loadFailed = false
+                            },
+                            onSuccess = {
+                                showLoadingIcon = false
+                                isLoading = false
+                                loadFailed = false
+                            },
+                            onError = {
+                                showLoadingIcon = false
+                                isLoading = false
+                                loadFailed = true
+                            },
                             contentDescription = tr("日记第 ${page + 1} 张照片", "Journal photo ${page + 1}"),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,
                         )
+                        if (showLoadingIcon || (isLoading && retryAttempt > 0)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(Modifier.testTag("photo-gallery-placeholder-$page"))
+                                Text(
+                                    tr("正在加载照片…", "Loading photo…"),
+                                    modifier = Modifier.padding(top = 12.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (loadFailed) {
+                            Surface(
+                                modifier = Modifier.padding(24.dp),
+                                shape = XikeShapes.inner,
+                                color = MaterialTheme.colorScheme.surface,
+                            ) {
+                                Column(
+                                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(XikeInnerCardPadding),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        tr("照片暂时无法加载，请重试。", "Unable to load the photo. Please retry."),
+                                        modifier = Modifier.testTag("photo-gallery-error-$page"),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    TextButton(
+                                        enabled = !isLoading,
+                                        onClick = { retryAttempt++ },
+                                        shape = XikeShapes.button,
+                                    ) { Text(tr("重试", "Retry")) }
+                                }
+                            }
+                        }
                     }
                 }
 

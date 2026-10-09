@@ -1384,6 +1384,7 @@ internal fun JournalEntryDetailDialog(
                         when {
                             entry.audio != null -> localizedText("这一刻还留下了一段声音。")
                             entry.video != null -> tr("这一刻还留下了一段视频。", "A video was kept from this moment.")
+                            entry.imageFileNames.isNotEmpty() -> tr("这一刻还留下了照片。", "Photos were kept from this moment.")
                             else -> localizedText("这一刻只留下了一种心情。")
                         }
                     },
