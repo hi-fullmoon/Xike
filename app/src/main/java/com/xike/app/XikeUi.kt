@@ -68,6 +68,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Bedtime
@@ -75,17 +76,19 @@ import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Commute
+import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Interests
 import androidx.compose.material.icons.outlined.KeyboardHide
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
@@ -96,10 +99,12 @@ import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelfImprovement
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
@@ -3188,7 +3193,7 @@ fun ProfileSettingsScreen(
             SectionTitle(index = tr("偏好", "Preferences"), title = localizedText("语言"))
             Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
                 SettingsAction(
-                    icon = XikeIcons.Settings,
+                    icon = Icons.Outlined.Language,
                     title = localizedText("应用语言"),
                     subtitle = AppLocale.language.nativeName,
                     onClick = { showLanguageDialog = true },
@@ -3243,7 +3248,7 @@ fun ProfileSettingsScreen(
                     if (reminderSettings.enabled) {
                         HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
-                            icon = Icons.Outlined.Timer,
+                            icon = Icons.Outlined.Schedule,
                             title = localizedText("提醒时间"),
                             subtitle = reminderSettings.summary(),
                             onClick = { showReminderDialog = true },
@@ -3269,7 +3274,7 @@ fun ProfileSettingsScreen(
                     }
                     HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     SettingsToggleRow(
-                        icon = XikeIcons.Mark,
+                        icon = Icons.Outlined.Quiz,
                         title = localizedText("每日一问"),
                         subtitle = if (dailyPromptSettings.enabled) {
                             dailyPromptSettings.style.label
@@ -3284,7 +3289,7 @@ fun ProfileSettingsScreen(
                     if (dailyPromptSettings.enabled) {
                         HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
-                            icon = XikeIcons.Mark,
+                            icon = Icons.AutoMirrored.Outlined.MenuBook,
                             title = localizedText("本地问题库"),
                             subtitle = dailyPromptSettings.style.description,
                             onClick = { showPromptStyleDialog = true },
@@ -3343,7 +3348,7 @@ fun ProfileSettingsScreen(
             Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     SettingsAction(
-                        icon = Icons.Outlined.CloudUpload,
+                        icon = Icons.Outlined.FileUpload,
                         title = localizedText("导出日记备份"),
                         subtitle = localizedText("可选密码加密，附离线阅读页"),
                         onClick = onExport,
@@ -3358,7 +3363,7 @@ fun ProfileSettingsScreen(
                     if (canUndoRestore) {
                         HorizontalDivider(modifier = Modifier.padding(start = 70.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SettingsAction(
-                            icon = Icons.Outlined.Restore,
+                            icon = Icons.AutoMirrored.Outlined.Undo,
                             title = localizedText("撤销上次恢复"),
                             subtitle = localizedText("找回恢复前的设备内容，仅可撤销一次"),
                             onClick = onUndoRestore,
@@ -3663,7 +3668,7 @@ private fun AppLockToggleRow(
         Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    Icons.Outlined.Lock,
+                    Icons.Outlined.EnhancedEncryption,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.primary,
