@@ -2124,6 +2124,7 @@ internal fun MomentContentToolbar(
                 Icon(
                     XikeIcons.Add,
                     contentDescription = tr("添加内容", "Add content"),
+                    modifier = Modifier.offset(x = (-8).dp),
                     tint = if (enabled) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 )
