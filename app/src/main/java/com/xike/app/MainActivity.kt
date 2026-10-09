@@ -20,6 +20,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,6 +35,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -1033,22 +1038,27 @@ private fun BackupPasswordDialog(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun ProcessingDialog(message: String) {
-    AlertDialog(
+    BasicAlertDialog(
         onDismissRequest = {},
-        shape = XikeShapes.dialog,
-        text = {
+    ) {
+        Surface(
+            shape = XikeShapes.dialog,
+            color = AlertDialogDefaults.containerColor,
+            contentColor = AlertDialogDefaults.textContentColor,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
+        ) {
             Row(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
                 Spacer(Modifier.width(16.dp))
                 Text(message, style = MaterialTheme.typography.bodyLarge)
             }
-        },
-        confirmButton = {},
-    )
+        }
+    }
 }
 
 @Composable
