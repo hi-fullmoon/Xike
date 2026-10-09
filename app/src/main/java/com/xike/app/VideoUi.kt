@@ -68,7 +68,12 @@ internal data class VideoServices(
 internal val LocalVideoServices = compositionLocalOf { VideoServices() }
 
 @Composable
-internal fun VideoAddButton(enabled: Boolean, onPicked: (Uri) -> Unit, modifier: Modifier = Modifier) {
+internal fun VideoAddButton(
+    enabled: Boolean,
+    onPicked: (Uri) -> Unit,
+    modifier: Modifier = Modifier,
+    content: (@Composable (() -> Unit) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -114,7 +119,10 @@ internal fun VideoAddButton(enabled: Boolean, onPicked: (Uri) -> Unit, modifier:
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) shoot() else failure(IllegalStateException(tr("需要存储权限才能保存拍摄的视频。", "Storage permission is required to save captured videos.")))
     }
-    MomentQuickAction(icon = Icons.Outlined.Videocam, label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = { focus.clearFocus(); keyboard?.hide(); choosing = true })
+    val choose = { focus.clearFocus(); keyboard?.hide(); choosing = true }
+    if (content != null) content(choose) else {
+        MomentQuickAction(icon = Icons.Outlined.Videocam, label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
+    }
     if (choosing) AlertDialog(
         onDismissRequest = { choosing = false }, shape = XikeShapes.dialog,
         title = { Text(tr("添加视频", "Add video")) },

@@ -71,6 +71,7 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -117,6 +118,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -968,6 +972,7 @@ fun AppLockScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MomentScreen(
     padding: PaddingValues,
@@ -1091,6 +1096,8 @@ fun MomentScreen(
         onImagesPicked(uris)
     }
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddContent by rememberSaveable { mutableStateOf(false) }
+    var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
         systemActivityCallbacks.onResult()
@@ -1254,114 +1261,79 @@ fun MomentScreen(
                     Text("02 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(16.dp))
-                BasicTextField(
-                    value = draft.note,
-                    onValueChange = { if (!isSaving) onDraftNoteChange(it) },
-                    enabled = !isSaving,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = localizedText("此刻的注脚") }
-                        .onFocusChanged { isNoteFocused = it.isFocused },
-                    minLines = 2,
-                    maxLines = 5,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    decorationBox = { innerTextField ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
-                            if (draft.note.isEmpty()) {
-                                Text(
-                                    localizedText("这一刻，有什么想留下？"),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                                )
-                            }
-                            innerTextField()
-                        }
-                    },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                if (draft.note.isNotEmpty() || isNoteFocused) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (isNoteFocused) {
-                            TextButton(onClick = dismissKeyboard, shape = XikeShapes.button) {
-                                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                                Spacer(Modifier.width(XikeInlineActionGap))
-                                Text(localizedText("完成"), maxLines = 1)
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(if (isNoteFocused) 4.dp else 12.dp))
-                Text(localizedText("添加内容 · 可选"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(7.dp))
-                val actionTextMeasurer = rememberTextMeasurer()
-                val actionLabelStyle = MaterialTheme.typography.labelLarge
-                val actionLabels = listOf(localizedText("语音"), localizedText("照片"), localizedText("补记"), tr("视频", "Video"))
-                val widestActionWidth = with(LocalDensity.current) {
-                    actionLabels.maxOf { actionTextMeasurer.measure(it, actionLabelStyle, softWrap = false).size.width }.toDp()
-                } + 38.dp
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val useEqualWidths = widestActionWidth <= (maxWidth - 24.dp) / 4
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        MomentQuickAction(
-                            icon = Icons.Outlined.MicNone,
-                            label = actionLabels[0],
-                            enabled = !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
-                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
-                            onClick = beginVoiceCapture,
-                        )
-                        MomentQuickAction(
-                            icon = Icons.Outlined.AddPhotoAlternate,
-                            label = actionLabels[1],
-                            enabled = !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
-                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
-                            onClick = {
-                                dismissKeyboard()
-                                showPhotoSourceDialog = true
-                            },
-                        )
-                        VideoAddButton(
-                            enabled = !isSaving && !videoServices.draftSaving,
-                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
-                            onPicked = videoServices.addDraft,
-                        )
-                        MomentQuickAction(
-                            icon = Icons.Outlined.History,
-                            label = actionLabels[2],
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = XikeShapes.inner,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                ) {
+                    Column(Modifier.padding(horizontal = 14.dp).padding(top = 16.dp, bottom = 4.dp)) {
+                        BasicTextField(
+                            value = draft.note,
+                            onValueChange = { if (!isSaving) onDraftNoteChange(it) },
                             enabled = !isSaving,
-                            modifier = if (useEqualWidths) Modifier.weight(1f) else Modifier,
-                            onClick = {
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics { contentDescription = localizedText("此刻的注脚") }
+                                .onFocusChanged { isNoteFocused = it.isFocused },
+                            minLines = 2,
+                            maxLines = 5,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = FontFamily.SansSerif,
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { innerTextField ->
+                                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp)) {
+                                    if (draft.note.isEmpty()) {
+                                        Text(
+                                            localizedText("这一刻，有什么想留下？"),
+                                            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        if (draft.note.isNotEmpty() || isNoteFocused) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    if (draft.note.isEmpty()) "" else "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (isNoteFocused) {
+                                    TextButton(onClick = dismissKeyboard, shape = XikeShapes.button) {
+                                        Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
+                                        Spacer(Modifier.width(XikeInlineActionGap))
+                                        Text(localizedText("完成"), maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                        MomentContentToolbar(
+                            recordedAt = draft.recordedAt,
+                            enabled = !isSaving,
+                            onAdd = {
                                 dismissKeyboard()
-                                showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
+                                showAddContent = true
+                            },
+                            onChooseTime = {
+                                dismissKeyboard()
+                                if (draft.recordedAt == null) {
+                                    showRecordedAtPicker(pickerContext, null, onDraftRecordedAtChange)
+                                } else {
+                                    showRecordedAtOptions = true
+                                }
                             },
                         )
                     }
-                }
-                if (draft.recordedAt != null) {
-                    Spacer(Modifier.height(8.dp))
-                    RecordedAtSelector(
-                        recordedAt = draft.recordedAt,
-                        enabled = !isSaving,
-                        onChoose = {
-                            dismissKeyboard()
-                            showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
-                        },
-                        onReset = { onDraftRecordedAtChange(null) },
-                    )
-                    Spacer(Modifier.height(16.dp))
                 }
                 DraftSecurityRow(
                     hasDraft = !draft.isEmpty,
@@ -1635,6 +1607,96 @@ fun MomentScreen(
                 openImage = { context.contentResolver.openInputStream(Uri.parse(it)) },
                 onDismiss = { previewUri = null },
             )
+        }
+    }
+
+    if (showRecordedAtOptions) {
+        AlertDialog(
+            onDismissRequest = { showRecordedAtOptions = false },
+            shape = XikeShapes.dialog,
+            title = { Text(localizedText("记录时间")) },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        onClick = {
+                            showRecordedAtOptions = false
+                            showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
+                        },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = XikeShapes.button,
+                    ) { Text(tr("修改日期时间", "Change date and time")) }
+                    TextButton(
+                        onClick = {
+                            showRecordedAtOptions = false
+                            onDraftRecordedAtChange(null)
+                        },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = XikeShapes.button,
+                    ) { Text(localizedText("改为现在")) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRecordedAtOptions = false }, shape = XikeShapes.button) {
+                    Text(localizedText("取消"))
+                }
+            },
+        )
+    }
+
+    // Keep the video launcher and source dialog composed after the sheet closes.
+    VideoAddButton(
+        enabled = !isSaving && !videoServices.draftSaving,
+        onPicked = videoServices.addDraft,
+    ) { chooseVideo ->
+        if (showAddContent) {
+            ModalBottomSheet(
+                onDismissRequest = { showAddContent = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                sheetMaxWidth = XikeContentMaxWidth,
+                shape = XikeShapes.sheet,
+                containerColor = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp).padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        tr("添加内容", "Add content"),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    )
+                    MomentMediaAction(
+                        Icons.Outlined.MicNone, tr("录音", "Record audio"),
+                        !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
+                    ) {
+                        showAddContent = false
+                        beginVoiceCapture()
+                    }
+                    MomentMediaAction(
+                        Icons.Outlined.AddPhotoAlternate, localizedText("照片"),
+                        !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
+                    ) {
+                        showAddContent = false
+                        showPhotoSourceDialog = true
+                    }
+                    MomentMediaAction(
+                        Icons.Outlined.Videocam, tr("视频", "Video"),
+                        !isSaving && !videoServices.draftSaving,
+                    ) {
+                        showAddContent = false
+                        chooseVideo()
+                    }
+                }
+            }
         }
     }
 
@@ -2032,59 +2094,69 @@ private fun DraftSecurityRow(
 }
 
 @Composable
-private fun RecordedAtSelector(
+internal fun MomentContentToolbar(
     recordedAt: Long?,
     enabled: Boolean,
-    onChoose: () -> Unit,
-    onReset: () -> Unit,
+    onAdd: () -> Unit,
+    onChooseTime: () -> Unit,
 ) {
-    Text(localizedText("记录时间"), style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
-    Surface(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onChoose),
-        shape = XikeShapes.inner,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(XikeInnerCardPadding),
-            verticalAlignment = Alignment.CenterVertically,
+        TextButton(
+            onClick = onAdd,
+            enabled = enabled,
+            shape = XikeShapes.button,
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
         ) {
-            Icon(
-                Icons.Outlined.CalendarMonth,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary,
+            Text(
+                tr("添加内容", "Add content"),
+                style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal),
             )
-            Spacer(Modifier.width(11.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    recordedAt?.asDraftMomentLabel() ?: localizedText("就在此刻"),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    if (recordedAt == null) localizedText("保存时使用当前时间 · 点按可补记") else localizedText("将归入所选日期 · 点按可修改"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+        TextButton(
+            onClick = onChooseTime,
+            enabled = enabled,
+            shape = XikeShapes.button,
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        ) {
+            Text(
+                if (recordedAt == null) tr("今天 · 修改时间", "Today · Change time") else {
+                    val moment = Instant.ofEpochMilli(recordedAt).atZone(ZoneId.systemDefault())
+                    val pattern = if (moment.year == LocalDate.now().year) {
+                        tr("M月d日 HH:mm", "MMM d, HH:mm")
+                    } else {
+                        tr("yyyy年M月d日 HH:mm", "MMM d, yyyy HH:mm")
+                    }
+                    DateTimeFormatter.ofPattern(pattern, AppLocale.locale).format(moment) + tr(" · 补记", " · Backdated")
+                },
+                style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal),
             )
         }
     }
-    if (recordedAt != null) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                localizedText("补记也会参与对应日期的回望与轨迹"),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = onReset, enabled = enabled, shape = XikeShapes.button) { Text(localizedText("改为现在")) }
-        }
+}
+
+@Composable
+private fun MomentMediaAction(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = XikeShapes.inner,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f),
+        ),
+    ) {
+        Icon(icon, null, Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif))
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -2130,20 +2202,6 @@ internal fun showRecordedAtPicker(
     }
     dialog.showWithXikeShape()
     return dialog
-}
-
-private fun Long.asDraftMomentLabel(zoneId: ZoneId = ZoneId.systemDefault()): String {
-    val moment = Instant.ofEpochMilli(this).atZone(zoneId)
-    val today = LocalDate.now(zoneId)
-    val dateLabel = when (moment.toLocalDate()) {
-        today -> localizedText("今天")
-        today.minusDays(1) -> localizedText("昨天")
-        else -> DateTimeFormatter.ofPattern(
-            if (moment.year == today.year) tr("M月d日 EEEE", "EEEE, MMM d") else tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"),
-            AppLocale.locale,
-        ).format(moment)
-    }
-    return "$dateLabel ${DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale).format(moment)}"
 }
 
 @Composable
