@@ -5,11 +5,19 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.SystemClock
+import android.view.KeyEvent
+import android.view.Window
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,14 +30,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,13 +65,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -174,36 +196,118 @@ internal fun VoiceCaptureSheet(
     onRecorded: (File, Long) -> Unit,
     onClosed: () -> Unit,
 ) {
-    var finishRequest by remember { mutableIntStateOf(0) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val recorder = remember { XikeAudioRecorder(context.applicationContext) }
+    var isClosed by remember { mutableStateOf(false) }
+    fun closeCapture() {
+        if (isClosed) return
+        isClosed = true
+        recorder.cancel()
+        onClosed()
+    }
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { value ->
             if (value == SheetValue.Hidden) {
-                finishRequest++
+                closeCapture()
                 false
             } else true
         },
     )
     ModalBottomSheet(
-        onDismissRequest = { finishRequest++ },
+        onDismissRequest = { closeCapture() },
         sheetState = sheetState,
         sheetMaxWidth = XikeContentMaxWidth,
         shape = XikeShapes.sheet,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
+        VoiceCaptureDismissHandler { closeCapture() }
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp),
         ) {
             Text(localizedText("录下这一刻"), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 localizedText("录音结束后将加密保存"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
-            VoiceCaptureCard(enabled, onRecorded, onClosed, finishRequest)
+            Spacer(Modifier.height(16.dp))
+            VoiceCaptureCard(enabled, onRecorded, { closeCapture() }, recorder, { isClosed })
+        }
+    }
+}
+
+@Composable
+private fun VoiceCaptureDismissHandler(onDismiss: () -> Unit) {
+    val view = LocalView.current
+    val dismiss by rememberUpdatedState(onDismiss)
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        val original = window?.callback
+        if (window == null || original == null) return@DisposableEffect onDispose {}
+        val callback = object : Window.Callback by original {
+            override fun onWindowFocusChanged(hasFocus: Boolean) {
+                if (!hasFocus) dismiss()
+                original.onWindowFocusChanged(hasFocus)
+            }
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    dismiss()
+                    return true
+                }
+                return original.dispatchKeyEvent(event)
+            }
+        }
+        window.callback = callback
+        val backCallback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            OnBackInvokedCallback { dismiss() }.also {
+                window.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, it)
+            }
+        } else null
+        onDispose {
+            if (window.callback === callback) window.callback = original
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && backCallback != null) {
+                window.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(backCallback)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceCaptureLayout(content: @Composable (androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.Dp) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val density = LocalDensity.current
+        val textMeasurer = rememberTextMeasurer(cacheSize = 16)
+        val typography = MaterialTheme.typography
+        fun textHeight(text: String, style: TextStyle, width: Int): Int =
+            textMeasurer.measure(text, style, constraints = Constraints(maxWidth = width.coerceAtLeast(1))).size.height
+        val panelWidth = with(density) { (maxWidth - 32.dp).roundToPx() }
+        val timerWidth = textMeasurer.measure("5:00", typography.titleLarge.copy(fontFamily = FontFamily.Monospace)).size.width
+        val statusWidth = panelWidth - timerWidth - with(density) { 28.dp.roundToPx() }
+        val recordingHeight = maxOf(
+            textHeight(localizedText("正在录音"), typography.labelMedium, statusWidth),
+            textHeight("5:00", typography.titleLarge.copy(fontFamily = FontFamily.Monospace), panelWidth),
+        ) + with(density) { 72.dp.roundToPx() } + maxOf(
+            textHeight(tr("松手完成，上滑取消", "Release to finish · Slide up to cancel"), typography.labelMedium, panelWidth),
+            textHeight(tr("松开取消", "Release to cancel"), typography.labelMedium, panelWidth),
+        )
+        val idleHeight = with(density) { 68.dp.roundToPx() } +
+            textHeight(tr("按住下方按钮开始录音", "Hold the button below to record"), typography.bodyMedium, panelWidth) +
+            textHeight(tr("最长 5 分钟", "Up to 5 minutes"), typography.labelSmall, panelWidth)
+        val panelHeight = with(density) { maxOf(164.dp.roundToPx(), maxOf(idleHeight, recordingHeight) + 24.dp.roundToPx()).toDp() }
+        val buttonTextWidth = with(density) { (maxWidth - 52.dp - XikeInlineActionGap).roundToPx() }
+        val buttonHeight = with(density) {
+            maxOf(56.dp.roundToPx(), listOf(
+                tr("按住说话", "Hold to record"), tr("松手完成", "Release to finish"), tr("松开取消", "Release to cancel"),
+            ).maxOf { textHeight(it, typography.labelLarge, buttonTextWidth) } + 24.dp.roundToPx()).toDp()
+        }
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            content(panelHeight, buttonHeight)
         }
     }
 }
@@ -213,32 +317,49 @@ internal fun VoiceCaptureCard(
     enabled: Boolean,
     onRecorded: (File, Long) -> Unit,
     onClosed: () -> Unit,
-    finishRequest: Int = 0,
+    recorder: XikeAudioRecorder,
+    isClosed: () -> Boolean,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val recorder = remember { XikeAudioRecorder(context.applicationContext) }
     var isRecording by remember { mutableStateOf(false) }
-    var isPaused by remember { mutableStateOf(false) }
     var isStopping by remember { mutableStateOf(false) }
     var startedAt by remember { mutableLongStateOf(0L) }
-    var pausedAt by remember { mutableLongStateOf(0L) }
-    var totalPaused by remember { mutableLongStateOf(0L) }
     var elapsedMillis by remember { mutableLongStateOf(0L) }
     var waveform by remember { mutableStateOf(VoiceWaveformTimeline()) }
     var waveformOffset by remember { mutableFloatStateOf(0f) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var limitReached by remember { mutableLongStateOf(0L) }
+    var cancelRequested by remember { mutableStateOf(false) }
+    var cancelBounds by remember { mutableStateOf(Rect.Zero) }
+    var buttonOrigin by remember { mutableStateOf(Offset.Zero) }
+
+    fun cancelRecording() {
+        recorder.cancel()
+        isRecording = false
+        cancelRequested = false
+        elapsedMillis = 0L
+        waveform = VoiceWaveformTimeline()
+        waveformOffset = 0f
+    }
 
     fun currentDuration(): Long {
         val now = SystemClock.elapsedRealtime()
-        val activePause = if (isPaused) now - pausedAt else 0L
-        return (now - startedAt - totalPaused - activePause)
+        return (now - startedAt)
             .coerceIn(0L, MAX_AUDIO_DURATION_MILLIS)
     }
 
     fun finishRecording() {
+        if (isClosed() || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            cancelRecording()
+            onClosed()
+            return
+        }
         if (!isRecording || isStopping) return
+        if (cancelRequested) {
+            cancelRecording()
+            onClosed()
+            return
+        }
         isStopping = true
         val duration = currentDuration().coerceAtLeast(1L)
         elapsedMillis = duration
@@ -262,37 +383,26 @@ internal fun VoiceCaptureCard(
     }
 
     fun beginRecording() {
-        if (!enabled || isRecording || isStopping) return
+        if (!enabled || isRecording || isStopping || isClosed() ||
+            !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        ) return
         errorMessage = null
         runCatching {
             recorder.start { limitReached = SystemClock.elapsedRealtime() }
         }.onSuccess {
             startedAt = SystemClock.elapsedRealtime()
-            pausedAt = 0L
-            totalPaused = 0L
             elapsedMillis = 0L
             waveform = VoiceWaveformTimeline()
             waveformOffset = 0f
             limitReached = 0L
-            isPaused = false
             isRecording = true
         }.onFailure { error ->
             errorMessage = error.message ?: localizedText("无法开始录音，请检查麦克风。")
         }
     }
 
-    LaunchedEffect(Unit) {
-        beginRecording()
-    }
-
-    LaunchedEffect(finishRequest) {
-        if (finishRequest > 0) {
-            if (isRecording) finishRecording() else onClosed()
-        }
-    }
-
-    LaunchedEffect(isRecording, isPaused) {
-        while (isRecording && !isPaused) {
+    LaunchedEffect(isRecording) {
+        while (isRecording) {
             val duration = currentDuration()
             elapsedMillis = duration
             if (waveform.isSampleDue(duration)) {
@@ -306,8 +416,8 @@ internal fun VoiceCaptureCard(
         }
     }
 
-    LaunchedEffect(isRecording, isPaused) {
-        while (isRecording && !isPaused) {
+    LaunchedEffect(isRecording) {
+        while (isRecording) {
             withFrameNanos {
                 waveformOffset = waveform.offset(currentDuration())
             }
@@ -319,11 +429,12 @@ internal fun VoiceCaptureCard(
     }
 
     val finishWhenBackgrounded by rememberUpdatedState {
-        if (isRecording && !isStopping) finishRecording()
+        cancelRecording()
+        onClosed()
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) finishWhenBackgrounded()
+            if (event == Lifecycle.Event.ON_PAUSE) finishWhenBackgrounded()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
@@ -337,128 +448,165 @@ internal fun VoiceCaptureCard(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(
-            modifier = Modifier.padding(XikeCardPadding),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .background(
-                            if (isPaused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
-                            CircleShape,
-                        ),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    when {
-                        isStopping -> localizedText("正在结束录音")
-                        isPaused -> localizedText("录音已暂停")
-                        isRecording -> localizedText("正在录音")
-                        else -> localizedText("录音未开始")
-                    },
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    formatAudioDuration(MAX_AUDIO_DURATION_MILLIS),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Text(
-                formatAudioDuration(elapsedMillis),
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
+        VoiceCaptureLayout { panelHeight, buttonHeight ->
             Surface(
+                modifier = Modifier.fillMaxWidth().onGloballyPositioned { cancelBounds = it.boundsInRoot() },
                 shape = XikeShapes.inner,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                color = when {
+                    cancelRequested -> MaterialTheme.colorScheme.errorContainer
+                    isRecording -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f)
+                    else -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
+                },
             ) {
-                Column(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
-                    VoiceWaveform(waveform.values) { waveformOffset }
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(panelHeight).padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isRecording) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.error, CircleShape))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    localizedText("正在录音"),
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    formatAudioDuration(elapsedMillis),
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace),
+                                )
+                            }
+                            VoiceWaveform(waveform.values) { waveformOffset }
+                            Text(
+                                if (cancelRequested) tr("松开取消", "Release to cancel")
+                                else tr("松手完成，上滑取消", "Release to finish · Slide up to cancel"),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (cancelRequested) MaterialTheme.colorScheme.onErrorContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(52.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Outlined.MicNone,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(26.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            Text(
+                                tr("按住下方按钮开始录音", "Hold the button below to record"),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                tr("最长 5 分钟", "Up to 5 minutes"),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
-            Text(
-                localizedText("最长 5 分钟 · 离开应用时自动结束"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
             errorMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    enabled = !isStopping,
-                    modifier = Modifier.weight(1f),
-                    shape = XikeShapes.button,
-                    onClick = {
-                        recorder.cancel()
-                        isRecording = false
-                        onClosed()
-                    },
-                ) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = null,
-                        modifier = Modifier.xikeInlineActionIcon(),
-                    )
-                    Spacer(Modifier.width(XikeInlineActionGap))
-                    Text(localizedText("取消"), maxLines = 1)
-                }
-                OutlinedButton(
-                    enabled = isRecording && !isStopping,
-                    modifier = Modifier.weight(1f),
-                    shape = XikeShapes.button,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    onClick = {
-                        runCatching {
-                            if (isPaused) {
-                                recorder.resume()
-                                totalPaused += SystemClock.elapsedRealtime() - pausedAt
-                                pausedAt = 0L
-                                isPaused = false
-                            } else {
-                                recorder.pause()
-                                pausedAt = SystemClock.elapsedRealtime()
-                                isPaused = true
+            val beginHeldRecording by rememberUpdatedState { beginRecording() }
+            val finishHeldRecording by rememberUpdatedState { finishRecording() }
+            val cancelHeldRecording by rememberUpdatedState { cancelRecording() }
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(buttonHeight)
+                    .onGloballyPositioned { buttonOrigin = it.positionInRoot() }
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        contentDescription = tr("长按录音，上滑取消，松手完成", "Hold to record, slide up to cancel, release to finish")
+                        stateDescription = if (isRecording) localizedText("正在录音") else localizedText("录音未开始")
+                        if (!enabled || isStopping) disabled()
+                        onClick(label = if (isRecording) localizedText("结束录音") else localizedText("开始录音")) {
+                            if (!enabled || isStopping) false else {
+                                if (isRecording) finishRecording() else beginRecording()
+                                true
                             }
-                        }.onFailure { errorMessage = localizedText("暂时无法切换录音状态。") }
+                        }
+                        onLongClick(label = localizedText("开始录音")) {
+                            if (!enabled || isRecording || isStopping) false else { beginRecording(); true }
+                        }
+                        customActions = if (isRecording && !isStopping) listOf(
+                            CustomAccessibilityAction(localizedText("取消")) { cancelRecording(); onClosed(); true },
+                        ) else emptyList()
+                    }
+                    .pointerInput(enabled) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            if (!enabled) return@awaitEachGesture
+                            val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                            held.consume()
+                            beginHeldRecording()
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == held.id }
+                                    if (change == null || change.isConsumed) {
+                                        cancelHeldRecording()
+                                        break
+                                    }
+                                    val position = buttonOrigin + change.position
+                                    cancelRequested = position.y < cancelBounds.bottom - 24.dp.toPx()
+                                    change.consume()
+                                    if (!change.pressed) {
+                                        finishHeldRecording()
+                                        break
+                                    }
+                                }
+                            } finally {
+                                cancelHeldRecording()
+                            }
+                        }
                     },
-                ) {
-                    Icon(
-                        if (isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
-                        contentDescription = null,
-                        modifier = Modifier.xikeInlineActionIcon(),
-                    )
-                    Spacer(Modifier.width(XikeInlineActionGap))
-                    Text(if (isPaused) localizedText("继续") else localizedText("暂停"), maxLines = 1)
-                }
-            }
-            Button(
-                enabled = enabled && !isStopping,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = XikeShapes.button,
-                elevation = xikeButtonElevation(),
-                onClick = { if (isRecording) finishRecording() else beginRecording() },
+                color = if (cancelRequested) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                contentColor = if (cancelRequested) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
             ) {
-                Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                    if (isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(
-                        if (isRecording) Icons.Outlined.StopCircle else Icons.Outlined.MicNone,
-                        contentDescription = null,
-                        modifier = Modifier.xikeInlineActionIcon(),
-                    )
+                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                        if (isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        else Icon(
+                            Icons.Outlined.MicNone,
+                            contentDescription = null,
+                            modifier = Modifier.xikeInlineActionIcon(),
+                        )
+                    }
+                    Spacer(Modifier.width(XikeInlineActionGap))
+                    Text(when {
+                        cancelRequested -> tr("松开取消", "Release to cancel")
+                        isRecording -> tr("松手完成", "Release to finish")
+                        else -> tr("按住说话", "Hold to record")
+                    }, modifier = Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelLarge)
                 }
-                Spacer(Modifier.width(XikeInlineActionGap))
-                Text(if (isRecording) localizedText("结束录音") else localizedText("开始录音"), maxLines = 1)
             }
         }
     }
