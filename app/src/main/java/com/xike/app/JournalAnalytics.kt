@@ -4,10 +4,8 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
-import java.util.Locale
 
 data class DailyMoodSummary(
     val date: LocalDate,
@@ -63,6 +61,8 @@ data class TagTrendItem(
     val ratio: Double,
     val averageScore: Double?,
     val entryIds: List<String>,
+    val recordedDayCount: Int = 0,
+    val moodCounts: Map<Mood, Int> = emptyMap(),
 ) {
     val countDelta: Int
         get() = entryCount - previousEntryCount
@@ -153,6 +153,8 @@ data class JournalPeriodSummary(
     val evidence: InsightEvidence,
     val comparison: PeriodComparison,
     val entryIds: List<String>,
+    val reviewDays: List<MoodTrendPoint> = emptyList(),
+    val previousMoodCounts: Map<Mood, Int> = emptyMap(),
 ) {
     val averageEntriesPerRecordedDay: Double?
         get() = if (recordedDayCount == 0) null else entryCount.toDouble() / recordedDayCount
@@ -225,6 +227,9 @@ fun journalPeriodSummary(
                 ratio = count.toDouble() / journals.size.coerceAtLeast(1),
                 averageScore = taggedEntries.moodAverage(),
                 entryIds = taggedEntries.map(JournalEntry::id),
+                recordedDayCount = periodEntries.filter { it.entry.tags.containsTopic(tag) }
+                    .map(DatedJournalEntry::date).distinct().size,
+                moodCounts = taggedEntries.groupingBy(JournalEntry::mood).eachCount(),
             )
         }
     val weekdayInsight = periodEntries.dayTypeInsight(
@@ -273,6 +278,12 @@ fun journalPeriodSummary(
             currentAverageScore = journals.moodAverage(),
         ),
         entryIds = journals.map(JournalEntry::id),
+        reviewDays = periodEntries.groupBy(DatedJournalEntry::date).toSortedMap().map { (date, dated) ->
+            val dayEntries = dated.map(DatedJournalEntry::entry)
+            MoodTrendPoint(date, date.plusDays(1), date.toString(), dayEntries.size,
+                dayEntries.moodAverage(), dayEntries.sortedWith(compareBy<JournalEntry> { it.createdAt }.thenBy { it.id }).map(JournalEntry::id))
+        },
+        previousMoodCounts = previousJournals.groupingBy(JournalEntry::mood).eachCount(),
     )
 }
 
@@ -301,32 +312,6 @@ fun weeklyJournalSummary(
 internal fun entriesWithIds(entries: List<JournalEntry>, entryIds: Collection<String>): List<JournalEntry> {
     val ids = entryIds.toSet()
     return entries.filter { it.id in ids }.sortedByDescending(JournalEntry::createdAt)
-}
-
-internal fun localReviewText(summary: JournalPeriodSummary): String {
-    val dateFormatter = DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
-    val moodLine = summary.moodDistribution
-        .filter { it.entryCount > 0 }
-        .sortedByDescending(MoodDistributionItem::entryCount)
-        .joinToString("、") { tr("${it.mood.label} ${it.entryCount} 次", "${it.mood.label} ${it.entryCount} entries") }
-        .ifBlank { localizedText("暂无心情分布") }
-    val tagLine = summary.topTags.take(3)
-        .joinToString("、") { tr("${it.tag} ${it.entryCount} 次", "${localizedText(it.tag)} ${it.entryCount} entries") }
-        .ifBlank { localizedText("暂无主题") }
-    val comparisonLine = if (summary.comparison.hasEnoughSamples) {
-        tr("相比前一周期，记录次数${summary.comparison.entryCountDelta.signedCount()}，记录天数${summary.comparison.recordedDayDelta.signedCount()}。", "Compared with the previous period, entries ${summary.comparison.entryCountDelta.signedCount()} and days recorded ${summary.comparison.recordedDayDelta.signedCount()}.")
-    } else {
-        tr("当前或前一周期样本少于 $MIN_COMPARISON_ENTRIES 条，因此不解读周期变化。", "The current or previous period has fewer than $MIN_COMPARISON_ENTRIES entries, so changes are not interpreted.")
-    }
-    return buildString {
-        appendLine(tr("息刻 · ${summary.period.contextName}本地回顾", "Xike · Local review: ${summary.period.contextName}"))
-        appendLine("${summary.startDate.format(dateFormatter)} — ${summary.endDate.format(dateFormatter)}")
-        appendLine(tr("记录 ${summary.entryCount} 次，分布在 ${summary.recordedDayCount} 天。", "${summary.entryCount} entries across ${summary.recordedDayCount} days."))
-        appendLine(tr("心情分布：$moodLine。", "Mood distribution: $moodLine."))
-        appendLine(tr("常见主题：$tagLine。", "Common topics: $tagLine."))
-        appendLine(comparisonLine)
-        append(localizedText("这些是本机记录的描述性统计，不代表原因、诊断或建议。"))
-    }
 }
 
 private fun InsightsPeriod.bounds(today: LocalDate): PeriodBounds {
@@ -447,12 +432,6 @@ private fun LocalDate.weekdayLabel(): String = when (dayOfWeek) {
     DayOfWeek.FRIDAY -> localizedText("五")
     DayOfWeek.SATURDAY -> localizedText("六")
     DayOfWeek.SUNDAY -> localizedText("日")
-}
-
-private fun Int.signedCount(): String = when {
-    this > 0 -> tr("增加 $this", "increased by $this")
-    this < 0 -> tr("减少 ${-this}", "decreased by ${-this}")
-    else -> localizedText("相同")
 }
 
 fun entriesOnDate(

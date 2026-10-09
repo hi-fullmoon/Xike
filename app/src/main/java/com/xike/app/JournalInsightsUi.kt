@@ -3,8 +3,10 @@ package com.xike.app
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -103,6 +105,7 @@ fun JournalInsightsScreen(
     }
     var drilldown by remember { mutableStateOf<InsightDrilldown?>(null) }
     var showReview by rememberSaveable { mutableStateOf(false) }
+    val reviewScrollState = rememberSaveable(showReview, saver = ScrollState.Saver) { ScrollState(0) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -218,9 +221,13 @@ fun JournalInsightsScreen(
         )
     }
 
-    if (showReview) {
+    if (showReview && drilldown == null) {
         LocalReviewDialog(
-            reviewText = localReviewText(summary),
+            review = localJournalReview(summary),
+            scrollState = reviewScrollState,
+            onOpenSource = { source ->
+                drilldown = InsightDrilldown(source.label, tr("本地回顾引用的原始记录", "Original entries referenced by the local review"), source.entryIds)
+            },
             onDismiss = { showReview = false },
         )
     }
@@ -842,7 +849,7 @@ private fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () -> 
             }
             Spacer(Modifier.height(13.dp))
             Text(
-                localizedText("把计数、分布和样本限制整理成一段克制的文字，留给你自己回看。"),
+                tr("整理心情变化、常见主题和值得回看的片段，形成一份有记录依据的回顾。", "Review mood changes, recurring topics and moments worth revisiting, grounded in your entries."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
             )
@@ -979,15 +986,34 @@ private fun InsightsPeriodSelector(selected: InsightsPeriod, onSelected: (Insigh
 }
 
 @Composable
-private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
+private fun LocalReviewDialog(review: LocalJournalReview, scrollState: ScrollState, onOpenSource: (ReviewSource) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = XikeShapes.dialog,
         title = { Text(localizedText("本地回顾")) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(reviewText, style = MaterialTheme.typography.bodyMedium)
+            Column(modifier = Modifier.verticalScroll(scrollState).testTag("local-review-scroll"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(review.title, style = MaterialTheme.typography.titleSmall)
+                Text(review.dateRange, style = MaterialTheme.typography.bodySmall)
+                review.sections.forEach { section ->
+                    Text(section.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(section.text, style = MaterialTheme.typography.bodyMedium)
+                    section.sources.forEach { source ->
+                        Box(
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.Button,
+                                    onClick = { onOpenSource(source) },
+                                ),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Text(source.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
                 Text(
                     localizedText("分享会把以上文字交给你下一步选择的应用。息刻不会自动上传。"),
                     style = MaterialTheme.typography.bodySmall,
@@ -1000,7 +1026,7 @@ private fun LocalReviewDialog(reviewText: String, onDismiss: () -> Unit) {
                 onClick = {
                     val shareIntent = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
-                        .putExtra(Intent.EXTRA_TEXT, reviewText)
+                        .putExtra(Intent.EXTRA_TEXT, review.text)
                     context.startActivity(Intent.createChooser(shareIntent, localizedText("分享息刻回顾")))
                 },
                 shape = XikeShapes.button,

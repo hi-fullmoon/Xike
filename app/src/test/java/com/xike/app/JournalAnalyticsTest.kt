@@ -122,6 +122,13 @@ class JournalAnalyticsTest {
         assertEquals(10, summary.weekendInsight.elapsedDayCount)
         assertEquals(0.2, summary.weekendInsight.coverageRatio, 0.0)
         assertEquals(InsightEvidenceLevel.DEVELOPING, summary.evidence.level)
+        assertEquals(3, summary.reviewDays.size)
+        assertEquals(4.0, summary.reviewDays.last().averageScore!!, 0.0)
+        assertEquals(2, summary.topTags.single { it.tag == "工作" }.recordedDayCount)
+        val review = localJournalReview(summary)
+        assertTrue(review.text.contains("没有单一最常见的心情"))
+        val sources = review.sections.flatMap { it.sources }.flatMap { it.entryIds }
+        assertTrue(sources.all { id -> entries.any { it.id == id } })
     }
 
     @Test
@@ -145,6 +152,8 @@ class JournalAnalyticsTest {
         assertEquals(listOf("current-first", "current-second"), relationships.entryIds)
         assertEquals(2.5, relationships.averageScore!!, 0.01)
         assertEquals("关系", summary.mostUsedTag)
+        assertEquals(2, relationships.recordedDayCount)
+        assertEquals(mapOf(Mood.GOOD to 1, Mood.LOW to 1), relationships.moodCounts)
     }
 
     @Test
@@ -188,6 +197,9 @@ class JournalAnalyticsTest {
 
         assertEquals(InsightEvidenceLevel.NONE, empty.evidence.level)
         assertEquals(0.0, empty.evidence.coverageRatio, 0.0)
+        val emptyReview = localJournalReview(empty)
+        assertTrue(emptyReview.sections.all { it.sources.isEmpty() })
+        assertFalse(emptyReview.text.contains("最常出现"))
         assertEquals(InsightEvidenceLevel.LIMITED, single.evidence.level)
         assertFalse(single.evidence.canDescribePatterns)
         assertFalse(single.comparison.hasEnoughSamples)
@@ -270,6 +282,10 @@ class JournalAnalyticsTest {
 
         assertTrue(review.contains("样本少于 3 条"))
         assertTrue(review.contains("不代表原因、诊断或建议"))
+        assertTrue(review.contains("目前不判断时间趋势"))
+        assertFalse(review.contains("值得回看的片段"))
+        val sources = localJournalReview(summary).sections.flatMap { it.sources }.flatMap { it.entryIds }
+        assertTrue(sources.all { it in summary.entryIds })
     }
 
     @Test

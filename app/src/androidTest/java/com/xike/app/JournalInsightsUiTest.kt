@@ -130,7 +130,9 @@ class JournalInsightsUiTest {
         composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("查看本地回顾"))
         composeRule.onNodeWithText("查看本地回顾").performClick()
         composeRule.onNodeWithText("本地回顾").assertIsDisplayed()
+        composeRule.onNodeWithText("不代表原因、诊断或建议", substring = true).performScrollTo()
         composeRule.onNodeWithText("不代表原因、诊断或建议", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("息刻不会自动上传", substring = true).performScrollTo()
         composeRule.onNodeWithText("息刻不会自动上传", substring = true).assertIsDisplayed()
     }
 
