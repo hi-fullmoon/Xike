@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -170,10 +171,14 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                 }
                 Surface(Modifier.align(Alignment.BottomEnd).padding(8.dp), shape = XikeShapes.inner,
                     color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White) {
-                    Text(videoTime(video.durationMillis), Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    Text(
+                        videoTime(video.durationMillis),
+                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    )
                 }
             }
-            if (onRemove != null) TextButton(onClick = onRemove, modifier = Modifier.align(Alignment.End)) { Text(tr("移除视频", "Remove video")) }
+            if (onRemove != null) TextButton(onClick = onRemove, modifier = Modifier.align(Alignment.End), shape = XikeShapes.button) { Text(tr("移除视频", "Remove video")) }
         }
     }
     if (playing && !previewOnly) VideoPlayerDialog(video) { playing = false }
@@ -182,7 +187,11 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
 @Composable
 internal fun VideoImportStatus(progress: Float?) {
     Column(Modifier.fillMaxWidth()) {
-        Text(tr("正在加密导入视频，请稍候", "Encrypting and importing video, please wait"))
+        Text(
+            tr("正在加密导入视频，请稍候", "Encrypting and importing video, please wait"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (progress == null) LinearProgressIndicator(Modifier.fillMaxWidth())
         else LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
     }

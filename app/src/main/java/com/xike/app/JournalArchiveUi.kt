@@ -1190,7 +1190,7 @@ private fun ArchiveResultStatus(
             Column(Modifier.weight(1f)) {
                 Text(
                     selectedDate?.let { tr("${it.asShortChineseDate()}的记录", "Entries for ${it.asShortChineseDate()}") } ?: localizedText("最近的片段"),
-                    style = XikeSectionTitleStyle.copy(fontSize = 21.sp, lineHeight = 29.sp),
+                    style = XikeSectionTitleStyle,
                 )
                 Text(
                     if (selectedDate == null) localizedText("按时间从近到远") else localizedText("只看这一天留下的片段"),
@@ -1308,8 +1308,8 @@ internal fun JournalEntryDetailDialog(
                     .widthIn(max = XikeContentMaxWidth)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = XikeScreenVerticalPadding),
+                verticalArrangement = Arrangement.spacedBy(XikeContentGap),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(localizedText("这一刻"), modifier = Modifier.weight(1f), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))

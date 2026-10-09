@@ -883,7 +883,7 @@ private fun InsightSectionCard(
                 Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(3.dp))
-                    Text(title, style = XikeSectionTitleStyle.copy(fontSize = 21.sp, lineHeight = 29.sp))
+                    Text(title, style = XikeSectionTitleStyle)
                 }
                 if (trailing != null) {
                     Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1036,8 +1036,8 @@ private fun InsightDrilldownDialog(
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
                     .wrapContentWidth(Alignment.CenterHorizontally)
                     .widthIn(max = XikeContentMaxWidth).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = XikeScreenHorizontalPadding, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = XikeScreenHorizontalPadding, vertical = XikeScreenVerticalPadding),
+                verticalArrangement = Arrangement.spacedBy(XikeContentGap),
             ) {
                 item(key = "drilldown-header") {
                     Row(verticalAlignment = Alignment.CenterVertically) {

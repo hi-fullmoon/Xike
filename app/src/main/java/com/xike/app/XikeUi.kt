@@ -1350,10 +1350,14 @@ fun MomentScreen(
                     if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
                     draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
-                        Text(tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."))
+                        Text(
+                            tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Row {
-                            TextButton(onClick = { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }) { Text(tr("重试导入", "Retry import")) }
-                            TextButton(onClick = videoServices.removeDraft) { Text(tr("移除视频", "Remove video")) }
+                            TextButton(onClick = { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }, shape = XikeShapes.button) { Text(tr("重试导入", "Retry import")) }
+                            TextButton(onClick = videoServices.removeDraft, shape = XikeShapes.button) { Text(tr("移除视频", "Remove video")) }
                         }
                     }
                 }
