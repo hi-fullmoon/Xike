@@ -10,6 +10,10 @@ import android.view.KeyEvent
 import android.view.Window
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -63,6 +67,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
@@ -73,6 +78,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
@@ -99,6 +105,10 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.util.Locale
 import kotlin.math.pow
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -874,7 +884,7 @@ internal fun VoicePlaybackCard(
                 Column(Modifier.weight(1f)) {
                     Text(localizedText("声音片段"), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(4.dp))
-                    VoicePlaybackIndicator(isPlaying, position)
+                    VoicePlaybackIndicator(isPlaying)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -916,7 +926,7 @@ internal fun VoicePlaybackCard(
             if (onReplace != null || onDelete != null) {
                 Spacer(Modifier.height(14.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (onReplace != null) {
                         TextButton(shape = XikeShapes.button, onClick = {
@@ -951,15 +961,48 @@ internal fun VoicePlaybackCard(
 }
 
 @Composable
-private fun VoicePlaybackIndicator(isPlaying: Boolean, position: Long) {
-    val color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+private fun VoicePlaybackIndicator(isPlaying: Boolean) {
+    val color by animateColorAsState(
+        if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(240),
+        label = "Voice indicator color",
+    )
+    val activity by animateFloatAsState(
+        if (isPlaying) 1f else 0f,
+        animationSpec = tween(280),
+        label = "Voice indicator activity",
+    )
+    var phase by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        val motionDurationScale = currentCoroutineContext()[MotionDurationScale]
+        var previousFrame = withFrameNanos { it }
+        while (true) {
+            val durationScale = motionDurationScale?.scaleFactor ?: 1f
+            if (durationScale == 0f) {
+                snapshotFlow { motionDurationScale?.scaleFactor ?: 1f }.first { it > 0f }
+                previousFrame = withFrameNanos { it }
+                continue
+            }
+            withInfiniteAnimationFrameNanos { frame ->
+                val elapsed = ((frame - previousFrame) / 1_000_000_000f).coerceAtMost(0.05f)
+                phase = (phase + elapsed / (1.6f * durationScale)) % 1f
+                previousFrame = frame
+            }
+        }
+    }
     // A playback activity indicator, not an invented recording waveform.
     Canvas(Modifier.size(64.dp, 16.dp)) {
+        val cycle = phase * (2 * PI).toFloat()
         repeat(12) { index ->
-            val phase = if (isPlaying) ((position / 200 + index) % 4).toInt() else index % 4
-            val height = size.height * (0.3f + phase * 0.2f)
+            val envelope = sin(PI * (index + 0.5) / 12).toFloat()
+            val pulse = (sin(cycle - index * 0.65f) + 1f) / 2f
+            val restingHeight = 0.16f + envelope * 0.22f
+            val playingHeight = 0.2f + envelope * (0.25f + pulse * 0.42f)
+            val height = size.height * (restingHeight + (playingHeight - restingHeight) * activity)
             val x = size.width * (index + 0.5f) / 12
-            drawLine(color, Offset(x, (size.height - height) / 2), Offset(x, (size.height + height) / 2),
+            drawLine(color.copy(alpha = 0.65f + envelope * 0.35f),
+                Offset(x, (size.height - height) / 2), Offset(x, (size.height + height) / 2),
                 strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
         }
     }
