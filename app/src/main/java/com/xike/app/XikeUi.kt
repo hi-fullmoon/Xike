@@ -1225,10 +1225,10 @@ fun MomentScreen(
                     top = XikeScreenVerticalPadding,
                     bottom = XikeScreenVerticalPadding,
                 ),
-            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             BrandHeader(today)
-            Column(modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)) {
+            Column {
                 Text(
                     tr("留一刻给自己", "A MOMENT FOR YOURSELF"),
                     style = XikeEyebrowStyle,
@@ -1261,9 +1261,24 @@ fun MomentScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                    Text("02 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!draft.isEmpty) {
+                        val canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving
+                        Text(
+                            localizedText("清空"),
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = canDiscard,
+                                role = Role.Button,
+                                onClick = { showDiscardConfirmation = true },
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (canDiscard) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        )
+                    }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = XikeShapes.card,
@@ -1332,10 +1347,8 @@ fun MomentScreen(
                         )
                     }
                 }
+                Spacer(Modifier.height(8.dp))
                 DraftSecurityRow(
-                    hasDraft = !draft.isEmpty,
-                    enabled = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
-                    onDiscard = { showDiscardConfirmation = true },
                     statusText = when {
                         showVoiceCapture -> localizedText("录音结束后将加密保存")
                         pendingDraftAudio != null -> localizedText("录音仍待加密保存")
@@ -1386,7 +1399,7 @@ fun MomentScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(8.dp))
                     if (pendingDraftAudio != null) {
                         VoicePendingSaveCard(
                             durationMillis = pendingDraftAudio.durationMillis,
@@ -1513,7 +1526,7 @@ fun MomentScreen(
                                     color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                                 )
                             }
-                            Spacer(Modifier.height(7.dp))
+                            Spacer(Modifier.height(8.dp))
                             TopicChoices(draft.tags) { topic ->
                                 if (!isSaving) onDraftTagToggle(topic.label)
                             }
@@ -2078,13 +2091,10 @@ private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("
 
 @Composable
 private fun DraftSecurityRow(
-    hasDraft: Boolean,
-    enabled: Boolean,
-    onDiscard: () -> Unit,
     statusText: String? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -2100,9 +2110,6 @@ private fun DraftSecurityRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (hasDraft) {
-            TextButton(onClick = onDiscard, enabled = enabled, shape = XikeShapes.button) { Text(localizedText("清空")) }
-        }
     }
 }
 
@@ -2128,7 +2135,6 @@ internal fun MomentContentToolbar(
                 Icon(
                     XikeIcons.Add,
                     contentDescription = tr("添加内容", "Add content"),
-                    modifier = Modifier.offset(x = (-8).dp),
                     tint = if (enabled) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 )
@@ -2270,9 +2276,8 @@ private fun MoodPicker(
     Column(Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(localizedText("此刻的心情"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            Text("01 / 02", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = XikeShapes.card,
