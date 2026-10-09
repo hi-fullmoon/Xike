@@ -1998,8 +1998,18 @@ private fun OutdoorContextCard(
                         modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(onClick = onChooseCity, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) { Text(localizedText("手动选城市")) }
-                        TextButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.heightIn(min = 48.dp), shape = XikeShapes.button) { Text(localizedText("重新尝试")) }
+                        TextButton(
+                            onClick = onChooseCity,
+                            enabled = enabled,
+                            shape = XikeShapes.button,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        ) { Text(localizedText("手动选城市")) }
+                        TextButton(
+                            onClick = onAdd,
+                            enabled = enabled && !isLoading,
+                            shape = XikeShapes.button,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        ) { Text(localizedText("重新尝试")) }
                     }
                 }
             }
