@@ -1976,7 +1976,7 @@ private fun OutdoorContextCard(
                         Icon(
                             Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp).offset(y = 1.dp),
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
