@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Videocam
@@ -121,7 +122,13 @@ internal fun VideoAddButton(
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) shoot() else failure(IllegalStateException(tr("需要存储权限才能保存拍摄的视频。", "Storage permission is required to save captured videos.")))
     }
-    val choose = { focus.clearFocus(); keyboard?.hide(); choosing = true }
+    val choose: () -> Unit = {
+        if (enabled) {
+            focus.clearFocus()
+            keyboard?.hide()
+            choosing = true
+        }
+    }
     if (content != null) content(choose) else {
         MomentQuickAction(label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
     }
@@ -147,14 +154,14 @@ internal fun VideoAddButton(
 }
 
 @Composable
-internal fun VideoCard(video: JournalVideo, onRemove: (() -> Unit)? = null, previewOnly: Boolean = false, onOpen: (() -> Unit)? = null) {
+internal fun VideoCard(video: JournalVideo, onRemove: (() -> Unit)? = null, previewOnly: Boolean = false, onOpen: (() -> Unit)? = null, aspectRatio: Float = 16f / 9f, onReplace: (() -> Unit)? = null) {
     key(video.fileName) {
-        VideoCardContent(video, onRemove, previewOnly, onOpen)
+        VideoCardContent(video, onRemove, previewOnly, onOpen, aspectRatio, onReplace)
     }
 }
 
 @Composable
-private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previewOnly: Boolean, onOpen: (() -> Unit)?) {
+private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previewOnly: Boolean, onOpen: (() -> Unit)?, aspectRatio: Float, onReplace: (() -> Unit)?) {
     val services = LocalVideoServices.current
     var playing by remember { mutableStateOf(false) }
     val cover by produceState<android.graphics.Bitmap?>(null, video.coverFileName) {
@@ -162,7 +169,7 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
     }
     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clipToBounds().clickable { if (onOpen != null) onOpen() else playing = true }, contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().aspectRatio(aspectRatio).clipToBounds().clickable { if (onOpen != null) onOpen() else playing = true }, contentAlignment = Alignment.Center) {
                 cover?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
                 Surface(Modifier.size(48.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
                     Box(contentAlignment = Alignment.Center) {
@@ -177,12 +184,23 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                     )
                 }
-                if (onRemove != null) {
-                    IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(48.dp)) {
-                        Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+                Row(Modifier.align(Alignment.TopEnd)) {
+                    if (onReplace != null) {
+                        IconButton(onClick = { playing = false; onReplace() }, modifier = Modifier.size(48.dp)) {
                             Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Outlined.Close, tr("移除视频", "Remove video"), Modifier.size(16.dp), tint = Color.White)
+                                    Icon(Icons.Outlined.Refresh, tr("重新录制视频", "Record video again"), Modifier.size(16.dp), tint = Color.White)
+                                }
+                            }
+                        }
+                    }
+                    if (onRemove != null) {
+                        IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Outlined.Close, tr("移除视频", "Remove video"), Modifier.size(16.dp), tint = Color.White)
+                                    }
                                 }
                             }
                         }
