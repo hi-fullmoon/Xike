@@ -167,6 +167,10 @@ class MainActivity : FragmentActivity() {
                 XikeTheme(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
                     CompositionLocalProvider(
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,
+                        LocalAudioEditServices provides AudioEditServices(
+                            import = journalViewModel::importEditAudio,
+                            release = journalViewModel::releaseEditAudio,
+                        ),
                         LocalVideoServices provides VideoServices(
                             import = journalViewModel::importVideo,
                             release = journalViewModel::releaseVideo,

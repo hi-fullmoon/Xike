@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
@@ -105,6 +106,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.io.File
 import java.io.FileInputStream
+
 import java.io.InputStream
 import java.util.Locale
 import kotlin.math.pow
@@ -116,6 +118,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+internal data class AudioEditServices(
+    val import: suspend (File, Long) -> Result<JournalAudio>,
+    val release: (JournalAudio) -> Unit,
+)
+
+internal val LocalAudioEditServices = androidx.compose.runtime.compositionLocalOf<AudioEditServices> {
+    error("Audio edit service unavailable")
+}
 
 internal class XikeAudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
@@ -728,6 +739,7 @@ internal fun VoicePlaybackCard(
 
     val playbackAttributes = remember(audio.fileName) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_SPEECH) }
     val hasTopEndDelete = showDeleteAtTopEnd && onDelete != null
+    val hasTopEndReplace = showDeleteAtTopEnd && onReplace != null
 
     fun pausePlayback() {
         player?.let { active ->
@@ -867,7 +879,8 @@ internal fun VoicePlaybackCard(
         Box {
             Column(Modifier.padding(XikeCardPadding)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(end = if (hasTopEndDelete) 32.dp else 0.dp),
+                    modifier = Modifier.fillMaxWidth().padding(end =
+                        (if (hasTopEndDelete) 32.dp else 0.dp) + (if (hasTopEndReplace) 48.dp else 0.dp)),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
@@ -932,12 +945,12 @@ internal fun VoicePlaybackCard(
                 playbackError?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
-                if (onReplace != null || (onDelete != null && !hasTopEndDelete)) {
+                if ((onReplace != null && !hasTopEndReplace) || (onDelete != null && !hasTopEndDelete)) {
                     Spacer(Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(Modifier.height(4.dp))
                     val actions: @Composable () -> Unit = {
-                        if (onReplace != null) {
+                        if (onReplace != null && !hasTopEndReplace) {
                             TextButton(shape = XikeShapes.button, onClick = {
                                 releasePlayer()
                                 onReplace()
@@ -979,26 +992,47 @@ internal fun VoicePlaybackCard(
                     }
                 }
             }
-            if (hasTopEndDelete) {
-                IconButton(
-                    onClick = {
-                        releasePlayer()
-                        onDelete()
-                    },
-                    modifier = Modifier.align(Alignment.TopEnd).size(48.dp),
-                ) {
-                    Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+            Row(Modifier.align(Alignment.TopEnd)) {
+                if (hasTopEndReplace) {
+                    IconButton(
+                        onClick = {
+                            releasePlayer()
+                            onReplace?.invoke()
+                        },
+                        modifier = Modifier.size(48.dp),
+                    ) {
                         Surface(
                             modifier = Modifier.size(32.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = localizedText("删除语音"),
-                                    modifier = Modifier.size(16.dp),
-                                )
+                                Icon(Icons.Outlined.Refresh, contentDescription = localizedText("重新录制"), modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+                if (hasTopEndDelete) {
+                    IconButton(
+                        onClick = {
+                            releasePlayer()
+                            onDelete()
+                        },
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Surface(
+                                modifier = Modifier.size(32.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = localizedText("删除语音"),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
                             }
                         }
                     }
