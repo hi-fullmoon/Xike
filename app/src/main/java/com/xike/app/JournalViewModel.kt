@@ -39,6 +39,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val outdoorRepository = OutdoorContextRepository(application)
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
+    private var outdoorRequestGeneration = 0L
     private var noteSaveJob: Job? = null
     private val noteSaveScopeJob = SupervisorJob()
     private val noteSaveScope = CoroutineScope(noteSaveScopeJob + Dispatchers.IO)
@@ -211,6 +212,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateDraftRecordedAt(recordedAt: Long?) {
+        if (recordedAt != null) outdoorRequestGeneration++
         persistDraft(
             draft.copy(
                 recordedAt = recordedAt,
@@ -220,28 +222,33 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun clearDraftOutdoor() {
+        outdoorRequestGeneration++
         persistDraft(draft.copy(outdoor = null))
     }
 
-    suspend fun attachCurrentOutdoor(): Result<Unit> {
-        val requestGeneration = draftGeneration
-        return runOutdoorRequest(outdoorRepository::current).mapCatching { snapshot ->
-            if (requestGeneration != draftGeneration) return@mapCatching
-            check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
-            check(persistDraft(draft.copy(outdoor = snapshot))) {
-                localizedText("地点与天气已取得，但草稿保存失败。")
-            }
-        }
-    }
+    suspend fun attachCurrentOutdoor(): Result<Unit> = attachOutdoor(
+        saveError = localizedText("地点与天气已取得，但草稿保存失败。"),
+        request = outdoorRepository::current,
+    )
 
-    suspend fun attachOutdoorForCity(city: String): Result<Unit> {
-        val requestGeneration = draftGeneration
-        return runOutdoorRequest { outdoorRepository.city(city) }.mapCatching { snapshot ->
-            if (requestGeneration != draftGeneration) return@mapCatching
+    suspend fun attachOutdoorForCity(city: String): Result<Unit> = attachOutdoor(
+        saveError = localizedText("城市天气已取得，但草稿保存失败。"),
+        request = { outdoorRepository.city(city) },
+    )
+
+    private suspend fun attachOutdoor(
+        saveError: String,
+        request: suspend () -> OutdoorSnapshot,
+    ): Result<Unit> {
+        val requestDraftGeneration = draftGeneration
+        val requestGeneration = ++outdoorRequestGeneration
+        val result = runOutdoorRequest(request)
+        if (requestDraftGeneration != draftGeneration || requestGeneration != outdoorRequestGeneration) {
+            return Result.success(Unit)
+        }
+        return result.mapCatching { snapshot ->
             check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
-            check(persistDraft(draft.copy(outdoor = snapshot))) {
-                localizedText("城市天气已取得，但草稿保存失败。")
-            }
+            check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
         }
     }
 
@@ -553,6 +560,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     internal suspend fun saveVideoEditDraft(entry: JournalEntry, video: JournalVideo?): Result<Unit> = withContext(Dispatchers.IO) { runCatching { videoStore.saveEdit(entry, video) } }
     internal suspend fun clearVideoEditDraft(entryId: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { videoStore.clearEdit(entryId) } }
     fun openVideoCover(name: String): InputStream? = runCatching { videoStore.open(name) }.getOrNull()
+
+    suspend fun importEditAudio(source: File, durationMillis: Long): Result<JournalAudio> = withContext(Dispatchers.IO) {
+        runCatching { store.importAudio(source, durationMillis) }
+    }
+
+    fun releaseEditAudio(audio: JournalAudio) {
+        viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(audio.fileName) }
+    }
 
     suspend fun importVideo(uri: Uri, progress: (Float) -> Unit): Result<JournalVideo> = withContext(Dispatchers.IO) {
         runCatching { store.importVideo(uri, progress) }

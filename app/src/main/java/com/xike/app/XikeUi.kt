@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -78,6 +79,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Commute
 import androidx.compose.material.icons.outlined.EnhancedEncryption
@@ -1408,24 +1410,26 @@ fun MomentScreen(
                 }
             }
 
-            OutdoorContextCard(
-                snapshot = draft.outdoor,
-                isBackdated = draft.recordedAt != null,
-                isLoading = isOutdoorLoading,
-                errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
-                    localizedText("没有位置权限，也可以只选择城市。")
-                } else {
-                    null
-                },
-                enabled = !isSaving,
-                onAdd = requestCurrentOutdoor,
-                onRefresh = requestCurrentOutdoor,
-                onChooseCity = { showOutdoorCityDialog = true },
-                onRemove = {
-                    outdoorError = null
-                    onClearDraftOutdoor()
-                },
-            )
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(localizedText("此刻窗外"), style = MaterialTheme.typography.titleSmall)
+                OutdoorContextCard(
+                    snapshot = draft.outdoor,
+                    isBackdated = draft.recordedAt != null,
+                    isLoading = isOutdoorLoading,
+                    errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
+                        localizedText("没有位置权限，也可以只选择城市。")
+                    } else {
+                        null
+                    },
+                    enabled = !isSaving,
+                    onAdd = requestCurrentOutdoor,
+                    onChooseCity = { showOutdoorCityDialog = true },
+                    onRemove = {
+                        outdoorError = null
+                        onClearDraftOutdoor()
+                    },
+                )
+            }
 
             if (pendingDraftAudio != null || draft.audio != null) {
                 val voiceAnchor = remember { BringIntoViewRequester() }
@@ -1466,6 +1470,7 @@ fun MomentScreen(
                                 audio = audio,
                                 openAudio = openAudio,
                                 onDelete = if (isSaving) null else onDraftAudioRemoved,
+                                onReplace = if (isSaving || isDraftAudioSaving || showVoiceCapture) null else beginVoiceCapture,
                                 showBorder = false,
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 showDeleteAtTopEnd = true,
@@ -1508,7 +1513,16 @@ fun MomentScreen(
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(tr("这一刻的视频", "Video of this moment"), style = MaterialTheme.typography.titleSmall)
                     if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
-                    draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
+                    draft.video?.let { video ->
+                        val canChangeVideo = !isSaving && !videoServices.draftSaving && draft.pendingVideoUri == null
+                        VideoAddButton(enabled = canChangeVideo, onPicked = videoServices.addDraft) { chooseVideo ->
+                            VideoCard(
+                                video,
+                                onRemove = if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft,
+                                onReplace = if (canChangeVideo) chooseVideo else null,
+                            )
+                        }
+                    }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
                         Text(
                             tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."),
@@ -1834,169 +1848,180 @@ private fun OutdoorContextCard(
     errorMessage: String?,
     enabled: Boolean,
     onAdd: () -> Unit,
-    onRefresh: () -> Unit,
     onChooseCity: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
-    val containerColor = when {
-        snapshot != null -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-        isEmpty -> MaterialTheme.colorScheme.surfaceContainerHighest
-        else -> MaterialTheme.colorScheme.surface
-    }
     val cardModifier = if (isEmpty && enabled) {
         Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onAdd)
     } else {
         Modifier.fillMaxWidth()
     }
 
-    Surface(
+    PaperCard(
         modifier = cardModifier,
-        shape = XikeShapes.card,
-        color = containerColor,
+        contentPadding = PaddingValues(0.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier.size(42.dp),
-                    shape = XikeShapes.inner,
-                    color = if (snapshot != null) {
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        when {
-                            isLoading -> CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
+        Box(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .padding(top = if (snapshot != null) 32.dp else 0.dp)
+                    .padding(XikeCardPadding),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        shape = XikeShapes.inner,
+                        color = if (snapshot != null) {
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            when {
+                                isLoading -> CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                snapshot != null -> Icon(
+                                    Icons.Outlined.Cloud,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                isBackdated -> Icon(
+                                    Icons.Outlined.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                errorMessage != null -> Icon(
+                                    Icons.Outlined.LocationOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                else -> Icon(
+                                    Icons.Outlined.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            when {
+                                snapshot != null -> snapshot.placeName
+                                isLoading -> localizedText("正在获取地点与天气")
+                                isBackdated -> localizedText("补记不使用今天的天气")
+                                errorMessage != null -> localizedText("暂时无法添加地点与天气")
+                                else -> tr("地点与天气", "Location and weather")
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            when {
+                                isLoading -> localizedText("只获取一次，不会在后台持续定位")
+                                snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
+                                isBackdated -> localizedText("避免把现在的环境误记到过去")
+                                errorMessage != null -> localizedText(errorMessage)
+                                else -> localizedText("地点与天气 · 可选")
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (errorMessage == null) 1 else 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (snapshot != null) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "${snapshot.temperatureCelsius.roundToInt()}°",
+                                style = MaterialTheme.typography.titleLarge,
                             )
-                            snapshot != null -> Icon(
-                                Icons.Outlined.Cloud,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
+                            Text(
+                                weatherConditionLabel(snapshot.weatherCode),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            isBackdated -> Icon(
-                                Icons.Outlined.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
+                        }
+                    } else if (isEmpty) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                localizedText("添加"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            errorMessage != null -> Icon(
-                                Icons.Outlined.LocationOff,
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            else -> Icon(
-                                Icons.Outlined.LocationOn,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        when {
-                            snapshot != null -> tr("此刻窗外 · ${snapshot.placeName}", "Outside now · ${snapshot.placeName}")
-                            isLoading -> localizedText("正在获取地点与天气")
-                            isBackdated -> localizedText("补记不使用今天的天气")
-                            errorMessage != null -> localizedText("暂时无法添加地点与天气")
-                            else -> localizedText("此刻窗外")
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        when {
-                            isLoading -> localizedText("只获取一次，不会在后台持续定位")
-                            snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
-                            isBackdated -> localizedText("避免把现在的环境误记到过去")
-                            errorMessage != null -> localizedText(errorMessage)
-                            else -> localizedText("地点与天气 · 可选")
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (snapshot != null) {
-                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        maxLines = if (errorMessage == null) 1 else 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (snapshot != null) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "${snapshot.temperatureCelsius.roundToInt()}°",
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(
-                            weatherConditionLabel(snapshot.weatherCode),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.76f),
-                        )
+
+                when {
+                    snapshot != null -> {
+                        if (!isLoading && errorMessage != null) {
+                            Text(
+                                errorMessage,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
-                } else if (isEmpty) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            localizedText("添加"),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Icon(
-                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    errorMessage != null -> {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                            horizontalArrangement = Arrangement.End,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            OutdoorCardAction(localizedText("手动选城市"), enabled, onChooseCity)
+                            OutdoorCardAction(localizedText("重新尝试"), enabled && !isLoading, onAdd)
+                        }
                     }
                 }
             }
-
-            when {
-                snapshot != null -> {
-                    if (!isLoading && errorMessage != null) {
-                        Text(
-                            errorMessage,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    Spacer(Modifier.height(9.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+            if (snapshot != null) {
+                Row(Modifier.align(Alignment.TopEnd)) {
+                    IconButton(
+                        onClick = onAdd,
+                        enabled = enabled && !isLoading,
+                        modifier = Modifier.size(48.dp),
                     ) {
-                        OutdoorCardAction(
-                            label = localizedText("移除"),
-                            enabled = enabled,
-                            onClick = onRemove,
-                        )
-                        OutdoorCardAction(
-                            label = localizedText("刷新"),
-                            enabled = enabled && !isLoading,
-                            onClick = onRefresh,
-                        )
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = localizedText("刷新"), modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
-                }
-                errorMessage != null -> {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    IconButton(
+                        onClick = onRemove,
+                        enabled = enabled,
+                        modifier = Modifier.size(48.dp),
                     ) {
-                        OutdoorCardAction(localizedText("手动选城市"), enabled, onChooseCity)
-                        OutdoorCardAction(localizedText("重新尝试"), enabled && !isLoading, onAdd)
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Close, contentDescription = tr("移除此刻窗外", "Remove outside now"), modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -2729,22 +2754,23 @@ private fun SelectedPhotoTile(
             onClick = onRemove,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(2.dp)
                 .size(48.dp)
                 .semantics { contentDescription = tr("移除第 $order 张照片", "Remove photo $order") },
         ) {
-            Surface(
-                modifier = Modifier.size(32.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                shadowElevation = 0.dp,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    shadowElevation = 0.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
@@ -3004,6 +3030,7 @@ internal fun JournalEntryCard(
     openImage: (String) -> InputStream?,
     onImageClick: (Int) -> Unit,
     onClick: () -> Unit = {},
+    compactMedia: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -3011,8 +3038,8 @@ internal fun JournalEntryCard(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
-            entry.video?.let { VideoCard(it, previewOnly = true, onOpen = onClick) }
-            if (entry.imageFileNames.isNotEmpty()) {
+            if (!compactMedia) entry.video?.let { VideoCard(it, previewOnly = true, onOpen = onClick) }
+            if (!compactMedia && entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
             }
             Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
@@ -3055,7 +3082,7 @@ internal fun JournalEntryCard(
                         Spacer(Modifier.height(9.dp))
                         Text(entry.note, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    entry.audio?.let { audio ->
+                    entry.audio?.takeIf { !compactMedia }?.let { audio ->
                         Spacer(Modifier.height(9.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -3073,6 +3100,64 @@ internal fun JournalEntryCard(
                         }
                     }
                 }
+            }
+            if (compactMedia) {
+                val mediaCount = entry.imageFileNames.size + if (entry.video != null) 1 else 0
+                val hasMedia = mediaCount > 0
+                if (hasMedia) {
+                    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)) {
+                        val thumbnailWidth = (maxWidth - 8.dp) / 2
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            entry.video?.let { video ->
+                                item(key = "video-${video.fileName}", contentType = "video") {
+                                    Box(Modifier.width(thumbnailWidth)) {
+                                        VideoCard(video, aspectRatio = 1f)
+                                    }
+                                }
+                            }
+                            items(
+                                count = entry.imageFileNames.size,
+                                key = { index -> "photo-$index-${entry.imageFileNames[index]}" },
+                                contentType = { "photo" },
+                            ) { index ->
+                                val fileName = entry.imageFileNames[index]
+                                SavedJournalImage(
+                                    fileName = fileName,
+                                    openStream = { openImage(fileName) },
+                                    modifier = Modifier.width(thumbnailWidth).aspectRatio(1f).clip(XikeShapes.inner),
+                                    order = index + 1,
+                                    onClick = { onImageClick(index) },
+                                )
+                            }
+                        }
+                    }
+                    if (mediaCount > 2) {
+                        Text(
+                            tr("共 $mediaCount 项媒体 · 左右滑动查看", "$mediaCount media items · Swipe to view"),
+                            modifier = Modifier.padding(horizontal = XikeCardPadding).padding(top = 8.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                entry.audio?.let { audio ->
+                    Row(
+                        Modifier.padding(horizontal = XikeCardPadding).padding(top = if (hasMedia) 12.dp else 0.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.MicNone, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            tr("语音 · ${formatAudioDuration(audio.durationMillis)}", "Audio · ${formatAudioDuration(audio.durationMillis)}"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (hasMedia || entry.audio != null) Spacer(Modifier.height(XikeCardPadding))
             }
         }
     }
