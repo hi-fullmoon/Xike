@@ -1744,7 +1744,7 @@ internal fun OutdoorContextCard(
                             }
                         }
                         Column(Modifier.weight(1f)) {
-                            Box(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = if (showRefresh) 82.dp else 34.dp)) {
+                            Box(Modifier.fillMaxWidth().padding(end = if (showRefresh) 82.dp else 34.dp)) {
                                 Text(
                                     snapshot.placeName,
                                     modifier = Modifier.align(Alignment.CenterStart),
@@ -1775,7 +1775,7 @@ internal fun OutdoorContextCard(
                     Text(
                         tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
                             "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}"),
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1988,7 +1988,7 @@ internal fun MomentNoteCard(
                 modifier = Modifier.fillMaxWidth()
                     .semantics { contentDescription = localizedText("此刻的注脚") }
                     .onFocusChanged { onFocusChange(it.isFocused) },
-                minLines = 2,
+                minLines = 3,
                 maxLines = 5,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1996,7 +1996,7 @@ internal fun MomentNoteCard(
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 decorationBox = { innerTextField ->
-                    Column(Modifier.fillMaxWidth().heightIn(min = 104.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.fillMaxWidth()) {
                         Box(Modifier.fillMaxWidth()) {
                             if (note.isEmpty()) {
                                 Text(
