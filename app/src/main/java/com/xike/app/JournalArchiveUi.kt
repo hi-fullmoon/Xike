@@ -3,7 +3,6 @@ package com.xike.app
 import android.Manifest
 import android.net.Uri
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -222,11 +221,17 @@ fun JournalArchiveScreen(
         )
     }
 
-    LaunchedEffect(entries, searchQuery) {
-        if (searchQuery.normalizedText.isNotEmpty()) delay(220)
+    val requestKey = remember(entries, searchQuery) { Any() }
+    val currentRequestKey by androidx.compose.runtime.rememberUpdatedState(requestKey)
+    var resultKey by remember { mutableStateOf<Any?>(null) }
+
+    LaunchedEffect(requestKey) {
         isSearching = true
         isLoadingMore = false
-        onSearch(searchQuery, 0, ARCHIVE_PAGE_SIZE)
+        if (searchQuery.normalizedText.isNotEmpty()) delay(220)
+        val firstPage = onSearch(searchQuery, 0, ARCHIVE_PAGE_SIZE)
+        if (currentRequestKey !== requestKey) return@LaunchedEffect
+        firstPage
             .onSuccess { page ->
                 resultEntries = page.entries
                 totalResultCount = page.totalCount
@@ -240,6 +245,7 @@ fun JournalArchiveScreen(
                 hasMoreResults = false
                 searchError = error.message ?: localizedText("搜索暂时不可用")
             }
+        resultKey = requestKey
         isSearching = false
         if (scrollToSelectedDateResults) {
             withFrameNanos { }
@@ -410,15 +416,20 @@ fun JournalArchiveScreen(
                 item(key = "archive-load-more") {
                     TextButton(
                         shape = XikeShapes.button,
-                        enabled = !isLoadingMore,
+                        enabled = !isLoadingMore && !isSearching && resultKey === requestKey,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
-                            if (isLoadingMore) return@TextButton
+                            if (isLoadingMore || isSearching || resultKey !== requestKey) return@TextButton
                             isLoadingMore = true
+                            val pageKey = requestKey
+                            val pageQuery = searchQuery
+                            val baseEntries = resultEntries
                             scope.launch {
-                                onSearch(searchQuery, resultEntries.size, ARCHIVE_PAGE_SIZE)
+                                val result = onSearch(pageQuery, baseEntries.size, ARCHIVE_PAGE_SIZE)
+                                if (currentRequestKey !== pageKey) return@launch
+                                result
                                     .onSuccess { page ->
-                                        resultEntries = (resultEntries + page.entries).distinctBy { it.id }
+                                        resultEntries = (baseEntries + page.entries).distinctBy { it.id }
                                         totalResultCount = page.totalCount
                                         hasMoreResults = page.hasMore
                                         searchError = null
@@ -524,13 +535,13 @@ fun JournalArchiveScreen(
                                     onUndoDelete(entry.id)
                                         .onSuccess {
                                             deleteWasUndone = true
-                                            Toast.makeText(context, localizedText("记录已恢复"), Toast.LENGTH_SHORT).show()
+                                            XikeNotice.makeText(context, localizedText("记录已恢复"), XikeNotice.LENGTH_SHORT).show()
                                         }
                                         .onFailure { error ->
-                                            Toast.makeText(
+                                            XikeNotice.makeText(
                                                 context,
                                                 error.message ?: localizedText("撤销删除失败"),
-                                                Toast.LENGTH_LONG,
+                                                XikeNotice.LENGTH_LONG,
                                             ).show()
                                         }
                                 }
@@ -1486,7 +1497,7 @@ private fun JournalEntryEditDialog(
     }
     val microphonePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) showVoiceCapture = true
-        else Toast.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), Toast.LENGTH_LONG).show()
+        else XikeNotice.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), XikeNotice.LENGTH_LONG).show()
     }
     val beginVoiceCapture: () -> Unit = {
         if (androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -1537,10 +1548,10 @@ private fun JournalEntryEditDialog(
         }
         newImageUriStrings = newImageUriStrings + readableAdditions
         if (readableAdditions.size < additions.size) {
-            Toast.makeText(context, localizedText("所选照片无法获得长期读取权限，请重新选择。"), Toast.LENGTH_LONG).show()
+            XikeNotice.makeText(context, localizedText("所选照片无法获得长期读取权限，请重新选择。"), XikeNotice.LENGTH_LONG).show()
         }
         if (additions.size < uris.distinct().size) {
-            Toast.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), Toast.LENGTH_SHORT).show()
+            XikeNotice.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), XikeNotice.LENGTH_SHORT).show()
         }
     }
     val photoPicker = rememberLauncherForActivityResult(
@@ -1561,10 +1572,10 @@ private fun JournalEntryEditDialog(
         pendingCameraUriString = null
         if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, localizedText("照片已添加并保存到系统相册"), Toast.LENGTH_SHORT).show()
+            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
-            if (captured) Toast.makeText(context, localizedText("照片保存失败，请重试"), Toast.LENGTH_SHORT).show()
+            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
         }
     }
     val openPhotoPicker = {
@@ -1598,7 +1609,7 @@ private fun JournalEntryEditDialog(
             } else {
                 runCatching(openDocuments).getOrDefault(false)
             }
-            if (!opened) Toast.makeText(context, localizedText("无法打开系统照片选择器"), Toast.LENGTH_LONG).show()
+            if (!opened) XikeNotice.makeText(context, localizedText("无法打开系统照片选择器"), XikeNotice.LENGTH_LONG).show()
         }
     }
     val launchSystemCamera = {
@@ -1613,12 +1624,12 @@ private fun JournalEntryEditDialog(
                             pendingCameraUriString = null
                             deleteCameraCapture(context, captureUri)
                             Log.w("XikeEditCamera", "Camera launch failed", error)
-                            Toast.makeText(context, localizedText("无法打开系统相机"), Toast.LENGTH_LONG).show()
+                            XikeNotice.makeText(context, localizedText("无法打开系统相机"), XikeNotice.LENGTH_LONG).show()
                         }
                 }
                 .onFailure { error ->
                     Log.w("XikeEditCamera", "Camera capture file creation failed", error)
-                    Toast.makeText(context, localizedText("无法准备拍照，请重试"), Toast.LENGTH_LONG).show()
+                    XikeNotice.makeText(context, localizedText("无法准备拍照，请重试"), XikeNotice.LENGTH_LONG).show()
                 }
         }
     }
@@ -1628,7 +1639,7 @@ private fun JournalEntryEditDialog(
         if (granted) {
             launchSystemCamera()
         } else {
-            Toast.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), Toast.LENGTH_LONG).show()
+            XikeNotice.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), XikeNotice.LENGTH_LONG).show()
         }
     }
     val openCamera = {
@@ -1728,7 +1739,7 @@ private fun JournalEntryEditDialog(
                                         importedAudioJsons = emptyList()
                                         importedVideos.forEach(videoServices.release)
                                         importedVideoJsons = emptyList()
-                                        Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
+                                        XikeNotice.makeText(context, localizedText("修改已保存"), XikeNotice.LENGTH_SHORT).show()
                                         onDismiss()
                                     }
                                 }.onFailure { error ->
