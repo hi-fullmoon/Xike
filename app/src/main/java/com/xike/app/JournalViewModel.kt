@@ -27,6 +27,8 @@ data class PendingDraftAudio(
     val stagedFileName: String? = null,
 )
 
+internal class JournalOperationFeedback(val message: String, val isError: Boolean)
+
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
     private val videoStore = JournalVideoStore(application)
@@ -62,6 +64,23 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     var isDraftAudioSaving by mutableStateOf(false)
         private set
+
+    var isDraftSaving by mutableStateOf(false)
+        private set
+
+    var isBackupExporting by mutableStateOf(false)
+        private set
+
+    internal var operationFeedback by mutableStateOf(emptyList<JournalOperationFeedback>())
+        private set
+
+    internal fun acknowledgeFeedback(feedback: JournalOperationFeedback) {
+        operationFeedback = operationFeedback.filterNot { it === feedback }
+    }
+
+    private fun reportOperation(message: String, isError: Boolean = false) {
+        operationFeedback = operationFeedback + JournalOperationFeedback(message, isError)
+    }
 
     var draftAudioSaveError by mutableStateOf<String?>(null)
         private set
@@ -437,17 +456,29 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = viewModelScope.async {
-        if (isDraftVideoSaving || draft.pendingVideoUri != null) return@async Result.failure(IllegalStateException(tr("请先完成视频导入。", "Please finish importing the video first.")))
+    suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = withContext(Dispatchers.Main.immediate) {
+        if (isDraftSaving) return@withContext Result.failure(IllegalStateException(tr("正在保存，请稍候。", "Saving. Please wait.")))
+        if (isDraftVideoSaving || draft.pendingVideoUri != null) return@withContext Result.failure(IllegalStateException(tr("请先完成视频导入。", "Please finish importing the video first.")))
+        isDraftSaving = true
         val savedDraft = draft
-        val result = withContext(Dispatchers.IO) {
-            runCatching { store.add(entry, imageUris, refreshEntries = false) }
-        }
-        result.onSuccess {
-            clearDraftAfterSave(savedDraft)
-        }
-        result.map { }
-    }.await()
+        // The operation belongs to the ViewModel even if the requesting page leaves composition.
+        viewModelScope.async {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { store.add(entry, imageUris, refreshEntries = false) }
+                }
+                result.onSuccess {
+                    clearDraftAfterSave(savedDraft)
+                    reportOperation(if (savedDraft.recordedAt == null) localizedText("这一刻，已经好好收下了") else localizedText("那一刻，已经好好收下了"))
+                }.onFailure {
+                    reportOperation(it.message ?: localizedText("保存失败，请重试"), isError = true)
+                }
+                result.map { }
+            } finally {
+                isDraftSaving = false
+            }
+        }.await()
+    }
 
     suspend fun update(
         entry: JournalEntry,
@@ -497,13 +528,25 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching { store.search(query, offset, limit) }
     }.await()
 
-    suspend fun exportBackup(uri: Uri, password: String?): Result<Unit> = viewModelScope.async(Dispatchers.IO) {
-        runCatching {
-            getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
-                store.writeBackup(output, password)
-            } ?: error(localizedText("无法写入备份文件"))
+    fun startBackupExport(uri: Uri, password: String?) {
+        if (isBackupExporting) return
+        isBackupExporting = true
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+                            store.writeBackup(output, password)
+                        } ?: error(localizedText("无法写入备份文件"))
+                    }
+                }
+                result.onSuccess { reportOperation(localizedText("备份已保存")) }
+                    .onFailure { reportOperation(it.message ?: localizedText("备份失败"), isError = true) }
+            } finally {
+                isBackupExporting = false
+            }
         }
-    }.await()
+    }
 
     suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> = viewModelScope.async(Dispatchers.IO) {
         runCatching {

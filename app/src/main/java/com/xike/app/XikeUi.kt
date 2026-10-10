@@ -11,7 +11,6 @@ import android.net.Uri
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.View
-import android.widget.Toast
 import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -736,8 +735,10 @@ fun XikeTheme(
         MaterialTheme(
             colorScheme = colors,
             typography = typographyFor(style),
-            content = content,
-        )
+        ) {
+            content()
+            XikeNoticeHost()
+        }
     }
 }
 
@@ -996,6 +997,8 @@ fun MomentScreen(
     openAudio: (String) -> InputStream? = { null },
     onVoiceCaptureStateChange: (Boolean) -> Unit = {},
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    isDraftSaving: Boolean = false,
+    saveFeedbackHandledExternally: Boolean = false,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
         Result.failure(IllegalStateException(localizedText("窗外天气暂时不可用。")))
@@ -1012,7 +1015,8 @@ fun MomentScreen(
     var revealDetailsRequest by remember { mutableIntStateOf(0) }
     val detailsAnchor = remember { BringIntoViewRequester() }
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
-    var isSaving by remember { mutableStateOf(false) }
+    var localSaving by remember { mutableStateOf(false) }
+    val isSaving = localSaving || isDraftSaving
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
     var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
@@ -1107,10 +1111,10 @@ fun MomentScreen(
         pendingCameraUriString = null
         if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
             onImagesPicked(listOf(captureUri))
-            Toast.makeText(context, localizedText("照片已添加并保存到系统相册"), Toast.LENGTH_SHORT).show()
+            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
         } else if (captureUri != null) {
             deleteCameraCapture(context, captureUri)
-            if (captured) Toast.makeText(context, localizedText("照片保存失败，请重试"), Toast.LENGTH_SHORT).show()
+            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
         }
     }
     val openPhotoPicker = {
@@ -1148,7 +1152,7 @@ fun MomentScreen(
             }.getOrDefault(false)
         }
         if (!opened) {
-            Toast.makeText(context, localizedText("无法打开系统照片选择器"), Toast.LENGTH_LONG).show()
+            XikeNotice.makeText(context, localizedText("无法打开系统照片选择器"), XikeNotice.LENGTH_LONG).show()
         }
     }
     val launchSystemCamera = {
@@ -1162,12 +1166,12 @@ fun MomentScreen(
                         pendingCameraUriString = null
                         deleteCameraCapture(context, captureUri)
                         Log.w("XikeCamera", "Camera launch failed", error)
-                        Toast.makeText(context, localizedText("无法打开系统相机"), Toast.LENGTH_LONG).show()
+                        XikeNotice.makeText(context, localizedText("无法打开系统相机"), XikeNotice.LENGTH_LONG).show()
                     }
             }
             .onFailure { error ->
                 Log.w("XikeCamera", "Camera capture file creation failed", error)
-                Toast.makeText(context, localizedText("无法准备拍照，请重试"), Toast.LENGTH_LONG).show()
+                XikeNotice.makeText(context, localizedText("无法准备拍照，请重试"), XikeNotice.LENGTH_LONG).show()
             }
     }
     val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
@@ -1176,7 +1180,7 @@ fun MomentScreen(
         if (granted) {
             launchSystemCamera()
         } else {
-            Toast.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), Toast.LENGTH_LONG).show()
+            XikeNotice.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), XikeNotice.LENGTH_LONG).show()
         }
     }
     val openCamera = {
@@ -1192,7 +1196,7 @@ fun MomentScreen(
         if (granted) {
             showVoiceCapture = true
         } else {
-            Toast.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), Toast.LENGTH_LONG).show()
+            XikeNotice.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), XikeNotice.LENGTH_LONG).show()
         }
     }
     val beginVoiceCapture = {
@@ -1553,7 +1557,7 @@ fun MomentScreen(
                     val mood = draft.mood ?: return@Button
                     if (isSaving || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
                     dismissKeyboard()
-                    isSaving = true
+                    localSaving = true
                     scope.launch {
                         onSave(
                             JournalEntry(
@@ -1568,15 +1572,15 @@ fun MomentScreen(
                             draft.imageUriStrings.map(Uri::parse),
                         ).onSuccess {
                             showDetails = false
-                            Toast.makeText(
+                            if (!saveFeedbackHandledExternally) XikeNotice.makeText(
                                 context,
                                 if (draft.recordedAt == null) localizedText("这一刻，已经好好收下了") else localizedText("那一刻，已经好好收下了"),
-                                Toast.LENGTH_SHORT,
+                                XikeNotice.LENGTH_SHORT,
                             ).show()
                         }.onFailure { error ->
-                            Toast.makeText(context, error.message ?: localizedText("保存失败，请重试"), Toast.LENGTH_LONG).show()
+                            if (!saveFeedbackHandledExternally) XikeNotice.makeText(context, error.message ?: localizedText("保存失败，请重试"), XikeNotice.LENGTH_LONG).show()
                         }
-                        isSaving = false
+                        localSaving = false
                     }
                 },
                 enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
@@ -1598,6 +1602,8 @@ fun MomentScreen(
                         isSaving -> localizedText("正在收下…")
                         showVoiceCapture -> localizedText("请先完成录音")
                         pendingDraftAudio != null -> if (isDraftAudioSaving) localizedText("正在保存语音…") else localizedText("请先处理录音")
+                        videoServices.draftSaving -> tr("正在导入视频…", "Importing video…")
+                        draft.pendingVideoUri != null -> tr("请先处理视频", "Please resolve the video import")
                         draft.mood == null -> localizedText("先选择一种心情")
                         draft.recordedAt != null -> localizedText("补记这一刻")
                         else -> localizedText("记下此刻")
@@ -2204,7 +2210,7 @@ internal fun showRecordedAtPicker(
                 { _, hour, minute ->
                     val selected = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
                     if (selected > System.currentTimeMillis()) {
-                        Toast.makeText(context, localizedText("记录时间不能晚于现在"), Toast.LENGTH_SHORT).show()
+                        XikeNotice.makeText(context, localizedText("记录时间不能晚于现在"), XikeNotice.LENGTH_SHORT).show()
                     } else {
                         onSelected(selected)
                     }
@@ -3739,7 +3745,7 @@ private fun SettingsToggleRow(
 }
 
 @Composable
-private fun ReminderScheduleDialog(
+internal fun ReminderScheduleDialog(
     settings: ReminderSettings,
     onConfirm: (ReminderSettings) -> Unit,
     onDismiss: () -> Unit,
@@ -3747,7 +3753,13 @@ private fun ReminderScheduleDialog(
     val context = LocalRecordedAtPickerContext.current
     var selectedHour by rememberSaveable(settings.hour) { mutableStateOf(settings.hour) }
     var selectedMinute by rememberSaveable(settings.minute) { mutableStateOf(settings.minute) }
-    var selectedDays by remember(settings.weekdays) { mutableStateOf(settings.weekdays) }
+    var selectedDays by rememberSaveable(
+        settings.weekdays,
+        stateSaver = androidx.compose.runtime.saveable.listSaver<Set<DayOfWeek>, String>(
+            save = { days -> days.map(DayOfWeek::name) },
+            restore = { names -> names.map(DayOfWeek::valueOf).toSet() },
+        ),
+    ) { mutableStateOf(settings.weekdays) }
     var quietHoursEnabled by rememberSaveable(settings.quietHoursEnabled) {
         mutableStateOf(settings.quietHoursEnabled)
     }

@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
@@ -135,7 +134,7 @@ class MainActivity : FragmentActivity() {
                 if (granted) {
                     persistReminderSettings(reminderSettings.copy(enabled = true))
                 } else {
-                    Toast.makeText(this, localizedText("没有开启通知，记录功能仍可正常使用"), Toast.LENGTH_LONG).show()
+                    XikeNotice.makeText(this, localizedText("没有开启通知，记录功能仍可正常使用"), XikeNotice.LENGTH_LONG).show()
                 }
             }
             if (!lockSession.journalSessionOpened) {
@@ -164,7 +163,7 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                XikeTheme(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
+                JournalTheme(journalViewModel, noticesBlocked = appLockEnabled && lockSession.isAppLocked) {
                     CompositionLocalProvider(
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,
                         LocalAudioEditServices provides AudioEditServices(
@@ -228,12 +227,14 @@ class MainActivity : FragmentActivity() {
                             onReminderSettingsChange = ::persistReminderSettings,
                             onDailyPromptSettingsChange = ::persistDailyPromptSettings,
                             onSave = journalViewModel::save,
+                            isDraftSaving = journalViewModel.isDraftSaving,
+                            isBackupExporting = journalViewModel.isBackupExporting,
                             onUpdate = journalViewModel::update,
                             onDelete = journalViewModel::delete,
                             onUndoDelete = journalViewModel::undoDelete,
                             onFinalizeDelete = journalViewModel::finalizeDelete,
                             onSearch = journalViewModel::search,
-                            onExportBackup = journalViewModel::exportBackup,
+                            onExportBackup = journalViewModel::startBackupExport,
                             onBackupRequiresPassword = journalViewModel::backupRequiresPassword,
                             onInspectBackup = journalViewModel::inspectBackup,
                             onRestoreBackup = journalViewModel::restoreBackup,
@@ -359,7 +360,7 @@ class MainActivity : FragmentActivity() {
                             BiometricPrompt.ERROR_USER_CANCELED,
                         )
                     ) {
-                        Toast.makeText(this@MainActivity, errString, Toast.LENGTH_SHORT).show()
+                        XikeNotice.makeText(this@MainActivity, errString, XikeNotice.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -411,14 +412,14 @@ class MainActivity : FragmentActivity() {
                 lockSession.isAppLocked = false
                 lockSession.journalSessionOpened = true
                 lockSession.backgroundedAtMillis = null
-                Toast.makeText(
+                XikeNotice.makeText(
                     this,
                     if (enabled) localizedText("应用锁已开启") else localizedText("应用锁已关闭"),
-                    Toast.LENGTH_SHORT,
+                    XikeNotice.LENGTH_SHORT,
                 ).show()
             }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: localizedText("应用锁设置保存失败"), Toast.LENGTH_SHORT).show()
+                XikeNotice.makeText(this, error.message ?: localizedText("应用锁设置保存失败"), XikeNotice.LENGTH_SHORT).show()
             }
     }
 
@@ -426,7 +427,7 @@ class MainActivity : FragmentActivity() {
         runCatching { lockPreferences.timeout = timeout }
             .onSuccess { appLockTimeout = timeout }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: localizedText("自动锁定设置保存失败"), Toast.LENGTH_SHORT).show()
+                XikeNotice.makeText(this, error.message ?: localizedText("自动锁定设置保存失败"), XikeNotice.LENGTH_SHORT).show()
             }
     }
 
@@ -459,7 +460,7 @@ class MainActivity : FragmentActivity() {
                 ReminderScheduler.reconcile(this, settings)
             }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: localizedText("提醒设置保存失败"), Toast.LENGTH_LONG).show()
+                XikeNotice.makeText(this, error.message ?: localizedText("提醒设置保存失败"), XikeNotice.LENGTH_LONG).show()
             }
     }
 
@@ -467,7 +468,7 @@ class MainActivity : FragmentActivity() {
         runCatching { habitPreferences.dailyPrompt = settings }
             .onSuccess { dailyPromptSettings = settings }
             .onFailure { error ->
-                Toast.makeText(this, error.message ?: localizedText("每日一问设置保存失败"), Toast.LENGTH_LONG).show()
+                XikeNotice.makeText(this, error.message ?: localizedText("每日一问设置保存失败"), XikeNotice.LENGTH_LONG).show()
             }
     }
 
@@ -500,7 +501,7 @@ class MainActivity : FragmentActivity() {
         runCatching { startActivity(intent) }
             .onFailure {
                 lockSession.pendingAuthenticationAfterEnrollment = null
-                Toast.makeText(this, localizedText("无法打开系统安全设置"), Toast.LENGTH_SHORT).show()
+                XikeNotice.makeText(this, localizedText("无法打开系统安全设置"), XikeNotice.LENGTH_SHORT).show()
             }
     }
 
@@ -544,13 +545,36 @@ class AppLockSessionState : ViewModel() {
 
 private enum class BackupAction { EXPORT, IMPORT }
 
+@Composable
+private fun JournalTheme(journal: JournalViewModel, noticesBlocked: Boolean, content: @Composable () -> Unit) {
+    val feedback = journal.operationFeedback.firstOrNull()
+    val retainedNotice = remember(feedback) {
+        feedback?.let {
+            NoticeMessage(it.message, if (it.isError) XikeNotice.LENGTH_LONG else XikeNotice.LENGTH_SHORT) {
+                journal.acknowledgeFeedback(it)
+            }
+        }
+    }
+    CompositionLocalProvider(LocalRetainedNotice provides retainedNotice.takeUnless { noticesBlocked }) {
+        XikeTheme(journal.selectedTheme, journal.selectedStyle, content = content)
+    }
+}
+
 private data class PendingRestore(
     val uri: Uri,
     val password: String?,
     val summary: BackupSummary,
 )
 
-private data class PendingExport(val password: String?)
+internal data class PendingExport(val password: String?)
+
+internal class BackupExportState : ViewModel() {
+    private var pending: PendingExport? = null
+
+    fun begin(password: String?) { pending = PendingExport(password) }
+
+    fun take(): PendingExport? = pending.also { pending = null }
+}
 
 @Composable
 private fun XikeApp(
@@ -592,12 +616,14 @@ private fun XikeApp(
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
+    isDraftSaving: Boolean,
+    isBackupExporting: Boolean,
     onUpdate: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
     onDelete: suspend (JournalEntry) -> Result<Unit>,
     onUndoDelete: suspend (String) -> Result<Unit>,
     onFinalizeDelete: suspend (String) -> Result<Unit>,
     onSearch: suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage>,
-    onExportBackup: suspend (Uri, String?) -> Result<Unit>,
+    onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
     onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
     onRestoreBackup: suspend (Uri, String?) -> Result<Int>,
@@ -610,7 +636,9 @@ private fun XikeApp(
     val scope = rememberCoroutineScope()
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
-    var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
+    val exportState: BackupExportState = viewModel()
+    var exportRequested by rememberSaveable { mutableStateOf(false) }
+    var encryptedExportRequested by rememberSaveable { mutableStateOf(false) }
     var pendingImportUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
@@ -627,10 +655,10 @@ private fun XikeApp(
         busyMessage = localizedText("正在撤销上次恢复…")
         onUndoRestore()
             .onSuccess { count ->
-                Toast.makeText(context, tr("已撤销恢复，找回 $count 条日记", "Restore undone. Recovered $count entries"), Toast.LENGTH_SHORT).show()
+                XikeNotice.makeText(context, tr("已撤销恢复，找回 $count 条日记", "Restore undone. Recovered $count entries"), XikeNotice.LENGTH_SHORT).show()
             }
             .onFailure {
-                Toast.makeText(context, it.message ?: localizedText("撤销恢复失败"), Toast.LENGTH_LONG).show()
+                XikeNotice.makeText(context, it.message ?: localizedText("撤销恢复失败"), XikeNotice.LENGTH_LONG).show()
             }
         busyMessage = null
     }
@@ -639,25 +667,22 @@ private fun XikeApp(
         busyMessage = localizedText("正在验证备份…")
         onInspectBackup(uri, password)
             .onSuccess { summary -> pendingRestore = PendingRestore(uri, password, summary) }
-            .onFailure { Toast.makeText(context, it.message ?: localizedText("备份验证失败"), Toast.LENGTH_LONG).show() }
+            .onFailure { XikeNotice.makeText(context, it.message ?: localizedText("备份验证失败"), XikeNotice.LENGTH_LONG).show() }
         busyMessage = null
     }
 
     fun handleExportSelection(uri: Uri?) {
-        val export = pendingExport
-        pendingExport = null
+        // Keep passwords only in memory across configuration changes. After process death,
+        // plain exports can resume; encrypted exports must ask the user to start again.
+        val export = exportState.take()
+            ?: if (exportRequested && !encryptedExportRequested) PendingExport(null) else null
+        exportRequested = false
+        encryptedExportRequested = false
+        if (uri != null && export == null) {
+            XikeNotice.makeText(context, tr("备份导出已中断，文件尚未写入。请重新导出并输入密码。", "Backup export was interrupted. The file has not been written. Export again and enter the password."), XikeNotice.LENGTH_LONG).show()
+        }
         if (uri != null && export != null) {
-            scope.launch {
-                busyMessage = localizedText("正在创建备份…")
-                onExportBackup(uri, export.password)
-                    .onSuccess {
-                        Toast.makeText(context, localizedText("备份已保存"), Toast.LENGTH_SHORT).show()
-                    }
-                    .onFailure {
-                        Toast.makeText(context, it.message ?: localizedText("备份失败"), Toast.LENGTH_SHORT).show()
-                    }
-                busyMessage = null
-            }
+            onExportBackup(uri, export.password)
         }
     }
 
@@ -686,7 +711,7 @@ private fun XikeApp(
                     }
                     .onFailure {
                         busyMessage = null
-                        Toast.makeText(context, it.message ?: localizedText("无法识别备份"), Toast.LENGTH_LONG).show()
+                        XikeNotice.makeText(context, it.message ?: localizedText("无法识别备份"), XikeNotice.LENGTH_LONG).show()
                     }
             }
         }
@@ -700,7 +725,7 @@ private fun XikeApp(
                 selected = screen,
                 onSelected = { selected ->
                     if (isVoiceCaptureActive && selected != AppScreen.HOME) {
-                        Toast.makeText(context, localizedText("请先完成或取消录音"), Toast.LENGTH_SHORT).show()
+                        XikeNotice.makeText(context, localizedText("请先完成或取消录音"), XikeNotice.LENGTH_SHORT).show()
                     } else {
                         screen = selected
                     }
@@ -735,6 +760,8 @@ private fun XikeApp(
                     onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
                     onDraftDiscard = onDraftDiscard,
                     onSave = onSave,
+                    isDraftSaving = isDraftSaving,
+                    saveFeedbackHandledExternally = true,
                 )
                 AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage, openAudio)
                 AppScreen.ARCHIVE -> JournalArchiveScreen(
@@ -780,7 +807,9 @@ private fun XikeApp(
         BackupExportDialog(
             onDismiss = { backupAction = null },
             onConfirm = { password ->
-                pendingExport = PendingExport(password)
+                exportState.begin(password)
+                exportRequested = true
+                encryptedExportRequested = password != null
                 backupAction = null
                 val date = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
                 if (password == null) plainExportLauncher.launch("xike-backup-$date.zip")
@@ -830,7 +859,7 @@ private fun XikeApp(
                             if (result == SnackbarResult.ActionPerformed) runUndoRestore()
                         }
                         .onFailure {
-                            Toast.makeText(context, it.message ?: localizedText("恢复失败"), Toast.LENGTH_LONG).show()
+                            XikeNotice.makeText(context, it.message ?: localizedText("恢复失败"), XikeNotice.LENGTH_LONG).show()
                             busyMessage = null
                         }
                 }
@@ -838,7 +867,7 @@ private fun XikeApp(
         )
     }
 
-    busyMessage?.let { message -> ProcessingDialog(message) }
+    (if (isBackupExporting) localizedText("正在创建备份…") else busyMessage)?.let { message -> ProcessingDialog(message) }
 }
 
 @Composable
