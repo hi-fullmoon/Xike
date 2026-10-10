@@ -606,15 +606,10 @@ internal fun VoiceCaptureCard(
                 contentColor = if (cancelRequested) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
             ) {
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                        if (isStopping) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        else Icon(
-                            Icons.Outlined.MicNone,
-                            contentDescription = null,
-                            modifier = Modifier.xikeInlineActionIcon(),
-                        )
+                    if (isStopping) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(XikeInlineActionGap))
                     }
-                    Spacer(Modifier.width(XikeInlineActionGap))
                     Text(when {
                         cancelRequested -> tr("松开取消", "Release to cancel")
                         isRecording -> tr("松手完成", "Release to finish")
@@ -947,14 +942,6 @@ internal fun VoicePlaybackCard(
                                 releasePlayer()
                                 onReplace()
                             }) {
-                                if (!showDeleteLabel) {
-                                    Icon(
-                                        Icons.Outlined.MicNone,
-                                        contentDescription = null,
-                                        modifier = Modifier.xikeInlineActionIcon(),
-                                    )
-                                    Spacer(Modifier.width(XikeInlineActionGap))
-                                }
                                 Text(localizedText("重新录制"), maxLines = if (showDeleteLabel) Int.MAX_VALUE else 1)
                             }
                         }

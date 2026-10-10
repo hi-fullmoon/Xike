@@ -123,7 +123,7 @@ internal fun VideoAddButton(
     }
     val choose = { focus.clearFocus(); keyboard?.hide(); choosing = true }
     if (content != null) content(choose) else {
-        MomentQuickAction(icon = Icons.Outlined.Videocam, label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
+        MomentQuickAction(label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
     }
     if (choosing) MediaSourceDialog(
         title = tr("添加视频", "Add video"),

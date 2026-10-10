@@ -57,15 +57,12 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -738,7 +735,6 @@ private fun ArchiveModeGroup(
             ) {
                 ArchiveModeButton(
                     label = localizedText("月历"),
-                    icon = Icons.Outlined.CalendarMonth,
                     selected = viewMode == ArchiveViewMode.CALENDAR,
                     modifier = Modifier.weight(1f).testTag("archive-mode-calendar").then(
                         if (viewMode == ArchiveViewMode.CALENDAR) Modifier.bringIntoViewRequester(selectedItemRequester) else Modifier,
@@ -747,7 +743,6 @@ private fun ArchiveModeGroup(
                 )
                 ArchiveModeButton(
                     label = localizedText("时间流"),
-                    icon = Icons.Outlined.ViewAgenda,
                     selected = viewMode == ArchiveViewMode.TIMELINE,
                     modifier = Modifier.weight(1f).testTag("archive-mode-timeline").then(
                         if (viewMode == ArchiveViewMode.TIMELINE) Modifier.bringIntoViewRequester(selectedItemRequester) else Modifier,
@@ -809,19 +804,11 @@ private fun ArchiveFilterToggle(
 @Composable
 private fun ArchiveModeButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-    val labelWidth = with(LocalDensity.current) {
-        maxOf(
-            textMeasurer.measure(localizedText("月历"), labelStyle, softWrap = false).size.width,
-            textMeasurer.measure(localizedText("时间流"), labelStyle, softWrap = false).size.width,
-        ).toDp()
-    }
     Surface(
         modifier = modifier
             .sizeIn(minHeight = 48.dp)
@@ -833,48 +820,18 @@ private fun ArchiveModeButton(
         shape = XikeShapes.button,
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
     ) {
-        BoxWithConstraints(
+        Box(
             Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val iconContent: @Composable () -> Unit = {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            val labelContent: @Composable () -> Unit = {
-                Text(
-                    label,
-                    style = labelStyle,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (maxWidth < labelWidth + 22.dp) {
-                Column(
-                    Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    iconContent()
-                    labelContent()
-                }
-            } else {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    iconContent()
-                    Spacer(Modifier.width(4.dp))
-                    labelContent()
-                }
-            }
+            Text(
+                label,
+                style = labelStyle,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -1426,8 +1383,6 @@ internal fun JournalEntryDetailDialog(
                             shape = XikeShapes.button,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) {
-                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                            Spacer(Modifier.width(XikeInlineActionGap))
                             Text(localizedText("删除记录"), maxLines = 1)
                         }
                         OutlinedButton(

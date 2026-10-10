@@ -72,7 +72,6 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
-import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -90,13 +89,11 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Interests
-import androidx.compose.material.icons.outlined.KeyboardHide
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MicNone
@@ -106,7 +103,6 @@ import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Restore
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
@@ -754,8 +750,6 @@ internal fun xikeButtonElevation(): ButtonElevation = ButtonDefaults.buttonEleva
 
 internal val XikeInlineActionGap = 6.dp
 
-internal fun Modifier.xikeInlineActionIcon(): Modifier = size(20.dp)
-
 @Composable
 internal fun xikeSwitchColors(): SwitchColors = SwitchDefaults.colors(
     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -959,12 +953,6 @@ fun AppLockScreen(
                     contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
                     elevation = xikeButtonElevation(),
                 ) {
-                    Icon(
-                        if (authenticationAvailable) Icons.Outlined.LockOpen else Icons.Outlined.Shield,
-                        contentDescription = null,
-                        modifier = Modifier.xikeInlineActionIcon(),
-                    )
-                    Spacer(Modifier.width(XikeInlineActionGap))
                     Text(if (authenticationAvailable) localizedText("解锁息刻") else localizedText("设置设备锁屏"), maxLines = 1)
                 }
             }
@@ -1682,21 +1670,21 @@ fun MomentScreen(
                         style = MaterialTheme.typography.titleLarge,
                     )
                     MomentMediaAction(
-                        Icons.Outlined.MicNone, tr("录音", "Record audio"),
+                        tr("录音", "Record audio"),
                         !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
                     ) {
                         showAddContent = false
                         beginVoiceCapture()
                     }
                     MomentMediaAction(
-                        Icons.Outlined.AddPhotoAlternate, localizedText("照片"),
+                        localizedText("照片"),
                         !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
                     ) {
                         showAddContent = false
                         showPhotoSourceDialog = true
                     }
                     MomentMediaAction(
-                        Icons.Outlined.Videocam, tr("视频", "Video"),
+                        tr("视频", "Video"),
                         !isSaving && !videoServices.draftSaving,
                     ) {
                         showAddContent = false
@@ -1789,7 +1777,6 @@ fun MomentScreen(
 
 @Composable
 internal fun MomentQuickAction(
-    icon: ImageVector,
     label: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
@@ -1828,12 +1815,6 @@ internal fun MomentQuickAction(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(4.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
@@ -2143,10 +2124,6 @@ internal fun MomentContentToolbar(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) {
-            if (onDone != null) {
-                Icon(Icons.Outlined.KeyboardHide, contentDescription = null, modifier = Modifier.xikeInlineActionIcon())
-                Spacer(Modifier.width(XikeInlineActionGap))
-            }
             Text(
                 if (onDone != null) localizedText("完成")
                 else if (recordedAt == null) tr("今天 · 修改时间", "Today · Change time") else {
@@ -2165,7 +2142,7 @@ internal fun MomentContentToolbar(
 }
 
 @Composable
-private fun MomentMediaAction(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun MomentMediaAction(label: String, enabled: Boolean, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
         enabled = enabled,
@@ -2178,10 +2155,7 @@ private fun MomentMediaAction(icon: ImageVector, label: String, enabled: Boolean
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f),
         ),
     ) {
-        Icon(icon, null, Modifier.size(24.dp))
-        Spacer(Modifier.width(16.dp))
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif))
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -2702,15 +2676,13 @@ private fun MultiImagePicker(
 @Composable
 internal fun AddPhotoTile(modifier: Modifier, label: String, onClick: () -> Unit) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(role = Role.Button, onClick = onClick),
         shape = XikeShapes.inner,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(6.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        Box(contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = label, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -3307,7 +3279,9 @@ internal fun PhotoGalleryDialog(
                                         enabled = !isLoading,
                                         onClick = { retryAttempt++ },
                                         shape = XikeShapes.button,
-                                    ) { Text(tr("重试", "Retry")) }
+                                    ) {
+                                        Text(tr("重试", "Retry"))
+                                    }
                                 }
                             }
                         }
