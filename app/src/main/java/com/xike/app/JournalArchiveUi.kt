@@ -55,6 +55,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -1690,20 +1692,13 @@ private fun JournalEntryEditDialog(
                         .padding(horizontal = XikeScreenHorizontalPadding, vertical = XikeScreenVerticalPadding),
                     verticalArrangement = Arrangement.spacedBy(XikeContentGap),
                 ) {
-                Text(
-                    localizedText("修改会同步更新回望、搜索与轨迹"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 EditSectionCard(
                     title = localizedText("心情"),
-                    supporting = localizedText("重新选择最接近那一刻的感受"),
-                    contentPadding = PaddingValues(XikeCardPadding),
                 ) {
                     MoodChoices(selectedMood, !isSaving, { selectedMoodName = it.name })
                 }
 
-                EditSectionCard(title = localizedText("记录时间"), supporting = localizedText("可修正补记日期与具体时间")) {
+                EditSectionCard(title = localizedText("记录时间")) {
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable(enabled = !isSaving) {
                             showRecordedAtPicker(pickerContext, createdAt) { createdAt = it }
@@ -1744,7 +1739,11 @@ private fun JournalEntryEditDialog(
                     }
                 }
 
-                EditSectionCard(title = localizedText("此刻的注脚"), supporting = tr("最多 $MAX_DRAFT_NOTE_LENGTH 字", "Up to $MAX_DRAFT_NOTE_LENGTH characters")) {
+                EditSectionCard(
+                    title = localizedText("此刻的注脚"),
+                    trailing = "${note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                    trailingStyle = MaterialTheme.typography.labelSmall,
+                ) {
                     TextField(
                         value = note,
                         onValueChange = { note = it.take(MAX_DRAFT_NOTE_LENGTH) },
@@ -1762,24 +1761,62 @@ private fun JournalEntryEditDialog(
                             unfocusedIndicatorColor = Color.Transparent,
                         ),
                     )
-                    Text(
-                        "${note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                        modifier = Modifier.align(Alignment.End),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
 
-                retainedAudio?.let { audio ->
-                    EditSectionCard(title = localizedText("语音"), supporting = localizedText("移除只影响息刻中的加密副本")) {
+                EditSectionCard(
+                    title = localizedText("主题"),
+                    trailing = if (selectedTags.isEmpty()) localizedText("可多选") else tr("已选 ${selectedTags.canonicalTopics().size}", "${selectedTags.canonicalTopics().size} selected"),
+                ) {
+                    TopicChoices(selectedTags) { topic ->
+                        if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
+                    }
+                }
+
+                EditSectionCard(title = tr("天气", "Weather")) {
+                    val outdoor = editedOutdoor
+                    if (outdoor != null) {
+                        EditMediaSummary(
+                            icon = Icons.Outlined.Cloud,
+                            text = "${outdoor.placeName} · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.temperatureCelsius.roundToInt()}°C",
+                        )
+                    } else {
+                        EditMediaSummary(Icons.Outlined.Cloud, tr("这条记录没有天气信息", "This entry has no weather information"))
+                    }
+                }
+
+                EditSectionCard(title = tr("录音", "Audio")) {
+                    val audio = retainedAudio
+                    if (audio != null) {
                         VoicePlaybackCard(
                             audio = audio,
                             openAudio = openAudio,
                             onDelete = if (isSaving) null else ({ if (!isSaving) retainedAudio = null }),
                         )
+                    } else {
+                        EditMediaSummary(Icons.Outlined.Mic, tr("这条记录没有录音", "This entry has no audio"))
                     }
                 }
-                EditSectionCard(title = tr("视频", "Video"), supporting = tr("最长 5 分钟 · 最大 500 MB · 移除只影响息刻副本", "Up to 5 minutes · 500 MB · Removal only affects the Xike copy")) {
+
+                EditSectionCard(
+                    title = localizedText("照片"),
+                    trailing = "${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY",
+                ) {
+                    EditPhotoStrip(
+                        retainedImages = retainedImages,
+                        newImageUriStrings = newImageUriStrings,
+                        canAdd = availableImageSlots > 0 && !isSaving,
+                        enabled = !isSaving,
+                        openImage = openImage,
+                        onAdd = { showPhotoSourceDialog = true },
+                        onPreview = { previewPhoto = it },
+                        onRemoveRetained = { if (!isSaving) retainedImages = retainedImages - it },
+                        onRemoveNew = { uriString ->
+                            if (!isSaving) newImageUriStrings = newImageUriStrings - uriString
+                        },
+                    )
+                }
+
+                EditSectionCard(title = tr("视频", "Video")) {
                     retainedVideo?.let { VideoCard(it, if (isSaving || isVideoImporting) null else ({
                         scope.launch { videoServices.saveEdit(entry, null).onSuccess { retainedVideoJson = null }.onFailure { saveError = it.message } }
                     })) }
@@ -1799,34 +1836,6 @@ private fun JournalEntryEditDialog(
                             } finally { isVideoImporting = false; videoProgress = null }
                         }
                     })
-                }
-
-                EditSectionCard(
-                    title = localizedText("主题"),
-                    supporting = if (selectedTags.isEmpty()) localizedText("可多选") else tr("已选 ${selectedTags.canonicalTopics().size}", "${selectedTags.canonicalTopics().size} selected"),
-                ) {
-                    TopicChoices(selectedTags) { topic ->
-                        if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label)
-                    }
-                }
-
-                EditSectionCard(
-                    title = localizedText("照片"),
-                    supporting = tr("${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · 移除只影响息刻副本", "${retainedImages.size + newImageUriStrings.size} / $MAX_IMAGES_PER_ENTRY · Removal only affects the Xike copy"),
-                ) {
-                    EditPhotoStrip(
-                        retainedImages = retainedImages,
-                        newImageUriStrings = newImageUriStrings,
-                        canAdd = availableImageSlots > 0 && !isSaving,
-                        enabled = !isSaving,
-                        openImage = openImage,
-                        onAdd = { showPhotoSourceDialog = true },
-                        onPreview = { previewPhoto = it },
-                        onRemoveRetained = { if (!isSaving) retainedImages = retainedImages - it },
-                        onRemoveNew = { uriString ->
-                            if (!isSaving) newImageUriStrings = newImageUriStrings - uriString
-                        },
-                    )
                 }
 
                 saveError?.let { error ->
@@ -1894,10 +1903,32 @@ private fun JournalEntryEditDialog(
 }
 
 @Composable
+private fun EditMediaSummary(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
 private fun EditSectionCard(
     title: String,
-    supporting: String,
-    contentPadding: PaddingValues = PaddingValues(XikeCardPadding),
+    trailing: String? = null,
+    trailingStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodySmall,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -1907,15 +1938,13 @@ private fun EditSectionCard(
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Column {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    supporting,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                trailing?.let {
+                    Text(it, style = trailingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             content()
         }
