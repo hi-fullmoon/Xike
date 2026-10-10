@@ -978,6 +978,9 @@ private fun BackupExportDialog(
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         isError = confirmation.isNotEmpty() && confirmation != password,
+                        supportingText = if (confirmation.isNotEmpty() && confirmation != password) {
+                            { Text(localizedText("两次密码不一致")) }
+                        } else null,
                         singleLine = true,
                     )
                     Text(localizedText("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。"), style = MaterialTheme.typography.bodySmall)

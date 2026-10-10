@@ -673,9 +673,9 @@ fun XikeTheme(
                 AppStyle.FOCUS -> Color(0xFFE7ECE9)
             },
             onSurfaceVariant = when (style) {
-                AppStyle.BREATHE -> Color(0xFF68756D)
-                AppStyle.PAPER -> Color(0xFF71695F)
-                AppStyle.FOCUS -> Color(0xFF626D67)
+                AppStyle.BREATHE -> Color(0xFF63706A)
+                AppStyle.PAPER -> Color(0xFF6B6359)
+                AppStyle.FOCUS -> Color(0xFF5F6A64)
             },
             surfaceTint = theme.primary,
             surfaceDim = when (style) {

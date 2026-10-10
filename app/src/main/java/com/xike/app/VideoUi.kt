@@ -171,7 +171,12 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
     }
     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(aspectRatio).clipToBounds().clickable { if (onOpen != null) onOpen() else playing = true }, contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(aspectRatio).clipToBounds().clickable(
+                    onClickLabel = if (onOpen != null) tr("查看这一刻", "View this moment") else tr("播放视频", "Play video"),
+                ) { if (onOpen != null) onOpen() else playing = true },
+                contentAlignment = Alignment.Center,
+            ) {
                 cover?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
                 Surface(Modifier.size(48.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
                     Box(contentAlignment = Alignment.Center) {
