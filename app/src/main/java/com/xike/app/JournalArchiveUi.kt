@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
@@ -68,6 +69,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -106,6 +108,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -880,6 +883,18 @@ private fun ArchiveFilters(
     onClearDate: () -> Unit,
     onClearAll: () -> Unit,
 ) {
+    val selectedContentColor = if (isSystemInDarkTheme()) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+            .compositeOver(MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+    val filterColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        selectedLabelColor = selectedContentColor,
+        selectedLeadingIconColor = selectedContentColor,
+        selectedTrailingIconColor = selectedContentColor,
+    )
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
@@ -911,6 +926,7 @@ private fun ArchiveFilters(
                     FilterChip(
                         shape = XikeShapes.inner,
                         selected = mood.name in selectedMoodNames,
+                        colors = filterColors,
                         onClick = { onToggleMood(mood) },
                         label = { Text(mood.label) },
                         leadingIcon = {
@@ -930,6 +946,7 @@ private fun ArchiveFilters(
                         FilterChip(
                             shape = XikeShapes.inner,
                             selected = selectedTags.containsTopic(tag),
+                            colors = filterColors,
                             onClick = { onToggleTag(tag) },
                             label = { Text(localizedText(tag)) },
                         )
@@ -947,6 +964,7 @@ private fun ArchiveFilters(
                         FilterChip(
                             shape = XikeShapes.inner,
                             selected = true,
+                            colors = filterColors,
                             onClick = onClearDate,
                             label = { Text(selectedDate.asShortChineseDate()) },
                             trailingIcon = { Icon(Icons.Outlined.Close, localizedText("清除指定日期"), Modifier.size(18.dp)) },
@@ -957,6 +975,7 @@ private fun ArchiveFilters(
                     FilterChip(
                         shape = XikeShapes.inner,
                         selected = selectedDate == null && datePreset == preset,
+                        colors = filterColors,
                         onClick = { onDatePresetChange(preset) },
                         label = { Text(preset.label) },
                     )
@@ -972,6 +991,7 @@ private fun ArchiveFilters(
                     FilterChip(
                         shape = XikeShapes.inner,
                         selected = imageFilter == option,
+                        colors = filterColors,
                         onClick = { onImageFilterChange(option) },
                         label = { Text(option.label, maxLines = 1) },
                     )
