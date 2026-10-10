@@ -1299,7 +1299,7 @@ fun MomentScreen(
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             decorationBox = { innerTextField ->
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp),
                                     verticalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Box(Modifier.fillMaxWidth()) {
@@ -1343,14 +1343,13 @@ fun MomentScreen(
                         )
                     }
                 }
+                val draftSecurityStatus = when {
+                    showVoiceCapture -> localizedText("录音结束后将加密保存")
+                    pendingDraftAudio != null -> localizedText("录音仍待加密保存")
+                    else -> localizedText("草稿自动加密保存在本机")
+                }
                 Spacer(Modifier.height(8.dp))
-                DraftSecurityRow(
-                    statusText = when {
-                        showVoiceCapture -> localizedText("录音结束后将加密保存")
-                        pendingDraftAudio != null -> localizedText("录音仍待加密保存")
-                        else -> null
-                    },
-                )
+                DraftSecurityRow(statusText = draftSecurityStatus)
             }
 
             if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
@@ -2080,7 +2079,7 @@ private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("
 
 @Composable
 private fun DraftSecurityRow(
-    statusText: String? = null,
+    statusText: String,
 ) {
     val firstLineHeight = with(LocalDensity.current) {
         MaterialTheme.typography.bodySmall.lineHeight.toDp()
@@ -2097,9 +2096,9 @@ private fun DraftSecurityRow(
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(4.dp))
         Text(
-            statusText ?: localizedText("草稿自动加密保存在本机"),
+            statusText,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2279,14 +2278,14 @@ private fun BrandHeader(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                    shape = XikeShapes.dialog,
+                    shape = XikeShapes.inner,
                     containerColor = MaterialTheme.colorScheme.surface,
                 ) {
                     DropdownMenuItem(
                         text = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 val tint = if (canDiscard) MaterialTheme.colorScheme.error
                                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)

@@ -2038,18 +2038,20 @@ private fun EditPhotoTile(
                 .size(48.dp)
                 .semantics { contentDescription = removeDescription },
         ) {
-            Surface(
-                modifier = Modifier.size(30.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.66f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.White,
-                    )
+            Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.66f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
         }

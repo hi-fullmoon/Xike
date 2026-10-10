@@ -177,11 +177,15 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                     )
                 }
-            }
-            if (onRemove != null) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)) {
-                    TextButton(onClick = onRemove, shape = XikeShapes.button) {
-                        Text(tr("移除视频", "Remove video"))
+                if (onRemove != null) {
+                    IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(48.dp)) {
+                        Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+                            Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.Close, tr("移除视频", "Remove video"), Modifier.size(16.dp), tint = Color.White)
+                                }
+                            }
+                        }
                     }
                 }
             }
