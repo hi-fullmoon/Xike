@@ -12,9 +12,9 @@ import java.util.UUID
 
 internal data class StagedDraftAudio(val fileName: String, val durationMillis: Long)
 
-internal class PendingDraftAudioStore(context: Context) {
+internal class PendingDraftAudioStore(context: Context, directoryName: String = "pending-draft-audio") {
     private val appContext = context.applicationContext
-    private val directory = File(appContext.filesDir, "pending-draft-audio")
+    private val directory = File(appContext.filesDir, directoryName)
     private val masterKey = MasterKey.Builder(appContext)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
@@ -51,6 +51,16 @@ internal class PendingDraftAudioStore(context: Context) {
         // Do not remove any candidate until all files have been read successfully.
         candidates.drop(1).forEach(File::delete)
         return validated.firstOrNull()
+    }
+
+    fun recoverLatest(): StagedDraftAudio? = checkNotNull(directory.listFiles())
+        .filter { it.isFile && isStagedFileName(it.name) }
+        .maxByOrNull(File::lastModified)?.let(::validate)
+
+    fun discardAll() {
+        checkNotNull(directory.listFiles()).filter { isStagedFileName(it.name) }.forEach {
+            check(it.delete()) { localizedText("录音暂存文件暂时无法清理。") }
+        }
     }
 
     fun open(staged: StagedDraftAudio): InputStream {

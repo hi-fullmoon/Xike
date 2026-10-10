@@ -166,6 +166,7 @@ class MainActivity : FragmentActivity() {
                 JournalTheme(journalViewModel, noticesBlocked = appLockEnabled && lockSession.isAppLocked) {
                     CompositionLocalProvider(
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,
+                        LocalJournalEditOperations provides journalViewModel.editOperations,
                         LocalAudioEditServices provides AudioEditServices(
                             import = journalViewModel::importEditAudio,
                             release = journalViewModel::releaseEditAudio,

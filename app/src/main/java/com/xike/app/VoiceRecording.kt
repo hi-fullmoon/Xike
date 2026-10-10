@@ -128,7 +128,10 @@ internal val LocalAudioEditServices = androidx.compose.runtime.compositionLocalO
     error("Audio edit service unavailable")
 }
 
-internal class XikeAudioRecorder(private val context: Context) {
+internal class XikeAudioRecorder(
+    private val context: Context,
+    private val recordingDirectory: File = context.cacheDir,
+) {
     private var recorder: MediaRecorder? = null
     private var output: File? = null
 
@@ -137,7 +140,8 @@ internal class XikeAudioRecorder(private val context: Context) {
 
     fun start(onLimitReached: () -> Unit): File {
         check(recorder == null) { localizedText("录音已经开始。") }
-        val target = File.createTempFile("xike-recording-", ".m4a", context.cacheDir)
+        check(recordingDirectory.isDirectory || recordingDirectory.mkdirs()) { localizedText("无法创建录音暂存目录。") }
+        val target = File.createTempFile("xike-recording-", ".m4a", recordingDirectory)
         val mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
         } else {
@@ -220,9 +224,12 @@ internal fun VoiceCaptureSheet(
     enabled: Boolean,
     onRecorded: (File, Long) -> Unit,
     onClosed: () -> Unit,
+    recordingDirectory: File? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val recorder = remember { XikeAudioRecorder(context.applicationContext) }
+    val recorder = remember(recordingDirectory) {
+        XikeAudioRecorder(context.applicationContext, recordingDirectory ?: context.cacheDir)
+    }
     var isClosed by remember { mutableStateOf(false) }
     fun closeCapture() {
         if (isClosed) return
@@ -1165,6 +1172,7 @@ internal fun formatAudioDuration(durationMillis: Long): String {
 
 internal fun pruneVoiceTemporaryFiles(context: Context) {
     context.cacheDir.listFiles()
-        ?.filter { it.name.startsWith("xike-recording-") || it.name.startsWith("xike-playback-") }
+        // Recording candidates may belong to a pending editor import after process death.
+        ?.filter { it.name.startsWith("xike-playback-") }
         ?.forEach(File::delete)
 }

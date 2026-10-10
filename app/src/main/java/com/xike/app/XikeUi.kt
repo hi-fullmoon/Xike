@@ -1274,72 +1274,29 @@ fun MomentScreen(
                     Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 }
                 Spacer(Modifier.height(8.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = XikeShapes.card,
-                    color = MaterialTheme.colorScheme.surface,
+                MomentNoteCard(
+                    note = draft.note,
+                    enabled = !isSaving,
+                    onNoteChange = { if (!isSaving) onDraftNoteChange(it) },
+                    onFocusChange = { isNoteFocused = it },
                 ) {
-                    Column(Modifier.padding(horizontal = 14.dp).padding(top = 16.dp, bottom = 4.dp)) {
-                        BasicTextField(
-                            value = draft.note,
-                            onValueChange = { if (!isSaving) onDraftNoteChange(it) },
-                            enabled = !isSaving,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .semantics { contentDescription = localizedText("此刻的注脚") }
-                                .onFocusChanged { isNoteFocused = it.isFocused },
-                            minLines = 2,
-                            maxLines = 5,
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontFamily = FontFamily.SansSerif,
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Box(Modifier.fillMaxWidth()) {
-                                        if (draft.note.isEmpty()) {
-                                            Text(
-                                                localizedText("这一刻，有什么想留下？"),
-                                                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                    if (draft.note.isNotEmpty()) {
-                                        Text(
-                                            "${draft.note.length} / $MAX_DRAFT_NOTE_LENGTH",
-                                            modifier = Modifier.align(Alignment.End).padding(top = 4.dp, bottom = 6.dp),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        MomentContentToolbar(
-                            recordedAt = draft.recordedAt,
-                            enabled = !isSaving,
-                            onDone = dismissKeyboard.takeIf { isNoteFocused },
-                            onAdd = {
-                                dismissKeyboard()
-                                showAddContent = true
-                            },
-                            onChooseTime = {
-                                dismissKeyboard()
-                                if (draft.recordedAt == null) {
-                                    showRecordedAtPicker(pickerContext, null, onDraftRecordedAtChange)
-                                } else {
-                                    showRecordedAtOptions = true
-                                }
-                            },
-                        )
-                    }
+                    MomentContentToolbar(
+                        recordedAt = draft.recordedAt,
+                        enabled = !isSaving,
+                        onDone = dismissKeyboard.takeIf { isNoteFocused },
+                        onAdd = {
+                            dismissKeyboard()
+                            showAddContent = true
+                        },
+                        onChooseTime = {
+                            dismissKeyboard()
+                            if (draft.recordedAt == null) {
+                                showRecordedAtPicker(pickerContext, null, onDraftRecordedAtChange)
+                            } else {
+                                showRecordedAtOptions = true
+                            }
+                        },
+                    )
                 }
                 val draftSecurityStatus = when {
                     showVoiceCapture -> localizedText("录音结束后将加密保存")
@@ -1852,7 +1809,7 @@ internal fun MomentQuickAction(
 }
 
 @Composable
-private fun OutdoorContextCard(
+internal fun OutdoorContextCard(
     snapshot: OutdoorSnapshot?,
     isBackdated: Boolean,
     isLoading: Boolean,
@@ -1861,6 +1818,7 @@ private fun OutdoorContextCard(
     onAdd: () -> Unit,
     onChooseCity: () -> Unit,
     onRemove: () -> Unit,
+    showRefresh: Boolean = true,
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
     val cardModifier = if (isEmpty && enabled) {
@@ -1892,7 +1850,7 @@ private fun OutdoorContextCard(
                             }
                         }
                         Column(Modifier.weight(1f)) {
-                            Box(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = 82.dp)) {
+                            Box(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = if (showRefresh) 82.dp else 34.dp)) {
                                 Text(
                                     snapshot.placeName,
                                     modifier = Modifier.align(Alignment.CenterStart),
@@ -2001,6 +1959,7 @@ private fun OutdoorContextCard(
             }
             if (snapshot != null) {
                 Row(Modifier.align(Alignment.TopEnd)) {
+                    if (showRefresh) {
                     IconButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.size(48.dp)) {
                         Surface(Modifier.size(32.dp), shape = CircleShape,
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
@@ -2017,6 +1976,7 @@ private fun OutdoorContextCard(
                                 }
                             }
                         }
+                    }
                     }
                     IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.size(48.dp)) {
                         Surface(Modifier.size(32.dp), shape = CircleShape,
@@ -2118,12 +2078,66 @@ private fun DraftSecurityRow(
 }
 
 @Composable
+internal fun MomentNoteCard(
+    note: String,
+    enabled: Boolean,
+    onNoteChange: (String) -> Unit,
+    onFocusChange: (Boolean) -> Unit,
+    toolbar: @Composable () -> Unit,
+) {
+    Surface(Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(horizontal = 14.dp).padding(top = 16.dp, bottom = 4.dp)) {
+            BasicTextField(
+                value = note,
+                onValueChange = onNoteChange,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth()
+                    .semantics { contentDescription = localizedText("此刻的注脚") }
+                    .onFocusChanged { onFocusChange(it.isFocused) },
+                minLines = 2,
+                maxLines = 5,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = FontFamily.SansSerif,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Column(Modifier.fillMaxWidth().heightIn(min = 104.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                        Box(Modifier.fillMaxWidth()) {
+                            if (note.isEmpty()) {
+                                Text(
+                                    localizedText("这一刻，有什么想留下？"),
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                )
+                            }
+                            innerTextField()
+                        }
+                        if (note.isNotEmpty()) {
+                            Text(
+                                "${note.length} / $MAX_DRAFT_NOTE_LENGTH",
+                                modifier = Modifier.align(Alignment.End).padding(top = 4.dp, bottom = 6.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            toolbar()
+        }
+    }
+}
+
+@Composable
 internal fun MomentContentToolbar(
     recordedAt: Long?,
     enabled: Boolean,
     onAdd: () -> Unit,
     onChooseTime: () -> Unit,
     onDone: (() -> Unit)? = null,
+    isEditing: Boolean = false,
 ) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
@@ -2160,7 +2174,8 @@ internal fun MomentContentToolbar(
                     } else {
                         tr("yyyy年M月d日 HH:mm", "MMM d, yyyy HH:mm")
                     }
-                    DateTimeFormatter.ofPattern(pattern, AppLocale.locale).format(moment) + tr(" · 补记", " · Backdated")
+                    DateTimeFormatter.ofPattern(pattern, AppLocale.locale).format(moment) +
+                        if (isEditing) tr(" · 修改时间", " · Change time") else tr(" · 补记", " · Backdated")
                 },
                 style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal),
             )
@@ -2169,7 +2184,7 @@ internal fun MomentContentToolbar(
 }
 
 @Composable
-private fun MomentMediaAction(label: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun MomentMediaAction(label: String, enabled: Boolean, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
         enabled = enabled,
@@ -2316,7 +2331,7 @@ private fun BrandHeader(
 }
 
 @Composable
-private fun MoodPicker(
+internal fun MoodPicker(
     selectedMood: Mood?,
     enabled: Boolean,
     onSelected: (Mood?) -> Unit,
@@ -4215,7 +4230,7 @@ internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: St
 }
 
 @Composable
-private fun PaperCard(
+internal fun PaperCard(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(XikeCardPadding),
     content: @Composable ColumnScope.() -> Unit,

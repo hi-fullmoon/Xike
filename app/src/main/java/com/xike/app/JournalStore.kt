@@ -476,6 +476,11 @@ class JournalStore(context: Context) {
 
     @Synchronized
     fun importEditAudio(source: File, durationMillis: Long): JournalAudio {
+        return FileInputStream(source).use { importEditAudio(it, durationMillis) }
+    }
+
+    @Synchronized
+    fun importEditAudio(source: InputStream, durationMillis: Long): JournalAudio {
         val audio = importAudio(source, durationMillis)
         try {
             check(editAudioPreferences.edit().putBoolean(audio.fileName, true).commit())

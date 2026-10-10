@@ -31,6 +31,7 @@ internal class JournalOperationFeedback(val message: String, val isError: Boolea
 
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
+    internal val editOperations by lazy { JournalEditOperations(application, viewModelScope, store) { draft.imageUriStrings } }
     private val videoStore = JournalVideoStore(application)
     var isDraftVideoSaving by mutableStateOf(false)
         private set
@@ -703,6 +704,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun releaseDraftImageAccess(uri: Uri) {
+        if (editOperations.imageInUse(uri)) return
         val application = getApplication<Application>()
         if (isCameraCaptureUri(application, uri)) {
             return
