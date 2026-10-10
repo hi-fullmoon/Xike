@@ -432,43 +432,6 @@ private fun InsightsSectionLabel(title: String, supporting: String) {
 }
 
 @Composable
-private fun EvidenceCard(evidence: InsightEvidence) {
-    InsightSectionCard(
-        icon = Icons.Outlined.DataUsage,
-        index = localizedText("依据"),
-        title = evidence.level.label,
-    ) {
-        Text(
-            evidence.level.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        val percent = (evidence.coverageRatio * 100).roundToInt()
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(localizedText("有记录的日期"), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.weight(1f))
-            Text(
-                tr("${evidence.recordedDayCount} / ${evidence.elapsedDayCount} 天 · $percent%", "${evidence.recordedDayCount} / ${evidence.elapsedDayCount} days · $percent%"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(7.dp))
-        RatioBar(
-            ratio = evidence.coverageRatio,
-            description = tr("数据覆盖：${evidence.elapsedDayCount} 天中有 ${evidence.recordedDayCount} 天存在记录", "Data coverage: entries on ${evidence.recordedDayCount} of ${evidence.elapsedDayCount} days"),
-        )
-        Spacer(Modifier.height(7.dp))
-        Text(
-            localizedText("覆盖比例只说明哪些日期有记录，不是完成率，也不要求每天记录。"),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun TrendCard(
     summary: JournalPeriodSummary,
     today: LocalDate,

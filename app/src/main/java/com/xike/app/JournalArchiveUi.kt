@@ -2,9 +2,7 @@ package com.xike.app
 
 import android.Manifest
 import android.net.Uri
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -236,6 +234,10 @@ fun JournalArchiveScreen(
     val requestKey = remember(entries, searchQuery) { Any() }
     val currentRequestKey by androidx.compose.runtime.rememberUpdatedState(requestKey)
     var resultKey by remember { mutableStateOf<Any?>(null) }
+    val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
+    // 结果状态项之前固定有页头与工具箱两项，其间按需插入筛选面板与月历；列表项增删时同步维护这里。
+    val resultStatusIndex = 2 + (if (showFilters) 1 else 0) + (if (viewMode == ArchiveViewMode.CALENDAR) 1 else 0)
+    val currentResultStatusIndex by androidx.compose.runtime.rememberUpdatedState(resultStatusIndex)
 
     LaunchedEffect(requestKey) {
         isSearching = true
@@ -261,9 +263,7 @@ fun JournalArchiveScreen(
         isSearching = false
         if (scrollToSelectedDateResults) {
             withFrameNanos { }
-            archiveListState.animateScrollToItem(
-                2 + (if (showFilters) 1 else 0) + (if (viewModeName == ArchiveViewMode.CALENDAR.name) 1 else 0),
-            )
+            archiveListState.animateScrollToItem(currentResultStatusIndex)
             scrollToSelectedDateResults = false
         }
     }
@@ -289,7 +289,6 @@ fun JournalArchiveScreen(
         calendarEntries.groupBy { it.localDate() }
     }
     val visibleMonth = runCatching { YearMonth.parse(visibleMonthValue) }.getOrDefault(YearMonth.from(today))
-    val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
 
     LaunchedEffect(entries, detailEntry?.id, entriesLoading) {
         if (entriesLoading) return@LaunchedEffect
@@ -1513,7 +1512,6 @@ private fun JournalEntryEditDialog(
     onSaved: (JournalEntry) -> Unit,
 ) {
     val context = LocalContext.current
-    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val scope = rememberCoroutineScope()
     val operations = LocalJournalEditOperations.current
     val operationState = operations.state(entry.id)
@@ -1598,7 +1596,6 @@ private fun JournalEntryEditDialog(
     var saveFailureCount by remember { mutableIntStateOf(0) }
     var showDiscardConfirmation by rememberSaveable(entry.id) { mutableStateOf(false) }
     var showPhotoSourceDialog by rememberSaveable(entry.id) { mutableStateOf(false) }
-    var pendingCameraUriString by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(operationState.outcome) {
         val delivered = operationState.outcome ?: return@LaunchedEffect
         val outcome = if (delivered is EditOutcome.Restored) {
@@ -1658,7 +1655,7 @@ private fun JournalEntryEditDialog(
     val editedOutdoor = if (outdoorRemoved) null else timeRetainedOutdoor
     val removesOutdoor = !outdoorRemoved && entry.outdoor != null && timeRetainedOutdoor == null
     val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
-    val onImagesPicked: (List<Uri>) -> Unit = { uris ->
+    val imagePickers = rememberJournalImagePickers(entry.id) { uris ->
         val additions = uris
             .map(Uri::toString)
             .distinct()
@@ -1681,101 +1678,8 @@ private fun JournalEntryEditDialog(
             XikeNotice.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), XikeNotice.LENGTH_SHORT).show()
         }
     }
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
-    ) { uris ->
-        systemActivityCallbacks.onResult()
-        onImagesPicked(uris)
-    }
-    val documentPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        systemActivityCallbacks.onResult()
-        onImagesPicked(uris)
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
-        systemActivityCallbacks.onResult()
-        val captureUri = pendingCameraUriString?.let(Uri::parse)
-        pendingCameraUriString = null
-        if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
-            onImagesPicked(listOf(captureUri))
-            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
-        } else if (captureUri != null) {
-            deleteCameraCapture(context, captureUri)
-            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
-        }
-    }
-    val openPhotoPicker = {
-        if (availableImageSlots > 0 && !isSaving) {
-            val openDocuments = {
-                val input = arrayOf("image/*")
-                val contract = ActivityResultContracts.OpenMultipleDocuments()
-                val canOpen = contract.createIntent(context, input)
-                    .resolveActivity(context.packageManager) != null
-                if (canOpen) {
-                    systemActivityCallbacks.onLaunch()
-                    runCatching { documentPicker.launch(input) }
-                        .onFailure { systemActivityCallbacks.onResult() }
-                        .getOrThrow()
-                }
-                canOpen
-            }
-            val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
-                runCatching {
-                    systemActivityCallbacks.onLaunch()
-                    photoPicker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                    true
-                }.onFailure { error ->
-                    systemActivityCallbacks.onResult()
-                    Log.w("XikeEditPhotoPicker", "Photo picker launch failed", error)
-                }.getOrElse {
-                    runCatching(openDocuments).getOrDefault(false)
-                }
-            } else {
-                runCatching(openDocuments).getOrDefault(false)
-            }
-            if (!opened) XikeNotice.makeText(context, localizedText("无法打开系统照片选择器"), XikeNotice.LENGTH_LONG).show()
-        }
-    }
-    val launchSystemCamera = {
-        if (availableImageSlots > 0 && !isSaving) {
-            runCatching { createCameraCaptureUri(context) }
-                .onSuccess { captureUri ->
-                    pendingCameraUriString = captureUri.toString()
-                    systemActivityCallbacks.onLaunch()
-                    runCatching { cameraLauncher.launch(captureUri) }
-                        .onFailure { error ->
-                            systemActivityCallbacks.onResult()
-                            pendingCameraUriString = null
-                            deleteCameraCapture(context, captureUri)
-                            Log.w("XikeEditCamera", "Camera launch failed", error)
-                            XikeNotice.makeText(context, localizedText("无法打开系统相机"), XikeNotice.LENGTH_LONG).show()
-                        }
-                }
-                .onFailure { error ->
-                    Log.w("XikeEditCamera", "Camera capture file creation failed", error)
-                    XikeNotice.makeText(context, localizedText("无法准备拍照，请重试"), XikeNotice.LENGTH_LONG).show()
-                }
-        }
-    }
-    val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            launchSystemCamera()
-        } else {
-            XikeNotice.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), XikeNotice.LENGTH_LONG).show()
-        }
-    }
-    val openCamera = {
-        if (hasGalleryWriteAccess(context)) {
-            launchSystemCamera()
-        } else {
-            galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-    }
+    val openPhotoPicker = { if (availableImageSlots > 0 && !isSaving) imagePickers.openPhotoPicker() }
+    val openCamera = { if (availableImageSlots > 0 && !isSaving) imagePickers.openCamera() }
     val hasUnsavedChanges = selectedMood != entry.mood ||
         createdAt != entry.createdAt ||
         note != entry.note ||
@@ -1789,7 +1693,7 @@ private fun JournalEntryEditDialog(
         val audios = importedAudios.toList()
         val videos = importedVideos.toList()
         val selectedVideo = retainedVideo
-        val cameraUri = pendingCameraUriString
+        val cameraUri = imagePickers.pendingCameraUri()
         operations.start(entry.id, EditOperation.DISCARD) {
             if (entry.video != null || selectedVideo != null || videos.isNotEmpty()) videoServices.clearEdit(entry.id).getOrThrow()
             operations.discardAudio(entry.id)
@@ -1834,7 +1738,7 @@ private fun JournalEntryEditDialog(
             EditOutcome.Saved(savedEntry, cleanupFailed)
         }
     }
-    VideoAddButton(enabled = !operationState.busy, onPicked = { uri ->
+    val chooseVideo = rememberVideoChooser(enabled = !operationState.busy, onPicked = { uri ->
         val previousVideo = retainedVideo
         operations.start(entry.id, EditOperation.VIDEO) {
             val video = videoServices.import(uri) { progress -> operations.progress(entry.id, progress) }.getOrThrow()
@@ -1843,7 +1747,7 @@ private fun JournalEntryEditDialog(
             previousVideo?.takeIf { it != entry.video }?.let(videoServices.release)
             EditOutcome.VideoReady(video)
         }
-    }) { chooseVideo ->
+    })
     Dialog(
         onDismissRequest = { if (!isSaving && !isVideoImporting && !isAudioImporting) dismissEditor() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -2145,7 +2049,6 @@ private fun JournalEntryEditDialog(
                 }
             }
         }
-    }
     }
 
     if (showVoiceCapture) {

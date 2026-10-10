@@ -11,6 +11,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,8 +44,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -164,6 +173,123 @@ internal fun pruneCameraCaptures(context: Context) {
             }
         }
     }
+}
+
+internal class JournalImagePickers(
+    val openPhotoPicker: () -> Unit,
+    val openCamera: () -> Unit,
+    val pendingCameraUri: () -> String?,
+)
+
+@Composable
+internal fun rememberJournalImagePickers(
+    vararg keys: Any?,
+    onImagesPicked: (List<Uri>) -> Unit,
+): JournalImagePickers {
+    val context = LocalContext.current
+    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
+    var pendingCameraUriString by rememberSaveable(*keys) { mutableStateOf<String?>(null) }
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
+    val photoDocumentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        systemActivityCallbacks.onResult()
+        onImagesPicked(uris)
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        systemActivityCallbacks.onResult()
+        val captureUri = pendingCameraUriString?.let(Uri::parse)
+        pendingCameraUriString = null
+        if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
+            onImagesPicked(listOf(captureUri))
+            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
+        } else if (captureUri != null) {
+            deleteCameraCapture(context, captureUri)
+            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
+        }
+    }
+    val openPhotoPicker = {
+        val openDocuments = {
+            val input = arrayOf("image/*")
+            val contract = ActivityResultContracts.OpenMultipleDocuments()
+            val canOpen = contract.createIntent(context, input)
+                .resolveActivity(context.packageManager) != null
+            if (canOpen) {
+                systemActivityCallbacks.onLaunch()
+                runCatching { photoDocumentPicker.launch(input) }
+                    .onFailure { systemActivityCallbacks.onResult() }
+                    .getOrThrow()
+            }
+            canOpen
+        }
+        val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
+            runCatching {
+                systemActivityCallbacks.onLaunch()
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+                true
+            }.onFailure { error ->
+                systemActivityCallbacks.onResult()
+                Log.w("XikePhotoPicker", "Photo picker launch failed", error)
+            }.getOrElse {
+                runCatching(openDocuments).onFailure { error ->
+                    Log.w("XikePhotoPicker", "Document picker launch failed", error)
+                }.getOrDefault(false)
+            }
+        } else {
+            runCatching(openDocuments).onFailure { error ->
+                Log.w("XikePhotoPicker", "Document picker launch failed", error)
+            }.getOrDefault(false)
+        }
+        if (!opened) {
+            XikeNotice.makeText(context, localizedText("无法打开系统照片选择器"), XikeNotice.LENGTH_LONG).show()
+        }
+    }
+    val launchSystemCamera = {
+        runCatching { createCameraCaptureUri(context) }
+            .onSuccess { captureUri ->
+                pendingCameraUriString = captureUri.toString()
+                systemActivityCallbacks.onLaunch()
+                runCatching { cameraLauncher.launch(captureUri) }
+                    .onFailure { error ->
+                        systemActivityCallbacks.onResult()
+                        pendingCameraUriString = null
+                        deleteCameraCapture(context, captureUri)
+                        Log.w("XikeCamera", "Camera launch failed", error)
+                        XikeNotice.makeText(context, localizedText("无法打开系统相机"), XikeNotice.LENGTH_LONG).show()
+                    }
+            }
+            .onFailure { error ->
+                Log.w("XikeCamera", "Camera capture file creation failed", error)
+                XikeNotice.makeText(context, localizedText("无法准备拍照，请重试"), XikeNotice.LENGTH_LONG).show()
+            }
+    }
+    val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            launchSystemCamera()
+        } else {
+            XikeNotice.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), XikeNotice.LENGTH_LONG).show()
+        }
+    }
+    return JournalImagePickers(
+        openPhotoPicker = { openPhotoPicker() },
+        openCamera = {
+            if (hasGalleryWriteAccess(context)) {
+                launchSystemCamera()
+            } else {
+                galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        },
+        pendingCameraUri = { pendingCameraUriString },
+    )
 }
 
 @Composable

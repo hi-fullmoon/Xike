@@ -67,12 +67,7 @@ internal data class VideoServices(
 internal val LocalVideoServices = compositionLocalOf { VideoServices() }
 
 @Composable
-internal fun VideoAddButton(
-    enabled: Boolean,
-    onPicked: (Uri) -> Unit,
-    modifier: Modifier = Modifier,
-    content: (@Composable (() -> Unit) -> Unit)? = null,
-) {
+internal fun rememberVideoChooser(enabled: Boolean, onPicked: (Uri) -> Unit): () -> Unit {
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -128,9 +123,6 @@ internal fun VideoAddButton(
             choosing = true
         }
     }
-    if (content != null) content(choose) else {
-        MomentQuickAction(label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = choose)
-    }
     if (choosing) MediaSourceDialog(
         title = tr("添加视频", "Add video"),
         description = tr("每条日记 1 段 · 最长 5 分钟 · 最大 500 MB", "1 video per entry · Up to 5 minutes · Up to 500 MB"),
@@ -150,6 +142,17 @@ internal fun VideoAddButton(
         },
         onDismiss = { choosing = false },
     )
+    return choose
+}
+
+@Composable
+internal fun VideoAddButton(
+    enabled: Boolean,
+    onPicked: (Uri) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val chooseVideo = rememberVideoChooser(enabled, onPicked)
+    MomentQuickAction(label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = chooseVideo)
 }
 
 @Composable

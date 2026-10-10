@@ -8,13 +8,11 @@ import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.View
 import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -91,7 +89,6 @@ import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Interests
 import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
@@ -1017,6 +1014,10 @@ fun MomentScreen(
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var localSaving by remember { mutableStateOf(false) }
     val isSaving = localSaving || isDraftSaving
+    val chooseVideo = rememberVideoChooser(
+        enabled = !isSaving && !videoServices.draftSaving,
+        onPicked = videoServices.addDraft,
+    )
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
     var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
@@ -1026,7 +1027,6 @@ fun MomentScreen(
     var showVoiceCapture by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val pickerContext = LocalRecordedAtPickerContext.current
-    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -1086,109 +1086,11 @@ fun MomentScreen(
             detailsAnchor.bringIntoView()
         }
     }
-    val onImagesPicked: (List<Uri>) -> Unit = { uris ->
-        onDraftImagesAdded(uris)
-    }
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
-    ) { uris ->
-        systemActivityCallbacks.onResult()
-        onImagesPicked(uris)
-    }
-    val photoDocumentPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        systemActivityCallbacks.onResult()
-        onImagesPicked(uris)
-    }
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var showAddContent by rememberSaveable { mutableStateOf(false) }
     var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
-    var pendingCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
-        systemActivityCallbacks.onResult()
-        val captureUri = pendingCameraUriString?.let(Uri::parse)
-        pendingCameraUriString = null
-        if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
-            onImagesPicked(listOf(captureUri))
-            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
-        } else if (captureUri != null) {
-            deleteCameraCapture(context, captureUri)
-            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
-        }
-    }
-    val openPhotoPicker = {
-        val openDocuments = {
-            val contract = ActivityResultContracts.OpenMultipleDocuments()
-            val input = arrayOf("image/*")
-            val canOpen = contract.createIntent(context, input)
-                .resolveActivity(context.packageManager) != null
-            if (canOpen) {
-                systemActivityCallbacks.onLaunch()
-                runCatching { photoDocumentPicker.launch(input) }
-                    .onFailure { systemActivityCallbacks.onResult() }
-                    .getOrThrow()
-            }
-            canOpen
-        }
-        val opened = if (ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)) {
-            runCatching {
-                systemActivityCallbacks.onLaunch()
-                photoPicker.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
-                true
-            }.onFailure { error ->
-                systemActivityCallbacks.onResult()
-                Log.w("XikePhotoPicker", "Photo picker launch failed", error)
-            }.getOrElse {
-                runCatching(openDocuments).onFailure { error ->
-                    Log.w("XikePhotoPicker", "Document picker launch failed", error)
-                }.getOrDefault(false)
-            }
-        } else {
-            runCatching(openDocuments).onFailure { error ->
-                Log.w("XikePhotoPicker", "Document picker launch failed", error)
-            }.getOrDefault(false)
-        }
-        if (!opened) {
-            XikeNotice.makeText(context, localizedText("无法打开系统照片选择器"), XikeNotice.LENGTH_LONG).show()
-        }
-    }
-    val launchSystemCamera = {
-        runCatching { createCameraCaptureUri(context) }
-            .onSuccess { captureUri ->
-                pendingCameraUriString = captureUri.toString()
-                systemActivityCallbacks.onLaunch()
-                runCatching { cameraLauncher.launch(captureUri) }
-                    .onFailure { error ->
-                        systemActivityCallbacks.onResult()
-                        pendingCameraUriString = null
-                        deleteCameraCapture(context, captureUri)
-                        Log.w("XikeCamera", "Camera launch failed", error)
-                        XikeNotice.makeText(context, localizedText("无法打开系统相机"), XikeNotice.LENGTH_LONG).show()
-                    }
-            }
-            .onFailure { error ->
-                Log.w("XikeCamera", "Camera capture file creation failed", error)
-                XikeNotice.makeText(context, localizedText("无法准备拍照，请重试"), XikeNotice.LENGTH_LONG).show()
-            }
-    }
-    val galleryWritePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            launchSystemCamera()
-        } else {
-            XikeNotice.makeText(context, localizedText("需要存储权限才能把照片保存到系统相册"), XikeNotice.LENGTH_LONG).show()
-        }
-    }
-    val openCamera = {
-        if (hasGalleryWriteAccess(context)) {
-            launchSystemCamera()
-        } else {
-            galleryWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
+    val imagePickers = rememberJournalImagePickers { uris ->
+        onDraftImagesAdded(uris)
     }
     val microphonePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -1481,13 +1383,11 @@ fun MomentScreen(
                     if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
                     draft.video?.let { video ->
                         val canChangeVideo = !isSaving && !videoServices.draftSaving && draft.pendingVideoUri == null
-                        VideoAddButton(enabled = canChangeVideo, onPicked = videoServices.addDraft) { chooseVideo ->
-                            VideoCard(
-                                video,
-                                onRemove = if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft,
-                                onReplace = if (canChangeVideo) chooseVideo else null,
-                            )
-                        }
+                        VideoCard(
+                            video,
+                            onRemove = if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft,
+                            onReplace = if (canChangeVideo) chooseVideo else null,
+                        )
                     }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
                         Text(
@@ -1628,50 +1528,44 @@ fun MomentScreen(
         )
     }
 
-    // Keep the video launcher and source dialog composed after the sheet closes.
-    VideoAddButton(
-        enabled = !isSaving && !videoServices.draftSaving,
-        onPicked = videoServices.addDraft,
-    ) { chooseVideo ->
-        if (showAddContent) {
-            ModalBottomSheet(
-                onDismissRequest = { showAddContent = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                sheetMaxWidth = XikeContentMaxWidth,
-                shape = XikeShapes.sheet,
-                containerColor = MaterialTheme.colorScheme.surface,
+    if (showAddContent) {
+        ModalBottomSheet(
+            onDismissRequest = { showAddContent = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetMaxWidth = XikeContentMaxWidth,
+            shape = XikeShapes.sheet,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
-                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                        .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                Text(
+                    tr("添加内容", "Add content"),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                MomentMediaAction(
+                    tr("录音", "Record audio"),
+                    !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
                 ) {
-                    Text(
-                        tr("添加内容", "Add content"),
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    MomentMediaAction(
-                        tr("录音", "Record audio"),
-                        !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
-                    ) {
-                        showAddContent = false
-                        beginVoiceCapture()
-                    }
-                    MomentMediaAction(
-                        localizedText("照片"),
-                        !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
-                    ) {
-                        showAddContent = false
-                        showPhotoSourceDialog = true
-                    }
-                    MomentMediaAction(
-                        tr("视频", "Video"),
-                        !isSaving && !videoServices.draftSaving,
-                    ) {
-                        showAddContent = false
-                        chooseVideo()
-                    }
+                    showAddContent = false
+                    beginVoiceCapture()
+                }
+                MomentMediaAction(
+                    localizedText("照片"),
+                    !isSaving && draft.imageUriStrings.size < MAX_IMAGES_PER_ENTRY,
+                ) {
+                    showAddContent = false
+                    showPhotoSourceDialog = true
+                }
+                MomentMediaAction(
+                    tr("视频", "Video"),
+                    !isSaving && !videoServices.draftSaving,
+                ) {
+                    showAddContent = false
+                    chooseVideo()
                 }
             }
         }
@@ -1682,11 +1576,11 @@ fun MomentScreen(
             cameraAvailable = canTakePhoto(context),
             onTakePhoto = {
                 showPhotoSourceDialog = false
-                openCamera()
+                imagePickers.openCamera()
             },
             onChoosePhotos = {
                 showPhotoSourceDialog = false
-                openPhotoPicker()
+                imagePickers.openPhotoPicker()
             },
             onDismiss = { showPhotoSourceDialog = false },
         )
@@ -2810,237 +2704,6 @@ private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
 }
 
 @Composable
-fun WeeklyInsightsScreen(padding: PaddingValues, entries: List<JournalEntry>) {
-    var selectedPeriodName by rememberSaveable { mutableStateOf(InsightsPeriod.WEEK.name) }
-    val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName } ?: InsightsPeriod.WEEK
-    val today = LocalDate.now()
-    val summary = remember(entries, selectedPeriod, today, AppLocale.language) {
-        journalPeriodSummary(entries, selectedPeriod, today)
-    }
-
-    ScreenColumn(padding) {
-        ScreenHeader(
-            eyebrow = summary.startDate.asDateRange(summary.endDate),
-            title = localizedText("洞察"),
-            supporting = localizedText("看见变化，而不是评判自己。"),
-        )
-
-        InsightsPeriodSelector(
-            selected = selectedPeriod,
-            onSelected = { selectedPeriodName = it.name },
-        )
-
-        Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.primary) {
-            Column(Modifier.padding(XikeCardPadding)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        tr("${selectedPeriod.contextName}概览", "${selectedPeriod.contextName} overview"),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.13f)) {
-                        Text(
-                            tr("${summary.entryCount} 次 · ${summary.recordedDayCount} 天", "${summary.entryCount} entries · ${summary.recordedDayCount} days"),
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    summary.averageScore?.let(::moodBandLabel) ?: localizedText("等待第一条记录"),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    summary.averageScore?.let(::moodSummary) ?: localizedText("记录此刻的心情，让趋势从这里开始。"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-                )
-                summary.averageScore?.let { average ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        tr("心情平均位置 ${String.format(AppLocale.locale, "%.1f", average)} / 5", "Average mood position ${String.format(AppLocale.locale, "%.1f", average)} / 5"),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.68f),
-                    )
-                }
-            }
-        }
-
-        PaperCard {
-            SectionTitle(
-                index = localizedText("趋势"),
-                title = selectedPeriod.trendTitle,
-                trailing = if (selectedPeriod == InsightsPeriod.YEAR) localizedText("按月") else null,
-            )
-            Spacer(Modifier.height(14.dp))
-            if (summary.entryCount < 3) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = XikeShapes.inner,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                ) {
-                    Row(Modifier.padding(XikeInnerCardPadding), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(localizedText("还需要一点时间"), style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                when (summary.entryCount) {
-                                    0 -> localizedText("记录第一刻后，这里会开始描出变化。")
-                                    else -> tr("再记录 ${3 - summary.entryCount} 次，就能看到更清晰的趋势。", "Add ${3 - summary.entryCount} more entries to see a clearer trend.")
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    horizontalArrangement = Arrangement.spacedBy(if (summary.trendPoints.size > 9) 3.dp else 8.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    summary.trendPoints.forEach { point ->
-                        val isCurrent = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Bottom,
-                        ) {
-                            Text(
-                                point.entryCount.takeIf { it > 0 }?.toString().orEmpty(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Surface(
-                                modifier = Modifier
-                                    .width(if (summary.trendPoints.size > 9) 13.dp else 22.dp)
-                                    .height(point.averageScore?.let { (14 + it * 9).dp } ?: 5.dp),
-                                shape = CircleShape,
-                                color = if (point.averageScore == null) MaterialTheme.colorScheme.surfaceVariant
-                                else MaterialTheme.colorScheme.primary.copy(alpha = if (isCurrent) 1f else 0.48f),
-                            ) {}
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                point.label,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = if (summary.trendPoints.size > 9) 10.sp else 11.sp,
-                                ),
-                                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (summary.entryCount > 0) {
-            InsightCard(
-                icon = Icons.Outlined.LocalOffer,
-                label = summary.mostUsedTag ?: localizedText("还没有常见主题"),
-                content = if (summary.mostUsedTag == null) localizedText("添加主题后，这里会帮你发现反复出现的线索。")
-                else tr("“${summary.mostUsedTag}”是${selectedPeriod.contextName}最常出现的主题，或许值得多留意一点。", "“${localizedText(summary.mostUsedTag.orEmpty())}” is the most frequent topic for ${selectedPeriod.contextName}. It may be worth a closer look."),
-            )
-        }
-    }
-}
-
-@Composable
-private fun InsightsPeriodSelector(
-    selected: InsightsPeriod,
-    onSelected: (InsightsPeriod) -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-    ) {
-        Row(
-            modifier = Modifier.padding(4.dp).selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            InsightsPeriod.entries.forEach { period ->
-                val isSelected = selected == period
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(CircleShape)
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary
-                            else Color.Transparent,
-                        )
-                        .selectable(
-                            selected = isSelected,
-                            role = Role.RadioButton,
-                            onClick = { onSelected(period) },
-                        )
-                        .padding(vertical = 11.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        period.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InsightCard(icon: ImageVector, label: String, content: String) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
-            Surface(modifier = Modifier.size(42.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(5.dp))
-                Text(content, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun DateSectionHeader(date: LocalDate, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 1.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(shape = XikeShapes.button, color = MaterialTheme.colorScheme.primaryContainer) {
-            Text(
-                date.format(DateTimeFormatter.ofPattern(tr("M月d日", "MMM d"), AppLocale.locale)),
-                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(date.asFullWeekday(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.weight(1f))
-        Text(tr("$count 条", "$count entries"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
 internal fun JournalEntryCard(
     entry: JournalEntry,
     modifier: Modifier = Modifier,
@@ -4052,11 +3715,8 @@ private fun ThemeTile(theme: AppTheme, selected: Boolean, onClick: () -> Unit, m
 
 @Composable
 private fun StyleTile(style: AppStyle, selected: Boolean, onClick: () -> Unit) {
-    val cardCorner = when (style) {
-        AppStyle.BREATHE -> 28.dp
-        AppStyle.PAPER -> 6.dp
-        AppStyle.FOCUS -> 14.dp
-    }
+    val cardCorner = style.spec().cardCorner
+    // 预览缩略图用的迷你圆角，约为实际 innerCorner 的七成，不与真实组件形状一一对应。
     val innerCorner = when (style) {
         AppStyle.BREATHE -> 14.dp
         AppStyle.PAPER -> 2.dp
@@ -4300,22 +3960,6 @@ internal fun rememberPreviewBitmap(
     return bitmap
 }
 
-private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> localizedText("愉悦时刻更多")
-    average >= 3.5 -> localizedText("整体更轻松")
-    average >= 2.5 -> localizedText("大多比较平静")
-    average >= 1.5 -> localizedText("疲惫感停留较多")
-    else -> localizedText("低落时刻较多")
-}
-
-private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> localizedText("这段时间里，有不少开心而舒展的时刻。")
-    average >= 3.5 -> localizedText("轻松的时刻更多，也允许自己偶尔停一停。")
-    average >= 2.5 -> localizedText("平静与起伏都曾出现，慢慢看见就好。")
-    average >= 1.5 -> localizedText("疲惫和低落停留得更多，记得给自己留一点余地。")
-    else -> localizedText("低落似乎停留了一阵，请更温柔地照顾自己。")
-}
-
 private data class MoodVisualStyle(val accent: Color, val container: Color)
 
 private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
@@ -4340,32 +3984,6 @@ private fun Mood.visualStyle(): MoodVisualStyle = when (this) {
         container = Color(0xFFF5E7C7),
     )
 }
-
-private fun LocalDate.asChineseDay(): String = DateTimeFormatter.ofPattern(tr("EEEE · M月d日", "EEEE · MMM d"), AppLocale.locale).format(this)
-
-private fun LocalDate.asDateRange(end: LocalDate): String = if (year == end.year) {
-    tr(
-        "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日",
-        "${format(DateTimeFormatter.ofPattern("MMM d", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
-    )
-} else {
-    tr(
-        "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日",
-        "${format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
-    )
-}
-
-private fun LocalDate.asWeekday(): String = when (dayOfWeek) {
-    java.time.DayOfWeek.MONDAY -> localizedText("一")
-    java.time.DayOfWeek.TUESDAY -> localizedText("二")
-    java.time.DayOfWeek.WEDNESDAY -> localizedText("三")
-    java.time.DayOfWeek.THURSDAY -> localizedText("四")
-    java.time.DayOfWeek.FRIDAY -> localizedText("五")
-    java.time.DayOfWeek.SATURDAY -> localizedText("六")
-    java.time.DayOfWeek.SUNDAY -> localizedText("日")
-}
-
-private fun LocalDate.asFullWeekday(): String = dayOfWeek.getDisplayName(DateTextStyle.FULL, AppLocale.locale)
 
 private fun Long.asChineseTime(): String = DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
     .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))
