@@ -2762,7 +2762,7 @@ internal fun JournalEntryCard(
                         Spacer(Modifier.height(9.dp))
                         Text(entry.note, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    entry.audio?.takeIf { !compactMedia }?.let { audio ->
+                    entry.audio?.let { audio ->
                         Spacer(Modifier.height(9.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -2786,7 +2786,7 @@ internal fun JournalEntryCard(
                 val hasMedia = mediaCount > 0
                 if (hasMedia) {
                     BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)) {
-                        val thumbnailWidth = (maxWidth - 8.dp) / 2
+                        val thumbnailWidth = (maxWidth - 16.dp) / 3
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2814,7 +2814,7 @@ internal fun JournalEntryCard(
                             }
                         }
                     }
-                    if (mediaCount > 2) {
+                    if (mediaCount > 3) {
                         Text(
                             tr("共 $mediaCount 项媒体 · 左右滑动查看", "$mediaCount media items · Swipe to view"),
                             modifier = Modifier.padding(horizontal = XikeCardPadding).padding(top = 8.dp),
@@ -2823,21 +2823,7 @@ internal fun JournalEntryCard(
                         )
                     }
                 }
-                entry.audio?.let { audio ->
-                    Row(
-                        Modifier.padding(horizontal = XikeCardPadding).padding(top = if (hasMedia) 12.dp else 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Outlined.MicNone, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            tr("语音 · ${formatAudioDuration(audio.durationMillis)}", "Audio · ${formatAudioDuration(audio.durationMillis)}"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                if (hasMedia || entry.audio != null) Spacer(Modifier.height(XikeCardPadding))
+                if (hasMedia) Spacer(Modifier.height(XikeCardPadding))
             }
         }
     }
