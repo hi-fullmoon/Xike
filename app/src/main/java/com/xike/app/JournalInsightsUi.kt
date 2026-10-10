@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -72,6 +73,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -469,111 +471,142 @@ private fun TrendCard(
 }
 
 @Composable
-private fun MoodTrendChart(
+internal fun MoodTrendChart(
     points: List<MoodTrendPoint>,
     today: LocalDate,
     onPointClick: (MoodTrendPoint) -> Unit,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val guide = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
-    val axisWidth = if (LocalDensity.current.fontScale >= 1.5f) 52.dp else 36.dp
-    Column(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
-        Box(Modifier.fillMaxWidth().height(142.dp)) {
-            Column(
-                modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                listOf(localizedText("愉悦"), localizedText("平静"), localizedText("低落")).forEach { label ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
-            Box(Modifier.fillMaxSize().padding(start = axisWidth)) {
-                Canvas(Modifier.fillMaxSize()) {
-                    if (points.isEmpty()) return@Canvas
-                    val step = size.width / points.size
-                    val top = 16.dp.toPx()
-                    val bottom = size.height - 14.dp.toPx()
-                    fun position(index: Int, score: Double): Offset = Offset(
-                        x = step * (index + 0.5f),
-                        y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
-                    )
-                    listOf(1.0, 3.0, 5.0).forEach { score ->
-                        val y = position(0, score).y
-                        drawLine(guide, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                    }
-                    var runStart = 0
-                    while (runStart < points.size) {
-                        if (points[runStart].averageScore == null) {
-                            runStart++
-                            continue
-                        }
-                        var runEnd = runStart
-                        while (runEnd + 1 < points.size && points[runEnd + 1].averageScore != null) runEnd++
-                        if (runEnd > runStart) {
-                            val first = position(runStart, requireNotNull(points[runStart].averageScore))
-                            val path = Path().apply { moveTo(first.x, first.y) }
-                            for (index in runStart until runEnd) {
-                                val from = position(index, requireNotNull(points[index].averageScore))
-                                val to = position(index + 1, requireNotNull(points[index + 1].averageScore))
-                                val midX = (from.x + to.x) / 2f
-                                path.cubicTo(midX, from.y, midX, to.y, to.x, to.y)
-                            }
-                            val area = Path().apply {
-                                addPath(path)
-                                lineTo(position(runEnd, requireNotNull(points[runEnd].averageScore)).x, bottom)
-                                lineTo(first.x, bottom)
-                                close()
-                            }
-                            drawPath(area, Brush.verticalGradient(listOf(primary.copy(alpha = 0.18f), primary.copy(alpha = 0.01f))))
-                            drawPath(path, primary.copy(alpha = 0.8f), style = Stroke(width = 2.5.dp.toPx()))
-                        }
-                        runStart = runEnd + 1
-                    }
-                    points.forEachIndexed { index, point ->
-                        val score = point.averageScore
-                        if (score != null) {
-                            val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
-                            val center = position(index, score)
-                            if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
-                            drawCircle(primary, radius = if (current) 5.dp.toPx() else 4.dp.toPx(), center = center)
-                            drawCircle(Color.White, radius = 1.7.dp.toPx(), center = center)
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxSize()) {
-                    points.forEach { point ->
-                        val description = buildString {
-                            append(point.dateRangeLabel())
-                            append(tr("，${point.entryCount} 条记录", ", ${point.entryCount} entries"))
-                            point.averageScore?.let { append(tr("，心情平均位置 ${it.oneDecimal()}", ", average mood position ${it.oneDecimal()}")) }
-                        }
-                        Box(
-                            Modifier.weight(1f).fillMaxSize()
-                                .semantics { contentDescription = description }
-                                .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth().padding(start = axisWidth)) {
-            points.forEachIndexed { index, point ->
-                val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    if (points.size <= 9 || index % 2 == 0 || current) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val axisLabels = listOf(localizedText("愉悦"), localizedText("平静"), localizedText("低落"))
+    val axisStyle = MaterialTheme.typography.labelSmall
+    val pointStyle = axisStyle.copy(fontSize = if (points.size > 9) 10.sp else 11.sp)
+    var renderedAxisWidth by remember(axisLabels, axisStyle, density) { mutableStateOf(0.dp) }
+    var renderedPointWidth by remember(points.map { it.label }, pointStyle, density) { mutableStateOf(0.dp) }
+    val axisWidth = with(density) {
+        maxOf(renderedAxisWidth, if (fontScale >= 1.5f) 52.dp else 36.dp,
+            axisLabels.maxOf {
+                textMeasurer.measure(it, axisStyle, softWrap = false, maxLines = 1, density = density)
+                    .multiParagraph.maxIntrinsicWidth
+            }.toDp() + 8.dp)
+    }
+    val pointWidth = with(density) {
+        maxOf(renderedPointWidth, (points.maxOfOrNull {
+            textMeasurer.measure(it.label, pointStyle.copy(fontWeight = FontWeight.Bold), softWrap = false,
+                maxLines = 1, density = density).multiParagraph.maxIntrinsicWidth
+        } ?: 0f).toDp() + 8.dp)
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
+        Column(Modifier.horizontalScroll(rememberScrollState()).width(maxOf(maxWidth, axisWidth + pointWidth * points.size))) {
+            Box(Modifier.fillMaxWidth().height(142.dp)) {
+                Column(
+                    modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    axisLabels.forEach { label ->
                         Text(
-                            point.label,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = if (points.size > 9) 10.sp else 11.sp),
-                            color = if (current) primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
+                            softWrap = false,
+                            onTextLayout = { layout ->
+                                val width = with(density) { layout.multiParagraph.maxIntrinsicWidth.toDp() } + 8.dp
+                                if (width > renderedAxisWidth) renderedAxisWidth = width
+                            },
                         )
+                    }
+                }
+                Box(Modifier.fillMaxSize().padding(start = axisWidth)) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        if (points.isEmpty()) return@Canvas
+                        val step = size.width / points.size
+                        val top = 16.dp.toPx()
+                        val bottom = size.height - 14.dp.toPx()
+                        fun position(index: Int, score: Double): Offset = Offset(
+                            x = step * (index + 0.5f),
+                            y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
+                        )
+                        listOf(1.0, 3.0, 5.0).forEach { score ->
+                            val y = position(0, score).y
+                            drawLine(guide, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                        }
+                        var runStart = 0
+                        while (runStart < points.size) {
+                            if (points[runStart].averageScore == null) {
+                                runStart++
+                                continue
+                            }
+                            var runEnd = runStart
+                            while (runEnd + 1 < points.size && points[runEnd + 1].averageScore != null) runEnd++
+                            if (runEnd > runStart) {
+                                val first = position(runStart, requireNotNull(points[runStart].averageScore))
+                                val path = Path().apply { moveTo(first.x, first.y) }
+                                for (index in runStart until runEnd) {
+                                    val from = position(index, requireNotNull(points[index].averageScore))
+                                    val to = position(index + 1, requireNotNull(points[index + 1].averageScore))
+                                    val midX = (from.x + to.x) / 2f
+                                    path.cubicTo(midX, from.y, midX, to.y, to.x, to.y)
+                                }
+                                val area = Path().apply {
+                                    addPath(path)
+                                    lineTo(position(runEnd, requireNotNull(points[runEnd].averageScore)).x, bottom)
+                                    lineTo(first.x, bottom)
+                                    close()
+                                }
+                                drawPath(area, Brush.verticalGradient(listOf(primary.copy(alpha = 0.18f), primary.copy(alpha = 0.01f))))
+                                drawPath(path, primary.copy(alpha = 0.8f), style = Stroke(width = 2.5.dp.toPx()))
+                            }
+                            runStart = runEnd + 1
+                        }
+                        points.forEachIndexed { index, point ->
+                            val score = point.averageScore
+                            if (score != null) {
+                                val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                                val center = position(index, score)
+                                if (current) drawCircle(primary.copy(alpha = 0.15f), radius = 10.dp.toPx(), center = center)
+                                drawCircle(primary, radius = if (current) 5.dp.toPx() else 4.dp.toPx(), center = center)
+                                drawCircle(Color.White, radius = 1.7.dp.toPx(), center = center)
+                            }
+                        }
+                    }
+                    Row(Modifier.fillMaxSize()) {
+                        points.forEach { point ->
+                            val description = buildString {
+                                append(point.dateRangeLabel())
+                                append(tr("，${point.entryCount} 条记录", ", ${point.entryCount} entries"))
+                                point.averageScore?.let { append(tr("，心情平均位置 ${it.oneDecimal()}", ", average mood position ${it.oneDecimal()}")) }
+                            }
+                            Box(
+                                Modifier.weight(1f).fillMaxSize()
+                                    .semantics { contentDescription = description }
+                                    .clickable(enabled = point.entryCount > 0) { onPointClick(point) },
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().padding(start = axisWidth)) {
+                points.forEachIndexed { index, point ->
+                    val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (points.size <= 9 || index % 2 == 0 || current) {
+                            Text(
+                                point.label,
+                                style = pointStyle,
+                                color = if (current) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                softWrap = false,
+                                onTextLayout = { layout ->
+                                    val width = with(density) { layout.multiParagraph.maxIntrinsicWidth.toDp() } + 8.dp
+                                    if (width > renderedPointWidth) renderedPointWidth = width
+                                },
+                            )
+                        }
                     }
                 }
             }

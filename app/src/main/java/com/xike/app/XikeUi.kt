@@ -910,58 +910,63 @@ fun AppLockScreen(
     onOpenSecuritySettings: () -> Unit,
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 32.dp, vertical = 28.dp),
         ) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Surface(
-                    modifier = Modifier.size(86.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                Box(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                        .heightIn(min = maxHeight),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Outlined.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(38.dp),
-                            tint = MaterialTheme.colorScheme.primary,
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            modifier = Modifier.size(86.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Outlined.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(38.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Text(tr("只属于你的空间", "A SPACE OF YOUR OWN"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(9.dp))
+                        Text(localizedText("息刻已锁定"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (authenticationAvailable) {
+                                localizedText("验证身份后，回到只属于你的留白。")
+                            } else {
+                                localizedText("需要先在系统中设置屏幕锁，才能继续验证身份。")
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Spacer(Modifier.height(28.dp))
+                        Button(
+                            onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
+                            shape = XikeShapes.button,
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
+                            elevation = xikeButtonElevation(),
+                        ) {
+                            Text(if (authenticationAvailable) localizedText("解锁息刻") else localizedText("设置设备锁屏"))
+                        }
                     }
-                }
-                Spacer(Modifier.height(24.dp))
-                Text(tr("只属于你的空间", "A SPACE OF YOUR OWN"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(9.dp))
-                Text(localizedText("息刻已锁定"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (authenticationAvailable) {
-                        localizedText("验证身份后，回到只属于你的留白。")
-                    } else {
-                        localizedText("需要先在系统中设置屏幕锁，才能继续验证身份。")
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(28.dp))
-                Button(
-                    onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
-                    shape = XikeShapes.button,
-                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
-                    elevation = xikeButtonElevation(),
-                ) {
-                    Text(if (authenticationAvailable) localizedText("解锁息刻") else localizedText("设置设备锁屏"), maxLines = 1)
                 }
             }
 
             Text(
                 localizedText("身份信息仅由 Android 系统验证，息刻不会读取或保存。"),
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1863,123 +1868,112 @@ private fun OutdoorContextCard(
         contentPadding = PaddingValues(0.dp),
     ) {
         Box(Modifier.fillMaxWidth()) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .padding(top = if (snapshot != null) 32.dp else 0.dp)
-                    .padding(XikeCardPadding),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        modifier = Modifier.size(42.dp),
-                        shape = XikeShapes.inner,
-                        color = if (snapshot != null) {
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
+            if (snapshot != null) {
+                Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = 82.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            snapshot.placeName,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            when {
-                                isLoading -> CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                                snapshot != null -> Icon(
-                                    Icons.Outlined.Cloud,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                isBackdated -> Icon(
-                                    Icons.Outlined.History,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                errorMessage != null -> Icon(
-                                    Icons.Outlined.LocationOff,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                else -> Icon(
-                                    Icons.Outlined.LocationOn,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = XikeShapes.inner,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Cloud, contentDescription = null,
+                                    modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        Text(
+                            "${snapshot.temperatureCelsius.roundToInt()}°",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            weatherConditionLabel(snapshot.weatherCode),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
+                            "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}"),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!isLoading && errorMessage != null) {
+                        Text(errorMessage, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(42.dp),
+                            shape = XikeShapes.inner,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                when {
+                                    isLoading -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    isBackdated -> Icon(Icons.Outlined.History, contentDescription = null,
+                                        modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                    errorMessage != null -> Icon(Icons.Outlined.LocationOff, contentDescription = null,
+                                        modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                    else -> Icon(Icons.Outlined.LocationOn, contentDescription = null,
+                                        modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                when {
+                                    isLoading -> localizedText("正在获取地点与天气")
+                                    isBackdated -> localizedText("补记不使用今天的天气")
+                                    errorMessage != null -> localizedText("暂时无法添加地点与天气")
+                                    else -> tr("地点与天气", "Location and weather")
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                when {
+                                    isLoading -> localizedText("只获取一次，不会在后台持续定位")
+                                    isBackdated -> localizedText("避免把现在的环境误记到过去")
+                                    errorMessage != null -> localizedText(errorMessage)
+                                    else -> localizedText("地点与天气 · 可选")
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = if (errorMessage == null) 1 else 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (isEmpty) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(localizedText("添加"), style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null,
+                                    modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            when {
-                                snapshot != null -> snapshot.placeName
-                                isLoading -> localizedText("正在获取地点与天气")
-                                isBackdated -> localizedText("补记不使用今天的天气")
-                                errorMessage != null -> localizedText("暂时无法添加地点与天气")
-                                else -> tr("地点与天气", "Location and weather")
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            when {
-                                isLoading -> localizedText("只获取一次，不会在后台持续定位")
-                                snapshot != null -> tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}", "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}")
-                                isBackdated -> localizedText("避免把现在的环境误记到过去")
-                                errorMessage != null -> localizedText(errorMessage)
-                                else -> localizedText("地点与天气 · 可选")
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = if (errorMessage == null) 1 else 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (snapshot != null) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                "${snapshot.temperatureCelsius.roundToInt()}°",
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                            Text(
-                                weatherConditionLabel(snapshot.weatherCode),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    } else if (isEmpty) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                localizedText("添加"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Icon(
-                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                when {
-                    snapshot != null -> {
-                        if (!isLoading && errorMessage != null) {
-                            Text(
-                                errorMessage,
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                    errorMessage != null -> {
+                    if (errorMessage != null) {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                             horizontalArrangement = Arrangement.End,
@@ -1993,31 +1987,26 @@ private fun OutdoorContextCard(
             }
             if (snapshot != null) {
                 Row(Modifier.align(Alignment.TopEnd)) {
-                    IconButton(
-                        onClick = onAdd,
-                        enabled = enabled && !isLoading,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(32.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        ) {
+                    IconButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.size(48.dp)) {
+                        Surface(Modifier.size(32.dp), shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = localizedText("刷新"), modifier = Modifier.size(16.dp))
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp).semantics {
+                                            contentDescription = tr("正在刷新天气", "Refreshing weather")
+                                        },
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Icon(Icons.Outlined.Refresh, contentDescription = localizedText("刷新"), modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
-                    IconButton(
-                        onClick = onRemove,
-                        enabled = enabled,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(32.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        ) {
+                    IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.size(48.dp)) {
+                        Surface(Modifier.size(32.dp), shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Outlined.Close, contentDescription = tr("移除此刻窗外", "Remove outside now"), modifier = Modifier.size(16.dp))
                             }
@@ -2028,7 +2017,6 @@ private fun OutdoorContextCard(
         }
     }
 }
-
 @Composable
 private fun OutdoorCardAction(
     label: String,
