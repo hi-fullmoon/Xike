@@ -1870,20 +1870,10 @@ private fun OutdoorContextCard(
         Box(Modifier.fillMaxWidth()) {
             if (snapshot != null) {
                 Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
-                    Row(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = 82.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            snapshot.placeName,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        itemVerticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Surface(
                             modifier = Modifier.size(48.dp),
@@ -1895,21 +1885,39 @@ private fun OutdoorContextCard(
                                     modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        Text(
-                            "${snapshot.temperatureCelsius.roundToInt()}°",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            weatherConditionLabel(snapshot.weatherCode),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Box(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(end = 82.dp)) {
+                                Text(
+                                    snapshot.placeName,
+                                    modifier = Modifier.align(Alignment.CenterStart),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                itemVerticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "${snapshot.temperatureCelsius.roundToInt()}°",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    weatherConditionLabel(snapshot.weatherCode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                     Text(
                         tr("获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
                             "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}"),
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
