@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -37,7 +36,7 @@ class JournalInsightsUiTest {
         }
 
         composeRule.onNodeWithText("暂无样本").assertIsDisplayed()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("有记录后可生成"))
+        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasText("有记录后可生成"))
         composeRule.onNodeWithText("有记录后可生成").assertIsDisplayed()
     }
 
@@ -87,7 +86,7 @@ class JournalInsightsUiTest {
             }
         }
 
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("2 次 · 67%"))
+        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasText("2 次 · 67%"))
         composeRule.onNodeWithText("2 次 · 67%").performClick()
         composeRule.onNodeWithText("轻松 · 2 条").assertIsDisplayed()
         composeRule.onNodeWithText("第一条可追溯记录").assertIsDisplayed()
@@ -127,7 +126,7 @@ class JournalInsightsUiTest {
 
         composeRule.onNodeWithText("已留下 1 条心情记录").assertIsDisplayed()
         composeRule.onNodeWithText("先看看留下的记录，积累更多片段后再回顾变化。").assertIsDisplayed()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("查看本地回顾"))
+        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasText("查看本地回顾"))
         composeRule.onNodeWithText("查看本地回顾").performClick()
         composeRule.onNodeWithText("本地回顾").assertIsDisplayed()
         composeRule.onNodeWithText("不代表原因、诊断或建议", substring = true).performScrollTo()

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,7 +40,7 @@ class LocalReviewNavigationTest {
                 JournalInsightsScreen(PaddingValues(), entries, store::openImage, store::openAudio)
             }
         }
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(localizedText("查看本地回顾")))
+        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasText(localizedText("查看本地回顾")))
         composeRule.onNodeWithText(localizedText("查看本地回顾")).performClick()
         composeRule.onNodeWithText(source.label).performScrollTo()
         val before = reviewScrollPosition()

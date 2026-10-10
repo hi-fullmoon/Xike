@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DataUsage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,11 +54,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +87,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private data class InsightDrilldown(
     val title: String,
@@ -101,16 +107,39 @@ fun JournalInsightsScreen(
     val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName }
         ?: InsightsPeriod.WEEK
     val today = LocalDate.now()
-    val summary = remember(entries, selectedPeriod, today, AppLocale.language) {
-        journalPeriodSummary(entries, selectedPeriod, today)
+    val language = AppLocale.language
+    var calculatedSummary by remember {
+        mutableStateOf<JournalPeriodSummary?>(null)
     }
-    var drilldown by remember { mutableStateOf<InsightDrilldown?>(null) }
+    LaunchedEffect(entries, selectedPeriod, today, language) {
+        calculatedSummary = withContext(Dispatchers.Default) {
+            journalPeriodSummary(entries, selectedPeriod, today)
+        }
+    }
+    var drilldown by rememberSaveable(
+        stateSaver = listSaver<InsightDrilldown?, String>(
+            save = { request -> request?.let { listOf(it.title, it.subtitle) + it.entryIds } ?: emptyList() },
+            restore = { values -> if (values.isEmpty()) null else InsightDrilldown(values[0], values[1], values.drop(2)) },
+        ),
+    ) { mutableStateOf<InsightDrilldown?>(null) }
     var showReview by rememberSaveable { mutableStateOf(false) }
     val reviewScrollState = rememberSaveable(showReview, saver = ScrollState.Saver) { ScrollState(0) }
+    val listState = rememberLazyListState()
+
+    val summary = calculatedSummary
+    if (summary == null) {
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(Modifier.semantics { contentDescription = localizedText("正在读取…") })
+        }
+        return
+    }
+    val displayedPeriod = summary.period
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
+                .testTag("insights-list")
                 .widthIn(max = XikeContentMaxWidth)
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
@@ -139,7 +168,7 @@ fun JournalInsightsScreen(
                     summary = summary,
                     onClick = {
                         drilldown = InsightDrilldown(
-                            title = tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
+                            title = tr("${displayedPeriod.contextName}的记录", "Entries: ${displayedPeriod.contextName}"),
                             subtitle = summary.dateRangeLabel(),
                             entryIds = summary.entryIds,
                         )
@@ -165,7 +194,7 @@ fun JournalInsightsScreen(
                 MoodDistributionCard(summary.moodDistribution) { item ->
                     drilldown = InsightDrilldown(
                         title = tr("${item.mood.label} · ${item.entryCount} 条", "${item.mood.label} · ${item.entryCount} entries"),
-                        subtitle = tr("${selectedPeriod.contextName}的心情分布", "Mood distribution: ${selectedPeriod.contextName}"),
+                        subtitle = tr("${displayedPeriod.contextName}的心情分布", "Mood distribution: ${displayedPeriod.contextName}"),
                         entryIds = item.entryIds,
                     )
                 }
@@ -173,7 +202,7 @@ fun JournalInsightsScreen(
             item(key = "insights-comparison") {
                 PeriodComparisonCard(summary.comparison) { previous ->
                     drilldown = InsightDrilldown(
-                        title = if (previous) localizedText("前一周期的记录") else tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
+                        title = if (previous) localizedText("前一周期的记录") else tr("${displayedPeriod.contextName}的记录", "Entries: ${displayedPeriod.contextName}"),
                         subtitle = if (previous) summary.comparison.dateRangeLabel() else summary.dateRangeLabel(),
                         entryIds = if (previous) summary.comparison.entryIds else summary.entryIds,
                     )
@@ -183,7 +212,7 @@ fun JournalInsightsScreen(
                 TagTrendsCard(summary.topTags, summary.evidence) { tag ->
                     drilldown = InsightDrilldown(
                         title = tr("${tag.tag} · ${tag.entryCount} 条", "${localizedText(tag.tag)} · ${tag.entryCount} entries"),
-                        subtitle = tr("${selectedPeriod.contextName}的主题", "Topics: ${selectedPeriod.contextName}"),
+                        subtitle = tr("${displayedPeriod.contextName}的主题", "Topics: ${displayedPeriod.contextName}"),
                         entryIds = tag.entryIds,
                     )
                 }
@@ -195,7 +224,7 @@ fun JournalInsightsScreen(
                     onClick = { insight ->
                         drilldown = InsightDrilldown(
                             title = tr("${insight.type.label} · ${insight.entryCount} 条", "${insight.type.label} · ${insight.entryCount} entries"),
-                            subtitle = tr("${selectedPeriod.contextName}的记录", "Entries: ${selectedPeriod.contextName}"),
+                            subtitle = tr("${displayedPeriod.contextName}的记录", "Entries: ${displayedPeriod.contextName}"),
                             entryIds = insight.entryIds,
                         )
                     },
@@ -204,7 +233,7 @@ fun JournalInsightsScreen(
             item(key = "insights-review") {
                 LocalReviewCard(
                     enabled = summary.entryCount > 0,
-                    periodName = selectedPeriod.contextName,
+                    periodName = displayedPeriod.contextName,
                     onOpen = { showReview = true },
                 )
             }
@@ -1079,9 +1108,10 @@ private fun InsightDrilldownDialog(
     openAudio: (String) -> InputStream?,
     onDismiss: () -> Unit,
 ) {
-    var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
-    var galleryImages by remember { mutableStateOf<List<String>?>(null) }
-    var galleryInitialPage by remember { mutableIntStateOf(0) }
+    var detailEntryId by rememberSaveable { mutableStateOf<String?>(null) }
+    val detailEntry = entries.firstOrNull { it.id == detailEntryId }
+    var galleryImages by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var galleryInitialPage by rememberSaveable { mutableIntStateOf(0) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1114,12 +1144,13 @@ private fun InsightDrilldownDialog(
                     items(entries, key = JournalEntry::id) { entry ->
                         JournalEntryCard(
                             entry = entry,
+                            modifier = Modifier.testTag("insight-source-${entry.id}"),
                             openImage = openImage,
                             onImageClick = { index ->
                                 galleryImages = entry.imageFileNames
                                 galleryInitialPage = index
                             },
-                            onClick = { detailEntry = entry },
+                            onClick = { detailEntryId = entry.id },
                         )
                     }
                 }
@@ -1132,7 +1163,7 @@ private fun InsightDrilldownDialog(
             entry = entry,
             openImage = openImage,
             openAudio = openAudio,
-            onDismiss = { detailEntry = null },
+            onDismiss = { detailEntryId = null },
         )
     }
     galleryImages?.let { images ->
