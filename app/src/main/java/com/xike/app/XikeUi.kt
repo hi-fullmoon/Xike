@@ -1279,7 +1279,6 @@ fun MomentScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = XikeShapes.card,
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp).padding(top = 16.dp, bottom = 4.dp)) {
                         BasicTextField(
@@ -1352,117 +1351,6 @@ fun MomentScreen(
                 DraftSecurityRow(statusText = draftSecurityStatus)
             }
 
-            if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(tr("这一刻的视频", "Video of this moment"), style = MaterialTheme.typography.titleSmall)
-                    if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
-                    draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
-                    if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
-                        Text(
-                            tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }
-                            OutdoorCardAction(tr("移除视频", "Remove video"), !isSaving, videoServices.removeDraft)
-                        }
-                    }
-                }
-            }
-            if (pendingDraftAudio != null || draft.audio != null) {
-                val voiceAnchor = remember { BringIntoViewRequester() }
-                LaunchedEffect(draft.audio?.fileName) {
-                    withFrameNanos { }
-                    voiceAnchor.bringIntoView()
-                }
-                Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor)) {
-                    Text(
-                        when {
-                            pendingDraftAudio != null -> localizedText("收好这段声音")
-                            else -> localizedText("这一刻的声音")
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        when {
-                            pendingDraftAudio != null && isDraftAudioSaving -> localizedText("正在加密保存到草稿")
-                            pendingDraftAudio != null -> localizedText("保存失败，录音仍暂存在本机")
-                            else -> localizedText("录音已加密保存在本机")
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    if (pendingDraftAudio != null) {
-                        VoicePendingSaveCard(
-                            durationMillis = pendingDraftAudio.durationMillis,
-                            isSaving = isDraftAudioSaving,
-                            errorMessage = draftAudioSaveError,
-                            onRetry = onDraftAudioRetry,
-                            onDiscard = onDraftAudioDiscard,
-                        )
-                    } else {
-                        draft.audio?.let { audio ->
-                            VoicePlaybackCard(
-                                audio = audio,
-                                openAudio = openAudio,
-                                onDelete = onDraftAudioRemoved,
-                                onReplace = beginVoiceCapture,
-                                showBorder = false,
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                showDeleteLabel = true,
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (draft.imageUriStrings.isNotEmpty()) {
-                val previewAnchor = remember { BringIntoViewRequester() }
-                LaunchedEffect(draft.imageUriStrings) {
-                    withFrameNanos { }
-                    previewAnchor.bringIntoView()
-                }
-                PaperCard {
-                    MultiImagePicker(
-                        selectedUris = draft.imageUriStrings,
-                        firstPhotoModifier = Modifier.bringIntoViewRequester(previewAnchor),
-                        onPreview = {
-                            dismissKeyboard()
-                            previewUri = it
-                        },
-                        onPick = {
-                            if (!isSaving) {
-                                dismissKeyboard()
-                                showPhotoSourceDialog = true
-                            }
-                        },
-                        onRemove = { if (!isSaving) onDraftImageRemoved(it) },
-                    )
-                }
-            }
-
-            OutdoorContextCard(
-                snapshot = draft.outdoor,
-                isBackdated = draft.recordedAt != null,
-                isLoading = isOutdoorLoading,
-                errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
-                    localizedText("没有位置权限，也可以只选择城市。")
-                } else {
-                    null
-                },
-                enabled = !isSaving,
-                onAdd = requestCurrentOutdoor,
-                onRefresh = requestCurrentOutdoor,
-                onChooseCity = { showOutdoorCityDialog = true },
-                onRemove = {
-                    outdoorError = null
-                    onClearDraftOutdoor()
-                },
-            )
-
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = XikeShapes.card,
@@ -1527,6 +1415,121 @@ fun MomentScreen(
                             TopicChoices(draft.tags) { topic ->
                                 if (!isSaving) onDraftTagToggle(topic.label)
                             }
+                        }
+                    }
+                }
+            }
+
+            OutdoorContextCard(
+                snapshot = draft.outdoor,
+                isBackdated = draft.recordedAt != null,
+                isLoading = isOutdoorLoading,
+                errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
+                    localizedText("没有位置权限，也可以只选择城市。")
+                } else {
+                    null
+                },
+                enabled = !isSaving,
+                onAdd = requestCurrentOutdoor,
+                onRefresh = requestCurrentOutdoor,
+                onChooseCity = { showOutdoorCityDialog = true },
+                onRemove = {
+                    outdoorError = null
+                    onClearDraftOutdoor()
+                },
+            )
+
+            if (pendingDraftAudio != null || draft.audio != null) {
+                val voiceAnchor = remember { BringIntoViewRequester() }
+                LaunchedEffect(draft.audio?.fileName) {
+                    withFrameNanos { }
+                    voiceAnchor.bringIntoView()
+                }
+                Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor)) {
+                    Text(
+                        when {
+                            pendingDraftAudio != null -> localizedText("收好这段声音")
+                            else -> localizedText("这一刻的声音")
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        when {
+                            pendingDraftAudio != null && isDraftAudioSaving -> localizedText("正在加密保存到草稿")
+                            pendingDraftAudio != null -> localizedText("保存失败，录音仍暂存在本机")
+                            else -> localizedText("录音已加密保存在本机")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (pendingDraftAudio != null) {
+                        VoicePendingSaveCard(
+                            durationMillis = pendingDraftAudio.durationMillis,
+                            isSaving = isDraftAudioSaving,
+                            errorMessage = draftAudioSaveError,
+                            onRetry = onDraftAudioRetry,
+                            onDiscard = onDraftAudioDiscard,
+                        )
+                    } else {
+                        draft.audio?.let { audio ->
+                            VoicePlaybackCard(
+                                audio = audio,
+                                openAudio = openAudio,
+                                onDelete = if (isSaving) null else onDraftAudioRemoved,
+                                showBorder = false,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                showDeleteAtTopEnd = true,
+                                shape = XikeShapes.inner,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (draft.imageUriStrings.isNotEmpty()) {
+                val previewAnchor = remember { BringIntoViewRequester() }
+                LaunchedEffect(draft.imageUriStrings) {
+                    withFrameNanos { }
+                    previewAnchor.bringIntoView()
+                }
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tr("这一刻的照片", "Photos of this moment"), style = MaterialTheme.typography.titleSmall)
+                    PaperCard {
+                        MultiImagePicker(
+                            selectedUris = draft.imageUriStrings,
+                            firstPhotoModifier = Modifier.bringIntoViewRequester(previewAnchor),
+                            onPreview = {
+                                dismissKeyboard()
+                                previewUri = it
+                            },
+                            onPick = {
+                                if (!isSaving) {
+                                    dismissKeyboard()
+                                    showPhotoSourceDialog = true
+                                }
+                            },
+                            onRemove = { if (!isSaving) onDraftImageRemoved(it) },
+                        )
+                    }
+                }
+            }
+
+            if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tr("这一刻的视频", "Video of this moment"), style = MaterialTheme.typography.titleSmall)
+                    if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
+                    draft.video?.let { VideoCard(it, if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft) }
+                    if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
+                        Text(
+                            tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }
+                            OutdoorCardAction(tr("移除视频", "Remove video"), !isSaving, videoServices.removeDraft)
                         }
                     }
                 }
@@ -2652,10 +2655,7 @@ private fun MultiImagePicker(
         }
     } else {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text(localizedText("照片"), style = MaterialTheme.typography.titleSmall)
-                Text(localizedText("加密保存在本机"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text(localizedText("加密保存在本机"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                 Text(

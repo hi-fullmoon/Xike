@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
@@ -712,6 +714,8 @@ internal fun VoicePlaybackCard(
     showBorder: Boolean = true,
     containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
     showDeleteLabel: Boolean = false,
+    showDeleteAtTopEnd: Boolean = false,
+    shape: androidx.compose.ui.graphics.Shape = XikeShapes.card,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -728,6 +732,7 @@ internal fun VoicePlaybackCard(
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
 
     val playbackAttributes = remember(audio.fileName) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_SPEECH) }
+    val hasTopEndDelete = showDeleteAtTopEnd && onDelete != null
 
     fun pausePlayback() {
         player?.let { active ->
@@ -860,125 +865,156 @@ internal fun VoicePlaybackCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = XikeShapes.card,
+        shape = shape,
         color = containerColor,
         border = if (showBorder) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) else null,
     ) {
-        Column(Modifier.padding(XikeCardPadding)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                FilledIconButton(
-                    enabled = !isPreparing,
-                    onClick = ::togglePlayback,
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
+        Box {
+            Column(Modifier.padding(XikeCardPadding)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(end = if (hasTopEndDelete) 32.dp else 0.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    if (isPreparing) {
-                        CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(
-                            if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                            contentDescription = if (isPlaying) localizedText("暂停语音") else localizedText("播放语音"),
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(localizedText("声音片段"), style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
-                    VoicePlaybackIndicator(isPlaying)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth()) {
-                    PlaybackProgressSlider(
-                        value = (if (isSeeking) seekPosition else position.toFloat())
-                            .coerceIn(0f, audio.durationMillis.coerceAtLeast(1L).toFloat()),
-                        onValueChange = {
-                            isSeeking = true
-                            seekPosition = it
-                        },
-                        onValueChangeFinished = {
-                            position = seekPosition.toLong()
-                            player?.seekTo(position.toInt())
-                            isSeeking = false
-                        },
-                        valueRange = 0f..audio.durationMillis.coerceAtLeast(1L).toFloat(),
+                    FilledIconButton(
                         enabled = !isPreparing,
-                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = localizedText("语音播放进度") },
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(
-                            formatAudioDuration(if (isSeeking) seekPosition.toLong() else position),
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            formatAudioDuration(audio.durationMillis),
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            playbackError?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-            if (onReplace != null || onDelete != null) {
-                Spacer(Modifier.height(14.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(Modifier.height(4.dp))
-                val actions: @Composable () -> Unit = {
-                    if (onReplace != null) {
-                        TextButton(shape = XikeShapes.button, onClick = {
-                            releasePlayer()
-                            onReplace()
-                        }) {
-                            if (!showDeleteLabel) {
-                                Icon(
-                                    Icons.Outlined.MicNone,
-                                    contentDescription = null,
-                                    modifier = Modifier.xikeInlineActionIcon(),
-                                )
-                                Spacer(Modifier.width(XikeInlineActionGap))
-                            }
-                            Text(localizedText("重新录制"), maxLines = if (showDeleteLabel) Int.MAX_VALUE else 1)
+                        onClick = ::togglePlayback,
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        if (isPreparing) {
+                            CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                                contentDescription = if (isPlaying) localizedText("暂停语音") else localizedText("播放语音"),
+                                modifier = Modifier.size(28.dp),
+                            )
                         }
                     }
-                    if (onDelete != null) {
-                        if (showDeleteLabel) {
-                            TextButton(shape = XikeShapes.button, onClick = {
-                                releasePlayer()
-                                onDelete()
-                            }) {
-                                Text(localizedText("删除语音"))
-                            }
-                        } else IconButton(onClick = {
-                            releasePlayer()
-                            onDelete()
-                        }) {
-                            Icon(Icons.Outlined.DeleteOutline,
-                                contentDescription = localizedText("删除语音"),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Column(Modifier.weight(1f)) {
+                        Text(localizedText("声音片段"), style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(4.dp))
+                        VoicePlaybackIndicator(isPlaying)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth()) {
+                        PlaybackProgressSlider(
+                            value = (if (isSeeking) seekPosition else position.toFloat())
+                                .coerceIn(0f, audio.durationMillis.coerceAtLeast(1L).toFloat()),
+                            onValueChange = {
+                                isSeeking = true
+                                seekPosition = it
+                            },
+                            onValueChangeFinished = {
+                                position = seekPosition.toLong()
+                                player?.seekTo(position.toInt())
+                                isSeeking = false
+                            },
+                            valueRange = 0f..audio.durationMillis.coerceAtLeast(1L).toFloat(),
+                            enabled = !isPreparing,
+                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = localizedText("语音播放进度") },
+                        )
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                formatAudioDuration(if (isSeeking) seekPosition.toLong() else position),
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                formatAudioDuration(audio.durationMillis),
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
-                if (showDeleteLabel) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) { actions() }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (onReplace == null) Arrangement.End else Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) { actions() }
+                playbackError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                if (onReplace != null || (onDelete != null && !hasTopEndDelete)) {
+                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(Modifier.height(4.dp))
+                    val actions: @Composable () -> Unit = {
+                        if (onReplace != null) {
+                            TextButton(shape = XikeShapes.button, onClick = {
+                                releasePlayer()
+                                onReplace()
+                            }) {
+                                if (!showDeleteLabel) {
+                                    Icon(
+                                        Icons.Outlined.MicNone,
+                                        contentDescription = null,
+                                        modifier = Modifier.xikeInlineActionIcon(),
+                                    )
+                                    Spacer(Modifier.width(XikeInlineActionGap))
+                                }
+                                Text(localizedText("重新录制"), maxLines = if (showDeleteLabel) Int.MAX_VALUE else 1)
+                            }
+                        }
+                        if (onDelete != null && !hasTopEndDelete) {
+                            if (showDeleteLabel) {
+                                TextButton(shape = XikeShapes.button, onClick = {
+                                    releasePlayer()
+                                    onDelete()
+                                }) {
+                                    Text(localizedText("删除语音"))
+                                }
+                            } else IconButton(onClick = {
+                                releasePlayer()
+                                onDelete()
+                            }) {
+                                Icon(Icons.Outlined.DeleteOutline,
+                                    contentDescription = localizedText("删除语音"),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    if (showDeleteLabel) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) { actions() }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = if (onReplace == null) Arrangement.End else Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) { actions() }
+                    }
+                }
+            }
+            if (hasTopEndDelete) {
+                IconButton(
+                    onClick = {
+                        releasePlayer()
+                        onDelete()
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).size(48.dp),
+                ) {
+                    Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = localizedText("删除语音"),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
