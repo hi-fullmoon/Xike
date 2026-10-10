@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -63,6 +64,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -92,12 +94,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -178,8 +183,12 @@ fun JournalArchiveScreen(
     var searchError by remember { mutableStateOf<String?>(null) }
     var galleryImages by remember { mutableStateOf<List<String>?>(null) }
     var galleryInitialPage by remember { mutableIntStateOf(0) }
-    var detailEntry by remember { mutableStateOf<JournalEntry?>(null) }
-    var editEntry by remember { mutableStateOf<JournalEntry?>(null) }
+    val entrySaver = Saver<JournalEntry?, String>(
+        save = { it?.toJson()?.toString() ?: "" },
+        restore = { it.takeIf(String::isNotEmpty)?.let { json -> JournalEntry.fromJson(org.json.JSONObject(json)) } },
+    )
+    var detailEntry by rememberSaveable(stateSaver = entrySaver) { mutableStateOf<JournalEntry?>(null) }
+    var editEntry by rememberSaveable(stateSaver = entrySaver) { mutableStateOf<JournalEntry?>(null) }
     var scrollToSelectedDateResults by remember { mutableStateOf(false) }
     var deleteCandidate by remember { mutableStateOf<JournalEntry?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
@@ -1218,6 +1227,7 @@ private fun ArchiveTimelineEntry(
 ) {
     JournalEntryCard(
         entry = entry,
+        compactMedia = true,
         openImage = openImage,
         onImageClick = onImageClick,
         onClick = onClick,
@@ -1309,59 +1319,68 @@ internal fun JournalEntryDetailDialog(
                 }
 
                 if (entry.tags.isNotEmpty()) {
-                    Text(localizedText("主题"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    Text(entry.tags.joinToString("  ·  ") { localizedText(it) }, style = MaterialTheme.typography.bodyLarge)
+                    JournalDetailSection(localizedText("主题")) {
+                        Text(entry.tags.joinToString("  ·  ") { localizedText(it) }, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
 
                 entry.outdoor?.let { outdoor ->
-                    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(XikeInnerCardPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Outlined.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(tr("此刻窗外 · ${outdoor.placeName}", "Outside now · ${outdoor.placeName}"), style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    JournalDetailSection(localizedText("此刻窗外")) {
+                        Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(XikeInnerCardPadding),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Outlined.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(outdoor.placeName, style = MaterialTheme.typography.titleSmall)
+                                    Text(
+                                        "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                Text(localizedText("记录"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text(
-                    entry.note.ifBlank {
-                        when {
-                            entry.audio != null -> localizedText("这一刻还留下了一段声音。")
-                            entry.video != null -> tr("这一刻还留下了一段视频。", "A video was kept from this moment.")
-                            entry.imageFileNames.isNotEmpty() -> tr("这一刻还留下了照片。", "Photos were kept from this moment.")
-                            else -> localizedText("这一刻只留下了一种心情。")
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (entry.note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-                )
+                if (entry.note.isNotBlank()) {
+                    JournalDetailSection(localizedText("记录")) {
+                        Text(
+                            entry.note,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
 
                 entry.audio?.let { audio ->
-                    Text(localizedText("这一刻的声音"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    VoicePlaybackCard(audio = audio, openAudio = openAudio)
+                    JournalDetailSection(localizedText("这一刻的声音")) {
+                        VoicePlaybackCard(
+                            audio = audio,
+                            openAudio = openAudio,
+                            showBorder = false,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            shape = XikeShapes.inner,
+                        )
+                    }
                 }
-                entry.video?.let { VideoCard(it) }
-
                 if (entry.imageFileNames.isNotEmpty()) {
-                    Text(tr("照片 · ${entry.imageFileNames.size} 张", "Photos · ${entry.imageFileNames.size}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
-                        JournalPhotoMosaic(entry.imageFileNames, openImage) { photoPage = it }
+                    JournalDetailSection(tr("这一刻的照片 · ${entry.imageFileNames.size} 张", "Photos from this moment · ${entry.imageFileNames.size}")) {
+                        Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surface) {
+                            JournalPhotoMosaic(entry.imageFileNames, openImage) { photoPage = it }
+                        }
+                    }
+                }
+                entry.video?.let { video ->
+                    JournalDetailSection(tr("这一刻的视频", "Video from this moment")) {
+                        VideoCard(video)
                     }
                 }
 
@@ -1406,6 +1425,17 @@ internal fun JournalEntryDetailDialog(
 }
 
 @Composable
+private fun JournalDetailSection(title: String, content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        content()
+    }
+}
+
+@Composable
 private fun JournalEntryEditDialog(
     entry: JournalEntry,
     openImage: (String) -> InputStream?,
@@ -1419,7 +1449,49 @@ private fun JournalEntryEditDialog(
     var selectedMoodName by rememberSaveable(entry.id) { mutableStateOf(entry.mood.name) }
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
-    var retainedAudio by remember(entry.id) { mutableStateOf(entry.audio) }
+    var retainedAudioJson by rememberSaveable(entry.id) { mutableStateOf(entry.audio?.toJson()?.toString()) }
+    val retainedAudio = retainedAudioJson?.let { JournalAudio.fromJson(org.json.JSONObject(it)) }
+    val audioServices = LocalAudioEditServices.current
+    var importedAudioJsons by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
+    val importedAudios = importedAudioJsons.map { JournalAudio.fromJson(org.json.JSONObject(it))!! }
+    var showVoiceCapture by remember { mutableStateOf(false) }
+    val pendingAudioSaver = Saver<Pair<java.io.File, Long>?, List<String>>(
+        save = { it?.let { (file, duration) -> listOf(file.absolutePath, duration.toString()) } ?: emptyList() },
+        restore = { if (it.isEmpty()) null else java.io.File(it[0]) to it[1].toLong() },
+    )
+    var pendingAudio by rememberSaveable(entry.id, stateSaver = pendingAudioSaver) { mutableStateOf<Pair<java.io.File, Long>?>(null) }
+    var isAudioImporting by remember { mutableStateOf(false) }
+    var audioImportError by remember { mutableStateOf<String?>(null) }
+    val importPendingAudio: () -> Unit = {
+        pendingAudio?.let { (file, duration) ->
+            if (!isAudioImporting) {
+                isAudioImporting = true
+                scope.launch {
+                    try {
+                        audioServices.import(file, duration).onSuccess { audio ->
+                            importedAudioJsons = importedAudioJsons + audio.toJson().toString()
+                            retainedAudioJson = audio.toJson().toString()
+                            file.delete()
+                            pendingAudio = null
+                            audioImportError = null
+                        }.onFailure { audioImportError = it.message }
+                    } finally { isAudioImporting = false }
+                }
+            }
+        }
+    }
+    LaunchedEffect(entry.id) {
+        if (pendingAudio != null) importPendingAudio()
+    }
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) showVoiceCapture = true
+        else Toast.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), Toast.LENGTH_LONG).show()
+    }
+    val beginVoiceCapture: () -> Unit = {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED) showVoiceCapture = true
+        else microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
     val videoServices = LocalVideoServices.current
     var retainedVideoJson by rememberSaveable(entry.id) {
         val recovered = videoServices.editDraft(entry)
@@ -1428,20 +1500,25 @@ private fun JournalEntryEditDialog(
     val retainedVideo = retainedVideoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) }
     var isVideoImporting by remember { mutableStateOf(false) }
     var videoProgress by remember { mutableStateOf<Float?>(null) }
-    val importedVideos = remember { mutableListOf<JournalVideo>() }
+    var importedVideoJsons by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
+    val importedVideos = importedVideoJsons.map { JournalVideo.fromJson(org.json.JSONObject(it))!! }
     var createdAt by rememberSaveable(entry.id) { mutableStateOf(entry.createdAt) }
     val pickerContext = LocalRecordedAtPickerContext.current
     var previewPhoto by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     var retainedImages by rememberSaveable(entry.id) { mutableStateOf(entry.imageFileNames) }
     var newImageUriStrings by rememberSaveable(entry.id) { mutableStateOf(emptyList<String>()) }
     var isSaving by remember { mutableStateOf(false) }
+    var isVideoRemoving by remember { mutableStateOf(false) }
+    var isDiscarding by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     var showDiscardConfirmation by rememberSaveable(entry.id) { mutableStateOf(false) }
     var showPhotoSourceDialog by rememberSaveable(entry.id) { mutableStateOf(false) }
     var pendingCameraUriString by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     val selectedMood = Mood.entries.firstOrNull { it.name == selectedMoodName } ?: entry.mood
-    val editedOutdoor = retainOutdoorForEditedTime(entry.outdoor, entry.createdAt, createdAt)
-    val removesOutdoor = entry.outdoor != null && editedOutdoor == null
+    var outdoorRemoved by rememberSaveable(entry.id) { mutableStateOf(false) }
+    val timeRetainedOutdoor = retainOutdoorForEditedTime(entry.outdoor, entry.createdAt, createdAt)
+    val editedOutdoor = if (outdoorRemoved) null else timeRetainedOutdoor
+    val removesOutdoor = !outdoorRemoved && entry.outdoor != null && timeRetainedOutdoor == null
     val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         val additions = uris
@@ -1552,28 +1629,42 @@ private fun JournalEntryEditDialog(
         createdAt != entry.createdAt ||
         note != entry.note ||
         selectedTags != entry.tags ||
-        retainedAudio != entry.audio ||
+        retainedAudio != entry.audio || pendingAudio != null ||
         retainedVideo != entry.video ||
+        editedOutdoor != entry.outdoor ||
         retainedImages != entry.imageFileNames ||
         newImageUriStrings.isNotEmpty()
     val discardEditor: () -> Unit = {
-        scope.launch {
-            val cleared = if (entry.video != null || retainedVideo != null || importedVideos.isNotEmpty()) videoServices.clearEdit(entry.id) else Result.success(Unit)
-            cleared.onSuccess {
-                importedVideos.forEach(videoServices.release)
-                retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
-                pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
-                pendingCameraUriString = null
-                onDismiss()
-            }.onFailure { saveError = it.message }
+        if (!isSaving && !isVideoImporting && !isAudioImporting && !isVideoRemoving && !isDiscarding) {
+            isDiscarding = true
+            isSaving = true
+            scope.launch {
+                try {
+                    val cleared = if (entry.video != null || retainedVideo != null || importedVideos.isNotEmpty()) videoServices.clearEdit(entry.id) else Result.success(Unit)
+                    cleared.onSuccess {
+                        importedAudios.forEach(audioServices.release)
+                        pendingAudio?.first?.delete()
+                        importedVideos.forEach(videoServices.release)
+                        retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
+                        pendingCameraUriString?.let(Uri::parse)?.let { deleteCameraCapture(context, it) }
+                        pendingCameraUriString = null
+                        onDismiss()
+                    }.onFailure { saveError = it.message }
+                } finally {
+                    isDiscarding = false
+                    isSaving = false
+                }
+            }
         }
     }
     val dismissEditor = {
-        if (hasUnsavedChanges) showDiscardConfirmation = true else discardEditor()
+        if (!isVideoRemoving && !isDiscarding) {
+            if (hasUnsavedChanges) showDiscardConfirmation = true else discardEditor()
+        }
     }
 
     Dialog(
-        onDismissRequest = { if (!isSaving && !isVideoImporting) dismissEditor() },
+        onDismissRequest = { if (!isSaving && !isVideoImporting && !isAudioImporting) dismissEditor() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -1589,16 +1680,16 @@ private fun JournalEntryEditDialog(
                         .padding(horizontal = XikeScreenHorizontalPadding, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(enabled = !isSaving && !isVideoImporting, onClick = dismissEditor) {
+                    IconButton(enabled = !isSaving && !isVideoImporting && !isAudioImporting && !isVideoRemoving && !isDiscarding, onClick = dismissEditor) {
                         Icon(Icons.Outlined.Close, contentDescription = localizedText("取消编辑"))
                     }
                     Spacer(Modifier.width(4.dp))
                     Text(localizedText("编辑这一刻"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                     Button(
-                        enabled = !isSaving && !isVideoImporting,
+                        enabled = !isSaving && !isVideoImporting && !isAudioImporting && !isVideoRemoving && !isDiscarding && pendingAudio == null,
                         shape = XikeShapes.button,
                         onClick = {
-                            if (isSaving || isVideoImporting) return@Button
+                            if (isSaving || isVideoImporting || isAudioImporting || isVideoRemoving || isDiscarding || pendingAudio != null) return@Button
                             isSaving = true
                             saveError = null
                             val updatedEntry = entry.copy(
@@ -1618,9 +1709,11 @@ private fun JournalEntryEditDialog(
                                     imagesToRetain,
                                     imagesToAdd,
                                 ).onSuccess {
+                                    importedAudios.forEach(audioServices.release)
+                                    importedAudioJsons = emptyList()
                                     videoServices.clearEdit(entry.id)
                                     importedVideos.forEach(videoServices.release)
-                                    importedVideos.clear()
+                                    importedVideoJsons = emptyList()
                                     Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
                                 }.onFailure { error ->
                                     saveError = error.message ?: localizedText("修改保存失败，请重试。")
@@ -1629,11 +1722,11 @@ private fun JournalEntryEditDialog(
                             }
                         },
                     ) {
-                        if (isSaving) {
+                        if (isSaving && !isDiscarding) {
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(7.dp))
                         }
-                        Text(if (isSaving) localizedText("保存中") else localizedText("保存"))
+                        Text(if (isSaving && !isDiscarding) localizedText("保存中") else localizedText("保存"))
                     }
                 }
 
@@ -1727,7 +1820,14 @@ private fun JournalEntryEditDialog(
                     }
                 }
 
-                EditSectionCard(title = tr("天气", "Weather")) {
+                EditSectionCard(
+                    title = tr("天气", "Weather"),
+                    titleAction = if (editedOutdoor != null) ({
+                        IconButton(enabled = !isSaving, onClick = { outdoorRemoved = true }) {
+                            Icon(Icons.Outlined.Close, contentDescription = tr("移除天气", "Remove weather"))
+                        }
+                    }) else null,
+                ) {
                     val outdoor = editedOutdoor
                     if (outdoor != null) {
                         EditMediaSummary(
@@ -1739,16 +1839,43 @@ private fun JournalEntryEditDialog(
                     }
                 }
 
-                EditSectionCard(title = tr("录音", "Audio")) {
+                EditSectionCard(
+                    title = tr("录音", "Audio"),
+                    titleAction = if (retainedAudio == null && pendingAudio == null) ({
+                        IconButton(enabled = !isSaving && !isAudioImporting, onClick = beginVoiceCapture) {
+                            Icon(EditMediaAddIcon, contentDescription = tr("添加录音", "Add audio"))
+                        }
+                    }) else null,
+                ) {
                     val audio = retainedAudio
                     if (audio != null) {
                         VoicePlaybackCard(
                             audio = audio,
                             openAudio = openAudio,
-                            onDelete = if (isSaving) null else ({ if (!isSaving) retainedAudio = null }),
+                            onDelete = if (isSaving || isAudioImporting || pendingAudio != null) null else ({ retainedAudioJson = null }),
+                            onReplace = if (isSaving || isAudioImporting || pendingAudio != null) null else beginVoiceCapture,
+                            showBorder = false,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            showDeleteAtTopEnd = true,
+                            shape = XikeShapes.inner,
                         )
-                    } else {
+                    } else if (pendingAudio == null) {
                         EditMediaSummary(Icons.Outlined.Mic, tr("这条记录没有录音", "This entry has no audio"))
+                    }
+                    pendingAudio?.let { (_, duration) ->
+                        VoicePendingSaveCard(
+                            durationMillis = duration,
+                            isSaving = isAudioImporting,
+                            errorMessage = audioImportError,
+                            onRetry = importPendingAudio,
+                            onDiscard = {
+                                if (!isAudioImporting) {
+                                    pendingAudio?.first?.delete()
+                                    pendingAudio = null
+                                    audioImportError = null
+                                }
+                            },
+                        )
                     }
                 }
 
@@ -1771,26 +1898,50 @@ private fun JournalEntryEditDialog(
                     )
                 }
 
-                EditSectionCard(title = tr("视频", "Video")) {
-                    retainedVideo?.let { VideoCard(it, if (isSaving || isVideoImporting) null else ({
-                        scope.launch { videoServices.saveEdit(entry, null).onSuccess { retainedVideoJson = null }.onFailure { saveError = it.message } }
-                    })) }
-                    if (isVideoImporting) VideoImportStatus(videoProgress)
-                    VideoAddButton(enabled = !isSaving && !isVideoImporting, onPicked = { uri ->
-                        isVideoImporting = true
-                        scope.launch {
-                            try {
-                                videoServices.import(uri) { progress -> scope.launch { videoProgress = progress } }
-                                    .onSuccess { video ->
-                                        videoServices.saveEdit(entry, video).onSuccess {
-                                            retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
-                                            importedVideos += video; retainedVideoJson = video.toJson().toString()
-                                        }.onFailure { videoServices.release(video); saveError = it.message }
+                VideoAddButton(enabled = !isSaving && !isVideoImporting && !isVideoRemoving && !isDiscarding, onPicked = { uri ->
+                    isVideoImporting = true
+                    scope.launch {
+                        try {
+                            videoServices.import(uri) { progress -> scope.launch { videoProgress = progress } }
+                                .onSuccess { video ->
+                                    videoServices.saveEdit(entry, video).onSuccess {
+                                        retainedVideo?.takeIf { it != entry.video }?.let(videoServices.release)
+                                        importedVideoJsons = importedVideoJsons + video.toJson().toString(); retainedVideoJson = video.toJson().toString()
+                                    }.onFailure { videoServices.release(video); saveError = it.message }
+                                }
+                                .onFailure { saveError = it.message ?: tr("视频导入失败。", "Video import failed.") }
+                        } finally { isVideoImporting = false; videoProgress = null }
+                    }
+                }) { chooseVideo ->
+                    EditSectionCard(
+                        title = tr("视频", "Video"),
+                        titleAction = if (retainedVideo == null) ({
+                            IconButton(enabled = !isSaving && !isVideoImporting, onClick = chooseVideo) {
+                                Icon(EditMediaAddIcon, contentDescription = tr("添加视频", "Add video"))
+                            }
+                        }) else null,
+                    ) {
+                        if (isVideoImporting) VideoImportStatus(videoProgress)
+                        val video = retainedVideo
+                        if (video != null) {
+                            VideoCard(
+                                video = video,
+                                onRemove = if (isSaving || isVideoImporting || isVideoRemoving || isDiscarding) null else ({
+                                    isVideoRemoving = true
+                                    scope.launch {
+                                        try {
+                                            videoServices.saveEdit(entry, null)
+                                                .onSuccess { retainedVideoJson = null }
+                                                .onFailure { saveError = it.message }
+                                        } finally { isVideoRemoving = false }
                                     }
-                                    .onFailure { saveError = it.message ?: tr("视频导入失败。", "Video import failed.") }
-                            } finally { isVideoImporting = false; videoProgress = null }
+                                }),
+                                onReplace = if (isSaving || isVideoImporting || isVideoRemoving || isDiscarding) null else chooseVideo,
+                            )
+                        } else if (!isVideoImporting) {
+                            EditMediaSummary(Icons.Outlined.Videocam, tr("这条记录没有视频", "This entry has no video"))
                         }
-                    })
+                    }
                 }
 
                 saveError?.let { error ->
@@ -1810,6 +1961,17 @@ private fun JournalEntryEditDialog(
                 }
             }
         }
+    }
+
+    if (showVoiceCapture) {
+        VoiceCaptureSheet(
+            enabled = !isSaving && !isAudioImporting,
+            onRecorded = { file, duration ->
+                pendingAudio = file to duration
+                importPendingAudio()
+            },
+            onClosed = { showVoiceCapture = false },
+        )
     }
 
     val photos = retainedImages + newImageUriStrings
@@ -1878,12 +2040,28 @@ private fun EditMediaSummary(
     }
 }
 
+private val EditMediaAddIcon = ImageVector.Builder(
+    name = "EditMediaAdd",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    path(stroke = SolidColor(Color.Black), strokeLineWidth = 1.25f) {
+        moveTo(5f, 12f)
+        lineTo(19f, 12f)
+        moveTo(12f, 5f)
+        lineTo(12f, 19f)
+    }
+}.build()
+
 @Composable
 private fun EditSectionCard(
     title: String,
     trailing: String? = null,
     trailingStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodySmall,
     contentPadding: PaddingValues = PaddingValues(18.dp),
+    titleAction: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -1895,10 +2073,22 @@ private fun EditSectionCard(
             modifier = Modifier.padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                trailing?.let {
-                    Text(it, style = trailingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(end = if (titleAction != null) 48.dp else 0.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    trailing?.let {
+                        Text(it, style = trailingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (titleAction != null) {
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                        Box(Modifier.wrapContentSize(unbounded = true)) {
+                            titleAction()
+                        }
+                    }
                 }
             }
             content()
@@ -1993,7 +2183,7 @@ private fun EditPhotoTile(
                 .size(48.dp)
                 .semantics { contentDescription = removeDescription },
         ) {
-            Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.TopEnd) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Surface(
                     modifier = Modifier.size(32.dp),
                     shape = CircleShape,
