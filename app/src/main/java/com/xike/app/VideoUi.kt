@@ -11,7 +11,6 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -84,7 +83,7 @@ internal fun VideoAddButton(
         canCaptureMedia(context, MediaStore.ACTION_VIDEO_CAPTURE)
     } else false
     var captureUri by rememberSaveable { mutableStateOf<String?>(null) }
-    fun failure(error: Throwable) { Toast.makeText(context, error.message ?: tr("无法添加视频。", "Unable to add video."), Toast.LENGTH_LONG).show() }
+    fun failure(error: Throwable) { XikeNotice.makeText(context, error.message ?: tr("无法添加视频。", "Unable to add video."), XikeNotice.LENGTH_LONG).show() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         system.onResult(); uri?.let(onPicked)
     }

@@ -9,7 +9,6 @@ import android.app.LocaleManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.LocaleList
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -115,7 +114,7 @@ internal fun ComponentActivity.setLocalizedContent(content: @Composable () -> Un
                 runCatching { LanguagePreferences(this).language = selected }
                     .onSuccess { AppLocale.select(this, selected) }
                     .onFailure {
-                        Toast.makeText(this, tr("语言设置保存失败，请重试。", "Unable to save language. Please try again."), Toast.LENGTH_LONG).show()
+                        XikeNotice.makeText(this, tr("语言设置保存失败，请重试。", "Unable to save language. Please try again."), XikeNotice.LENGTH_LONG).show()
                     }
             },
             content = content,
