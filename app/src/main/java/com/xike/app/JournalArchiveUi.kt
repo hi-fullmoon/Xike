@@ -160,6 +160,7 @@ fun JournalArchiveScreen(
     onFinalizeDelete: suspend (String) -> Result<Unit>,
     openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream? = { null },
+    entriesLoading: Boolean = false,
 ) {
     val today = LocalDate.now()
     val context = LocalContext.current
@@ -272,7 +273,8 @@ fun JournalArchiveScreen(
     val visibleMonth = runCatching { YearMonth.parse(visibleMonthValue) }.getOrDefault(YearMonth.from(today))
     val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
 
-    LaunchedEffect(entries, detailEntry?.id) {
+    LaunchedEffect(entries, detailEntry?.id, entriesLoading) {
+        if (entriesLoading) return@LaunchedEffect
         val selectedId = detailEntry?.id ?: return@LaunchedEffect
         detailEntry = entries.firstOrNull { it.id == selectedId }
     }
@@ -480,7 +482,6 @@ fun JournalArchiveScreen(
             onSave = { updatedEntry, retainedImages, newImageUris ->
                 onUpdate(updatedEntry, retainedImages, newImageUris).onSuccess { savedEntry ->
                     detailEntry = savedEntry
-                    editEntry = null
                 }
             },
         )
@@ -1523,9 +1524,21 @@ private fun JournalEntryEditDialog(
     val onImagesPicked: (List<Uri>) -> Unit = { uris ->
         val additions = uris
             .map(Uri::toString)
+            .distinct()
             .filterNot { it in newImageUriStrings }
             .take(availableImageSlots.coerceAtLeast(0))
-        newImageUriStrings = newImageUriStrings + additions
+        val readableAdditions = additions.filter { source ->
+            val uri = Uri.parse(source)
+            isCameraCaptureUri(context, uri) || runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }.isSuccess
+        }
+        newImageUriStrings = newImageUriStrings + readableAdditions
+        if (readableAdditions.size < additions.size) {
+            Toast.makeText(context, localizedText("所选照片无法获得长期读取权限，请重新选择。"), Toast.LENGTH_LONG).show()
+        }
         if (additions.size < uris.distinct().size) {
             Toast.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), Toast.LENGTH_SHORT).show()
         }
@@ -1709,12 +1722,15 @@ private fun JournalEntryEditDialog(
                                     imagesToRetain,
                                     imagesToAdd,
                                 ).onSuccess {
-                                    importedAudios.forEach(audioServices.release)
-                                    importedAudioJsons = emptyList()
-                                    videoServices.clearEdit(entry.id)
-                                    importedVideos.forEach(videoServices.release)
-                                    importedVideoJsons = emptyList()
-                                    Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
+                                    withContext(NonCancellable) {
+                                        videoServices.clearEdit(entry.id)
+                                        importedAudios.forEach(audioServices.release)
+                                        importedAudioJsons = emptyList()
+                                        importedVideos.forEach(videoServices.release)
+                                        importedVideoJsons = emptyList()
+                                        Toast.makeText(context, localizedText("修改已保存"), Toast.LENGTH_SHORT).show()
+                                        onDismiss()
+                                    }
                                 }.onFailure { error ->
                                     saveError = error.message ?: localizedText("修改保存失败，请重试。")
                                 }

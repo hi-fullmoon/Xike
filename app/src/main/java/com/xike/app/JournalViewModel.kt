@@ -562,11 +562,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     fun openVideoCover(name: String): InputStream? = runCatching { videoStore.open(name) }.getOrNull()
 
     suspend fun importEditAudio(source: File, durationMillis: Long): Result<JournalAudio> = withContext(Dispatchers.IO) {
-        runCatching { store.importAudio(source, durationMillis) }
+        runCatching { store.importEditAudio(source, durationMillis) }
     }
 
     fun releaseEditAudio(audio: JournalAudio) {
-        viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(audio.fileName) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { store.releaseEditAudio(audio) } }
+                .onFailure {
+                    dataError = tr("编辑录音暂时无法清理，原文件已保留。", "Unable to clean up the edited audio. The original file is preserved.")
+                }
+        }
     }
 
     suspend fun importVideo(uri: Uri, progress: (Float) -> Unit): Result<JournalVideo> = withContext(Dispatchers.IO) {

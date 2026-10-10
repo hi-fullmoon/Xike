@@ -176,6 +176,15 @@ class JournalStore(context: Context) {
     private val masterKey = MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
     private val database by lazy { JournalDatabase.get(appContext) }
     private val dao by lazy { database.journalDao() }
+    private val editAudioPreferences by lazy {
+        EncryptedSharedPreferences.create(
+            appContext,
+            "xike-edit-audio-references",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
     private val legacyPreferences by lazy {
         EncryptedSharedPreferences.create(
             appContext,
@@ -463,6 +472,24 @@ class JournalStore(context: Context) {
     @Synchronized
     fun deleteUnreferencedAudio(fileName: String) {
         if (fileName !in referencedAudioFileNames()) deleteAudio(fileName)
+    }
+
+    @Synchronized
+    fun importEditAudio(source: File, durationMillis: Long): JournalAudio {
+        val audio = importAudio(source, durationMillis)
+        try {
+            check(editAudioPreferences.edit().putBoolean(audio.fileName, true).commit())
+        } catch (error: Throwable) {
+            deleteAudio(audio.fileName)
+            throw error
+        }
+        return audio
+    }
+
+    @Synchronized
+    fun releaseEditAudio(audio: JournalAudio) {
+        check(editAudioPreferences.edit().remove(audio.fileName).commit())
+        deleteUnreferencedAudio(audio.fileName)
     }
 
     @Synchronized
@@ -1091,6 +1118,7 @@ class JournalStore(context: Context) {
     private fun referencedAudioFileNames(): Set<String> = buildSet {
         addAll(dao.audioFileNames())
         pendingDeletedEntry?.audio?.fileName?.let(::add)
+        addAll(editAudioPreferences.all.keys)
     }
 
     private fun referencedVideoFiles(): Set<String> =

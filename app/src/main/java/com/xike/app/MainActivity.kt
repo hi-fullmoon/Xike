@@ -187,6 +187,7 @@ class MainActivity : FragmentActivity() {
                     ) {
                         XikeApp(
                             entries = journalViewModel.entries,
+                            entriesLoading = journalViewModel.isLoading,
                             draft = journalViewModel.draft,
                             selectedTheme = journalViewModel.selectedTheme,
                             selectedStyle = journalViewModel.selectedStyle,
@@ -554,6 +555,7 @@ private data class PendingExport(val password: String?)
 @Composable
 private fun XikeApp(
     entries: List<JournalEntry>,
+    entriesLoading: Boolean,
     draft: JournalDraft,
     selectedTheme: AppTheme,
     selectedStyle: AppStyle,
@@ -738,6 +740,7 @@ private fun XikeApp(
                 AppScreen.ARCHIVE -> JournalArchiveScreen(
                     padding = innerPadding,
                     entries = entries,
+                    entriesLoading = entriesLoading,
                     onSearch = onSearch,
                     onUpdate = onUpdate,
                     onDelete = onDelete,
