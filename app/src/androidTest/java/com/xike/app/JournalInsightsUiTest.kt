@@ -7,6 +7,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -67,6 +69,16 @@ class JournalInsightsUiTest {
             .boundsInRoot
 
         assertTrue("Large-font headline should be placed below the mood badge", headlineBounds.top >= badgeBounds.bottom)
+
+        val description = composeRule.onAllNodesWithText(
+            localizedText("还没有记录，因此不生成趋势判断。"), useUnmergedTree = true,
+        ).onFirst()
+        description.performScrollTo().assertIsDisplayed()
+        val descriptionBounds = description.fetchSemanticsNode().boundsInRoot
+        val evidenceBounds = composeRule.onNodeWithText(
+            localizedText("暂无样本"), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        assertTrue("Large-font evidence description should use its own row", descriptionBounds.top >= evidenceBounds.bottom)
     }
 
     @Test

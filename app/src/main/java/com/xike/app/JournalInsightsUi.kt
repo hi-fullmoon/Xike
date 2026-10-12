@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,7 +82,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.io.InputStream
@@ -277,7 +279,7 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
         color = MaterialTheme.colorScheme.primaryContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
     ) {
-        Column(Modifier.padding(XikeCardPadding)) {
+        Column(Modifier.padding(XikeContentCardPadding)) {
             if (stackContent) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -352,7 +354,12 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                 description = tr("数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录", "Data coverage: entries on ${summary.evidence.recordedDayCount} of ${summary.evidence.elapsedDayCount} days"),
             )
             Spacer(Modifier.height(9.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = if (stackContent) 1 else 2,
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)) {
                     Text(
                         summary.evidence.level.label,
@@ -361,20 +368,21 @@ private fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> U
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    summary.evidence.level.description,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
-                )
-                if (summary.entryCount > 0) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = localizedText("查看这段时间的记录"),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        summary.evidence.level.description,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
                     )
+                    if (summary.entryCount > 0) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = localizedText("查看这段时间的记录"),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -400,19 +408,13 @@ private fun OverviewMoodBadge(summary: JournalPeriodSummary) {
 
 @Composable
 private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
-    Surface(
+    Column(
         modifier = modifier,
-        shape = XikeShapes.inner,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(
-            Modifier.padding(XikeInnerCardPadding),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(2.dp))
-            Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f))
+        Spacer(Modifier.height(4.dp))
+        Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
@@ -473,8 +475,15 @@ internal fun MoodTrendChart(
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val axisLabels = listOf(localizedText("愉悦"), localizedText("平静"), localizedText("低落"))
-    val axisStyle = MaterialTheme.typography.labelSmall
-    val pointStyle = axisStyle.copy(fontSize = if (points.size > 9) 10.sp else 11.sp)
+    val axisStyle = MaterialTheme.typography.labelMedium
+    val pointStyle = axisStyle
+    val axisLabelHeight = with(density) {
+        axisLabels.maxOf { textMeasurer.measure(it, axisStyle, softWrap = false).size.height }.toDp()
+    }
+    val chartHeight = maxOf(142.dp, axisLabelHeight * 3 + 12.dp)
+    val plotTop = maxOf(16.dp, axisLabelHeight / 2 + 6.dp)
+    val plotBottom = chartHeight - maxOf(14.dp, axisLabelHeight / 2 + 6.dp)
+    val scrollState = rememberScrollState()
     var renderedAxisWidth by remember(axisLabels, axisStyle, density) { mutableStateOf(0.dp) }
     var renderedPointWidth by remember(points.map { it.label }, pointStyle, density) { mutableStateOf(0.dp) }
     val axisWidth = with(density) {
@@ -485,38 +494,49 @@ internal fun MoodTrendChart(
             }.toDp() + 8.dp)
     }
     val pointWidth = with(density) {
-        maxOf(renderedPointWidth, (points.maxOfOrNull {
+        maxOf(48.dp, renderedPointWidth, (points.maxOfOrNull {
             textMeasurer.measure(it.label, pointStyle.copy(fontWeight = FontWeight.Bold), softWrap = false,
                 maxLines = 1, density = density).multiParagraph.maxIntrinsicWidth
         } ?: 0f).toDp() + 8.dp)
     }
     BoxWithConstraints(Modifier.fillMaxWidth().padding(XikeInnerCardPadding)) {
-        Column(Modifier.horizontalScroll(rememberScrollState()).width(maxOf(maxWidth, axisWidth + pointWidth * points.size))) {
-            Box(Modifier.fillMaxWidth().height(142.dp)) {
-                Column(
-                    modifier = Modifier.width(axisWidth).fillMaxHeight().padding(vertical = 6.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    axisLabels.forEach { label ->
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                            onTextLayout = { layout ->
-                                val width = with(density) { layout.multiParagraph.maxIntrinsicWidth.toDp() } + 8.dp
-                                if (width > renderedAxisWidth) renderedAxisWidth = width
-                            },
-                        )
-                    }
+        val viewportWidth = (maxWidth - axisWidth).coerceAtLeast(0.dp)
+        val plotWidth = maxOf(viewportWidth, pointWidth * points.size)
+        LaunchedEffect(points.map { it.startDate to it.endDateExclusive }, today, plotWidth, viewportWidth, density) {
+            val currentIndex = points.indexOfFirst { !today.isBefore(it.startDate) && today.isBefore(it.endDateExclusive) }
+            if (currentIndex >= 0 && viewportWidth > 0.dp) {
+                withFrameNanos { }
+                val target = with(density) {
+                    (plotWidth / points.size * (currentIndex + 0.5f) - viewportWidth / 2).toPx().roundToInt()
                 }
-                Box(Modifier.fillMaxSize().padding(start = axisWidth)) {
+                scrollState.scrollTo(target.coerceAtLeast(0))
+            }
+        }
+        Box(Modifier.width(axisWidth).height(chartHeight)) {
+            axisLabels.forEachIndexed { index, label ->
+                val tickPosition = plotTop + (plotBottom - plotTop) * (index / 2f)
+                Text(
+                    label,
+                    modifier = Modifier.offset(y = tickPosition - axisLabelHeight / 2).height(axisLabelHeight),
+                    style = axisStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    onTextLayout = { layout ->
+                        val width = with(density) { layout.multiParagraph.maxIntrinsicWidth.toDp() } + 8.dp
+                        if (width > renderedAxisWidth) renderedAxisWidth = width
+                    },
+                )
+            }
+        }
+        Column(Modifier.padding(start = axisWidth).horizontalScroll(scrollState).width(plotWidth)) {
+            Box(Modifier.fillMaxWidth().height(chartHeight).testTag("mood-trend-plot")) {
+                Box(Modifier.fillMaxSize()) {
                     Canvas(Modifier.fillMaxSize()) {
                         if (points.isEmpty()) return@Canvas
                         val step = size.width / points.size
-                        val top = 16.dp.toPx()
-                        val bottom = size.height - 14.dp.toPx()
+                        val top = plotTop.toPx()
+                        val bottom = plotBottom.toPx()
                         fun position(index: Int, score: Double): Offset = Offset(
                             x = step * (index + 0.5f),
                             y = bottom - ((score.coerceIn(1.0, 5.0) - 1.0) / 4.0).toFloat() * (bottom - top),
@@ -581,7 +601,7 @@ internal fun MoodTrendChart(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().padding(start = axisWidth)) {
+            Row(Modifier.fillMaxWidth()) {
                 points.forEachIndexed { index, point ->
                     val current = !today.isBefore(point.startDate) && today.isBefore(point.endDateExclusive)
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -909,7 +929,7 @@ private fun InsightSectionCard(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.padding(XikeCardPadding)) {
+        Column(Modifier.padding(XikeContentCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)

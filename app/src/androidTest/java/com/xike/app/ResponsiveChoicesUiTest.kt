@@ -17,6 +17,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.text.TextLayoutResult
@@ -46,6 +47,61 @@ class ResponsiveChoicesUiTest {
     @After
     fun restoreLanguage() {
         composeRule.runOnIdle { AppLocale.select(context, originalLanguage) }
+    }
+
+    @Test
+    fun narrowLargeFontTopicsHeaderKeepsCountAndExplanationComplete() {
+        assertTopicsHeaderLayout()
+    }
+
+    @Test
+    fun narrowLargeFontChineseTopicsHeaderKeepsCountAndExplanationComplete() {
+        composeRule.runOnIdle { AppLocale.select(context, AppLanguage.CHINESE) }
+        composeRule.waitForIdle()
+        assertTopicsHeaderLayout()
+    }
+
+    @Test
+    fun narrowLargeFontEditingTopicsHeaderKeepsCountAndExplanationComplete() {
+        assertTopicsHeaderLayout(highlightSelection = false)
+    }
+
+    @Test
+    fun narrowLargeFontChineseEditingTopicsHeaderKeepsCountAndExplanationComplete() {
+        composeRule.runOnIdle { AppLocale.select(context, AppLanguage.CHINESE) }
+        composeRule.waitForIdle()
+        assertTopicsHeaderLayout(highlightSelection = false)
+    }
+
+    private fun assertTopicsHeaderLayout(highlightSelection: Boolean = true) {
+        val selectedStyle = mutableStateOf(AppStyle.BREATHE)
+        val selectedTopics = mutableStateOf(emptyList<JournalTopic>())
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
+                    Column(Modifier.width(240.dp)) { MomentTopicsHeader(selectedTopics.value.size, highlightSelection) }
+                }
+            }
+        }
+        AppStyle.entries.forEach { style ->
+            listOf(emptyList(), journalTopics).forEach { selection ->
+                composeRule.runOnIdle {
+                    selectedStyle.value = style
+                    selectedTopics.value = selection
+                }
+                val countLabel = if (selection.isEmpty()) localizedText("可多选")
+                    else tr("已选 ${selection.size}", "${selection.size} selected")
+                assertCompleteLabel(localizedText("主题"))
+                assertCompleteLabel(localizedText("这一刻与什么有关？"), allowWrap = true)
+                assertCompleteLabel(countLabel)
+                val explanation = composeRule.onNodeWithText(localizedText("这一刻与什么有关？")).getUnclippedBoundsInRoot()
+                val count = composeRule.onNodeWithText(countLabel).getUnclippedBoundsInRoot()
+                assertTrue("Explanation overlaps the count for $style",
+                    explanation.right + 8.dp <= count.left || explanation.bottom + 8.dp <= count.top)
+                assertTrue("Count escapes the header for $style", count.right <= 240.dp)
+            }
+        }
     }
 
     @Test
@@ -242,16 +298,19 @@ class ResponsiveChoicesUiTest {
         }
     }
 
-    private fun assertCompleteLabel(label: String) {
+    private fun assertCompleteLabel(label: String, allowWrap: Boolean = false) {
         val nodes = composeRule.onAllNodesWithText(label, useUnmergedTree = true).fetchSemanticsNodes()
         assertTrue("Missing label: $label", nodes.isNotEmpty())
         nodes.forEach { node ->
             val results = mutableListOf<TextLayoutResult>()
             assertTrue(node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results))
             val result = results.single()
-            assertEquals("Wrapped label: $label", 1, result.lineCount)
-            assertEquals("Truncated label: $label", label.length, result.getLineEnd(0))
-            assertFalse("Ellipsized label: $label", result.isLineEllipsized(0))
+            if (!allowWrap) assertEquals("Wrapped label: $label", 1, result.lineCount)
+            assertEquals("Truncated label: $label", label.length, result.getLineEnd(result.lineCount - 1))
+            repeat(result.lineCount) { line ->
+                assertFalse("Ellipsized label: $label", result.isLineEllipsized(line))
+                assertTrue("Clipped label: $label", result.getLineRight(line) <= result.size.width + 1f)
+            }
             // Paragraph metrics are fractional; layout bounds use integer pixels.
             assertTrue("Clipped label: $label, size=${result.size}, left=${result.getLineLeft(0)}, right=${result.getLineRight(0)}, paragraphWidth=${result.multiParagraph.width}, constraints=${result.layoutInput.constraints}", result.getLineRight(0) <= result.size.width + 1f)
             assertFalse("Vertically clipped label: $label", result.didOverflowHeight)

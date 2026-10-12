@@ -248,6 +248,7 @@ private data class XikeStyleSpec(
     val screenHorizontalPadding: Dp,
     val screenVerticalPadding: Dp,
     val contentGap: Dp,
+    val contentCardPadding: Dp,
     val pageTitleStyle: TextStyle,
     val sectionTitleStyle: TextStyle,
     val eyebrowStyle: TextStyle,
@@ -283,6 +284,7 @@ private val BreatheStyleSpec = XikeStyleSpec(
     screenHorizontalPadding = 20.dp,
     screenVerticalPadding = 18.dp,
     contentGap = 15.dp,
+    contentCardPadding = 18.dp,
     pageTitleStyle = TextStyle(
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Medium,
@@ -315,6 +317,7 @@ private val PaperStyleSpec = XikeStyleSpec(
     screenHorizontalPadding = 24.dp,
     screenVerticalPadding = 22.dp,
     contentGap = 19.dp,
+    contentCardPadding = 14.dp,
     pageTitleStyle = TextStyle(
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Normal,
@@ -349,6 +352,7 @@ private val FocusStyleSpec = XikeStyleSpec(
     screenHorizontalPadding = 16.dp,
     screenVerticalPadding = 12.dp,
     contentGap = 10.dp,
+    contentCardPadding = 14.dp,
     pageTitleStyle = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
@@ -421,6 +425,8 @@ private fun android.app.Dialog.showWithXikeShape() {
 internal val LocalRecordedAtPickerContext = staticCompositionLocalOf<Context> { error("Missing picker theme") }
 
 internal val XikeCardPadding = 14.dp
+internal val XikeContentCardPadding: Dp
+    @Composable get() = LocalXikeStyle.current.contentCardPadding
 internal val XikeInnerCardPadding = 10.dp
 internal val XikeSheetHorizontalPadding = 20.dp
 internal val XikeSheetBottomPadding = 20.dp
@@ -1227,7 +1233,7 @@ fun MomentScreen(
                                 showDetails = !showDetails
                                 if (showDetails) revealDetailsRequest++
                             }
-                            .padding(XikeCardPadding)
+                            .padding(XikeContentCardPadding)
                             .heightIn(min = 42.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -1249,26 +1255,11 @@ fun MomentScreen(
 
                     if (showDetails) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = XikeCardPadding),
+                            modifier = Modifier.padding(horizontal = XikeContentCardPadding),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
                         )
-                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(XikeCardPadding)) {
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Column {
-                                    Text(localizedText("主题"), style = MaterialTheme.typography.titleSmall)
-                                    Text(
-                                        localizedText("这一刻与什么有关？"),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Spacer(Modifier.weight(1f))
-                                Text(
-                                    if (draft.tags.isEmpty()) localizedText("可多选") else tr("已选 ${draft.tags.size}", "${draft.tags.size} selected"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (draft.tags.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                                )
-                            }
+                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(XikeContentCardPadding)) {
+                            MomentTopicsHeader(draft.tags.size)
                             Spacer(Modifier.height(8.dp))
                             TopicChoices(draft.tags) { topic ->
                                 if (!isSaving) onDraftTagToggle(topic.label)
@@ -1980,7 +1971,7 @@ internal fun MomentNoteCard(
     toolbar: @Composable () -> Unit,
 ) {
     Surface(Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(horizontal = 14.dp).padding(top = 16.dp, bottom = 4.dp)) {
+        Column(Modifier.padding(horizontal = XikeContentCardPadding).padding(top = 16.dp, bottom = 4.dp)) {
             BasicTextField(
                 value = note,
                 onValueChange = onNoteChange,
@@ -2042,7 +2033,7 @@ internal fun MomentContentToolbar(
             IconButton(
                 onClick = onAdd,
                 enabled = enabled,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     XikeIcons.Add,
@@ -2242,7 +2233,7 @@ internal fun MoodPicker(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
         ) {
-            Column(Modifier.padding(XikeCardPadding)) {
+            Column(Modifier.padding(XikeContentCardPadding)) {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val textMeasurer = rememberTextMeasurer()
                     val supportingStyle = MaterialTheme.typography.bodySmall
@@ -2404,7 +2395,7 @@ internal fun MoodChoice(
                 if (selected) moodColor else MaterialTheme.colorScheme.outlineVariant,
             ),
             tonalElevation = 0.dp,
-            shadowElevation = if (selected) 2.dp else 0.dp,
+            shadowElevation = 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 MoodEmoji(mood, size = 24.dp)
@@ -2451,6 +2442,44 @@ internal fun MoodChoices(
                     }
                     repeat(columns - moods.size) { Spacer(Modifier.weight(1f)) }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun MomentTopicsHeader(selectedCount: Int, highlightSelection: Boolean = true) {
+    val title = localizedText("主题")
+    val count = if (selectedCount == 0) localizedText("可多选") else tr("已选 $selectedCount", "$selectedCount selected")
+    val titleStyle = MaterialTheme.typography.titleSmall
+    val countStyle = MaterialTheme.typography.labelSmall
+    val measurer = rememberTextMeasurer()
+    val requiredWidth = with(LocalDensity.current) {
+        (measurer.measure(title, titleStyle, softWrap = false).size.width +
+            measurer.measure(count, countStyle, softWrap = false).size.width).toDp() + 8.dp
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stackCount = requiredWidth > maxWidth
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = if (stackCount) 1 else 2,
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = titleStyle)
+                Text(
+                    localizedText("这一刻与什么有关？"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box(if (stackCount) Modifier.fillMaxWidth() else Modifier, contentAlignment = Alignment.CenterEnd) {
+                Text(
+                    count,
+                    style = countStyle,
+                    color = if (selectedCount == 0 || !highlightSelection) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

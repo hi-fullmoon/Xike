@@ -1,14 +1,17 @@
 package com.xike.app
 
 import android.view.KeyEvent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
@@ -45,11 +48,16 @@ class MomentContentUiTest {
         openMedia()
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         rule.onNodeWithText(tr("视频", "Video")).assertDoesNotExist()
+        rule.onNodeWithContentDescription(localizedText("此刻的注脚")).performScrollTo().performClick()
+        rule.onNodeWithText(localizedText("完成")).performScrollTo().assertIsDisplayed().performClick()
+        rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).assertIsDisplayed()
         assertEquals(originalDraft, viewModel.draft)
     }
 
     private fun openMedia() {
-        rule.onNodeWithContentDescription(tr("添加内容", "Add content")).performScrollTo().performClick()
+        rule.onNodeWithContentDescription(tr("添加内容", "Add content"))
+            .performScrollTo()
+            .performTouchInput { click(Offset(width - 2f, height / 2f)) }
         rule.onNodeWithText(tr("视频", "Video")).assertIsDisplayed()
     }
 

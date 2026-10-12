@@ -1866,7 +1866,7 @@ private fun JournalEntryEditDialog(
                             showTopics = !showTopics
                             if (showTopics) revealTopicsRequest++
                         }
-                            .padding(XikeCardPadding).heightIn(min = 42.dp),
+                            .padding(XikeContentCardPadding).heightIn(min = 42.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -1880,19 +1880,9 @@ private fun JournalEntryEditDialog(
                         Icon(if (showTopics) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, tint = MaterialTheme.colorScheme.primary)
                     }
                     if (showTopics) {
-                        HorizontalDivider(Modifier.padding(horizontal = XikeCardPadding), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-                        Column(Modifier.bringIntoViewRequester(topicsAnchor).padding(XikeCardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(localizedText("主题"), style = MaterialTheme.typography.titleSmall)
-                                    Text(localizedText("这一刻与什么有关？"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    if (selectedTags.isEmpty()) localizedText("可多选") else tr("已选 ${selectedTags.canonicalTopics().size}", "${selectedTags.canonicalTopics().size} selected"),
-                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                        HorizontalDivider(Modifier.padding(horizontal = XikeContentCardPadding), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                        Column(Modifier.bringIntoViewRequester(topicsAnchor).padding(XikeContentCardPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MomentTopicsHeader(selectedTags.canonicalTopics().size, highlightSelection = false)
                             TopicChoices(selectedTags) { topic -> if (!isSaving) selectedTags = toggleTopic(selectedTags, topic.label) }
                         }
                     }
