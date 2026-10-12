@@ -295,7 +295,7 @@ class MainActivity : FragmentActivity() {
         appLockTimeout = lockPreferences.timeout
         if (appLockEnabled) {
             if (!returningFromSystemActivity &&
-                (lockSession.isAppLocked || shouldLockApp(lockSession.backgroundedAtMillis, SystemClock.elapsedRealtime(), appLockTimeout))
+                lockSession.shouldLockOnForeground(SystemClock.elapsedRealtime(), appLockTimeout)
             ) {
                 lockSession.isAppLocked = true
             } else {
@@ -549,6 +549,9 @@ class AppLockSessionState : ViewModel() {
     internal var systemActivityInProgress = false
     internal var authenticationAction: LockAuthentication? = null
     internal var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
+
+    internal fun shouldLockOnForeground(nowMillis: Long, timeout: AppLockTimeout): Boolean =
+        isAppLocked || (backgroundedAtMillis != null && shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
 
     internal fun beginSystemActivity() {
         systemActivityInProgress = true
