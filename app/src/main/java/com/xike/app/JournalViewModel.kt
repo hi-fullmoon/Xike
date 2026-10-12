@@ -60,6 +60,21 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     var draft by mutableStateOf(JournalDraft())
         private set
 
+    var hasResumedDraft by mutableStateOf(false)
+        private set
+    private var draftSessionBackgrounded = false
+
+    internal fun onAppBackgrounded() {
+        draftSessionBackgrounded = true
+    }
+
+    internal fun onAppForegrounded() {
+        if (draftSessionBackgrounded) {
+            hasResumedDraft = !draft.isEmpty || pendingDraftAudio != null
+            draftSessionBackgrounded = false
+        }
+    }
+
     var pendingDraftAudio by mutableStateOf<PendingDraftAudio?>(null)
         private set
 
@@ -112,12 +127,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 selectedTheme = appearance.theme
                 selectedStyle = appearance.style
                 canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
-                draftResult.onSuccess { draft = it }
+                draftResult.onSuccess {
+                    draft = it
+                    hasResumedDraft = !it.isEmpty
+                }
                 dataError = draftResult.exceptionOrNull()?.message ?: draftFlushResult.exceptionOrNull()?.message
                 pendingResult.onSuccess { staged ->
                     pendingDraftAudio = staged?.let {
                         PendingDraftAudio(it.durationMillis, draftGeneration, it.fileName)
                     }
+                    if (staged != null) hasResumedDraft = true
                 }.onFailure { error ->
                     dataError = error.message ?: localizedText("录音暂存文件暂时无法读取。")
                 }
@@ -200,6 +219,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateDraftNote(note: String) {
         draft = draft.copy(note = note.take(MAX_DRAFT_NOTE_LENGTH), updatedAt = System.currentTimeMillis()).normalized()
+        if (draft.isEmpty) hasResumedDraft = false
         scheduleNoteSave(250L)
     }
 
@@ -668,6 +688,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 noteSaveJob?.cancel()
                 noteSaveJob = null
                 draft = normalized
+                if (normalized.isEmpty) hasResumedDraft = false
             }
             .onFailure { error ->
                 if (reportError) dataError = error.message ?: localizedText("草稿保存失败，请重试。")
@@ -688,6 +709,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val currentDraft = draft
         if (currentDraft == savedDraft) {
             draft = JournalDraft()
+            hasResumedDraft = false
             runCatching { draftStore.save(draft) }
                 .onSuccess {
                     noteSaveJob?.cancel()

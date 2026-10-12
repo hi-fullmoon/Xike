@@ -19,6 +19,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
@@ -50,7 +53,7 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("草稿操作").assertDoesNotExist()
+        composeRule.onNodeWithText("放弃草稿").assertDoesNotExist()
         composeRule.onNodeWithText("此刻窗外").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("地点与天气 · 可选").assertIsDisplayed()
         composeRule.onNodeWithText("添加").assertIsDisplayed().performClick()
@@ -485,20 +488,19 @@ class JournalDraftUiTest {
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                     onDraftDiscard = { discarded = true },
+                    hasResumedDraft = true,
                 )
             }
         }
 
         composeRule.onNodeWithText("清空").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("草稿操作").performScrollTo().performClick()
-        composeRule.onNodeWithText("放弃草稿").performClick()
+        composeRule.onNodeWithText("放弃草稿").performScrollTo().performClick()
         composeRule.onNodeWithText("放弃这份草稿？").assertIsDisplayed()
         composeRule.onNodeWithText("继续保留").performClick()
         composeRule.runOnIdle { check(!discarded) }
 
-        composeRule.onNodeWithContentDescription("草稿操作").performScrollTo().performClick()
-        composeRule.onNodeWithText("放弃草稿").performClick()
-        composeRule.onNodeWithText("放弃草稿").performClick()
+        composeRule.onNodeWithText("放弃草稿").performScrollTo().performClick()
+        composeRule.onNode(hasText("放弃草稿") and hasAnyAncestor(isDialog())).performClick()
         composeRule.runOnIdle { check(discarded) }
     }
 }

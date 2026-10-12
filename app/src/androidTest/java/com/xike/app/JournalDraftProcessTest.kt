@@ -74,6 +74,7 @@ class JournalDraftProcessTest {
                     val viewModel = openViewModel()
                     awaitCondition { !viewModel.isLoading }
                     assertEquals(expected, viewModel.draft.note)
+                    assertTrue(viewModel.hasResumedDraft)
                 } finally {
                     instrumentation.runOnMainSync { owner.viewModelStore.clear() }
                     JournalDraftStore(application).save(original)

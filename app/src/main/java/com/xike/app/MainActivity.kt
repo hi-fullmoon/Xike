@@ -220,6 +220,7 @@ class MainActivity : FragmentActivity() {
                             onDraftAudioDiscard = journalViewModel::discardPendingDraftAudio,
                             onDraftAudioRemoved = journalViewModel::removeDraftAudio,
                             onDraftDiscard = journalViewModel::discardDraft,
+                            hasResumedDraft = journalViewModel.hasResumedDraft,
                             onReminderEnabledChange = { enabled ->
                                 changeReminderEnabled(enabled) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -273,6 +274,7 @@ class MainActivity : FragmentActivity() {
         // return never becomes indistinguishable from a normal foreground launch.
         val returningFromSystemActivity = lockSession.systemActivityInProgress
         super.onStart()
+        if (!returningFromSystemActivity) openedJournalViewModel?.onAppForegrounded()
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
         if (appLockEnabled) {
@@ -319,6 +321,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         openedJournalViewModel?.flushDraft()
+        if (!isChangingConfigurations && !lockSession.systemActivityInProgress) {
+            openedJournalViewModel?.onAppBackgrounded()
+        }
         if (appLockEnabled && !isChangingConfigurations) {
             lockSession.recordBackgrounded(SystemClock.elapsedRealtime())
         }
@@ -613,6 +618,7 @@ private fun XikeApp(
     onDraftAudioDiscard: () -> Unit,
     onDraftAudioRemoved: () -> Unit,
     onDraftDiscard: () -> Unit,
+    hasResumedDraft: Boolean,
     onReminderEnabledChange: (Boolean) -> Unit,
     onReminderSettingsChange: (ReminderSettings) -> Unit,
     onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
@@ -760,6 +766,7 @@ private fun XikeApp(
                     openAudio = openAudio,
                     onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
                     onDraftDiscard = onDraftDiscard,
+                    hasResumedDraft = hasResumedDraft,
                     onSave = onSave,
                     isDraftSaving = isDraftSaving,
                     saveFeedbackHandledExternally = true,

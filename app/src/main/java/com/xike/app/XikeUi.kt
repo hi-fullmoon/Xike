@@ -93,7 +93,6 @@ import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreHoriz
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.PauseCircle
@@ -111,8 +110,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1011,6 +1008,7 @@ fun MomentScreen(
     },
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
+    hasResumedDraft: Boolean = false,
 ) {
     var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
     val videoServices = LocalVideoServices.current
@@ -1140,7 +1138,7 @@ fun MomentScreen(
         ) {
             BrandHeader(
                 today = today,
-                hasDraft = !draft.isEmpty,
+                hasDraft = hasResumedDraft && !draft.isEmpty,
                 canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
                 onDiscard = {
                     dismissKeyboard()
@@ -1187,6 +1185,7 @@ fun MomentScreen(
                     enabled = !isSaving,
                     onNoteChange = { if (!isSaving) onDraftNoteChange(it) },
                     onFocusChange = { isNoteFocused = it },
+                    placeholderAlpha = 0.56f,
                 ) {
                     MomentContentToolbar(
                         recordedAt = draft.recordedAt,
@@ -1978,6 +1977,7 @@ internal fun MomentNoteCard(
     enabled: Boolean,
     onNoteChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    placeholderAlpha: Float = 0.78f,
     toolbar: @Composable () -> Unit,
 ) {
     Surface(Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
@@ -2003,7 +2003,7 @@ internal fun MomentNoteCard(
                                 Text(
                                     localizedText("这一刻，有什么想留下？"),
                                     style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.SansSerif),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = placeholderAlpha),
                                 )
                             }
                             innerTextField()
@@ -2169,56 +2169,27 @@ private fun BrandHeader(
         }
         Spacer(Modifier.width(9.dp))
         Text(localizedText("息刻"), style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.weight(1f))
-        Text(
-            today.format(DateTimeFormatter.ofPattern(tr("M月d日 · E", "MMM d · E"), AppLocale.locale)),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (hasDraft) {
-            var menuExpanded by remember { mutableStateOf(false) }
-            Spacer(Modifier.width(8.dp))
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.size(width = 48.dp, height = 32.dp),
+        Spacer(Modifier.width(8.dp))
+        FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                today.format(DateTimeFormatter.ofPattern(tr("M月d日 · E", "MMM d · E"), AppLocale.locale)),
+                modifier = Modifier.align(Alignment.CenterVertically),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (hasDraft) {
+                TextButton(
+                    onClick = onDiscard,
+                    enabled = canDiscard,
+                    modifier = Modifier.heightIn(min = 48.dp).align(Alignment.CenterVertically),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Icon(
-                        Icons.Outlined.MoreVert,
-                        contentDescription = tr("草稿操作", "Draft actions"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    shape = XikeShapes.inner,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                val tint = if (canDiscard) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                Icon(
-                                    Icons.Outlined.DeleteOutline,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = tint,
-                                )
-                                Text(localizedText("放弃草稿"), color = tint)
-                            }
-                        },
-                        enabled = canDiscard,
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        onClick = {
-                            menuExpanded = false
-                            onDiscard()
-                        },
-                    )
+                    Text(localizedText("放弃草稿"))
                 }
             }
         }
