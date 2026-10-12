@@ -1,4 +1,9 @@
 <resources>
+    <style name="Theme.Xike.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/welcome_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/welcome_launch_placeholder</item>
+        <item name="postSplashScreenTheme">@style/Theme.Xike</item>
+    </style>
     <style name="Theme.Xike" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>

@@ -46,6 +46,7 @@
         android:theme="@style/Theme.Xike">
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.Xike.Starting"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>

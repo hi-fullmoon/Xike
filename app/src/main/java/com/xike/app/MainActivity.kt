@@ -70,6 +70,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -81,6 +82,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     private val lockSession: AppLockSessionState by viewModels()
+    private val welcomeSession: WelcomeLaunchState by viewModels()
     private var openedJournalViewModel: JournalViewModel? = null
     private lateinit var lockPreferences: AppLockPreferences
     private lateinit var appearancePreferences: AppearancePreferences
@@ -97,7 +99,10 @@ class MainActivity : FragmentActivity() {
     private var lockScreenStyle by mutableStateOf(AppStyle.BREATHE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Hand the system launch background directly to the single welcome animation in Compose.
+        splashScreen.setOnExitAnimationListener { it.remove() }
         AppLocale.initialize(this)
         lockPreferences = AppLockPreferences(this)
         appearancePreferences = AppearancePreferences(this)
@@ -137,7 +142,19 @@ class MainActivity : FragmentActivity() {
                     XikeNotice.makeText(this, localizedText("没有开启通知，记录功能仍可正常使用"), XikeNotice.LENGTH_LONG).show()
                 }
             }
-            if (!lockSession.journalSessionOpened) {
+            // Prepare the existing store during the animation only when the lock already permits it.
+            val preparedJournal = if (lockSession.journalSessionOpened) viewModel<JournalViewModel>() else null
+            openedJournalViewModel = preparedJournal
+            if (welcomeSession.visible) {
+                XikeTheme(lockScreenTheme, lockScreenStyle) {
+                    WelcomeScreen(onFinished = {
+                        welcomeSession.finish()
+                        if (appLockEnabled && lockSession.isAppLocked) {
+                            requestAuthentication(LockAuthentication.UNLOCK, openSettingsWhenUnavailable = false)
+                        }
+                    })
+                }
+            } else if (!lockSession.journalSessionOpened) {
                 XikeTheme(lockScreenTheme, lockScreenStyle) {
                     AppLockScreen(
                         authenticationAvailable = authenticationAvailable,
@@ -148,8 +165,7 @@ class MainActivity : FragmentActivity() {
                     )
                 }
             } else {
-                val journalViewModel: JournalViewModel = viewModel()
-                openedJournalViewModel = journalViewModel
+                val journalViewModel = checkNotNull(preparedJournal)
                 LaunchedEffect(journalViewModel.selectedTheme, journalViewModel.selectedStyle) {
                     lockScreenTheme = journalViewModel.selectedTheme
                     lockScreenStyle = journalViewModel.selectedStyle
@@ -302,7 +318,7 @@ class MainActivity : FragmentActivity() {
         lockSession.pendingAuthenticationAfterEnrollment = null
         if (pendingAction != null && authenticationAvailable) {
             window.decorView.post { requestAuthentication(pendingAction) }
-        } else if (appLockEnabled && lockSession.isAppLocked) {
+        } else if (!welcomeSession.visible && appLockEnabled && lockSession.isAppLocked) {
             window.decorView.post {
                 requestAuthentication(LockAuthentication.UNLOCK, openSettingsWhenUnavailable = false)
             }
