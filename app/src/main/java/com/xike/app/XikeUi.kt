@@ -1937,14 +1937,19 @@ private fun Long.asOutdoorCapturedTime(): String = DateTimeFormatter.ofPattern("
 private fun DraftSecurityRow(
     statusText: String,
 ) {
-    val firstLineHeight = with(LocalDensity.current) {
+    val defaultFirstLineHeight = with(LocalDensity.current) {
         MaterialTheme.typography.bodySmall.lineHeight.toDp()
+    }
+    var firstLineCenter by remember(statusText, defaultFirstLineHeight) {
+        mutableStateOf<Float?>(null)
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
     ) {
-        Box(Modifier.height(firstLineHeight), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.height(defaultFirstLineHeight).alignBy { it.measuredHeight / 2 },
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 Icons.Outlined.Shield,
                 contentDescription = null,
@@ -1955,9 +1960,14 @@ private fun DraftSecurityRow(
         Spacer(Modifier.width(4.dp))
         Text(
             statusText,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).alignBy {
+                firstLineCenter?.roundToInt() ?: (it.measuredHeight / 2)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            onTextLayout = { layout ->
+                firstLineCenter = (layout.getLineTop(0) + layout.getLineBottom(0)) / 2f
+            },
         )
     }
 }
