@@ -1,6 +1,7 @@
 package com.xike.app
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -47,6 +48,53 @@ class ResponsiveChoicesUiTest {
     @After
     fun restoreLanguage() {
         composeRule.runOnIdle { AppLocale.select(context, originalLanguage) }
+    }
+
+    @Test
+    fun narrowLargeFontDistributionKeepsEnglishStatisticsReadable() {
+        assertDistributionLayout()
+    }
+
+    @Test
+    fun narrowLargeFontDistributionKeepsChineseStatisticsReadable() {
+        composeRule.runOnIdle { AppLocale.select(context, AppLanguage.CHINESE) }
+        composeRule.waitForIdle()
+        assertDistributionLayout()
+    }
+
+    private fun assertDistributionLayout() {
+        val selectedStyle = mutableStateOf(AppStyle.BREATHE)
+        val viewportWidth = mutableStateOf(240.dp)
+        val distribution = journalPeriodSummary(emptyList(), InsightsPeriod.WEEK).moodDistribution
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
+                    Column(Modifier.width(viewportWidth.value).verticalScroll(rememberScrollState())
+                        .padding(horizontal = XikeScreenHorizontalPadding)) {
+                        MoodDistributionCard(distribution) {}
+                    }
+                }
+            }
+        }
+        listOf(240.dp, 320.dp).forEach { width ->
+            AppStyle.entries.forEach { style ->
+                composeRule.runOnIdle {
+                    viewportWidth.value = width
+                    selectedStyle.value = style
+                }
+                val statistics = tr("0 次 · 0%", "0 entries · 0%")
+                assertCompleteLabel(statistics, allowWrap = true)
+                Mood.entries.forEach { assertCompleteLabel(it.label) }
+                composeRule.onAllNodesWithText(statistics, useUnmergedTree = true)
+                    .fetchSemanticsNodes().forEach { node ->
+                        val results = mutableListOf<TextLayoutResult>()
+                        assertTrue(node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results))
+                        assertTrue("Statistics became a narrow text column for $style at $width",
+                            results.single().lineCount <= 2)
+                    }
+            }
+        }
     }
 
     @Test

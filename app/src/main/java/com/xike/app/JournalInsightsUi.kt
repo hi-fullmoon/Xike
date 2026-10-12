@@ -627,7 +627,7 @@ internal fun MoodTrendChart(
 }
 
 @Composable
-private fun MoodDistributionCard(
+internal fun MoodDistributionCard(
     distribution: List<MoodDistributionItem>,
     onClick: (MoodDistributionItem) -> Unit,
 ) {
@@ -648,14 +648,28 @@ private fun MoodDistributionCard(
                 MoodEmoji(item.mood, size = 20.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Row {
-                        Text(item.mood.label, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            tr("${item.entryCount} 次 · ${(item.ratio * 100).roundToInt()}%", "${item.entryCount} entries · ${(item.ratio * 100).roundToInt()}%"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val label = item.mood.label
+                        val statistics = tr("${item.entryCount} 次 · ${(item.ratio * 100).roundToInt()}%", "${item.entryCount} entries · ${(item.ratio * 100).roundToInt()}%")
+                        val labelStyle = MaterialTheme.typography.labelLarge
+                        val statisticsStyle = MaterialTheme.typography.labelSmall
+                        val textMeasurer = rememberTextMeasurer()
+                        val requiredWidth = with(LocalDensity.current) {
+                            (textMeasurer.measure(label, labelStyle, softWrap = false).size.width +
+                                textMeasurer.measure(statistics, statisticsStyle, softWrap = false).size.width).toDp()
+                        } + 8.dp
+                        if (requiredWidth > maxWidth) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(label, style = labelStyle)
+                                Text(statistics, style = statisticsStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(label, style = labelStyle)
+                                Spacer(Modifier.weight(1f))
+                                Text(statistics, style = statisticsStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                     Spacer(Modifier.height(7.dp))
                     RatioBar(item.ratio, tr("${item.mood.label}占 ${(item.ratio * 100).roundToInt()}%，共 ${item.entryCount} 条", "${item.mood.label}: ${(item.ratio * 100).roundToInt()}%, ${item.entryCount} entries"))
@@ -742,7 +756,7 @@ private fun ComparisonMetric(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     ) {
         Column(Modifier.padding(XikeInnerCardPadding)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            InsightMetricLabel(label, clickable = count > 0)
             Spacer(Modifier.height(6.dp))
             Text(tr("$count 次", "$count entries"), style = MaterialTheme.typography.titleLarge)
             Text(tr("$days 天 · 均值 ${average?.oneDecimal() ?: "—"}", "$days days · Average ${average?.oneDecimal() ?: "—"}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -842,13 +856,29 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
     ) {
         Column(Modifier.padding(XikeInnerCardPadding)) {
-            Text(insight.type.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            InsightMetricLabel(insight.type.label, clickable = insight.entryCount > 0)
             Spacer(Modifier.height(6.dp))
             Text(tr("${insight.entryCount} 次", "${insight.entryCount} entries"), style = MaterialTheme.typography.titleLarge)
             Text(
                 tr("${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}", "${insight.recordedDayCount} / ${insight.elapsedDayCount} days · Average ${insight.averageScore?.oneDecimal() ?: "—"}"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InsightMetricLabel(label: String, clickable: Boolean) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        if (clickable) {
+            Spacer(Modifier.width(7.dp))
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
         }
     }
