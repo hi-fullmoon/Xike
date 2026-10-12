@@ -1190,6 +1190,7 @@ fun MomentScreen(
                     MomentContentToolbar(
                         recordedAt = draft.recordedAt,
                         enabled = !isSaving,
+                        addIconSize = 20.dp,
                         onDone = dismissKeyboard.takeIf { isNoteFocused },
                         onAdd = {
                             dismissKeyboard()
@@ -2033,6 +2034,7 @@ internal fun MomentContentToolbar(
     onChooseTime: () -> Unit,
     onDone: (() -> Unit)? = null,
     isEditing: Boolean = false,
+    addIconSize: Dp = 24.dp,
 ) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
@@ -2048,6 +2050,7 @@ internal fun MomentContentToolbar(
                 Icon(
                     XikeIcons.Add,
                     contentDescription = tr("添加内容", "Add content"),
+                    modifier = Modifier.size(addIconSize),
                     tint = if (enabled) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 )
