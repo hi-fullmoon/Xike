@@ -373,14 +373,12 @@ internal class OutdoorContextRepository(context: Context) {
     }
 }
 
-private fun Address.asPlaceLabel(includeStreet: Boolean): String? = listOf(
-    adminArea,
-    locality,
-    subAdminArea,
-    subLocality,
-    thoroughfare.takeIf { includeStreet },
-)
-    .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
-    .distinct()
-    .joinToString(" · ")
-    .takeIf(String::isNotBlank)
+private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
+    val district = listOf(subLocality, subAdminArea, locality, adminArea)
+        .firstNotNullOfOrNull { it?.trim()?.takeIf(String::isNotBlank) }
+    return listOf(district, thoroughfare.takeIf { includeStreet })
+        .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+        .distinct()
+        .joinToString(" · ")
+        .takeIf(String::isNotBlank)
+}

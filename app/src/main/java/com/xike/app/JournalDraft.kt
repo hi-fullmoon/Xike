@@ -41,7 +41,10 @@ data class JournalDraft(
             it.fileName.isNotBlank() && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
         }
         val normalizedRecordedAt = recordedAt?.takeIf { it > 0L }
-        val normalizedOutdoor = outdoor?.normalizedOrNull()?.takeIf { normalizedRecordedAt == null }
+        val normalizedOutdoor = outdoor?.normalizedOrNull()?.let { snapshot ->
+            if (normalizedRecordedAt == null) snapshot
+            else retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, normalizedRecordedAt)
+        }
         val normalizedIsEmpty = mood == null &&
             normalizedNote.isBlank() &&
             normalizedTags.isEmpty() &&

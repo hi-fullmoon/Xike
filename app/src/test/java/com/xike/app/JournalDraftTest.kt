@@ -85,13 +85,13 @@ class JournalDraftTest {
     @Test
     fun `backdated draft removes current outdoor snapshot`() {
         val draft = JournalDraft(
-            recordedAt = 123_456L,
+            recordedAt = 86_523_456L,
             outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
             updatedAt = 99L,
         ).normalized()
 
         assertEquals(null, draft.outdoor)
-        assertEquals(123_456L, draft.recordedAt)
+        assertEquals(86_523_456L, draft.recordedAt)
     }
 
     @Test
@@ -103,5 +103,17 @@ class JournalDraftTest {
         )
 
         assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
+    }
+
+    @Test
+    fun `changing time within the captured date preserves weather through persistence`() {
+        val draft = JournalDraft(
+            recordedAt = 123_456L,
+            outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
+            updatedAt = 99L,
+        )
+        assertEquals(draft, draft.normalized())
+        assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
+        assertEquals(draft.outdoor, draft.copy(recordedAt = null).normalized().outdoor)
     }
 }
