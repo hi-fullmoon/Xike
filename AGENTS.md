@@ -52,13 +52,15 @@
 | `feature/insights/JournalAnalytics.kt`、`feature/insights/LocalJournalReview.kt` | 周期统计、证据计算与本地回望内容生成 |
 | `feature/insights/JournalInsightsCards.kt`、`feature/insights/JournalInsightsCharts.kt`、`feature/insights/JournalInsightsSection.kt` | 轨迹卡片、图表及共享分节展示 |
 | `feature/insights/LocalReviewDialog.kt`、`feature/insights/InsightDrilldownDialog.kt` | 本地回顾与原始记录弹窗，继续复用共享日记详情 |
-| `XikeAudioRecorder.kt`、`ui/components/VoiceCaptureUi.kt`、`ui/components/VoicePlaybackUi.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
+| `XikeAudioRecorder.kt`、`ui/components/VoiceCaptureUi.kt`、`ui/components/VoicePlaybackUi.kt`、`media/VoiceTemporaryFiles.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
 | `AudioEditServices.kt` | 既有录音导入与释放接口的 CompositionLocal 声明 |
 | `JournalViewModel.kt` | 状态管理、业务调用和草稿持久化协调 |
 | `JournalStore.kt`、`JournalDatabase.kt` | 加密存储、数据库、附件和备份恢复 |
 | `data/JournalModels.kt`、`data/JournalBackupModels.kt` | 日记、附件与快照模型，备份摘要及恢复数据归一化 |
 | `data/JournalBackupCodec.kt` | 原有备份 JSON 解析、流校验及加密编码解码辅助能力 |
-| `JournalDraft.kt`、`PendingDraftAudioStore.kt` | 草稿与待保存录音的持久化和恢复 |
+| `data/model/JournalDraft.kt`、`data/model/JournalVideo.kt`、`data/model/OutdoorSnapshot.kt` | 草稿、视频和天气快照模型及原有 JSON 转换与校验 |
+| `data/draft/JournalDraftStore.kt`、`PendingDraftAudioStore.kt` | 草稿与待保存录音的持久化和恢复 |
+| `media/JournalVideoStore.kt`、`outdoor/OutdoorContextRepository.kt` | 视频加密存储、定位与天气查询 |
 | `AppearancePreferences.kt`、`LanguagePreferences.kt` | 外观与语言设置 |
 | `LocalizedStrings.kt`、`JournalTopics.kt` | 本地化映射与主题标识规范化 |
 | `ui/components/PreviewBitmapCache.kt`、`ui/components/GalleryImageLoader.kt` | 图片预览缓存与图库加载 |

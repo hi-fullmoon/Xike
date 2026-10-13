@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalDraft
+
 import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.BackupSummary

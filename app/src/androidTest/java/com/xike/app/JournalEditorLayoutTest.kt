@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.media.JournalVideoStore
+
 import com.xike.app.feature.archive.JournalArchiveScreen
 
 import com.xike.app.ui.theme.AppTheme

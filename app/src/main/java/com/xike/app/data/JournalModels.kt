@@ -1,8 +1,8 @@
 package com.xike.app.data
 
 import com.xike.app.localizedText
-import com.xike.app.JournalVideo
-import com.xike.app.OutdoorSnapshot
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.OutdoorSnapshot
 
 import org.json.JSONArray
 import org.json.JSONObject

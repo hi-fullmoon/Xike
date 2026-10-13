@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.draft.JournalDraftStore
+
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore

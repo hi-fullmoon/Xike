@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.media.JournalVideoStore
+import com.xike.app.data.draft.JournalDraftStore
+
 import com.xike.app.data.Mood
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.JournalEntry

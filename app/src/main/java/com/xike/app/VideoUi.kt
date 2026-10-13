@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.MAX_VIDEO_BYTES
+import com.xike.app.data.model.VideoEditDraft
+
 import com.xike.app.ui.components.PlaybackProgressSlider
 
 import com.xike.app.data.JournalEntry

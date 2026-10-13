@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.draft.JournalDraftStore
+
 import com.xike.app.data.Mood
 
 import android.content.Context

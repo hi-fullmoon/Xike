@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.VideoEditDraft
+
 import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry

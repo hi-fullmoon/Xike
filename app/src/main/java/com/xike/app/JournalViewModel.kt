@@ -1,5 +1,15 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.OutdoorSnapshot
+import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
+import com.xike.app.data.model.retainOutdoorForEditedTime
+import com.xike.app.data.model.VideoEditDraft
+import com.xike.app.media.JournalVideoStore
+import com.xike.app.data.draft.JournalDraftStore
+import com.xike.app.outdoor.OutdoorContextRepository
+
 import com.xike.app.media.pruneVoiceTemporaryFiles
 
 import com.xike.app.data.Mood

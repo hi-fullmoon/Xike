@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.model.parseJournalDraft
+import com.xike.app.data.draft.JournalDraftStore
+
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.ViewModelProvider

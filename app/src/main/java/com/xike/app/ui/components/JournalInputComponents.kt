@@ -3,7 +3,7 @@ package com.xike.app.ui.components
 import com.xike.app.ui.theme.XikeContentCardPadding
 import com.xike.app.ui.theme.XikeShapes
 
-import com.xike.app.MAX_DRAFT_NOTE_LENGTH
+import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
 import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.AppLocale

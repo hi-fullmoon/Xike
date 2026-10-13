@@ -1,4 +1,4 @@
-package com.xike.app
+package com.xike.app.media
 
 import com.xike.app.data.JournalEntry
 
@@ -22,39 +22,18 @@ import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 import java.util.UUID
 
-const val MAX_VIDEO_DURATION_MILLIS = 300_000L
-internal const val MAX_VIDEO_BYTES = 500L * 1024 * 1024
+
+import com.xike.app.tr
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.VideoEditDraft
+import com.xike.app.data.model.MAX_VIDEO_DURATION_MILLIS
+import com.xike.app.data.model.MAX_VIDEO_BYTES
+import com.xike.app.data.model.files
+import com.xike.app.data.model.safeVideoName
+import com.xike.app.data.model.videoExtensions
+
 internal const val MAX_BACKUP_VIDEO_BYTES = 10L * 1024 * 1024 * 1024
 private const val MAX_COVER_BYTES = 2L * 1024 * 1024
-
-data class JournalVideo(
-    val fileName: String,
-    val coverFileName: String,
-    val durationMillis: Long,
-    val sizeBytes: Long,
-    val mimeType: String,
-) {
-    fun toJson(): JSONObject = JSONObject()
-        .put("fileName", fileName).put("coverFileName", coverFileName)
-        .put("durationMillis", durationMillis).put("sizeBytes", sizeBytes).put("mimeType", mimeType)
-
-    internal fun isValid(): Boolean = durationMillis in 1..MAX_VIDEO_DURATION_MILLIS &&
-        sizeBytes in 1..MAX_VIDEO_BYTES && mimeType in videoExtensions &&
-        safeVideoName(fileName) && fileName.endsWith(".${videoExtensions[mimeType]}") &&
-        safeVideoName(coverFileName) && coverFileName.endsWith(".jpg") && fileName != coverFileName
-
-    companion object {
-        fun fromJson(json: JSONObject?): JournalVideo? = json?.let {
-            JournalVideo(it.getString("fileName"), it.getString("coverFileName"),
-                it.getLong("durationMillis"), it.getLong("sizeBytes"), it.getString("mimeType"))
-        }
-    }
-}
-
-internal fun JournalVideo?.files(): Set<String> = this?.let { setOf(it.fileName, it.coverFileName) }.orEmpty()
-private val videoExtensions = mapOf("video/mp4" to "mp4", "video/3gpp" to "3gp", "video/webm" to "webm", "video/quicktime" to "mov", "video/x-matroska" to "mkv")
-private fun safeVideoName(name: String): Boolean = name.isNotBlank() && name.length <= 160 &&
-    File(name).name == name && '/' !in name && '\\' !in name
 
 internal class JournalVideoStore(context: Context) {
     private val context = context.applicationContext
@@ -262,8 +241,6 @@ internal class JournalVideoStore(context: Context) {
 }
 
 /** Tink authenticates and decrypts only the requested segments, including after seeking. */
-internal data class VideoEditDraft(val originalFileName: String?, val video: JournalVideo?)
-
 internal class EncryptedVideoSource(private val length: Long, private val channel: SeekableByteChannel) : MediaDataSource() {
     @Synchronized override fun readAt(position: Long, buffer: ByteArray, destinationOffset: Int, size: Int): Int {
         check(channel.isOpen)

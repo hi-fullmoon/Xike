@@ -8,7 +8,7 @@ import com.xike.app.ui.theme.XikeShapes
 import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.AppLocale
-import com.xike.app.OutdoorSnapshot
+import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.weatherConditionLabel
 
 

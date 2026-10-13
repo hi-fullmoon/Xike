@@ -127,7 +127,9 @@ flowchart TD
 | [`JournalBackupModels.kt`](../app/src/main/java/com/xike/app/data/JournalBackupModels.kt) | 备份摘要与原有恢复数据归一化。 |
 | [`JournalBackupCodec.kt`](../app/src/main/java/com/xike/app/data/JournalBackupCodec.kt) | 原有 JSON 条目解析、有界流读取、校验与备份加解密辅助实现。 |
 | [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
-| [`JournalDraft.kt`](../app/src/main/java/com/xike/app/JournalDraft.kt) | 草稿模型、规范化、JSON 序列化和加密持久化。 |
+| [`JournalDraft.kt`](../app/src/main/java/com/xike/app/data/model/JournalDraft.kt) | 草稿模型、规范化和原有 JSON 序列化。 |
+| [`JournalDraftStore.kt`](../app/src/main/java/com/xike/app/data/draft/JournalDraftStore.kt) | 加密草稿持久化与顺序写入协调。 |
+| [`JournalVideo.kt`](../app/src/main/java/com/xike/app/data/model/JournalVideo.kt)、[`JournalVideoStore.kt`](../app/src/main/java/com/xike/app/media/JournalVideoStore.kt) | 视频模型与加密视频存储、导入及可寻址解密。 |
 | [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
 | [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度、主题与工作日/周末分析。 |
 | [`SystemActivityCallbacks.kt`](../app/src/main/java/com/xike/app/SystemActivityCallbacks.kt) | 系统 Activity 结果协调的 CompositionLocal 声明。 |
@@ -151,7 +153,8 @@ flowchart TD
 | [`JournalInsightsCharts.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |
 | [`JournalInsightsSection.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsSection.kt) | 轨迹组件共用的分节卡片、比例条与样本说明。 |
 | [`LocalReviewDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/LocalReviewDialog.kt)、[`InsightDrilldownDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/InsightDrilldownDialog.kt) | 本地回顾与原始记录弹窗，继续复用共享日记详情。 |
-| [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 一次前台定位、区与街道查询、城市检索、天气请求和天气快照规范化。 |
+| [`OutdoorSnapshot.kt`](../app/src/main/java/com/xike/app/data/model/OutdoorSnapshot.kt)、[`OutdoorContextRepository.kt`](../app/src/main/java/com/xike/app/outdoor/OutdoorContextRepository.kt) | 天气快照规范化与一次前台定位、区与街道查询、城市检索和天气请求。 |
+| [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 天气显示文案的本地化映射。 |
 | [`PhotoCapture.kt`](../app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
 | [`XikeAudioRecorder.kt`](../app/src/main/java/com/xike/app/XikeAudioRecorder.kt) | 既有麦克风录音器、录音文件生成及释放。 |
 | [`VoiceCaptureUi.kt`](../app/src/main/java/com/xike/app/ui/components/VoiceCaptureUi.kt) | 录音手势、返回处理、波形及待保存录音界面。 |

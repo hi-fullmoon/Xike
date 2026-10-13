@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.OutdoorSnapshot
+
 import com.xike.app.data.Mood
 
 import com.xike.app.feature.moment.MomentScreen

@@ -1,5 +1,10 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.OutdoorSnapshot
+import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
+import com.xike.app.data.model.parseJournalDraft
+
 import com.xike.app.data.Mood
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS

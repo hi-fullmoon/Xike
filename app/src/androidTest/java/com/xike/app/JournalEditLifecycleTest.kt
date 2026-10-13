@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.media.JournalVideoStore
+
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider

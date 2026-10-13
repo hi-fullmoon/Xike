@@ -25,7 +25,7 @@
 | 隐私与应用锁 | 数据库和附件加密、系统身份验证、自动锁定、后台缩略图保护 | [JournalDatabase](../app/src/main/java/com/xike/app/JournalDatabase.kt)、[DatabaseKeyManager](../app/src/main/java/com/xike/app/DatabaseKeyManager.kt)、[MainActivity](../app/src/main/java/com/xike/app/MainActivity.kt) |
 | 备份与恢复 | 密码加密或 ZIP 导出、离线 HTML 阅读、全部附件、旧格式兼容、恢复前摘要与替换确认、恢复后一次撤销 | [JournalStore](../app/src/main/java/com/xike/app/JournalStore.kt)、[BackupHtml](../app/src/main/java/com/xike/app/BackupHtml.kt)、[MainActivity](../app/src/main/java/com/xike/app/MainActivity.kt) |
 | 自主节奏与外观 | 可选本地提醒、每日一问、桌面快捷入口、界面风格与主色、系统深浅色 | [HabitPreferences](../app/src/main/java/com/xike/app/HabitPreferences.kt)、[ReminderScheduler](../app/src/main/java/com/xike/app/ReminderScheduler.kt)、[AppearancePreferences](../app/src/main/java/com/xike/app/AppearancePreferences.kt) |
-| 可选天气 | 主动查询天气，可拒绝定位并手动选择城市 | [OutdoorContext](../app/src/main/java/com/xike/app/OutdoorContext.kt) |
+| 可选天气 | 主动查询天气，可拒绝定位并手动选择城市 | [OutdoorContextRepository](../app/src/main/java/com/xike/app/outdoor/OutdoorContextRepository.kt) |
 | 工程与发布 | 单元、数据库迁移与 Compose 仪器测试代码，PR CI，签名 APK/AAB 发布流程 | [发布流水线](github-release-pipeline.md)、[发布检查清单](release-checklist.md) |
 
 当前恢复采用替换方式。自定义主题、定期备份和恢复合并尚未进入当前能力基线。

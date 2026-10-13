@@ -30,7 +30,7 @@ import com.xike.app.ui.theme.XikeEyebrowStyle
 import com.xike.app.ui.theme.xikeButtonElevation
 
 import com.xike.app.rememberVideoChooser
-import com.xike.app.retainOutdoorForEditedTime
+import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.feature.insights.entriesOnDate
 import com.xike.app.VideoImportStatus
 import com.xike.app.canTakePhoto
@@ -40,7 +40,7 @@ import com.xike.app.tr
 import com.xike.app.AppLocale
 import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
-import com.xike.app.JournalDraft
+import com.xike.app.data.model.JournalDraft
 import com.xike.app.PendingDraftAudio
 import com.xike.app.DailyPromptStyle
 import com.xike.app.DailyPromptSettings

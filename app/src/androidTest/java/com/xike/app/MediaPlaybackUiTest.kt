@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.media.JournalVideoStore
+import com.xike.app.data.draft.JournalDraftStore
+
 import com.xike.app.ui.components.VoicePlaybackCard
 import com.xike.app.ui.components.formatAudioDuration
 

@@ -29,7 +29,7 @@ import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.xikeButtonElevation
 
 import com.xike.app.LocalAudioEditServices
-import com.xike.app.MAX_DRAFT_NOTE_LENGTH
+import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
 import com.xike.app.EditOperation
 import com.xike.app.EditOutcome
 import com.xike.app.LocalJournalEditOperations
@@ -39,10 +39,10 @@ import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
 import com.xike.app.canonicalTopics
 import com.xike.app.toggleTopic
-import com.xike.app.JournalVideo
+import com.xike.app.data.model.JournalVideo
 import com.xike.app.localizedText
 import com.xike.app.tr
-import com.xike.app.retainOutdoorForEditedTime
+import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.StagedDraftAudio
 import com.xike.app.canTakePhoto
 import com.xike.app.isCameraCaptureUri

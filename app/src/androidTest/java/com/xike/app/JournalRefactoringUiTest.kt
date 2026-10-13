@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.draft.JournalDraftStore
+
 import com.xike.app.feature.insights.InsightsPeriod
 import com.xike.app.feature.insights.journalPeriodSummary
 
