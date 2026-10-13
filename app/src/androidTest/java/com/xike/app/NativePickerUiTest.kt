@@ -2,6 +2,7 @@ package com.xike.app
 
 import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
@@ -12,6 +13,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import java.time.YearMonth
+import java.time.LocalDateTime
+import org.junit.Assert.assertFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -20,6 +24,39 @@ import org.junit.Test
 class NativePickerUiTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun futureTimeKeepsDialogOpenAndCanBeCorrectedWithoutRestarting() {
+        val now = LocalDateTime.now()
+        assumeTrue(now.hour < 23)
+        lateinit var pickerContext: Context
+        composeRule.setContent {
+            XikeTheme(AppTheme.OCEAN, AppStyle.PAPER) {
+                val context = LocalRecordedAtPickerContext.current
+                SideEffect { pickerContext = context }
+            }
+        }
+        var selected: Long? = null
+        lateinit var dialog: TimePickerDialog
+        composeRule.runOnIdle {
+            dialog = showRecordedAtTimePicker(pickerContext, now.toLocalDate(), now.hour + 1, now.minute) {
+                selected = it
+            }
+        }
+        try {
+            composeRule.runOnIdle {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                assertTrue("Future time closed the dialog", dialog.isShowing)
+                assertEquals(null, selected)
+                dialog.updateTime(now.hour, now.minute)
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                assertFalse("Valid time did not close the dialog", dialog.isShowing)
+                assertTrue(requireNotNull(selected) <= System.currentTimeMillis())
+            }
+        } finally {
+            composeRule.runOnIdle { dialog.dismiss() }
+        }
+    }
 
     @Test
     fun nativeDatePickerKeepsAllDaysAndActionsInsideTheWindow() {
