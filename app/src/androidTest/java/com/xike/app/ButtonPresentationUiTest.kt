@@ -98,7 +98,7 @@ class ButtonPresentationUiTest {
         rule.setContent {
             XikeTheme(AppTheme.PINE, style) {
                 Column(Modifier.padding(16.dp)) {
-                    VideoAddButton(enabled = true, onPicked = {})
+                    VideoAddButton(enabled = true, onPicked = { _, _ -> true })
                     Spacer(Modifier.height(16.dp))
                     AddPhotoTile(Modifier.size(92.dp), photoLabel) { photoClicks++ }
                 }

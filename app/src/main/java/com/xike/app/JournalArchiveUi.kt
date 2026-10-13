@@ -1661,7 +1661,7 @@ private fun JournalEntryEditDialog(
     val editedOutdoor = if (outdoorRemoved) null else timeRetainedOutdoor
     val removesOutdoor = !outdoorRemoved && entry.outdoor != null && timeRetainedOutdoor == null
     val availableImageSlots = MAX_IMAGES_PER_ENTRY - retainedImages.size - newImageUriStrings.size
-    val imagePickers = rememberJournalImagePickers(entry.id) { uris ->
+    val imagePickers = rememberJournalImagePickers(entry.id) { uris, access ->
         val additions = uris
             .map(Uri::toString)
             .distinct()
@@ -1677,12 +1677,14 @@ private fun JournalEntryEditDialog(
         }
         readableAdditions.forEach { operations.retainImage(entry.id, Uri.parse(it)) }
         newImageUriStrings = newImageUriStrings + readableAdditions
+        access.transfer(newImageUriStrings.map(Uri::parse))
         if (readableAdditions.size < additions.size) {
             XikeNotice.makeText(context, localizedText("所选照片无法获得长期读取权限，请重新选择。"), XikeNotice.LENGTH_LONG).show()
         }
         if (additions.size < uris.distinct().size) {
             XikeNotice.makeText(context, tr("每条记录最多保留 $MAX_IMAGES_PER_ENTRY 张照片", "Each entry can keep up to $MAX_IMAGES_PER_ENTRY photos"), XikeNotice.LENGTH_SHORT).show()
         }
+        true
     }
     val openPhotoPicker = { if (availableImageSlots > 0 && !isSaving) imagePickers.openPhotoPicker() }
     val openCamera = { if (availableImageSlots > 0 && !isSaving) imagePickers.openCamera() }
@@ -1744,15 +1746,19 @@ private fun JournalEntryEditDialog(
             EditOutcome.Saved(savedEntry, cleanupFailed)
         }
     }
-    val chooseVideo = rememberVideoChooser(enabled = !operationState.busy, onPicked = { uri ->
+    val chooseVideo = rememberVideoChooser(enabled = !operationState.busy, ownerKey = entry.id, onPicked = { uri, access ->
         val previousVideo = retainedVideo
-        operations.start(entry.id, EditOperation.VIDEO) {
-            val video = videoServices.import(uri) { progress -> operations.progress(entry.id, progress) }.getOrThrow()
-            val result = videoServices.saveEdit(entry, video)
-            if (result.isFailure) { videoServices.release(video); result.getOrThrow() }
-            previousVideo?.takeIf { it != entry.video }?.let(videoServices.release)
-            EditOutcome.VideoReady(video)
+        val started = operations.start(entry.id, EditOperation.VIDEO) {
+            try {
+                val video = videoServices.import(uri) { progress -> operations.progress(entry.id, progress) }.getOrThrow()
+                val result = videoServices.saveEdit(entry, video)
+                if (result.isFailure) { videoServices.release(video); result.getOrThrow() }
+                previousVideo?.takeIf { it != entry.video }?.let(videoServices.release)
+                EditOutcome.VideoReady(video)
+            } finally { access.release() }
         }
+        if (started) access.deferRelease()
+        started
     })
     Dialog(
         onDismissRequest = { if (!isSaving && !isVideoImporting && !isAudioImporting) dismissEditor() },

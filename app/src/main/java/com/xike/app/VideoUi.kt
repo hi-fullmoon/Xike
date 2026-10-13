@@ -1,7 +1,7 @@
 package com.xike.app
 
 import android.Manifest
-import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaDataSource
@@ -11,7 +11,6 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -56,8 +56,9 @@ internal data class VideoServices(
     val release: (JournalVideo) -> Unit = {},
     val source: (JournalVideo) -> MediaDataSource = { error("Video service unavailable") },
     val cover: (String) -> InputStream? = { null },
-    val addDraft: (Uri) -> Unit = {},
+    val addDraft: (Uri) -> Boolean = { false },
     val removeDraft: () -> Unit = {},
+    val cancelPendingDraft: () -> Unit = {},
     val draftSaving: Boolean = false,
     val draftProgress: Float? = null,
     val editDraft: (JournalEntry) -> VideoEditDraft? = { null },
@@ -66,12 +67,26 @@ internal data class VideoServices(
 )
 internal val LocalVideoServices = compositionLocalOf { VideoServices() }
 
+internal class JournalVideoCaptureContract : ActivityResultContracts.CaptureVideo() {
+    override fun createIntent(context: Context, input: Uri): Intent = super.createIntent(context, input)
+        .putExtra(MediaStore.EXTRA_DURATION_LIMIT, 300)
+        .putExtra(MediaStore.EXTRA_SIZE_LIMIT, MAX_VIDEO_BYTES)
+        .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
+        .apply {
+            clipData = android.content.ClipData.newRawUri("video", input)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+}
+
 @Composable
-internal fun rememberVideoChooser(enabled: Boolean, onPicked: (Uri) -> Unit): () -> Unit {
+internal fun rememberVideoChooser(
+    enabled: Boolean,
+    onPicked: (Uri, SystemActivityReadAccess) -> Boolean,
+    ownerKey: String = "draft",
+): () -> Unit {
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val system = LocalSystemActivityCallbacks.current
     val scope = rememberCoroutineScope()
     var choosing by rememberSaveable { mutableStateOf(false) }
     val cameraAvailable = if (choosing) remember(context) {
@@ -79,41 +94,33 @@ internal fun rememberVideoChooser(enabled: Boolean, onPicked: (Uri) -> Unit): ()
     } else false
     var captureUri by rememberSaveable { mutableStateOf<String?>(null) }
     fun failure(error: Throwable) { XikeNotice.makeText(context, error.message ?: tr("无法添加视频。", "Unable to add video."), XikeNotice.LENGTH_LONG).show() }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        system.onResult(); uri?.let(onPicked)
+    val picker = rememberMediaActivityResultLauncher(ActivityResultContracts.PickVisualMedia(), "video/$ownerKey/picker", resultsReady = enabled) { uri, access ->
+        uri == null || onPicked(uri, access)
     }
-    val capture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        system.onResult()
+    val capture = rememberSystemActivityResultLauncher(JournalVideoCaptureContract(), "video/$ownerKey/capture") { captured ->
         val uri = captureUri?.let(Uri::parse)
         captureUri = null
         if (uri != null) scope.launch {
-            runCatching { withContext(Dispatchers.IO) { finishVideoCapture(context, uri, result.resultCode == Activity.RESULT_OK) } }
-                .onSuccess { if (it) onPicked(uri) }.onFailure(::failure)
+            runCatching { withContext(Dispatchers.IO) { finishVideoCapture(context, uri, captured) } }
+                .onSuccess { if (it) onPicked(uri, SystemActivityReadAccess(context, emptyList())) }.onFailure(::failure)
         }
     }
     val shoot: () -> Unit = {
         scope.launch {
             runCatching {
                 val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
-                    .putExtra(MediaStore.EXTRA_DURATION_LIMIT, 300)
-                    .putExtra(MediaStore.EXTRA_SIZE_LIMIT, MAX_VIDEO_BYTES)
-                    .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
                 check(intent.resolveActivity(context.packageManager) != null) { tr("没有可用的摄像应用。", "No camera app is available.") }
                 val uri = withContext(Dispatchers.IO) { createVideoCaptureUri(context) }
                 captureUri = uri.toString()
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
-                intent.clipData = android.content.ClipData.newRawUri("video", uri)
-                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                system.onLaunch()
-                try { capture.launch(intent) } catch (error: Throwable) {
-                    system.onResult(); captureUri = null
+                try { capture.launch(uri) } catch (error: Throwable) {
+                    captureUri = null
                     withContext(Dispatchers.IO) { finishVideoCapture(context, uri, false) }
                     throw error
                 }
             }.onFailure(::failure)
         }
     }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val permission = rememberSystemActivityResultLauncher(ActivityResultContracts.RequestPermission(), "video/$ownerKey/storage-permission") { granted ->
         if (granted) shoot() else failure(IllegalStateException(tr("需要存储权限才能保存拍摄的视频。", "Storage permission is required to save captured videos.")))
     }
     val choose: () -> Unit = {
@@ -137,8 +144,8 @@ internal fun rememberVideoChooser(enabled: Boolean, onPicked: (Uri) -> Unit): ()
         },
         onChooseMedia = {
             choosing = false
-            runCatching { system.onLaunch(); picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
-                .onFailure { system.onResult(); failure(it) }
+            runCatching { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
+                .onFailure { failure(it) }
         },
         onDismiss = { choosing = false },
     )
@@ -148,7 +155,7 @@ internal fun rememberVideoChooser(enabled: Boolean, onPicked: (Uri) -> Unit): ()
 @Composable
 internal fun VideoAddButton(
     enabled: Boolean,
-    onPicked: (Uri) -> Unit,
+    onPicked: (Uri, SystemActivityReadAccess) -> Boolean,
     modifier: Modifier = Modifier,
 ) {
     val chooseVideo = rememberVideoChooser(enabled, onPicked)
@@ -156,16 +163,17 @@ internal fun VideoAddButton(
 }
 
 @Composable
-internal fun VideoCard(video: JournalVideo, onRemove: (() -> Unit)? = null, previewOnly: Boolean = false, onOpen: (() -> Unit)? = null, aspectRatio: Float = 16f / 9f, onReplace: (() -> Unit)? = null) {
+internal fun VideoCard(video: JournalVideo, onRemove: (() -> Unit)? = null, previewOnly: Boolean = false, onOpen: (() -> Unit)? = null, aspectRatio: Float = 16f / 9f, onReplace: (() -> Unit)? = null, useActionMenu: Boolean = false) {
     key(video.fileName) {
-        VideoCardContent(video, onRemove, previewOnly, onOpen, aspectRatio, onReplace)
+        VideoCardContent(video, onRemove, previewOnly, onOpen, aspectRatio, onReplace, useActionMenu)
     }
 }
 
 @Composable
-private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previewOnly: Boolean, onOpen: (() -> Unit)?, aspectRatio: Float, onReplace: (() -> Unit)?) {
+private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previewOnly: Boolean, onOpen: (() -> Unit)?, aspectRatio: Float, onReplace: (() -> Unit)?, useActionMenu: Boolean) {
     val services = LocalVideoServices.current
     var playing by remember { mutableStateOf(false) }
+    var showActions by remember(onRemove == null, onReplace == null) { mutableStateOf(false) }
     val cover by produceState<android.graphics.Bitmap?>(null, video.coverFileName) {
         value = withContext(Dispatchers.IO) { runCatching { services.cover(video.coverFileName)?.use(BitmapFactory::decodeStream) }.getOrNull() }
     }
@@ -192,7 +200,28 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                     )
                 }
                 Row(Modifier.align(Alignment.TopEnd)) {
-                    if (onReplace != null) {
+                    if (useActionMenu && (onReplace != null || onRemove != null)) {
+                        Box {
+                            IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                                Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Outlined.MoreVert, tr("视频的更多操作", "More video actions"), Modifier.size(16.dp), tint = Color.White)
+                                    }
+                                }
+                            }
+                            DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                                if (onReplace != null) DropdownMenuItem(
+                                    text = { Text(tr("重新录制视频", "Record video again")) },
+                                    onClick = { showActions = false; playing = false; onReplace() },
+                                )
+                                if (onRemove != null) DropdownMenuItem(
+                                    text = { Text(tr("移除视频", "Remove video")) },
+                                    onClick = { showActions = false; playing = false; onRemove() },
+                                )
+                            }
+                        }
+                    }
+                    if (!useActionMenu && onReplace != null) {
                         IconButton(onClick = { playing = false; onReplace() }, modifier = Modifier.size(48.dp)) {
                             Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -201,7 +230,7 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                             }
                         }
                     }
-                    if (onRemove != null) {
+                    if (!useActionMenu && onRemove != null) {
                         IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {

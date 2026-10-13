@@ -74,7 +74,7 @@ class MediaSourceDialogUiTest {
         for (language in AppLanguage.entries) {
             withLanguage(language, content = {
                 XikeTheme(AppTheme.OCEAN, style.value) {
-                    val chooseVideo = rememberVideoChooser(enabled = true, onPicked = {})
+                        val chooseVideo = rememberVideoChooser(enabled = true, onPicked = { _, _ -> true })
                     TextButton(onClick = chooseVideo, shape = XikeShapes.button) {
                         Text(tr("视频", "Video"))
                     }

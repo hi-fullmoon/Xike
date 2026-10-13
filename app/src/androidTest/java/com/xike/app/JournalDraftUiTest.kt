@@ -46,7 +46,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -76,7 +76,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -151,7 +151,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -185,7 +185,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = onRemove,
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -213,7 +213,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -240,7 +240,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -263,7 +263,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -292,7 +292,7 @@ class JournalDraftUiTest {
                         onDraftMoodChange = {},
                         onDraftNoteChange = {},
                         onDraftTagToggle = {},
-                        onDraftImagesAdded = {},
+                        onDraftImagesAdded = { true },
                         onDraftImageRemoved = {},
                         onSave = { _, _ -> Result.success(Unit) },
                     )
@@ -318,7 +318,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -341,7 +341,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -370,7 +370,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = { selectedTag = it },
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -398,7 +398,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -425,7 +425,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                 )
@@ -455,7 +455,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                     onDraftRecordedAtChange = { resetValue = it },
@@ -484,7 +484,7 @@ class JournalDraftUiTest {
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
-                    onDraftImagesAdded = {},
+                    onDraftImagesAdded = { true },
                     onDraftImageRemoved = {},
                     onSave = { _, _ -> Result.success(Unit) },
                     onDraftDiscard = { discarded = true },
