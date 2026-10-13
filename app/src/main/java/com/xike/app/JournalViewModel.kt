@@ -43,6 +43,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
     private var outdoorRequestGeneration = 0L
+    var isDraftOutdoorLoading by mutableStateOf(false)
+        private set
     private var noteSaveJob: Job? = null
     private val noteSaveScopeJob = SupervisorJob()
     private val noteSaveScope = CoroutineScope(noteSaveScopeJob + Dispatchers.IO)
@@ -105,6 +107,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     var isLoading by mutableStateOf(true)
+        private set
+    var systemActivityResultsReady by mutableStateOf(false)
         private set
 
     var canUndoRestore by mutableStateOf(false)
@@ -181,6 +185,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }.onFailure { error ->
                 dataError = error.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
             }
+            systemActivityResultsReady = draftResult.isSuccess && result.isSuccess
             isLoading = false
             if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
             draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
@@ -252,11 +257,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateDraftRecordedAt(recordedAt: Long?) {
+        if (isDraftSaving) return
         if (recordedAt != null) outdoorRequestGeneration++
         persistDraft(
             draft.copy(
                 recordedAt = recordedAt,
-                outdoor = if (recordedAt == null) draft.outdoor else null,
+                outdoor = draft.outdoor?.let { snapshot ->
+                    retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, recordedAt ?: System.currentTimeMillis())
+                },
             ),
         )
     }
@@ -280,26 +288,37 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         saveError: String,
         request: suspend () -> OutdoorSnapshot,
     ): Result<Unit> {
+        if (isDraftSaving || isDraftOutdoorLoading) {
+            return Result.failure(IllegalStateException(tr("请等待当前操作完成。", "Please wait for the current operation to finish.")))
+        }
         val requestDraftGeneration = draftGeneration
         val requestGeneration = ++outdoorRequestGeneration
-        val result = runOutdoorRequest(request)
-        if (requestDraftGeneration != draftGeneration || requestGeneration != outdoorRequestGeneration) {
-            return Result.success(Unit)
-        }
-        return result.mapCatching { snapshot ->
-            check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
-            check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
+        isDraftOutdoorLoading = true
+        try {
+            val result = runOutdoorRequest(request)
+            if (requestDraftGeneration != draftGeneration || requestGeneration != outdoorRequestGeneration) {
+                return Result.success(Unit)
+            }
+            return result.mapCatching { snapshot ->
+                check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
+                check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
+            }
+        } finally {
+            isDraftOutdoorLoading = false
         }
     }
 
-    fun addDraftImages(uris: List<Uri>) {
+    fun addDraftImages(uris: List<Uri>): Boolean {
         val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
         val candidates = uris
             .filterNot { it.toString() in draft.imageUriStrings }
             .distinctBy(Uri::toString)
         val newUris = candidates.take(availableSlots)
-        candidates.drop(newUris.size).forEach(::releaseDraftImageAccess)
-        if (newUris.isEmpty()) return
+        if (newUris.isEmpty()) {
+            candidates.forEach(::releaseDraftImageAccess)
+            if (candidates.isNotEmpty()) reportOperation(tr("照片已达上限，请先移除照片再添加。", "The photo limit has been reached. Remove a photo before adding more."))
+            return true
+        }
 
         val application = getApplication<Application>()
         val contentResolver = application.contentResolver
@@ -322,18 +341,24 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         if (grantedUris.isEmpty()) {
+            candidates.forEach(::releaseDraftImageAccess)
             dataError = localizedText("所选照片无法获得长期读取权限，请重新选择。")
-            return
+            return true
         }
 
         val updated = draft.copy(
             imageUriStrings = draft.imageUriStrings + grantedUris.map(Uri::toString),
         )
         if (!persistDraft(updated)) {
-            grantedUris.forEach(::releaseDraftImageAccess)
+            return false
         } else if (grantedUris.size < newUris.size) {
             dataError = localizedText("部分照片无法长期读取，已保留可以恢复的照片。")
         }
+        candidates.filterNot { it in grantedUris }.forEach(::releaseDraftImageAccess)
+        if (candidates.size > availableSlots) {
+            reportOperation(tr("本次已添加 ${grantedUris.size} 张照片，其余照片因数量上限未添加。", "Added ${grantedUris.size} photos. The remaining photos were not added because of the limit."))
+        }
+        return true
     }
 
     fun removeDraftImage(uriString: String) {
@@ -479,6 +504,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = withContext(Dispatchers.Main.immediate) {
         if (isDraftSaving) return@withContext Result.failure(IllegalStateException(tr("正在保存，请稍候。", "Saving. Please wait.")))
+        if (isDraftOutdoorLoading) return@withContext Result.failure(IllegalStateException(tr("请先等待地点与天气获取完成。", "Please wait for location and weather to finish.")))
         if (isDraftVideoSaving || draft.pendingVideoUri != null) return@withContext Result.failure(IllegalStateException(tr("请先完成视频导入。", "Please finish importing the video first.")))
         isDraftSaving = true
         val savedDraft = draft
@@ -650,10 +676,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching { getApplication<Application>().contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
     }
 
-    fun queueDraftVideo(uri: Uri) {
-        if (isDraftVideoSaving) return
+    fun queueDraftVideo(uri: Uri): Boolean {
+        if (isDraftVideoSaving) return false
         runCatching { getApplication<Application>().contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        if (!persistDraft(draft.copy(pendingVideoUri = uri.toString()))) return
+        if (!persistDraft(draft.copy(pendingVideoUri = uri.toString()))) return false
         val generation = draftGeneration
         isDraftVideoSaving = true
         draftVideoProgress = null
@@ -666,9 +692,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                             previous?.let(::releaseVideo)
                             releaseVideoAccess(uri)
                         } else releaseVideo(video)
-                    }.onFailure { error -> dataError = error.message ?: tr("视频导入失败，请重试或移除。", "Video import failed. Retry or remove it.") }
+                    }.onFailure { error -> dataError = error.message ?: tr("视频导入失败，请重试或取消本次导入。", "Video import failed. Retry or cancel this import.") }
             } finally { isDraftVideoSaving = false; draftVideoProgress = null }
         }
+        return true
     }
 
     fun removeDraftVideo() {
@@ -678,6 +705,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (persistDraft(draft.copy(video = null, pendingVideoUri = null))) {
             previous?.let(::releaseVideo)
             pending?.let { releaseVideoAccess(Uri.parse(it)) }
+        }
+    }
+
+    fun cancelPendingDraftVideo() {
+        if (isDraftSaving || isDraftVideoSaving) return
+        val pending = draft.pendingVideoUri ?: return
+        if (persistDraft(draft.copy(pendingVideoUri = null))) {
+            releaseVideoAccess(Uri.parse(pending))
         }
     }
 

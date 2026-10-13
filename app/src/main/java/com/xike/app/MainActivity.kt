@@ -1,6 +1,7 @@
 package com.xike.app
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,6 +9,7 @@ import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.WindowManager
@@ -124,6 +126,7 @@ class MainActivity : FragmentActivity() {
             lockSession.journalSessionOpened = !appLockEnabled
             lockSession.initialized = true
         }
+        refreshLockMonitor()
         refreshAuthenticationAvailability()
         createBiometricPrompt()
 
@@ -173,12 +176,31 @@ class MainActivity : FragmentActivity() {
                     appearancePreferences.saveTheme(journalViewModel.selectedTheme)
                     appearancePreferences.saveStyle(journalViewModel.selectedStyle)
                 }
-                val systemActivityCallbacks = remember {
+                val systemActivityCallbacks =
                     SystemActivityCallbacks(
-                        onLaunch = lockSession::beginSystemActivity,
-                        onResult = lockSession::finishSystemActivity,
+                        onLaunch = { operationId, sameTask ->
+                            val observable = sameTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
+                            lockSession.beginSystemActivity(
+                                watchTaskVisibility = observable,
+                                requireAuthenticationOnReturn = appLockEnabled && !observable,
+                                operationId = operationId,
+                            )
+                        },
+                        onResult = { operationId ->
+                            refreshLockMonitor()
+                            lockSession.finishSystemActivity(operationId = operationId)
+                        },
+                        onLaunchFailed = { operationId ->
+                            refreshLockMonitor()
+                            lockSession.finishSystemActivity(resultReceived = false, operationId = operationId)
+                        },
+                        isLocked = appLockEnabled && lockSession.isAppLocked,
+                        resultsReady = journalViewModel.systemActivityResultsReady,
+                        canHandleResult = {
+                            journalViewModel.systemActivityResultsReady &&
+                                (!appLockEnabled || (!lockSession.isAppLocked && isDeviceInteractiveAndUnlocked()))
+                        },
                     )
-                }
 
                 JournalTheme(journalViewModel, noticesBlocked = appLockEnabled && lockSession.isAppLocked) {
                     CompositionLocalProvider(
@@ -195,6 +217,7 @@ class MainActivity : FragmentActivity() {
                             cover = journalViewModel::openVideoCover,
                             addDraft = journalViewModel::queueDraftVideo,
                             removeDraft = journalViewModel::removeDraftVideo,
+                            cancelPendingDraft = journalViewModel::cancelPendingDraftVideo,
                             draftSaving = journalViewModel.isDraftVideoSaving,
                             draftProgress = journalViewModel.draftVideoProgress,
                             editDraft = journalViewModel::videoEditDraft,
@@ -210,11 +233,6 @@ class MainActivity : FragmentActivity() {
                             selectedStyle = journalViewModel.selectedStyle,
                             appLockEnabled = appLockEnabled,
                             appLockTimeout = appLockTimeout,
-                            isAppLocked = appLockEnabled && lockSession.isAppLocked,
-                            onBackupPickerLaunch = {
-                                lockSession.beginSystemActivity()
-                                if (appLockEnabled) lockSession.watchSystemActivity(applicationContext, taskId)
-                            },
                             authenticationAvailable = authenticationAvailable,
                             reminderSettings = reminderSettings,
                             dailyPromptSettings = dailyPromptSettings,
@@ -230,6 +248,7 @@ class MainActivity : FragmentActivity() {
                             onDraftTagToggle = journalViewModel::toggleDraftTag,
                             onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,
                             onAttachCurrentOutdoor = journalViewModel::attachCurrentOutdoor,
+                            isDraftOutdoorLoading = journalViewModel.isDraftOutdoorLoading,
                             onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
                             onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
                             onDraftImagesAdded = journalViewModel::addDraftImages,
@@ -297,6 +316,7 @@ class MainActivity : FragmentActivity() {
         val returningFromSystemActivity = lockSession.systemActivityInProgress
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
+        refreshLockMonitor()
         if (appLockEnabled) {
             if (lockSession.shouldLockOnForeground(SystemClock.elapsedRealtime(), appLockTimeout)) {
                 lockSession.isAppLocked = true
@@ -315,6 +335,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        refreshLockMonitor()
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         refreshAuthenticationAvailability()
         notificationPermissionGranted = hasNotificationPermission()
@@ -363,7 +384,12 @@ class MainActivity : FragmentActivity() {
             ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    val current = lockSession.isCurrentAuthentication() && isDeviceInteractiveAndUnlocked()
                     lockSession.authenticationInProgress = false
+                    if (!current) {
+                        lockSession.authenticationAction = null
+                        return
+                    }
                     when (lockSession.authenticationAction) {
                         LockAuthentication.UNLOCK -> {
                             lockSession.isAppLocked = false
@@ -398,7 +424,7 @@ class MainActivity : FragmentActivity() {
         action: LockAuthentication,
         openSettingsWhenUnavailable: Boolean = true,
     ) {
-        if (lockSession.authenticationInProgress) return
+        if (lockSession.authenticationInProgress || !isDeviceInteractiveAndUnlocked()) return
         val availability = BiometricManager.from(this).canAuthenticate(allowedAuthenticators)
         authenticationAvailable = availability == BiometricManager.BIOMETRIC_SUCCESS
         if (!authenticationAvailable) {
@@ -408,8 +434,7 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        lockSession.authenticationAction = action
-        lockSession.authenticationInProgress = true
+        lockSession.beginAuthentication(action)
         biometricPrompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
                 .setTitle(
@@ -439,6 +464,7 @@ class MainActivity : FragmentActivity() {
                 lockSession.isAppLocked = false
                 lockSession.journalSessionOpened = true
                 lockSession.backgroundedAtMillis = null
+                refreshLockMonitor()
                 XikeNotice.makeText(
                     this,
                     if (enabled) localizedText("应用锁已开启") else localizedText("应用锁已关闭"),
@@ -449,6 +475,17 @@ class MainActivity : FragmentActivity() {
                 XikeNotice.makeText(this, error.message ?: localizedText("应用锁设置保存失败"), XikeNotice.LENGTH_SHORT).show()
             }
     }
+
+    private fun refreshLockMonitor() {
+        lockSession.observeDeviceLock(applicationContext, taskId, appLockEnabled)
+        if (appLockEnabled && !isDeviceInteractiveAndUnlocked()) {
+            lockSession.recordDeviceLocked()
+        }
+    }
+
+    private fun isDeviceInteractiveAndUnlocked(): Boolean =
+        getSystemService(PowerManager::class.java).isInteractive &&
+            !getSystemService(KeyguardManager::class.java).isDeviceLocked
 
     private fun changeAppLockTimeout(timeout: AppLockTimeout) {
         runCatching { lockPreferences.timeout = timeout }
@@ -461,7 +498,7 @@ class MainActivity : FragmentActivity() {
     private fun lockNow() {
         if (!appLockEnabled) return
         journalPlayback.pauseActive()
-        lockSession.isAppLocked = true
+        lockSession.recordDeviceLocked()
         window.decorView.post { requestAuthentication(LockAuthentication.UNLOCK) }
     }
 
@@ -555,25 +592,66 @@ class AppLockSessionState : ViewModel() {
     internal var authenticationAction: LockAuthentication? = null
     internal var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
     private var systemActivityMonitor: SystemActivityLockMonitor? = null
+    private var deviceLockRevision = 0L
+    private var authenticationDeviceLockRevision = 0L
+    private val activeSystemActivities = mutableMapOf<String, Int>()
+    private val systemActivitiesRequiringAuthentication = mutableSetOf<String>()
+
+    internal fun beginAuthentication(action: LockAuthentication) {
+        authenticationAction = action
+        authenticationDeviceLockRevision = deviceLockRevision
+        authenticationInProgress = true
+    }
+
+    internal fun isCurrentAuthentication(): Boolean =
+        authenticationInProgress && authenticationDeviceLockRevision == deviceLockRevision
 
     internal fun shouldLockOnForeground(nowMillis: Long, timeout: AppLockTimeout): Boolean =
-        isAppLocked || (backgroundedAtMillis != null && shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
+        isAppLocked || systemActivitiesRequiringAuthentication.isNotEmpty() ||
+            (backgroundedAtMillis != null && shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
 
-    internal fun beginSystemActivity() {
+    internal fun beginSystemActivity(
+        watchTaskVisibility: Boolean = true,
+        requireAuthenticationOnReturn: Boolean = false,
+        operationId: String = "default",
+    ) {
         systemActivityInProgress = true
+        activeSystemActivities[operationId] = (activeSystemActivities[operationId] ?: 0) + 1
+        if (requireAuthenticationOnReturn) systemActivitiesRequiringAuthentication.add(operationId)
         backgroundedAtMillis = null
+        systemActivityMonitor?.startWatching(watchTaskVisibility)
     }
 
-    internal fun finishSystemActivity() {
-        systemActivityMonitor?.stop()
-        systemActivityInProgress = false
+    internal fun finishSystemActivity(resultReceived: Boolean = true, operationId: String = "default") {
+        val outstanding = activeSystemActivities[operationId] ?: return
+        val requiresAuthentication = operationId in systemActivitiesRequiringAuthentication
+        if (resultReceived && requiresAuthentication) isAppLocked = true
+        if (outstanding == 1) {
+            activeSystemActivities.remove(operationId)
+            systemActivitiesRequiringAuthentication.remove(operationId)
+        } else activeSystemActivities[operationId] = outstanding - 1
+        if (activeSystemActivities.isEmpty()) {
+            systemActivityMonitor?.stopWatching()
+            systemActivityInProgress = false
+        }
     }
 
-    internal fun watchSystemActivity(context: Context, taskId: Int) {
+    internal fun observeDeviceLock(context: Context, taskId: Int, enabled: Boolean) {
+        if (!enabled) {
+            systemActivityMonitor?.stop()
+            return
+        }
         val monitor = systemActivityMonitor ?: SystemActivityLockMonitor(
-            context, ::interruptSystemActivity,
+            context, ::interruptSystemActivity, ::recordDeviceLocked,
         ).also { systemActivityMonitor = it }
-        monitor.start(taskId)
+        monitor.observe(taskId)
+    }
+
+    internal fun recordDeviceLocked() {
+        deviceLockRevision += 1
+        systemActivityMonitor?.stopWatching()
+        systemActivityInProgress = false
+        isAppLocked = true
     }
 
     internal fun interruptSystemActivity(nowMillis: Long) {
@@ -616,11 +694,9 @@ private data class PendingRestore(
 )
 
 internal data class PendingExport(val password: String?)
-internal data class BackupDocumentSelection(val uri: Uri?, val importing: Boolean)
 
 internal class BackupExportState : ViewModel() {
     private var pending: PendingExport? = null
-    var selectedDocument by mutableStateOf<BackupDocumentSelection?>(null)
 
     fun begin(password: String?) { pending = PendingExport(password) }
 
@@ -636,8 +712,6 @@ private fun XikeApp(
     selectedStyle: AppStyle,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
-    isAppLocked: Boolean,
-    onBackupPickerLaunch: () -> Unit,
     authenticationAvailable: Boolean,
     reminderSettings: ReminderSettings,
     dailyPromptSettings: DailyPromptSettings,
@@ -653,9 +727,10 @@ private fun XikeApp(
     onDraftTagToggle: (String) -> Unit,
     onDraftRecordedAtChange: (Long?) -> Unit,
     onAttachCurrentOutdoor: suspend () -> Result<Unit>,
+    isDraftOutdoorLoading: Boolean,
     onAttachOutdoorForCity: suspend (String) -> Result<Unit>,
     onClearDraftOutdoor: () -> Unit,
-    onDraftImagesAdded: (List<Uri>) -> Unit,
+    onDraftImagesAdded: (List<Uri>) -> Boolean,
     onDraftImageRemoved: (String) -> Unit,
     pendingDraftAudio: PendingDraftAudio?,
     isDraftAudioSaving: Boolean,
@@ -688,7 +763,6 @@ private fun XikeApp(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
     val exportState: BackupExportState = viewModel()
@@ -741,49 +815,35 @@ private fun XikeApp(
         }
     }
 
-    val encryptedExportLauncher = rememberLauncherForActivityResult(
+    val encryptedExportLauncher = rememberSystemActivityResultLauncher(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
-    ) { uri ->
-        systemActivityCallbacks.onResult()
-        exportState.selectedDocument = BackupDocumentSelection(uri, importing = false)
-    }
-    val plainExportLauncher = rememberLauncherForActivityResult(
+        "backup-export-encrypted",
+        ::handleExportSelection,
+    )
+    val plainExportLauncher = rememberSystemActivityResultLauncher(
         ActivityResultContracts.CreateDocument("application/zip"),
-    ) { uri ->
-        systemActivityCallbacks.onResult()
-        exportState.selectedDocument = BackupDocumentSelection(uri, importing = false)
-    }
+        "backup-export-plain",
+        ::handleExportSelection,
+    )
 
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        systemActivityCallbacks.onResult()
-        exportState.selectedDocument = BackupDocumentSelection(uri, importing = true)
-    }
-
-    LaunchedEffect(isAppLocked, exportState.selectedDocument) {
-        val selection = exportState.selectedDocument
-        if (!isAppLocked && selection != null) {
-            exportState.selectedDocument = null
-            val uri = selection.uri
-            if (!selection.importing) {
-                handleExportSelection(uri)
-            } else if (uri != null) {
-                scope.launch {
-                    busyMessage = localizedText("正在识别备份…")
-                    onBackupRequiresPassword(uri)
-                        .onSuccess { requiresPassword ->
-                            busyMessage = null
-                            if (requiresPassword) {
-                                pendingImportUri = uri.toString()
-                                backupAction = BackupAction.IMPORT
-                            } else {
-                                inspectSelectedBackup(uri, null)
-                            }
+    val importLauncher = rememberSystemActivityResultLauncher(ActivityResultContracts.OpenDocument(), "backup-import") { uri ->
+        if (uri != null) {
+            scope.launch {
+                busyMessage = localizedText("正在识别备份…")
+                onBackupRequiresPassword(uri)
+                    .onSuccess { requiresPassword ->
+                        busyMessage = null
+                        if (requiresPassword) {
+                            pendingImportUri = uri.toString()
+                            backupAction = BackupAction.IMPORT
+                        } else {
+                            inspectSelectedBackup(uri, null)
                         }
-                        .onFailure {
-                            busyMessage = null
-                            XikeNotice.makeText(context, it.message ?: localizedText("无法识别备份"), XikeNotice.LENGTH_LONG).show()
-                        }
-                }
+                    }
+                    .onFailure {
+                        busyMessage = null
+                        XikeNotice.makeText(context, it.message ?: localizedText("无法识别备份"), XikeNotice.LENGTH_LONG).show()
+                    }
             }
         }
     }
@@ -816,6 +876,7 @@ private fun XikeApp(
                     onDraftTagToggle = onDraftTagToggle,
                     onDraftRecordedAtChange = onDraftRecordedAtChange,
                     onAttachCurrentOutdoor = onAttachCurrentOutdoor,
+                    isDraftOutdoorLoading = isDraftOutdoorLoading,
                     onAttachOutdoorForCity = onAttachOutdoorForCity,
                     onClearDraftOutdoor = onClearDraftOutdoor,
                     onDraftImagesAdded = onDraftImagesAdded,
@@ -868,13 +929,7 @@ private fun XikeApp(
                     onDailyPromptSettingsChange = onDailyPromptSettingsChange,
                     onExport = { backupAction = BackupAction.EXPORT },
                     onImport = {
-                        try {
-                            onBackupPickerLaunch()
-                            importLauncher.launch(arrayOf("application/octet-stream", "application/json", "application/zip", "application/x-zip-compressed"))
-                        } catch (error: Exception) {
-                            systemActivityCallbacks.onResult()
-                            throw error
-                        }
+                        importLauncher.launch(arrayOf("application/octet-stream", "application/json", "application/zip", "application/x-zip-compressed"))
                     },
                     canUndoRestore = canUndoRestore,
                     onUndoRestore = { scope.launch { runUndoRestore() } },
@@ -893,11 +948,9 @@ private fun XikeApp(
                 backupAction = null
                 val date = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
                 try {
-                    onBackupPickerLaunch()
                     if (password == null) plainExportLauncher.launch("xike-backup-$date.zip")
                     else encryptedExportLauncher.launch("xike-backup-$date.xike")
                 } catch (error: Exception) {
-                    systemActivityCallbacks.onResult()
                     exportState.take()
                     exportRequested = false
                     encryptedExportRequested = false

@@ -15,22 +15,27 @@ import androidx.core.content.ContextCompat
 internal class SystemActivityLockMonitor(
     context: Context,
     private val onInterrupted: (Long) -> Unit,
+    private val onDeviceLocked: () -> Unit,
 ) {
     private val context = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false
     private var taskId = -1
+    private var watchingTask = false
     private val receiver = object : BroadcastReceiver() {
         @Suppress("DEPRECATION")
         override fun onReceive(context: Context, intent: Intent) {
             val userLeft = intent.action == Intent.ACTION_CLOSE_SYSTEM_DIALOGS &&
                 intent.getStringExtra("reason") in setOf("homekey", "recentapps")
-            if (intent.action == Intent.ACTION_SCREEN_OFF || userLeft) interrupt()
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                stopWatching()
+                onDeviceLocked()
+            } else if (userLeft) interrupt()
         }
     }
     private val checkVisibility = object : Runnable {
         override fun run() {
-            if (!registered || Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2) return
+            if (!registered || !watchingTask || Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2) return
             val visible = runCatching {
                 context.getSystemService(ActivityManager::class.java).appTasks
                     .firstOrNull { it.taskInfo.taskId == taskId }?.taskInfo?.isVisible == true
@@ -41,22 +46,36 @@ internal class SystemActivityLockMonitor(
     }
 
     @Suppress("DEPRECATION")
-    fun start(taskId: Int) {
-        stop()
+    fun observe(taskId: Int) {
         this.taskId = taskId
+        if (registered) return
         // These actions originate from the system; CLOSE_SYSTEM_DIALOGS restricts senders.
         ContextCompat.registerReceiver(
             context,
             receiver,
             IntentFilter(Intent.ACTION_SCREEN_OFF).apply { addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS) },
+            "android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS",
+            null,
             ContextCompat.RECEIVER_EXPORTED,
         )
         registered = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) handler.post(checkVisibility)
+    }
+
+    fun startWatching(watchTaskVisibility: Boolean) {
+        stopWatching()
+        watchingTask = watchTaskVisibility
+        if (registered && watchingTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            handler.post(checkVisibility)
+        }
+    }
+
+    fun stopWatching() {
+        watchingTask = false
+        handler.removeCallbacks(checkVisibility)
     }
 
     fun stop() {
-        handler.removeCallbacks(checkVisibility)
+        stopWatching()
         if (registered) {
             context.unregisterReceiver(receiver)
             registered = false
@@ -65,7 +84,7 @@ internal class SystemActivityLockMonitor(
 
     private fun interrupt() {
         if (!registered) return
-        stop()
+        stopWatching()
         onInterrupted(SystemClock.elapsedRealtime())
     }
 }

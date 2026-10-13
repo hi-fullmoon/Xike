@@ -76,7 +76,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Commute
 import androidx.compose.material.icons.outlined.EnhancedEncryption
@@ -105,6 +105,8 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -187,8 +189,12 @@ import kotlinx.coroutines.launch
 private const val ADD_PHOTO_TILE = "__add_photo__"
 
 internal data class SystemActivityCallbacks(
-    val onLaunch: () -> Unit = {},
-    val onResult: () -> Unit = {},
+    val onLaunch: (String, Boolean) -> Unit = { _, _ -> },
+    val onResult: (String) -> Unit = {},
+    val onLaunchFailed: (String) -> Unit = {},
+    val isLocked: Boolean = false,
+    val resultsReady: Boolean = true,
+    val canHandleResult: () -> Boolean = { true },
 )
 
 internal val LocalSystemActivityCallbacks = staticCompositionLocalOf { SystemActivityCallbacks() }
@@ -985,7 +991,7 @@ fun MomentScreen(
     onDraftMoodChange: (Mood?) -> Unit,
     onDraftNoteChange: (String) -> Unit,
     onDraftTagToggle: (String) -> Unit,
-    onDraftImagesAdded: (List<Uri>) -> Unit,
+    onDraftImagesAdded: (List<Uri>) -> Boolean,
     onDraftImageRemoved: (String) -> Unit,
     pendingDraftAudio: PendingDraftAudio? = null,
     isDraftAudioSaving: Boolean = false,
@@ -998,6 +1004,7 @@ fun MomentScreen(
     onVoiceCaptureStateChange: (Boolean) -> Unit = {},
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     isDraftSaving: Boolean = false,
+    isDraftOutdoorLoading: Boolean = false,
     saveFeedbackHandledExternally: Boolean = false,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
@@ -1020,10 +1027,31 @@ fun MomentScreen(
     val isSaving = localSaving || isDraftSaving
     val chooseVideo = rememberVideoChooser(
         enabled = !isSaving && !videoServices.draftSaving,
-        onPicked = videoServices.addDraft,
+        onPicked = { uri, access ->
+            val accepted = videoServices.addDraft(uri)
+            if (accepted) access.transferAll()
+            accepted
+        },
     )
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
+    val outdoorLoading = isOutdoorLoading || isDraftOutdoorLoading
+    var pendingRecordedAtChange by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showRecordedAtChangeConfirmation by rememberSaveable { mutableStateOf(false) }
+    val currentDraft by rememberUpdatedState(draft)
+    val currentIsSaving by rememberUpdatedState(isSaving)
+    val currentRecordedAtChange by rememberUpdatedState(onDraftRecordedAtChange)
+    val selectRecordedAt: (Long?) -> Unit = { selected ->
+        if (!currentIsSaving) {
+            val snapshot = currentDraft.outdoor
+            if (snapshot != null && retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, selected ?: System.currentTimeMillis()) == null) {
+                pendingRecordedAtChange = selected
+                showRecordedAtChangeConfirmation = true
+            } else {
+                currentRecordedAtChange(selected)
+            }
+        }
+    }
     var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val locationPreferences = remember(context) {
@@ -1041,14 +1069,17 @@ fun MomentScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val loadCurrentOutdoor: () -> Unit = {
-        if (!isOutdoorLoading && draft.recordedAt == null) {
+        if (!outdoorLoading && !isSaving && draft.recordedAt == null) {
             isOutdoorLoading = true
             outdoorError = null
             scope.launch {
-                onAttachCurrentOutdoor()
-                    .onSuccess { outdoorPermissionDenied = false }
-                    .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。") }
-                isOutdoorLoading = false
+                try {
+                    onAttachCurrentOutdoor()
+                        .onSuccess { outdoorPermissionDenied = false }
+                        .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。") }
+                } finally {
+                    isOutdoorLoading = false
+                }
             }
         }
     }
@@ -1077,14 +1108,17 @@ fun MomentScreen(
         }
     }
     val loadCityOutdoor: (String) -> Unit = { city ->
-        if (!isOutdoorLoading && city.isNotBlank()) {
+        if (!outdoorLoading && !isSaving && draft.recordedAt == null && city.isNotBlank()) {
             isOutdoorLoading = true
             outdoorError = null
             scope.launch {
-                onAttachOutdoorForCity(city)
-                    .onSuccess { outdoorPermissionDenied = false }
-                    .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。") }
-                isOutdoorLoading = false
+                try {
+                    onAttachOutdoorForCity(city)
+                        .onSuccess { outdoorPermissionDenied = false }
+                        .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。") }
+                } finally {
+                    isOutdoorLoading = false
+                }
             }
         }
     }
@@ -1107,8 +1141,10 @@ fun MomentScreen(
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var showAddContent by rememberSaveable { mutableStateOf(false) }
     var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
-    val imagePickers = rememberJournalImagePickers { uris ->
-        onDraftImagesAdded(uris)
+    val imagePickers = rememberJournalImagePickers(availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size) { uris, access ->
+        val accepted = onDraftImagesAdded(uris)
+        if (accepted) access.transferAll()
+        accepted
     }
     val microphonePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -1152,7 +1188,7 @@ fun MomentScreen(
         ) {
             BrandHeader(
                 today = today,
-                hasDraft = hasResumedDraft && !draft.isEmpty,
+                hasDraft = !draft.isEmpty,
                 canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
                 onDiscard = {
                     dismissKeyboard()
@@ -1213,7 +1249,7 @@ fun MomentScreen(
                         onChooseTime = {
                             dismissKeyboard()
                             if (draft.recordedAt == null) {
-                                showRecordedAtPicker(pickerContext, null, onDraftRecordedAtChange)
+                                showRecordedAtPicker(pickerContext, null, selectRecordedAt)
                             } else {
                                 showRecordedAtOptions = true
                             }
@@ -1288,7 +1324,7 @@ fun MomentScreen(
                 OutdoorContextCard(
                     snapshot = draft.outdoor,
                     isBackdated = draft.recordedAt != null,
-                    isLoading = isOutdoorLoading,
+                    isLoading = outdoorLoading,
                     errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
                         localizedText("没有位置权限，也可以只选择城市。")
                     } else {
@@ -1296,6 +1332,7 @@ fun MomentScreen(
                     },
                     enabled = !isSaving,
                     onAdd = requestCurrentOutdoor,
+                    showRefresh = draft.recordedAt == null,
                     onChooseCity = { showOutdoorCityDialog = true },
                     onRemove = {
                         outdoorError = null
@@ -1347,6 +1384,7 @@ fun MomentScreen(
                                 showBorder = false,
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 showDeleteAtTopEnd = true,
+                                useActionMenu = true,
                                 shape = XikeShapes.inner,
                             )
                         }
@@ -1392,6 +1430,7 @@ fun MomentScreen(
                             video,
                             onRemove = if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft,
                             onReplace = if (canChangeVideo) chooseVideo else null,
+                            useActionMenu = true,
                         )
                     }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
@@ -1402,7 +1441,7 @@ fun MomentScreen(
                         )
                         FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }
-                            OutdoorCardAction(tr("移除视频", "Remove video"), !isSaving, videoServices.removeDraft)
+                            OutdoorCardAction(tr("取消本次导入", "Cancel this import"), !isSaving, videoServices.cancelPendingDraft)
                         }
                     }
                 }
@@ -1417,7 +1456,7 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
+                    if (isSaving || outdoorLoading || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
                     dismissKeyboard()
                     localSaving = true
                     scope.launch {
@@ -1445,7 +1484,7 @@ fun MomentScreen(
                         localSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
+                enabled = draft.mood != null && !isSaving && !outdoorLoading && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
                 modifier = Modifier
                     .widthIn(max = XikeContentMaxWidth)
                     .fillMaxWidth()
@@ -1462,6 +1501,7 @@ fun MomentScreen(
                 Text(
                     when {
                         isSaving -> localizedText("正在收下…")
+                        outdoorLoading -> tr("正在获取地点与天气…", "Getting location and weather…")
                         showVoiceCapture -> localizedText("请先完成录音")
                         pendingDraftAudio != null -> if (isDraftAudioSaving) localizedText("正在保存语音…") else localizedText("请先处理录音")
                         videoServices.draftSaving -> tr("正在导入视频…", "Importing video…")
@@ -1508,7 +1548,7 @@ fun MomentScreen(
                     TextButton(
                         onClick = {
                             showRecordedAtOptions = false
-                            showRecordedAtPicker(pickerContext, draft.recordedAt, onDraftRecordedAtChange)
+                            showRecordedAtPicker(pickerContext, draft.recordedAt, selectRecordedAt)
                         },
                         enabled = !isSaving,
                         modifier = Modifier.fillMaxWidth(),
@@ -1517,7 +1557,7 @@ fun MomentScreen(
                     TextButton(
                         onClick = {
                             showRecordedAtOptions = false
-                            onDraftRecordedAtChange(null)
+                            selectRecordedAt(null)
                         },
                         enabled = !isSaving,
                         modifier = Modifier.fillMaxWidth(),
@@ -1607,6 +1647,29 @@ fun MomentScreen(
                     localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音、视频和补记时间。已保存的记录不会受影响。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            },
+        )
+    }
+
+    if (showRecordedAtChangeConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showRecordedAtChangeConfirmation = false },
+            shape = XikeShapes.dialog,
+            title = { Text(tr("修改记录日期？", "Change the entry date?")) },
+            text = {
+                Text(
+                    tr("改为其他日期会移除已添加的地点与天气；改回现在也不会自动恢复。", "Changing to another date removes the added location and weather. Returning to now will not restore them automatically."),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (!isSaving) onDraftRecordedAtChange(pendingRecordedAtChange)
+                    showRecordedAtChangeConfirmation = false
+                }, enabled = !isSaving, shape = XikeShapes.button) { Text(tr("修改日期", "Change date")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecordedAtChangeConfirmation = false }, shape = XikeShapes.button) { Text(localizedText("取消")) }
             },
         )
     }
@@ -1724,6 +1787,7 @@ internal fun OutdoorContextCard(
     showRefresh: Boolean = true,
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
+    var showActions by remember(snapshot, enabled) { mutableStateOf(false) }
     val cardModifier = if (isEmpty && enabled) {
         Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onAdd)
     } else {
@@ -1753,13 +1817,11 @@ internal fun OutdoorContextCard(
                             }
                         }
                         Column(Modifier.weight(1f)) {
-                            Box(Modifier.fillMaxWidth().padding(end = if (showRefresh) 82.dp else 34.dp)) {
+                            Box(Modifier.fillMaxWidth().padding(end = 34.dp)) {
                                 Text(
                                     snapshot.placeName,
                                     modifier = Modifier.align(Alignment.CenterStart),
                                     style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             FlowRow(
@@ -1862,31 +1924,41 @@ internal fun OutdoorContextCard(
             }
             if (snapshot != null) {
                 Row(Modifier.align(Alignment.TopEnd)) {
-                    if (showRefresh) {
-                    IconButton(onClick = onAdd, enabled = enabled && !isLoading, modifier = Modifier.size(48.dp)) {
-                        Surface(Modifier.size(32.dp), shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp).semantics {
-                                            contentDescription = tr("正在刷新天气", "Refreshing weather")
-                                        },
-                                        strokeWidth = 2.dp,
-                                    )
-                                } else {
-                                    Icon(Icons.Outlined.Refresh, contentDescription = localizedText("刷新"), modifier = Modifier.size(16.dp))
+                    Box {
+                        IconButton(onClick = { showActions = true }, enabled = enabled, modifier = Modifier.size(48.dp)) {
+                            Surface(Modifier.size(32.dp), shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (isLoading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp).semantics {
+                                                contentDescription = tr("正在获取地点与天气", "Getting location and weather")
+                                            },
+                                            strokeWidth = 2.dp,
+                                        )
+                                    } else {
+                                        Icon(Icons.Outlined.MoreVert, contentDescription = tr("地点与天气的更多操作", "More location and weather actions"), modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
                         }
-                    }
-                    }
-                    IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.size(48.dp)) {
-                        Surface(Modifier.size(32.dp), shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Close, contentDescription = tr("移除此刻窗外", "Remove outside now"), modifier = Modifier.size(16.dp))
-                            }
+                        DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                            if (showRefresh) DropdownMenuItem(
+                                text = { Text(tr("重新获取地点与天气", "Get location and weather again")) },
+                                enabled = enabled && !isLoading,
+                                onClick = {
+                                    showActions = false
+                                    if (enabled && !isLoading) onAdd()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("移除地点与天气", "Remove location and weather")) },
+                                enabled = enabled,
+                                onClick = {
+                                    showActions = false
+                                    onRemove()
+                                },
+                            )
                         }
                     }
                 }
@@ -2135,21 +2207,7 @@ internal fun showRecordedAtPicker(
         R.style.PickerSurface,
         { _, year, month, day ->
             val date = LocalDate.of(year, month + 1, day)
-            TimePickerDialog(
-                context,
-                R.style.PickerSurface,
-                { _, hour, minute ->
-                    val selected = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
-                    if (selected > System.currentTimeMillis()) {
-                        XikeNotice.makeText(context, localizedText("记录时间不能晚于现在"), XikeNotice.LENGTH_SHORT).show()
-                    } else {
-                        onSelected(selected)
-                    }
-                },
-                initial.hour,
-                initial.minute,
-                true,
-            ).showWithXikeShape()
+            showRecordedAtTimePicker(context, date, initial.hour, initial.minute, onSelected)
         },
         initial.year,
         initial.monthValue - 1,
@@ -2163,6 +2221,44 @@ internal fun showRecordedAtPicker(
         datePicker.getChildAt(0)?.let { content ->
             content.layoutParams = content.layoutParams.apply {
                 width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            }
+        }
+    }
+    dialog.showWithXikeShape()
+    return dialog
+}
+
+internal fun showRecordedAtTimePicker(
+    context: Context,
+    date: LocalDate,
+    initialHour: Int,
+    initialMinute: Int,
+    onSelected: (Long) -> Unit,
+): TimePickerDialog {
+    var rejectDismiss = false
+    val dialog = object : TimePickerDialog(
+        context,
+        R.style.PickerSurface,
+        { _, hour, minute ->
+            val selected = date.atTime(hour, minute)
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            if (selected > System.currentTimeMillis()) {
+                rejectDismiss = true
+                XikeNotice.makeText(context, localizedText("记录时间不能晚于现在"), XikeNotice.LENGTH_SHORT).show()
+            } else {
+                onSelected(selected)
+            }
+        },
+        initialHour,
+        initialMinute,
+        true,
+    ) {
+        override fun dismiss() {
+            // Keep the platform's input validation and only veto dismissal of a future time.
+            if (rejectDismiss) {
+                rejectDismiss = false
+            } else {
+                super.dismiss()
             }
         }
     }
