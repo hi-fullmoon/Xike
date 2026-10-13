@@ -6,6 +6,7 @@ import com.xike.app.feature.insights.InsightsPeriod
 import com.xike.app.feature.insights.journalPeriodSummary
 
 import com.xike.app.data.Mood
+import com.xike.app.ui.components.formatAudioDuration
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
@@ -77,11 +78,15 @@ class JournalRefactoringUiTest {
         rule.waitUntil(20_000) { !model.isLoading }
         val entry = model.entries.single { it.imageFileNames.isNotEmpty() && it.audio != null }
         val entryLabel = entry.note.ifBlank { entry.mood.label }
+        val entryCard = hasText(entryLabel) and hasText(tr(
+            "语音 · ${formatAudioDuration(requireNotNull(entry.audio).durationMillis)}",
+            "Audio · ${formatAudioDuration(requireNotNull(entry.audio).durationMillis)}",
+        ))
         rule.onNodeWithTag("navigation-archive").performClick()
         rule.onNode(hasScrollToIndexAction() and
             SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
-            .performScrollToNode(hasText(entryLabel))
-        rule.onNodeWithText(entryLabel).performScrollTo().performClick()
+            .performScrollToNode(entryCard)
+        rule.onNode(entryCard).performScrollTo().performClick()
         rule.onNodeWithContentDescription(localizedText("编辑记录")).performClick()
         val savedNote = "Xike editor acceptance ${UUID.randomUUID()}"
         rule.onNodeWithContentDescription(localizedText("此刻的注脚"))

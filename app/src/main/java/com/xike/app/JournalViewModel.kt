@@ -13,7 +13,6 @@ import com.xike.app.outdoor.OutdoorContextRepository
 import com.xike.app.media.pruneVoiceTemporaryFiles
 
 import com.xike.app.data.Mood
-import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.BackupSummary
@@ -23,7 +22,6 @@ import com.xike.app.ui.theme.AppStyle
 
 
 import android.app.Application
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,36 +43,35 @@ import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class PendingDraftAudio(
-    val durationMillis: Long,
-    val draftGeneration: Long,
-    val stagedFileName: String? = null,
-)
-
 internal class JournalOperationFeedback(val message: String, val isError: Boolean)
 
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
     internal val editOperations by lazy { JournalEditOperations(application, viewModelScope, store) { draft.imageUriStrings } }
     private val videoStore = JournalVideoStore(application)
-    var isDraftVideoSaving by mutableStateOf(false)
-        private set
-    var draftVideoProgress by mutableStateOf<Float?>(null)
-        private set
+    val isDraftVideoSaving: Boolean get() = draftMediaOperations.isDraftVideoSaving
+    val draftVideoProgress: Float? get() = draftMediaOperations.draftVideoProgress
     private val draftStore = JournalDraftStore(application)
-    private val pendingAudioStore = PendingDraftAudioStore(application)
+    private val draftMediaOperations = JournalDraftMediaOperations(
+        application, viewModelScope, store,
+        currentDraft = { draft },
+        currentDraftGeneration = { draftGeneration },
+        savingDraft = { isDraftSaving },
+        saveDraft = ::persistDraft,
+        imageInUse = { editOperations.imageInUse(it) },
+        onDataError = { dataError = it },
+        reportOperation = ::reportOperation,
+    )
     private val outdoorRepository = OutdoorContextRepository(application)
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
     private var outdoorRequestGeneration = 0L
     private var outdoorRequestJob: Job? = null
-    private var pendingDraftImageResults by mutableStateOf(emptySet<String>())
-    val isDraftImageResultPending: Boolean
-        get() = pendingDraftImageResults.isNotEmpty()
+    val isDraftImageResultPending: Boolean get() = draftMediaOperations.isDraftImageResultPending
 
-    internal fun setDraftImageResultPending(key: String, pending: Boolean) {
-        pendingDraftImageResults = if (pending) pendingDraftImageResults + key else pendingDraftImageResults - key
-    }
+    internal fun setDraftImageResultPending(key: String, pending: Boolean) =
+        draftMediaOperations.setDraftImageResultPending(key, pending)
+
     var isDraftOutdoorLoading by mutableStateOf(false)
         private set
     private var noteSaveJob: Job? = null
@@ -109,17 +106,25 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    var pendingDraftAudio by mutableStateOf<PendingDraftAudio?>(null)
-        private set
+    val pendingDraftAudio: PendingDraftAudio? get() = draftMediaOperations.pendingDraftAudio
 
-    var isDraftAudioSaving by mutableStateOf(false)
-        private set
+    val isDraftAudioSaving: Boolean get() = draftMediaOperations.isDraftAudioSaving
 
     var isDraftSaving by mutableStateOf(false)
         private set
 
-    var isBackupExporting by mutableStateOf(false)
-        private set
+    private val backupOperations = JournalBackupOperations(
+        application, viewModelScope, store,
+        currentDraft = { draft },
+        importingDraftVideo = { isDraftVideoSaving },
+        onRestored = { restored, undoAvailable ->
+            entries = restored
+            canUndoRestore = undoAvailable
+            dataError = null
+        },
+        reportOperation = ::reportOperation,
+    )
+    val isBackupExporting: Boolean get() = backupOperations.isBackupExporting
 
     internal var operationFeedback by mutableStateOf(emptyList<JournalOperationFeedback>())
         private set
@@ -132,8 +137,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         operationFeedback = operationFeedback + JournalOperationFeedback(message, isError)
     }
 
-    var draftAudioSaveError by mutableStateOf<String?>(null)
-        private set
+    val draftAudioSaveError: String? get() = draftMediaOperations.draftAudioSaveError
 
     var dataError by mutableStateOf<String?>(null)
         private set
@@ -153,7 +157,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
             val draftFlushResult = withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
             val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
-            val pendingResult = withContext(Dispatchers.IO) { runCatching(pendingAudioStore::recover) }
+            val pendingResult = withContext(Dispatchers.IO) { runCatching(draftMediaOperations::recoverPendingAudio) }
             result.onSuccess { snapshot ->
                 val appearance = appearancePreferences.migrateFromDatabase(
                     themeName = snapshot.themeName,
@@ -169,9 +173,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 }
                 dataError = draftResult.exceptionOrNull()?.message ?: draftFlushResult.exceptionOrNull()?.message
                 pendingResult.onSuccess { staged ->
-                    pendingDraftAudio = staged?.let {
-                        PendingDraftAudio(it.durationMillis, draftGeneration, it.fileName)
-                    }
+                    draftMediaOperations.restorePendingAudio(staged)
                     if (staged != null) hasResumedDraft = true
                 }.onFailure { error ->
                     dataError = error.message ?: localizedText("录音暂存文件暂时无法读取。")
@@ -358,184 +360,17 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addDraftImages(uris: List<Uri>): Boolean {
-        if (isDraftSaving) return false
-        val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
-        val candidates = uris
-            .filterNot { it.toString() in draft.imageUriStrings }
-            .distinctBy(Uri::toString)
-        val newUris = candidates.take(availableSlots)
-        if (newUris.isEmpty()) {
-            candidates.forEach(::releaseDraftImageAccess)
-            if (candidates.isNotEmpty()) reportOperation(tr("照片已达上限，请先移除照片再添加。", "The photo limit has been reached. Remove a photo before adding more."))
-            return true
-        }
+    fun addDraftImages(uris: List<Uri>): Boolean = draftMediaOperations.addDraftImages(uris)
 
-        val application = getApplication<Application>()
-        val contentResolver = application.contentResolver
-        val grantedUris = mutableListOf<Uri>()
-        newUris.forEach { uri ->
-            if (isCameraCaptureUri(application, uri)) {
-                val readable = runCatching {
-                    contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true
-                }.getOrDefault(false)
-                if (readable) grantedUris += uri else deleteCameraCapture(application, uri)
-            } else {
-                runCatching {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
-                }.onSuccess {
-                    grantedUris += uri
-                }
-            }
-        }
-        if (grantedUris.isEmpty()) {
-            candidates.forEach(::releaseDraftImageAccess)
-            dataError = localizedText("所选照片无法获得长期读取权限，请重新选择。")
-            return true
-        }
+    fun removeDraftImage(uriString: String) = draftMediaOperations.removeDraftImage(uriString)
 
-        val updated = draft.copy(
-            imageUriStrings = draft.imageUriStrings + grantedUris.map(Uri::toString),
-        )
-        if (!persistDraft(updated)) {
-            return false
-        } else if (grantedUris.size < newUris.size) {
-            dataError = localizedText("部分照片无法长期读取，已保留可以恢复的照片。")
-        }
-        candidates.filterNot { it in grantedUris }.forEach(::releaseDraftImageAccess)
-        if (candidates.size > availableSlots) {
-            reportOperation(tr("本次已添加 ${grantedUris.size} 张照片，其余照片因数量上限未添加。", "Added ${grantedUris.size} photos. The remaining photos were not added because of the limit."))
-        }
-        return true
-    }
+    fun queueDraftAudio(source: File, durationMillis: Long) = draftMediaOperations.queueDraftAudio(source, durationMillis)
 
-    fun removeDraftImage(uriString: String) {
-        if (uriString !in draft.imageUriStrings) return
-        if (persistDraft(draft.copy(imageUriStrings = draft.imageUriStrings - uriString))) {
-            runCatching { Uri.parse(uriString) }.getOrNull()?.let(::releaseDraftImageAccess)
-        }
-    }
+    fun retryPendingDraftAudio() = draftMediaOperations.retryPendingDraftAudio()
 
-    fun queueDraftAudio(source: File, durationMillis: Long) {
-        if (pendingDraftAudio != null) {
-            source.delete()
-            return
-        }
-        val pending = PendingDraftAudio(durationMillis, draftGeneration)
-        pendingDraftAudio = pending
-        isDraftAudioSaving = true
-        draftAudioSaveError = null
-        viewModelScope.launch {
-            val staged = try {
-                withContext(Dispatchers.IO) {
-                    try {
-                        pendingAudioStore.stage(source, durationMillis)
-                    } finally {
-                        source.delete()
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                if (pending === pendingDraftAudio) {
-                    pendingDraftAudio = null
-                    dataError = error.message ?: localizedText("录音未能加密暂存，请重新录制。")
-                }
-                isDraftAudioSaving = false
-                return@launch
-            }
-            if (pending !== pendingDraftAudio || pending.draftGeneration != draftGeneration) {
-                try {
-                    withContext(Dispatchers.IO) { runCatching { pendingAudioStore.delete(staged) } }
-                } finally {
-                    if (pending === pendingDraftAudio) pendingDraftAudio = null
-                    isDraftAudioSaving = false
-                }
-                return@launch
-            }
-            pendingDraftAudio = pending.copy(stagedFileName = staged.fileName)
-            isDraftAudioSaving = false
-            retryPendingDraftAudio()
-        }
-    }
+    fun discardPendingDraftAudio() = draftMediaOperations.discardPendingDraftAudio()
 
-    fun retryPendingDraftAudio() {
-        val pending = pendingDraftAudio ?: return
-        val staged = pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
-        if (isDraftAudioSaving) return
-        isDraftAudioSaving = true
-        draftAudioSaveError = null
-        viewModelScope.launch {
-            try {
-                val imported = withContext(Dispatchers.IO) {
-                    runCatching {
-                        pendingAudioStore.open(staged).use { input ->
-                            store.importAudio(input, pending.durationMillis)
-                        }
-                    }
-                }
-                val result = imported.mapCatching { audio ->
-                    check(pending === pendingDraftAudio && pending.draftGeneration == draftGeneration) {
-                        localizedText("这段录音已经取消。")
-                    }
-                    val previousAudio = draft.audio
-                    check(persistDraft(draft.copy(audio = audio), reportError = false)) {
-                        localizedText("录音已经完成，但草稿保存失败。")
-                    }
-                    if (previousAudio != null && previousAudio.fileName != audio.fileName) {
-                        viewModelScope.launch(Dispatchers.IO) {
-                            store.deleteUnreferencedAudio(previousAudio.fileName)
-                        }
-                    }
-                }
-                imported.getOrNull()?.takeIf { result.isFailure }?.let { audio ->
-                    withContext(Dispatchers.IO) {
-                        runCatching { store.deleteUnreferencedAudio(audio.fileName) }
-                    }
-                }
-                if (pending === pendingDraftAudio) {
-                    result.onSuccess {
-                        check(withContext(Dispatchers.IO) { pendingAudioStore.delete(staged) }) {
-                            localizedText("录音已保存，但暂存文件清理失败，请重试。")
-                        }
-                        pendingDraftAudio = null
-                    }.onFailure { error ->
-                        draftAudioSaveError = error.message ?: localizedText("录音保存失败，请重试。")
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                if (pending === pendingDraftAudio) {
-                    draftAudioSaveError = error.message ?: localizedText("录音保存失败，请重试。")
-                }
-            } finally {
-                isDraftAudioSaving = false
-            }
-        }
-    }
-
-    fun discardPendingDraftAudio() {
-        if (isDraftAudioSaving) return
-        val pending = pendingDraftAudio ?: return
-        val staged = pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
-        if (!pendingAudioStore.delete(staged)) {
-            draftAudioSaveError = localizedText("录音暂存文件暂时无法删除，请重试。")
-            return
-        }
-        pendingDraftAudio = null
-        draftAudioSaveError = null
-    }
-
-    fun removeDraftAudio() {
-        val removed = draft.audio ?: return
-        if (persistDraft(draft.copy(audio = null))) {
-            viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(removed.fileName) }
-        }
-    }
+    fun removeDraftAudio() = draftMediaOperations.removeDraftAudio()
 
     fun discardDraft() {
         if (isDraftSaving || pendingDraftAudio != null || isDraftVideoSaving) return
@@ -543,14 +378,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (persistDraft(JournalDraft())) {
             draftGeneration++
             cancelOutdoorRequest()
-            discardedDraft.imageUriStrings
-                .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
-                .forEach(::releaseDraftImageAccess)
-            discardedDraft.audio?.fileName?.let { fileName ->
-                viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(fileName) }
-            }
-            discardedDraft.video?.let { video -> viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedVideo(video) } }
-            discardedDraft.pendingVideoUri?.let { releaseVideoAccess(Uri.parse(it)) }
+            draftMediaOperations.releaseDiscardedMedia(discardedDraft)
         }
     }
 
@@ -645,70 +473,15 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         runCatching { store.search(query, offset, limit) }
     }.await()
 
-    fun startBackupExport(uri: Uri, password: String?) {
-        if (isBackupExporting) return
-        isBackupExporting = true
-        viewModelScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    runCatching {
-                        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
-                            store.writeBackup(output, password)
-                        } ?: error(localizedText("无法写入备份文件"))
-                    }
-                }
-                result.onSuccess { reportOperation(localizedText("备份已保存")) }
-                    .onFailure { reportOperation(it.message ?: localizedText("备份失败"), isError = true) }
-            } finally {
-                isBackupExporting = false
-            }
-        }
-    }
+    fun startBackupExport(uri: Uri, password: String?) = backupOperations.startBackupExport(uri, password)
 
-    suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> = viewModelScope.async(Dispatchers.IO) {
-        runCatching {
-            getApplication<Application>().contentResolver.openInputStream(uri)?.use(store::backupRequiresPassword)
-                ?: error(localizedText("无法读取备份文件"))
-        }
-    }.await()
+    suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> = backupOperations.backupRequiresPassword(uri)
 
-    suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> = viewModelScope.async(Dispatchers.IO) {
-        runCatching {
-            getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                store.inspectBackup(input, password)
-            } ?: error(localizedText("无法读取备份文件"))
-        }
-    }.await()
+    suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> = backupOperations.inspectBackup(uri, password)
 
-    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = viewModelScope.async {
-        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再恢复备份。", "Wait for video import to finish before restoring a backup.")))
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                    store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName), draft.video)
-                } ?: error(localizedText("无法读取备份文件"))
-            }
-        }
-        result.onSuccess {
-            entries = it
-            canUndoRestore = true
-            dataError = null
-        }
-        result.map { it.size }
-    }.await()
+    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = backupOperations.restoreBackup(uri, password)
 
-    suspend fun undoRestore(): Result<Int> = viewModelScope.async {
-        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再撤销恢复。", "Wait for video import to finish before undoing a restore.")))
-        val result = withContext(Dispatchers.IO) {
-            runCatching { store.undoLastRestore(setOfNotNull(draft.audio?.fileName), draft.video) }
-        }
-        result.onSuccess {
-            entries = it
-            canUndoRestore = false
-            dataError = null
-        }
-        result.map { it.size }
-    }.await()
+    suspend fun undoRestore(): Result<Int> = backupOperations.undoRestore()
 
     fun openImage(fileName: String): InputStream? = store.openImage(fileName)
 
@@ -734,57 +507,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun importVideo(uri: Uri, progress: (Float) -> Unit): Result<JournalVideo> = withContext(Dispatchers.IO) {
-        runCatching { store.importVideo(uri, progress) }
-    }
+    suspend fun importVideo(uri: Uri, progress: (Float) -> Unit): Result<JournalVideo> =
+        draftMediaOperations.importVideo(uri, progress)
 
-    fun releaseVideo(video: JournalVideo) {
-        viewModelScope.launch(Dispatchers.IO) { store.deleteUnreferencedVideo(video) }
-    }
+    fun releaseVideo(video: JournalVideo) = draftMediaOperations.releaseVideo(video)
 
-    private fun releaseVideoAccess(uri: Uri) {
-        runCatching { getApplication<Application>().contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-    }
+    fun queueDraftVideo(uri: Uri): Boolean = draftMediaOperations.queueDraftVideo(uri)
 
-    fun queueDraftVideo(uri: Uri): Boolean {
-        if (isDraftVideoSaving) return false
-        runCatching { getApplication<Application>().contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        if (!persistDraft(draft.copy(pendingVideoUri = uri.toString()))) return false
-        val generation = draftGeneration
-        isDraftVideoSaving = true
-        draftVideoProgress = null
-        viewModelScope.launch {
-            try {
-                importVideo(uri) { progress -> viewModelScope.launch { draftVideoProgress = progress } }
-                    .onSuccess { video ->
-                        val previous = draft.video
-                        if (generation == draftGeneration && persistDraft(draft.copy(video = video, pendingVideoUri = null))) {
-                            previous?.let(::releaseVideo)
-                            releaseVideoAccess(uri)
-                        } else releaseVideo(video)
-                    }.onFailure { error -> dataError = error.message ?: tr("视频导入失败，请重试或取消本次导入。", "Video import failed. Retry or cancel this import.") }
-            } finally { isDraftVideoSaving = false; draftVideoProgress = null }
-        }
-        return true
-    }
+    fun removeDraftVideo() = draftMediaOperations.removeDraftVideo()
 
-    fun removeDraftVideo() {
-        if (isDraftVideoSaving) return
-        val previous = draft.video
-        val pending = draft.pendingVideoUri
-        if (persistDraft(draft.copy(video = null, pendingVideoUri = null))) {
-            previous?.let(::releaseVideo)
-            pending?.let { releaseVideoAccess(Uri.parse(it)) }
-        }
-    }
-
-    fun cancelPendingDraftVideo() {
-        if (isDraftSaving || isDraftVideoSaving) return
-        val pending = draft.pendingVideoUri ?: return
-        if (persistDraft(draft.copy(pendingVideoUri = null))) {
-            releaseVideoAccess(Uri.parse(pending))
-        }
-    }
+    fun cancelPendingDraftVideo() = draftMediaOperations.cancelPendingDraftVideo()
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
@@ -824,25 +556,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     dataError = error.message ?: localizedText("记录已保存，但草稿清理失败。")
                 }
         }
-        savedDraft.imageUriStrings
-            .filterNot { it in draft.imageUriStrings }
-            .map(Uri::parse)
-            .forEach(::releaseDraftImageAccess)
-    }
-
-    private fun releaseDraftImageAccess(uri: Uri) {
-        if (editOperations.imageInUse(uri)) return
-        val application = getApplication<Application>()
-        if (isCameraCaptureUri(application, uri)) {
-            return
-        } else {
-            runCatching {
-                application.contentResolver.releasePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-        }
+        draftMediaOperations.releaseSavedImages(savedDraft)
     }
 
     private fun loadAccessibleDraft(): JournalDraft {
