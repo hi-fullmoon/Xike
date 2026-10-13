@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalDataException
+
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties

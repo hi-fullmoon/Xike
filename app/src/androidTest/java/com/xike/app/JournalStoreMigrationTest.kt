@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey

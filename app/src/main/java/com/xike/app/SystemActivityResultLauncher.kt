@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.ui.components.XikeNotice
+
+
 import android.content.Intent
 import android.content.Context
 import android.net.Uri

@@ -1,5 +1,14 @@
 package com.xike.app
 
+import com.xike.app.data.JournalAudio
+
+import com.xike.app.feature.archive.JournalArchiveScreen
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import android.content.Context
 import android.media.MediaRecorder
 import androidx.compose.foundation.layout.PaddingValues

@@ -1,5 +1,12 @@
 package com.xike.app
 
+import com.xike.app.ui.components.VoiceCaptureSheet
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.activity.ComponentActivity

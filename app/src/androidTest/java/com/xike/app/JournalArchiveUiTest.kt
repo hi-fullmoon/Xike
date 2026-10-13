@@ -1,5 +1,15 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+
+import com.xike.app.feature.archive.JournalArchiveScreen
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled

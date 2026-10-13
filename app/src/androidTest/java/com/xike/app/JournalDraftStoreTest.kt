@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4

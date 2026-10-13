@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+
+
 import android.graphics.Bitmap
 import android.content.res.Configuration
 import androidx.compose.ui.semantics.SemanticsActions

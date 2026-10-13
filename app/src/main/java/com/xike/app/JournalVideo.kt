@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalEntry
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaDataSource

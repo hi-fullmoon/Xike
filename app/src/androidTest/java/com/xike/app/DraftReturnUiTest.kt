@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.feature.lock.AppLockSessionState
+
 import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHeightIsAtLeast

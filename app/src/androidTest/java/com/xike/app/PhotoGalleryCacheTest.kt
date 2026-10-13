@@ -1,5 +1,14 @@
 package com.xike.app
 
+import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.components.GalleryPhoto
+import com.xike.app.ui.components.GalleryImageLoader
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import android.content.Context
 import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey

@@ -1,5 +1,10 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+import com.xike.app.data.JournalAudio
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

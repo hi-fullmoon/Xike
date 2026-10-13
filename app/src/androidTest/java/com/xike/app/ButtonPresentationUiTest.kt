@@ -1,5 +1,13 @@
 package com.xike.app
 
+import com.xike.app.ui.components.AddPhotoTile
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import android.graphics.Bitmap
 import android.app.LocaleManager
 import android.content.Context

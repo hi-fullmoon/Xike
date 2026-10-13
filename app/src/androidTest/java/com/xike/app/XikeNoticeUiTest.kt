@@ -1,5 +1,13 @@
 package com.xike.app
 
+import com.xike.app.ui.components.XikeNotice
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import androidx.activity.ComponentActivity
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box

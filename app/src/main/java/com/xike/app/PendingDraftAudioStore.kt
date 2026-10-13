@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+import com.xike.app.data.MAX_AUDIO_BYTES
+
 import android.content.Context
 import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey

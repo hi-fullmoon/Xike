@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri

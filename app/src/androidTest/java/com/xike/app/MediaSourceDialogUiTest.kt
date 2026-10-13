@@ -1,5 +1,11 @@
 package com.xike.app
 
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeTheme
+
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.provider.MediaStore

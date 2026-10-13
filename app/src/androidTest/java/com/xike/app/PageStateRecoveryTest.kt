@@ -1,5 +1,17 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.feature.insights.localJournalReview
+
+import com.xike.app.feature.settings.ReminderScheduleDialog
+
+import com.xike.app.feature.insights.JournalInsightsScreen
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.PaddingValues

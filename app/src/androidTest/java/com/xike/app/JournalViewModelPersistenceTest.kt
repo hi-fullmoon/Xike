@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalEntry
+
 import android.app.Application
 import android.Manifest
 import android.media.MediaRecorder

@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalAudio
+
 import java.io.File
 
 internal data class AudioEditServices(

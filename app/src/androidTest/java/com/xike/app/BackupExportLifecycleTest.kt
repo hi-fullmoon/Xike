@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.ui.components.XikeNotice
+
+
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule

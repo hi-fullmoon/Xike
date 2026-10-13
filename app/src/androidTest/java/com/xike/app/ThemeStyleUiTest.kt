@@ -1,5 +1,14 @@
 package com.xike.app
 
+import com.xike.app.ui.components.AppScreen
+import com.xike.app.ui.components.XikeNavigationBar
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule

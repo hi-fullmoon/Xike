@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalEntry
+
 import android.app.Application
 import android.net.Uri
 import android.os.SystemClock

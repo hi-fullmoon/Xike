@@ -1,5 +1,15 @@
 package com.xike.app
 
+import com.xike.app.ui.components.VoicePlaybackCard
+import com.xike.app.ui.components.formatAudioDuration
+
+import com.xike.app.data.JournalAudio
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
 import android.graphics.Bitmap
 import android.media.MediaRecorder
 import android.media.MediaMetadataRetriever

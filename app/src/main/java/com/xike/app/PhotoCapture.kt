@@ -1,5 +1,17 @@
 package com.xike.app
 
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+
+import com.xike.app.ui.components.XikeNotice
+
+import com.xike.app.ui.theme.XikeInnerCardPadding
+import com.xike.app.ui.theme.XikeSheetHorizontalPadding
+import com.xike.app.ui.theme.XikeSheetBottomPadding
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeContentMaxWidth
+
+
+
 import android.Manifest
 import android.content.ContentUris
 import android.content.ContentValues

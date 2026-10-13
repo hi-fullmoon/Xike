@@ -1,5 +1,17 @@
 package com.xike.app
 
+import com.xike.app.ui.components.PlaybackProgressSlider
+
+import com.xike.app.data.JournalEntry
+
+import com.xike.app.ui.components.XikeNotice
+
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeCurrentStyle
+
+
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState

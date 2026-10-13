@@ -1,5 +1,36 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.BackupSummary
+
+import com.xike.app.feature.lock.AppLockTimeout
+
+import com.xike.app.feature.settings.ProfileSettingsScreen
+import com.xike.app.feature.settings.PendingExport
+import com.xike.app.feature.settings.BackupExportState
+import com.xike.app.feature.settings.RestoreConfirmationDialog
+import com.xike.app.feature.settings.BackupExportDialog
+import com.xike.app.feature.settings.BackupPasswordDialog
+
+import com.xike.app.feature.insights.JournalInsightsScreen
+
+import com.xike.app.feature.archive.JournalArchiveScreen
+
+import com.xike.app.feature.moment.MomentScreen
+
+import com.xike.app.ui.components.AppScreen
+import com.xike.app.ui.components.XikeNavigationBar
+import com.xike.app.ui.components.ProcessingDialog
+import com.xike.app.ui.components.XikeNotice
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+
+
+
+
+
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding

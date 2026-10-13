@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.JournalDataException
+
 import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider

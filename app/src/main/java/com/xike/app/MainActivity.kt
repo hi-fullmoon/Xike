@@ -1,5 +1,24 @@
 package com.xike.app
 
+import com.xike.app.feature.lock.AppLockDialog
+import com.xike.app.feature.lock.AppLockScreen
+import com.xike.app.feature.lock.LockAuthentication
+import com.xike.app.feature.lock.AppLockSessionState
+import com.xike.app.feature.lock.AppLockTimeout
+import com.xike.app.feature.lock.AppLockPreferences
+
+import com.xike.app.ui.components.ProcessingDialog
+import com.xike.app.ui.components.DataErrorDialog
+import com.xike.app.ui.components.XikeNotice
+import com.xike.app.ui.components.NoticeMessage
+import com.xike.app.ui.components.LocalRetainedNotice
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import android.Manifest
 import android.app.KeyguardManager
 import android.content.Intent

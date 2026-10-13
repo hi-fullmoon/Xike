@@ -1,5 +1,16 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.journalPeriodSummary
+
+import com.xike.app.feature.lock.AppLockScreen
+
+import com.xike.app.feature.insights.MoodTrendChart
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height

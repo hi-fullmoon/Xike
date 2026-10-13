@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.JournalEntry
+
 import android.net.Uri
 import android.graphics.Bitmap
 import android.os.SystemClock

@@ -1,5 +1,17 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.InsightEvidenceLevel
+import com.xike.app.feature.insights.JournalPeriodSummary
+import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.feature.insights.weeklyJournalSummary
+import com.xike.app.feature.insights.entriesOnDate
+import com.xike.app.feature.insights.localReviewText
+import com.xike.app.feature.insights.localJournalReview
+
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals

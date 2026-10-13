@@ -1,5 +1,33 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.journalPeriodSummary
+
+import com.xike.app.data.Mood
+
+import com.xike.app.feature.insights.MoodDistributionCard
+
+import com.xike.app.feature.archive.ArchiveViewMode
+import com.xike.app.feature.archive.ArchiveHeader
+import com.xike.app.feature.archive.ArchiveSearchBar
+import com.xike.app.feature.archive.ArchiveControls
+
+import com.xike.app.ui.components.MoodChoices
+import com.xike.app.ui.components.JournalTopic
+import com.xike.app.ui.components.journalTopics
+import com.xike.app.ui.components.MomentTopicsHeader
+import com.xike.app.ui.components.TopicChoices
+import com.xike.app.ui.components.AppScreen
+import com.xike.app.ui.components.XikeNavigationBar
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeScreenHorizontalPadding
+import com.xike.app.ui.theme.XikeTheme
+
+
+
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width

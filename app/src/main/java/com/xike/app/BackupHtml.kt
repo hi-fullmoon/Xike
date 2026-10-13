@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalEntry
+
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

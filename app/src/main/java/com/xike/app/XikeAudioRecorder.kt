@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build

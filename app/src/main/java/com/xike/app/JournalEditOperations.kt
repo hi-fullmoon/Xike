@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalEntry
+
 import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadataRetriever

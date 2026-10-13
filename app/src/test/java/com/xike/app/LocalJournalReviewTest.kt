@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.reviewMoodShareChange
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

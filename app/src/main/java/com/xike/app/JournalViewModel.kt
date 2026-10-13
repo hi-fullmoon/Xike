@@ -1,5 +1,17 @@
 package com.xike.app
 
+import com.xike.app.ui.components.pruneVoiceTemporaryFiles
+
+import com.xike.app.data.Mood
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.BackupSummary
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.AppStyle
+
+
 import android.app.Application
 import android.content.Intent
 import android.net.Uri

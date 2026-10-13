@@ -1,5 +1,9 @@
 package com.xike.app
 
+import com.xike.app.feature.lock.LockAuthentication
+import com.xike.app.feature.lock.AppLockSessionState
+import com.xike.app.feature.lock.AppLockTimeout
+
 import java.lang.reflect.Modifier
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,5 +1,8 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+import com.xike.app.data.JournalEntry
+
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri

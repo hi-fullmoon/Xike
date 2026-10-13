@@ -1,5 +1,13 @@
 package com.xike.app
 
+import com.xike.app.ui.components.rememberPreviewBitmap
+import com.xike.app.ui.components.PreviewBitmapCache
+
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+
+
+
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap

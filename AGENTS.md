@@ -34,35 +34,35 @@
 | --- | --- |
 | `MainActivity.kt` | 系统入口、生命周期、权限、认证与系统结果回调协调 |
 | `XikeApp.kt` | 应用组合入口、导航、页面状态及备份选择与恢复协调 |
-| `AppLockSessionState.kt`、`AppLockUi.kt` | 应用锁会话状态与锁定界面 |
+| `feature/lock/AppLockSessionState.kt`、`feature/lock/AppLockUi.kt` | 应用锁会话状态与锁定界面 |
 | `SystemActivityCallbacks.kt` | 系统 Activity 结果协调的 CompositionLocal 声明 |
-| `BackupDialogs.kt` | 备份弹窗及已有导出状态 |
-| `JournalInputComponents.kt`、`RecordedAtPicker.kt` | 此刻与编辑共用的注脚、媒体操作及原生日期时间选择 |
-| `MoodPicker.kt`、`JournalTopicPicker.kt` | 心情选择、说明与视觉规则，以及主题目录与选择组件 |
-| `JournalEntryCard.kt`、`JournalPhotoUi.kt` | 记录卡片、照片缩略图、拼图、图库及预览位图加载 |
-| `XikePageComponents.kt`、`AppOperationDialogs.kt` | 跨页面复用的页头、内容卡片、处理与数据错误弹窗 |
-| `MomentScreen.kt`、`OutdoorContextUi.kt` | 此刻页面、草稿与媒体交互，以及窗外信息与城市选择组件 |
-| `SettingsScreen.kt` | 设置页面、专用弹窗、风格预览和辅助组件 |
-| `XikeTheme.kt` | 主题、风格、字体与尺寸规则 |
-| `XikeNavigationBar.kt` | 底部导航及页面标识 |
-| `JournalEntryDetailDialog.kt` | 回望与轨迹共用的日记详情及专用展示组件 |
-| `JournalEntryEditDialog.kt` | 日记编辑、专用照片组件及编辑状态与操作协调 |
-| `JournalArchiveUi.kt` | 回望、搜索、筛选、月历和删除 |
-| `JournalInsightsUi.kt` | 轨迹页面、周期选择、计算状态与下钻跳转协调 |
-| `JournalAnalytics.kt`、`LocalJournalReview.kt` | 周期统计、证据计算与本地回望内容生成 |
-| `JournalInsightsCards.kt`、`JournalInsightsCharts.kt`、`JournalInsightsSection.kt` | 轨迹卡片、图表及共享分节展示 |
-| `LocalReviewDialog.kt`、`InsightDrilldownDialog.kt` | 本地回顾与原始记录弹窗，继续复用共享日记详情 |
-| `XikeAudioRecorder.kt`、`VoiceCaptureUi.kt`、`VoicePlaybackUi.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
+| `feature/settings/BackupDialogs.kt` | 备份弹窗及已有导出状态 |
+| `ui/components/JournalInputComponents.kt`、`ui/components/RecordedAtPicker.kt` | 此刻与编辑共用的注脚、媒体操作及原生日期时间选择 |
+| `ui/components/MoodPicker.kt`、`ui/components/JournalTopicPicker.kt` | 心情选择、说明与视觉规则，以及主题目录与选择组件 |
+| `ui/components/JournalEntryCard.kt`、`ui/components/JournalPhotoUi.kt` | 记录卡片、照片缩略图、拼图、图库及预览位图加载 |
+| `ui/components/XikePageComponents.kt`、`ui/components/AppOperationDialogs.kt` | 跨页面复用的页头、内容卡片、处理与数据错误弹窗 |
+| `feature/moment/MomentScreen.kt`、`feature/moment/OutdoorContextUi.kt` | 此刻页面、草稿与媒体交互，以及窗外信息与城市选择组件 |
+| `feature/settings/SettingsScreen.kt` | 设置页面、专用弹窗、风格预览和辅助组件 |
+| `ui/theme/XikeTheme.kt` | 主题、风格、字体与尺寸规则 |
+| `ui/components/XikeNavigationBar.kt` | 底部导航及页面标识 |
+| `feature/archive/JournalEntryDetailDialog.kt` | 回望与轨迹共用的日记详情及专用展示组件 |
+| `feature/archive/JournalEntryEditDialog.kt` | 日记编辑、专用照片组件及编辑状态与操作协调 |
+| `feature/archive/JournalArchiveUi.kt` | 回望、搜索、筛选、月历和删除 |
+| `feature/insights/JournalInsightsUi.kt` | 轨迹页面、周期选择、计算状态与下钻跳转协调 |
+| `feature/insights/JournalAnalytics.kt`、`feature/insights/LocalJournalReview.kt` | 周期统计、证据计算与本地回望内容生成 |
+| `feature/insights/JournalInsightsCards.kt`、`feature/insights/JournalInsightsCharts.kt`、`feature/insights/JournalInsightsSection.kt` | 轨迹卡片、图表及共享分节展示 |
+| `feature/insights/LocalReviewDialog.kt`、`feature/insights/InsightDrilldownDialog.kt` | 本地回顾与原始记录弹窗，继续复用共享日记详情 |
+| `XikeAudioRecorder.kt`、`ui/components/VoiceCaptureUi.kt`、`ui/components/VoicePlaybackUi.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
 | `AudioEditServices.kt` | 既有录音导入与释放接口的 CompositionLocal 声明 |
 | `JournalViewModel.kt` | 状态管理、业务调用和草稿持久化协调 |
 | `JournalStore.kt`、`JournalDatabase.kt` | 加密存储、数据库、附件和备份恢复 |
-| `JournalModels.kt`、`JournalBackupModels.kt` | 日记、附件与快照模型，备份摘要及恢复数据归一化 |
-| `JournalBackupCodec.kt` | 原有备份 JSON 解析、流校验及加密编码解码辅助能力 |
+| `data/JournalModels.kt`、`data/JournalBackupModels.kt` | 日记、附件与快照模型，备份摘要及恢复数据归一化 |
+| `data/JournalBackupCodec.kt` | 原有备份 JSON 解析、流校验及加密编码解码辅助能力 |
 | `JournalDraft.kt`、`PendingDraftAudioStore.kt` | 草稿与待保存录音的持久化和恢复 |
 | `AppearancePreferences.kt`、`LanguagePreferences.kt` | 外观与语言设置 |
 | `LocalizedStrings.kt`、`JournalTopics.kt` | 本地化映射与主题标识规范化 |
-| `PreviewBitmapCache.kt`、`GalleryImageLoader.kt` | 图片预览缓存与图库加载 |
-| `XikeIcons.kt`、`MoodEmoji.kt`、`XikeNotice.kt`、`DestructiveConfirmationDialog.kt` | 共享图标、心情绘制、提示及确认弹窗 |
+| `ui/components/PreviewBitmapCache.kt`、`ui/components/GalleryImageLoader.kt` | 图片预览缓存与图库加载 |
+| `ui/components/XikeIcons.kt`、`ui/components/MoodEmoji.kt`、`ui/components/XikeNotice.kt`、`ui/components/DestructiveConfirmationDialog.kt` | 共享图标、心情绘制、提示及确认弹窗 |
 | `app/src/test/`、`app/src/androidTest/` | JVM 测试与设备端测试 |
 | `app/schemas/` | Room 数据库 schema |
 | `docs/`、`.github/workflows/` | 项目说明、验收与发布流程 |

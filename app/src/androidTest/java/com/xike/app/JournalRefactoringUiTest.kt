@@ -1,5 +1,10 @@
 package com.xike.app
 
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.journalPeriodSummary
+
+import com.xike.app.data.Mood
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.click

@@ -1,5 +1,13 @@
 package com.xike.app
 
+import com.xike.app.data.Mood
+
+import com.xike.app.ui.components.journalTopics
+
+import com.xike.app.ui.theme.AppTheme
+
+
+
 import android.content.Context
 import android.app.LocaleManager
 import android.content.pm.ShortcutManager
