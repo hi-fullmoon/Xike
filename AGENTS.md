@@ -56,6 +56,8 @@
 | `AudioEditServices.kt` | 既有录音导入与释放接口的 CompositionLocal 声明 |
 | `JournalViewModel.kt` | 状态管理、业务调用和草稿持久化协调 |
 | `JournalStore.kt`、`JournalDatabase.kt` | 加密存储、数据库、附件和备份恢复 |
+| `JournalModels.kt`、`JournalBackupModels.kt` | 日记、附件与快照模型，备份摘要及恢复数据归一化 |
+| `JournalBackupCodec.kt` | 原有备份 JSON 解析、流校验及加密编码解码辅助能力 |
 | `JournalDraft.kt`、`PendingDraftAudioStore.kt` | 草稿与待保存录音的持久化和恢复 |
 | `AppearancePreferences.kt`、`LanguagePreferences.kt` | 外观与语言设置 |
 | `LocalizedStrings.kt`、`JournalTopics.kt` | 本地化映射与主题标识规范化 |

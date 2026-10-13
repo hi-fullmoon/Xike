@@ -123,6 +123,9 @@ flowchart TD
 | [`AppOperationDialogs.kt`](../app/src/main/java/com/xike/app/AppOperationDialogs.kt) | 加载处理和数据错误弹窗。 |
 | [`JournalViewModel.kt`](../app/src/main/java/com/xike/app/JournalViewModel.kt) | 连接 UI 与数据层；编排初始化、草稿、增删改查、天气、备份和恢复。 |
 | [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储；负责数据库访问、附件加密、删除撤销、旧数据迁移、备份与恢复。 |
+| [`JournalModels.kt`](../app/src/main/java/com/xike/app/JournalModels.kt) | 心情、日记、录音、快照及数据异常模型，保持原有序列化标识。 |
+| [`JournalBackupModels.kt`](../app/src/main/java/com/xike/app/JournalBackupModels.kt) | 备份摘要与原有恢复数据归一化。 |
+| [`JournalBackupCodec.kt`](../app/src/main/java/com/xike/app/JournalBackupCodec.kt) | 原有 JSON 条目解析、有界流读取、校验与备份加解密辅助实现。 |
 | [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
 | [`JournalDraft.kt`](../app/src/main/java/com/xike/app/JournalDraft.kt) | 草稿模型、规范化、JSON 序列化和加密持久化。 |
 | [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
@@ -302,7 +305,7 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 - API 26–36 真机矩阵、动态字体、TalkBack、大屏和低存储验证。
 - 启动、搜索、图片解码和大备份的性能基线。
 
-UI、应用入口和音频文件已按职责提取，所有实现继续使用 `com.xike.app` 和单个 Gradle 模块。页面状态、Effect、认证与系统结果协调保留。存储模型与备份辅助提取及功能包迁移留待后续阶段。
+UI、应用入口、音频及存储辅助已分别按职责提取，所有实现继续使用 `com.xike.app` 和单个 Gradle 模块。Store 保留恢复、撤销、附件清理和同步锁，数据库完整类名与 schema 不变；功能包迁移留待后续阶段。
 
 ## 14. 新维护者建议阅读顺序
 

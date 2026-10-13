@@ -9,7 +9,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
@@ -23,134 +22,8 @@ import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
-import javax.crypto.CipherOutputStream
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-enum class Mood(private val sourceLabel: String, val score: Int, val emoji: String) {
-    LOW("低落", 1, "😔"),
-    TIRED("疲惫", 2, "😫"),
-    CALM("平静", 3, "😌"),
-    GOOD("轻松", 4, "🙂"),
-    JOYFUL("愉悦", 5, "😄");
-
-    val label: String get() = localizedText(sourceLabel)
-
-    companion object {
-        fun fromName(value: String): Mood = entries.firstOrNull { it.name == value } ?: CALM
-    }
-}
-
-const val MAX_IMAGES_PER_ENTRY = 9
-const val MAX_AUDIO_DURATION_MILLIS = 5L * 60L * 1000L
-internal const val MAX_AUDIO_BYTES = 16L * 1024L * 1024L
-
-data class JournalAudio(
-    val fileName: String,
-    val durationMillis: Long,
-    val mimeType: String = "audio/mp4",
-) {
-    fun toJson(): JSONObject = JSONObject()
-        .put("fileName", fileName)
-        .put("durationMillis", durationMillis)
-        .put("mimeType", mimeType)
-
-    companion object {
-        fun fromJson(json: JSONObject?): JournalAudio? = json?.let {
-            JournalAudio(
-                fileName = it.optString("fileName"),
-                durationMillis = it.optLong("durationMillis"),
-                mimeType = it.optString("mimeType", "audio/mp4"),
-            ).takeIf { audio -> audio.fileName.isNotBlank() && audio.durationMillis > 0L }
-        }
-    }
-}
-
-data class JournalEntry(
-    val id: String = UUID.randomUUID().toString(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val mood: Mood,
-    val tags: List<String>,
-    val note: String,
-    val imageFileNames: List<String> = emptyList(),
-    val audio: JournalAudio? = null,
-    val video: JournalVideo? = null,
-    val outdoor: OutdoorSnapshot? = null,
-) {
-    fun toJson(): JSONObject = JSONObject()
-        .put("id", id)
-        .put("createdAt", createdAt)
-        .put("mood", mood.name)
-        .put("tags", JSONArray(tags))
-        .put("note", note)
-        .put("imageFileNames", JSONArray(imageFileNames))
-        .put("audio", audio?.toJson() ?: JSONObject.NULL)
-        .put("video", video?.toJson() ?: JSONObject.NULL)
-        .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
-
-    companion object {
-        fun fromJson(json: JSONObject): JournalEntry = JournalEntry(
-            id = json.getString("id"),
-            createdAt = json.getLong("createdAt"),
-            mood = Mood.fromName(json.getString("mood")),
-            tags = json.optJSONArray("tags")?.let { values ->
-                List(values.length()) { index -> values.getString(index) }
-            } ?: emptyList(),
-            note = json.optString("note"),
-            imageFileNames = json.optJSONArray("imageFileNames")?.let { values ->
-                List(values.length()) { index -> values.getString(index) }
-            } ?: listOfNotNull(json.optString("imageFileName").takeIf { it.isNotBlank() }),
-            audio = JournalAudio.fromJson(json.optJSONObject("audio")),
-            video = JournalVideo.fromJson(json.optJSONObject("video")),
-            outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
-        )
-    }
-}
-
-internal fun normalizeRestoredEntries(
-    entries: List<JournalEntry>,
-    availableImages: Set<String>,
-    availableAudios: Set<String> = emptySet(),
-    availableVideos: Set<String> = emptySet(),
-): List<JournalEntry> = entries
-    .distinctBy { it.id }
-    .map { entry ->
-        entry.copy(
-            video = entry.video?.takeIf { it.fileName in availableVideos && it.coverFileName in availableVideos },
-            imageFileNames = entry.imageFileNames
-                .distinct()
-                .filter { it in availableImages }
-                .take(MAX_IMAGES_PER_ENTRY),
-            audio = entry.audio?.takeIf {
-                it.fileName in availableAudios && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
-            },
-        )
-    }
-    .sortedByDescending { it.createdAt }
-
-class JournalDataException(message: String, cause: Throwable) : IllegalStateException(message, cause)
-
-data class JournalSnapshot(
-    val entries: List<JournalEntry>,
-    val themeName: String?,
-    val styleName: String? = null,
-)
-
-data class BackupSummary(
-    val entryCount: Int,
-    val imageCount: Int,
-    val audioCount: Int = 0,
-    val videoCount: Int = 0,
-    val videoBytes: Long = 0,
-    val oldestCreatedAt: Long?,
-    val newestCreatedAt: Long?,
-)
 
 private data class PreparedBackup(
     val stagingDirectory: File,
@@ -880,22 +753,9 @@ class JournalStore(context: Context) {
         else -> IllegalArgumentException(localizedText("密码错误或备份文件已损坏。"), error)
     }
 
-    private fun parseEntries(values: JSONArray): List<JournalEntry> {
-        validateBackup(values.length() <= MAX_BACKUP_ENTRIES) { localizedText("备份包含过多日记。") }
-        return List(values.length()) { index ->
-            val entry = JournalEntry.fromJson(values.getJSONObject(index))
-            entry.video?.let { validateBackup(it.isValid()) { tr("备份视频信息无效。", "Invalid backup video metadata.") } }
-            entry.copy(
-                imageFileNames = entry.imageFileNames
-                    .filter(::isSafeImageFileName)
-                    .distinct()
-                    .take(MAX_IMAGES_PER_ENTRY),
-                audio = entry.audio?.takeIf {
-                    isSafeAudioFileName(it.fileName) && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
-                },
-            )
-        }
-    }
+    private fun parseEntries(values: JSONArray): List<JournalEntry> = parseBackupEntries(
+        values, MAX_BACKUP_ENTRIES, ::isSafeImageFileName, ::isSafeAudioFileName,
+    )
 
     private fun writeEncryptedImage(
         target: File,
@@ -1249,102 +1109,5 @@ class JournalStore(context: Context) {
         const val MAX_IMAGE_BYTES = 20L * 1024L * 1024L
         const val MAX_BACKUP_IMAGE_BYTES = 1024L * 1024L * 1024L
         const val MAX_BACKUP_AUDIO_BYTES = 1024L * 1024L * 1024L
-    }
-}
-
-private class BackupValidationException(message: String) : IllegalArgumentException(message)
-
-private inline fun validateBackup(condition: Boolean, lazyMessage: () -> String) {
-    if (!condition) throw BackupValidationException(lazyMessage())
-}
-
-private fun InputStream.readAvailable(target: ByteArray): Int {
-    var offset = 0
-    while (offset < target.size) {
-        val count = read(target, offset, target.size - offset)
-        if (count < 0) break
-        offset += count
-    }
-    return offset
-}
-
-private fun InputStream.readUtf8Limited(limit: Long): String {
-    val output = ByteArrayOutputStream()
-    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    var total = 0L
-    while (true) {
-        val count = read(buffer)
-        if (count < 0) break
-        total += count
-        validateBackup(total <= limit) { localizedText("备份文件过大。") }
-        output.write(buffer, 0, count)
-    }
-    return output.toString(Charsets.UTF_8.name())
-}
-
-internal object BackupCipher {
-    private const val ITERATIONS = 210_000
-    private const val KEY_BITS = 256
-    private const val SALT_BYTES = 16
-    private const val NONCE_BYTES = 12
-    private val streamingMagic = byteArrayOf('L'.code.toByte(), 'I'.code.toByte(), 'U'.code.toByte(), 'B'.code.toByte(), 'A'.code.toByte(), 'I'.code.toByte(), 4)
-
-    val magicSize: Int get() = streamingMagic.size
-
-    fun hasStreamingMagic(value: ByteArray): Boolean = value.contentEquals(streamingMagic)
-
-    fun encryptingStream(output: OutputStream, password: String): OutputStream {
-        val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
-        val nonce = ByteArray(NONCE_BYTES).also(SecureRandom()::nextBytes)
-        output.write(streamingMagic)
-        output.write(salt)
-        output.write(nonce)
-        output.flush()
-
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
-        return CipherOutputStream(output, cipher)
-    }
-
-    fun decryptingStream(input: InputStream, password: String): InputStream {
-        val salt = ByteArray(SALT_BYTES)
-        val nonce = ByteArray(NONCE_BYTES)
-        validateBackup(input.readAvailable(salt) == salt.size) { localizedText("备份文件头不完整。") }
-        validateBackup(input.readAvailable(nonce) == nonce.size) { localizedText("备份文件头不完整。") }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
-        return CipherInputStream(input, cipher)
-    }
-
-    fun encryptLegacy(plainText: String, password: String): String {
-        val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
-        val nonce = ByteArray(NONCE_BYTES).also(SecureRandom()::nextBytes)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
-        val encrypted = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-        return JSONObject()
-            .put("format", "xike-encrypted")
-            .put("version", 1)
-            .put("salt", Base64.getEncoder().encodeToString(salt))
-            .put("nonce", Base64.getEncoder().encodeToString(nonce))
-            .put("ciphertext", Base64.getEncoder().encodeToString(encrypted))
-            .toString()
-    }
-
-    fun decryptLegacy(payload: String, password: String): String {
-        val backup = JSONObject(payload)
-        validateBackup(backup.optString("format") == "xike-encrypted") { localizedText("备份未加密或文件格式不正确。") }
-        val salt = Base64.getDecoder().decode(backup.getString("salt"))
-        val nonce = Base64.getDecoder().decode(backup.getString("nonce"))
-        val ciphertext = Base64.getDecoder().decode(backup.getString("ciphertext"))
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
-        return cipher.doFinal(ciphertext).toString(Charsets.UTF_8)
-    }
-
-    private fun key(password: String, salt: ByteArray): SecretKeySpec {
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val derived = factory.generateSecret(PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_BITS)).encoded
-        return SecretKeySpec(derived, "AES")
     }
 }
