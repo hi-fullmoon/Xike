@@ -94,10 +94,10 @@
     <string name="text_keep_draft" formatted="false">"继续保留"</string>
     <string name="text_discard_draft" formatted="false">"放弃草稿"</string>
     <string name="text_add_weather_for_this_moment" formatted="false">"添加此刻窗外？"</string>
-    <string name="text_xike_uses_your_approximate_location_once_after" formatted="false">"息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。"</string>
+    <string name="text_xike_uses_your_approximate_location_once_after" formatted="false">"息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。系统地址服务会使用坐标查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。"</string>
     <string name="text_coordinates_are_not_saved_and_journal_content" formatted="false">"经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"</string>
     <string name="text_choose_a_city" formatted="false">"手动选城市"</string>
-    <string name="text_allow_approximate_location" formatted="false">"允许粗略定位"</string>
+    <string name="text_allow_approximate_location" formatted="false">"允许定位"</string>
     <string name="text_getting_location_and_weather" formatted="false">"正在获取地点与天气"</string>
     <string name="text_past_entries_do_not_use_today_s" formatted="false">"补记不使用今天的天气"</string>
     <string name="text_unable_to_add_location_and_weather" formatted="false">"暂时无法添加地点与天气"</string>

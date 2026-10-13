@@ -6,7 +6,7 @@
 
 息刻是一款面向 Android 的离线优先个人感受日记应用，产品标语是“停一刻，听见自己”。它希望让用户在十几秒内记录当下，并在之后安全、可靠地找回和理解这些记录。
 
-应用不要求账号，也没有自建服务端。日记正文、主题、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“此刻窗外”时，应用才会请求一次粗略位置并调用 Open-Meteo 获取当前天气。提醒、每日一问和分析均在设备本地完成。
+应用不要求账号，也没有自建服务端。日记正文、主题、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“此刻窗外”时，应用才会请求一次前台位置并调用 Open-Meteo 获取当前天气，支持精确定位并兼容粗略定位。提醒、每日一问和分析均在设备本地完成。
 
 当前仓库是一个单模块 Android 工程，应用包名为 `com.xike.app`，最低支持 Android 8.0（API 26），目标版本为 API 36。
 
@@ -28,7 +28,7 @@
 - 支持系统相机拍摄和系统照片选择器。
 - 支持补记过去的日期与时间。
 - 未完成内容会保存为加密草稿，进程重建后可继续编辑。
-- 用户可主动添加城市级地点、当前温度和天气状况。
+- 用户可主动添加地点文字、当前温度和天气状况；精确定位质量足够且系统地址服务可用时，地点显示到区、街道。
 
 ### 回望与查找
 
@@ -100,7 +100,7 @@ flowchart TD
     Activity <--> Habits[HabitPreferences<br/>提醒与每日一问设置]
     Activity <--> Scheduler[AlarmManager / Notification]
     Activity <--> Biometric[系统生物识别或设备凭据]
-    Outdoor --> Location[一次性粗略位置]
+    Outdoor --> Location[一次前台位置：精确或粗略]
     Outdoor --> Weather[Open-Meteo]
 ```
 
@@ -125,7 +125,7 @@ flowchart TD
 | [`XikeUi.kt`](../app/src/main/java/com/xike/app/XikeUi.kt) | 主题、导航、记录页、设置页和通用 Compose 组件。 |
 | [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/JournalArchiveUi.kt) | 回望、搜索、筛选、详情、编辑、删除和图片浏览界面。 |
 | [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/JournalInsightsUi.kt) | 轨迹、图表、样本说明和原始记录下钻界面。 |
-| [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 一次性粗略定位、城市检索、天气请求和天气快照规范化。 |
+| [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 一次前台定位、区与街道查询、城市检索、天气请求和天气快照规范化。 |
 | [`PhotoCapture.kt`](../app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
 | [`VoiceRecording.kt`](../app/src/main/java/com/xike/app/VoiceRecording.kt) | 麦克风录制、真实音量波形、暂停/继续和加密语音试听 UI。 |
 | [`ReminderScheduler.kt`](../app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
@@ -167,10 +167,10 @@ flowchart TD
 
 应用拥有 `INTERNET` 权限，但常规记录、搜索、洞察、提醒、加密和备份均不依赖网络。当前唯一明确的应用内网络调用是用户主动触发的 Open-Meteo 天气与城市查询：
 
-- 只请求一次前台粗略位置，不进行后台定位。
-- 请求前将经纬度四舍五入到 3 位小数。
+- 只请求一次前台位置，支持精确定位并兼容粗略定位，不进行后台定位。
+- 系统地址服务使用坐标查询地点；天气请求前将经纬度四舍五入到 3 位小数。
 - 经纬度不写入草稿、数据库或备份。
-- 日记只保存城市级地点名称和当时的天气快照。
+- 日记只保存地点文字和当时的天气快照。
 
 ## 9. 目录结构
 

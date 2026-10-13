@@ -9,6 +9,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import java.net.URL
@@ -18,6 +19,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
@@ -107,11 +112,15 @@ internal fun retainOutdoorForEditedTime(
 
 internal suspend fun <Candidate, Value : Any> firstNonNullResult(
     candidates: List<Candidate>,
+    timeoutMillis: Long? = null,
+    isPreferred: (Value) -> Boolean = { true },
+    isBetter: (Value, Value) -> Boolean = { _, _ -> false },
     request: suspend (Candidate) -> Value?,
 ): Value? {
     if (candidates.isEmpty()) return null
     return supervisorScope {
-        val result = CompletableDeferred<Value?>()
+        val result = CompletableDeferred<Unit>()
+        val best = AtomicReference<Value?>(null)
         val remaining = AtomicInteger(candidates.size)
         candidates.forEach { candidate ->
             launch {
@@ -123,13 +132,21 @@ internal suspend fun <Candidate, Value : Any> firstNonNullResult(
                     } catch (_: Exception) {
                         null
                     }
-                    if (resolved != null) result.complete(resolved)
+                    if (resolved != null) {
+                        best.updateAndGet { previous ->
+                            if (previous == null || isBetter(resolved, previous)) resolved else previous
+                        }
+                        if (isPreferred(resolved)) result.complete(Unit)
+                    }
                 } finally {
-                    if (remaining.decrementAndGet() == 0) result.complete(null)
+                    if (remaining.decrementAndGet() == 0) result.complete(Unit)
                 }
             }
         }
-        result.await().also { coroutineContext.cancelChildren() }
+        if (timeoutMillis == null) result.await()
+        else withTimeoutOrNull(timeoutMillis) { result.await() }
+        coroutineContext.cancelChildren()
+        best.get()
     }
 }
 
@@ -141,8 +158,10 @@ internal class OutdoorContextRepository(context: Context) {
     private val locationManager = appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
     suspend fun current(): OutdoorSnapshot {
-        val location = currentCoarseLocation()
-        val placeName = reverseGeocode(location) ?: localizedText("当前位置")
+        val location = currentLocation()
+        val placeName = withTimeoutOrNull(NETWORK_TIMEOUT_MILLIS.toLong()) {
+            reverseGeocode(location)
+        } ?: localizedText("当前位置")
         return fetchWeather(location.latitude, location.longitude, placeName)
     }
 
@@ -153,7 +172,7 @@ internal class OutdoorContextRepository(context: Context) {
         return fetchWeather(city.latitude, city.longitude, city.label)
     }
 
-    private suspend fun currentCoarseLocation(): Location {
+    private suspend fun currentLocation(): Location {
         if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_COARSE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -172,8 +191,21 @@ internal class OutdoorContextRepository(context: Context) {
             throw OutdoorContextException(localizedText("暂时找不到可用的定位服务，也可以手动选择城市。"))
         }
 
-        val location = withTimeoutOrNull(LOCATION_TIMEOUT_MILLIS) {
-            firstNonNullResult(providers, ::requestCurrentLocation)
+        val precise = ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val location = firstNonNullResult(
+            providers,
+            timeoutMillis = LOCATION_TIMEOUT_MILLIS,
+            isPreferred = { !precise || it.accuracy <= PREFERRED_ACCURACY_METERS },
+            isBetter = { candidate, previous -> candidate.accuracy < previous.accuracy },
+        ) { provider ->
+            requestCurrentLocation(provider)?.takeIf { candidate ->
+                val ageNanos = SystemClock.elapsedRealtimeNanos() - candidate.elapsedRealtimeNanos
+                ageNanos in 0..MAX_LOCATION_AGE_NANOS &&
+                    candidate.hasAccuracy() && candidate.accuracy.isFinite() && candidate.accuracy >= 0 &&
+                    candidate.latitude.isFinite() && candidate.latitude in -90.0..90.0 &&
+                    candidate.longitude.isFinite() && candidate.longitude in -180.0..180.0
+            }
         }
         if (location != null) return location
         throw OutdoorContextException(localizedText("暂时无法取得当前位置，请稍后重试或手动选择城市。"))
@@ -209,30 +241,47 @@ internal class OutdoorContextRepository(context: Context) {
         val geocoder = Geocoder(appContext, AppLocale.locale)
         val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             suspendCancellableCoroutine { continuation ->
-                geocoder.getFromLocation(
-                    location.latitude,
-                    location.longitude,
-                    1,
-                    object : Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: List<Address>) {
-                            if (continuation.isActive) continuation.resume(addresses.firstOrNull())
-                        }
+                runCatching {
+                    geocoder.getFromLocation(
+                        location.latitude,
+                        location.longitude,
+                        1,
+                        object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: List<Address>) {
+                                if (continuation.isActive) continuation.resume(addresses.firstOrNull())
+                            }
 
-                        override fun onError(errorMessage: String?) {
-                            if (continuation.isActive) continuation.resume(null)
-                        }
-                    },
-                )
+                            override fun onError(errorMessage: String?) {
+                                if (continuation.isActive) continuation.resume(null)
+                            }
+                        },
+                    )
+                }.onFailure {
+                    if (continuation.isActive) continuation.resume(null)
+                }
             }
         } else {
-            withContext(Dispatchers.IO) {
-                @Suppress("DEPRECATION")
+            // A blocking Binder call may ignore interruption. Do not make the caller
+            // wait for that worker after timeout, or queue more calls behind it.
+            suspendCancellableCoroutine { continuation ->
                 runCatching {
-                    geocoder.getFromLocation(location.latitude, location.longitude, 1)?.firstOrNull()
-                }.getOrNull()
+                    legacyGeocoderExecutor.submit {
+                        @Suppress("DEPRECATION")
+                        val result = runCatching {
+                            geocoder.getFromLocation(location.latitude, location.longitude, 1)?.firstOrNull()
+                        }.getOrNull()
+                        if (continuation.isActive) continuation.resume(result)
+                    }
+                }.onSuccess { task ->
+                    continuation.invokeOnCancellation { task.cancel(true) }
+                }.onFailure {
+                    if (continuation.isActive) continuation.resume(null)
+                }
             }
         }
-        return address?.asPlaceLabel()
+        val includeStreet = ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED && location.accuracy <= PREFERRED_ACCURACY_METERS
+        return address?.asPlaceLabel(includeStreet)
     }
 
     private suspend fun fetchWeather(
@@ -315,17 +364,23 @@ internal class OutdoorContextRepository(context: Context) {
     private companion object {
         const val LOCATION_TIMEOUT_MILLIS = 12_000L
         const val NETWORK_TIMEOUT_MILLIS = 10_000
+        const val MAX_LOCATION_AGE_NANOS = 120_000_000_000L
+        const val PREFERRED_ACCURACY_METERS = 100f
+        val legacyGeocoderExecutor = ThreadPoolExecutor(
+            0, 1, 30L, TimeUnit.SECONDS, SynchronousQueue(),
+            { task -> Thread(task, "xike-geocoder").apply { isDaemon = true } },
+        )
     }
 }
 
-private fun Address.asPlaceLabel(): String? = listOf(
+private fun Address.asPlaceLabel(includeStreet: Boolean): String? = listOf(
     adminArea,
     locality,
     subAdminArea,
     subLocality,
+    thoroughfare.takeIf { includeStreet },
 )
     .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
     .distinct()
-    .take(2)
     .joinToString(" · ")
     .takeIf(String::isNotBlank)

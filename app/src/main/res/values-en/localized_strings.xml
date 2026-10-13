@@ -94,10 +94,10 @@
     <string name="text_keep_draft" formatted="false">"Keep draft"</string>
     <string name="text_discard_draft" formatted="false">"Discard draft"</string>
     <string name="text_add_weather_for_this_moment" formatted="false">"Add weather for this moment?"</string>
-    <string name="text_xike_uses_your_approximate_location_once_after" formatted="false">"Xike uses your approximate location once after you tap and sends approximate coordinates to Open-Meteo to request weather. "</string>
+    <string name="text_xike_uses_your_approximate_location_once_after" formatted="false">"Xike requests your location once after you tap to show the district and street. You can also allow only approximate location. The system address service uses coordinates to look up the place, and approximate coordinates are sent to Open-Meteo for weather. "</string>
     <string name="text_coordinates_are_not_saved_and_journal_content" formatted="false">"Coordinates are not saved and journal content is not uploaded. The place and weather snapshot are encrypted with your draft and journal on this device."</string>
     <string name="text_choose_a_city" formatted="false">"Choose a city"</string>
-    <string name="text_allow_approximate_location" formatted="false">"Allow approximate location"</string>
+    <string name="text_allow_approximate_location" formatted="false">"Allow location"</string>
     <string name="text_getting_location_and_weather" formatted="false">"Getting location and weather"</string>
     <string name="text_past_entries_do_not_use_today_s" formatted="false">"Past entries do not use today\'s weather"</string>
     <string name="text_unable_to_add_location_and_weather" formatted="false">"Unable to add location and weather"</string>

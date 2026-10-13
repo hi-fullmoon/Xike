@@ -1025,11 +1025,17 @@ fun MomentScreen(
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
     var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val locationPreferences = remember(context) {
+        context.getSharedPreferences("xike-location", Context.MODE_PRIVATE)
+    }
+    var locationPermissionRequested by rememberSaveable {
+        mutableStateOf(locationPreferences.getBoolean("permission_requested", false))
+    }
     var outdoorError by rememberSaveable { mutableStateOf<String?>(null) }
     var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
     var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
     var showVoiceCapture by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val pickerContext = LocalRecordedAtPickerContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1047,15 +1053,23 @@ fun MomentScreen(
         }
     }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         outdoorPermissionDenied = !granted
-        if (granted) loadCurrentOutdoor()
+        if (granted) {
+            locationPreferences.edit().putBoolean("permission_requested", true).apply()
+            loadCurrentOutdoor()
+        }
     }
     val requestCurrentOutdoor: () -> Unit = {
         if (
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+                (locationPermissionRequested &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED)
         ) {
             loadCurrentOutdoor()
         } else {
@@ -1604,7 +1618,7 @@ fun MomentScreen(
             title = { Text(localizedText("添加此刻窗外？")) },
             text = {
                 Text(
-                    localizedText("息刻只会在你点击后使用一次粗略位置，并把粗略经纬度发送给 Open-Meteo 查询天气。") +
+                    localizedText("息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。系统地址服务会使用坐标查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。") +
                         localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1624,9 +1638,13 @@ fun MomentScreen(
                     shape = XikeShapes.button,
                     onClick = {
                         showOutdoorDisclosure = false
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        locationPermissionRequested = true
+                        locationPermissionLauncher.launch(arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ))
                     },
-                ) { Text(localizedText("允许粗略定位")) }
+                ) { Text(localizedText("允许定位")) }
             },
         )
     }

@@ -23,7 +23,7 @@
 - 息刻是离线优先的 Android 个人感受日记，无需账号，记录默认保存在本机。
 - 项目使用 Kotlin、Jetpack Compose、Material 3、Room／SQLCipher 和 Android Keystore。当前最低支持 API 26，编译与目标 SDK 为 36，Java／Kotlin 编译工具链为 17。
 - 构建、依赖和版本配置以 [app/build.gradle.kts](app/build.gradle.kts)、[build.gradle.kts](build.gradle.kts) 和 CI 配置为准，不在本文件重复维护依赖版本列表。
-- 天气查询仅由用户主动触发；保持一次前台粗略定位、城市级地点和坐标不落盘的既有边界。
+- 天气查询仅由用户主动触发；只获取一次前台位置，支持精确定位并兼容粗略权限。地点可显示到区、街道，只保存地点文字，坐标不落盘，不进行后台定位。
 - 用户日记、照片、录音、草稿、密码和密钥不得进入日志、提交内容、公开截图或测试报告。
 
 ## 主要代码入口
