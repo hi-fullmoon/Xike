@@ -1,6 +1,6 @@
 package com.xike.app
 
-import com.xike.app.ui.components.pruneVoiceTemporaryFiles
+import com.xike.app.media.pruneVoiceTemporaryFiles
 
 import com.xike.app.data.Mood
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY

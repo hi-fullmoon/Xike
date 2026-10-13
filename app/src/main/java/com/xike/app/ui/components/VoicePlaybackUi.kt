@@ -12,7 +12,6 @@ import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeShapes
 
 
-import android.content.Context
 import android.media.MediaPlayer
 import android.media.AudioAttributes
 import androidx.compose.animation.animateColorAsState
@@ -562,11 +561,4 @@ internal fun PlaybackProgressSlider(
 internal fun formatAudioDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis.coerceAtLeast(0L) / 1000L)
     return String.format(Locale.ROOT, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L)
-}
-
-internal fun pruneVoiceTemporaryFiles(context: Context) {
-    context.cacheDir.listFiles()
-        // Recording candidates may belong to a pending editor import after process death.
-        ?.filter { it.name.startsWith("xike-playback-") }
-        ?.forEach(File::delete)
 }

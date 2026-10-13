@@ -1,6 +1,6 @@
 package com.xike.app
 
-import com.xike.app.ui.components.pruneVoiceTemporaryFiles
+import com.xike.app.media.pruneVoiceTemporaryFiles
 
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
