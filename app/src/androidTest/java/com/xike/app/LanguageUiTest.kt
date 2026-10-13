@@ -49,7 +49,7 @@ class LanguageUiTest {
         composeRule.onNodeWithTag("navigation-settings").performClick()
         composeRule.onNodeWithText("应用语言").performScrollTo().performClick()
         composeRule.onNodeWithText("English").performClick()
-        composeRule.onNodeWithText("App language").assertIsDisplayed()
+        composeRule.onNodeWithText("App language").performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.ENGLISH, LanguagePreferences(context).language)
         assertSystemLanguage(AppLanguage.ENGLISH, "Keep this moment")
         assertEquals("Calm", Mood.CALM.label)
@@ -59,7 +59,7 @@ class LanguageUiTest {
         assertEquals(draft, ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft)
 
         composeRule.activityRule.scenario.recreate()
-        composeRule.onNodeWithText("App language").assertIsDisplayed()
+        composeRule.onNodeWithText("App language").performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.ENGLISH, AppLocale.language)
         composeRule.onNodeWithTag("navigation-home").performClick()
         composeRule.onNodeWithText("How you feel now").performScrollTo().assertIsDisplayed()
@@ -70,7 +70,7 @@ class LanguageUiTest {
         composeRule.onNodeWithTag("navigation-settings").performClick()
         composeRule.onNodeWithText("App language").performScrollTo().performClick()
         composeRule.onNodeWithText("中文").performClick()
-        composeRule.onNodeWithText("应用语言").assertIsDisplayed()
+        composeRule.onNodeWithText("应用语言").performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.CHINESE, LanguagePreferences(context).language)
         assertSystemLanguage(AppLanguage.CHINESE, "记录此刻")
     }

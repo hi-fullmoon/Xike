@@ -26,6 +26,7 @@
 
 ## 技术设计
 
+- 代码入口：`MainActivity.kt` 保留生命周期与认证回调，`AppLockSessionState.kt` 持有既有会话状态，`AppLockUi.kt` 展示冷启动锁定页与会话锁定层。
 - 认证方式：AndroidX `BiometricPrompt`。
   - Android 11 及以上：强生物识别或设备凭据。
   - Android 8–10：兼容生物识别或设备凭据的系统能力组合。

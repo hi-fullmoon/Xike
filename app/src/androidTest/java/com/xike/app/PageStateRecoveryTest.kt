@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -73,7 +72,7 @@ class PageStateRecoveryTest {
         }
         val source = localJournalReview(journalPeriodSummary(entries, InsightsPeriod.WEEK))
             .sections.flatMap { it.sources }.first()
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(source.label))
+        composeRule.onNodeWithTag("local-review-scroll").performScrollToNode(hasText(source.label))
         composeRule.onNodeWithText(source.label).performClick()
         composeRule.onNodeWithContentDescription(localizedText("关闭原始记录")).assertIsDisplayed()
         restoration.emulateSavedInstanceStateRestore()
@@ -104,7 +103,7 @@ class PageStateRecoveryTest {
             }
         }
         awaitSummary()
-        composeRule.onNodeWithTag("insights-overview-headline").performClick()
+        composeRule.onNodeWithTag("insights-overview-headline", useUnmergedTree = true).performClick()
         composeRule.onNodeWithTag("insight-source-${summary.entryIds.first()}").performClick()
         composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
         composeRule.runOnIdle { displayedEntries.value = entries.asReversed() }

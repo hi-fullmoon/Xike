@@ -6,7 +6,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -49,8 +51,16 @@ class MomentContentUiTest {
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         rule.onNodeWithText(tr("视频", "Video")).assertDoesNotExist()
         rule.onNodeWithContentDescription(localizedText("此刻的注脚")).performScrollTo().performClick()
-        rule.onNodeWithText(localizedText("完成")).performScrollTo().assertIsDisplayed().performClick()
-        rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).assertIsDisplayed()
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithText(localizedText("完成")).fetchSemanticsNodes().size == 1 &&
+                rule.onNodeWithText(localizedText("完成")).apply { performScrollTo() }.isDisplayed()
+        }
+        rule.onNodeWithText(localizedText("完成")).assertIsDisplayed().performClick()
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithText(tr("今天 · 修改时间", "Today · Change time"))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).performScrollTo().assertIsDisplayed()
         assertEquals(originalDraft, viewModel.draft)
     }
 

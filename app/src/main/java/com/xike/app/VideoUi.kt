@@ -1,5 +1,12 @@
 package com.xike.app
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -456,6 +463,57 @@ private fun VideoPlayerDialog(video: JournalVideo, onDismiss: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MomentQuickAction(
+    label: String,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    val style = XikeCurrentStyle
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val restingContainerColor = when {
+        isDark -> MaterialTheme.colorScheme.surfaceVariant
+        style == AppStyle.BREATHE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val containerColor = if (isPressed) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.72f else 0.82f)
+    } else {
+        restingContainerColor
+    }
+    val actionColor = if (isPressed) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        modifier = modifier.semantics { role = Role.Button },
+        shape = XikeShapes.button,
+        color = containerColor.copy(alpha = if (enabled) 1f else 0.52f),
+        contentColor = actionColor.copy(alpha = if (enabled) 1f else 0.45f),
+    ) {
+        Row(
+            modifier = Modifier.heightIn(min = 36.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

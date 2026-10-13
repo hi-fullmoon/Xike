@@ -115,19 +115,45 @@ flowchart TD
 
 | 文件 | 职责 |
 | --- | --- |
-| [`MainActivity.kt`](../app/src/main/java/com/xike/app/MainActivity.kt) | 应用入口；处理系统权限、生物识别、应用生命周期、备份文件选择、底部导航和全局对话框。 |
+| [`MainActivity.kt`](../app/src/main/java/com/xike/app/MainActivity.kt) | 系统入口；处理权限、生物识别、应用生命周期及系统结果回调协调。 |
+| [`XikeApp.kt`](../app/src/main/java/com/xike/app/XikeApp.kt) | 应用组合入口、底部导航、页面状态、备份文件选择及恢复协调。 |
+| [`AppLockSessionState.kt`](../app/src/main/java/com/xike/app/AppLockSessionState.kt) | 应用锁会话状态、后台时间与系统 Activity 监控状态。 |
+| [`AppLockUi.kt`](../app/src/main/java/com/xike/app/AppLockUi.kt) | 冷启动锁定页与会话锁定层。 |
+| [`BackupDialogs.kt`](../app/src/main/java/com/xike/app/BackupDialogs.kt) | 导出、密码与恢复确认弹窗，及已有导出请求状态。 |
+| [`AppOperationDialogs.kt`](../app/src/main/java/com/xike/app/AppOperationDialogs.kt) | 加载处理和数据错误弹窗。 |
 | [`JournalViewModel.kt`](../app/src/main/java/com/xike/app/JournalViewModel.kt) | 连接 UI 与数据层；编排初始化、草稿、增删改查、天气、备份和恢复。 |
 | [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储；负责数据库访问、附件加密、删除撤销、旧数据迁移、备份与恢复。 |
 | [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
 | [`JournalDraft.kt`](../app/src/main/java/com/xike/app/JournalDraft.kt) | 草稿模型、规范化、JSON 序列化和加密持久化。 |
 | [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
 | [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度、主题与工作日/周末分析。 |
-| [`XikeUi.kt`](../app/src/main/java/com/xike/app/XikeUi.kt) | 主题、导航、记录页、设置页和通用 Compose 组件。 |
-| [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/JournalArchiveUi.kt) | 回望、搜索、筛选、详情、编辑、删除和图片浏览界面。 |
-| [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/JournalInsightsUi.kt) | 轨迹、图表、样本说明和原始记录下钻界面。 |
+| [`SystemActivityCallbacks.kt`](../app/src/main/java/com/xike/app/SystemActivityCallbacks.kt) | 系统 Activity 结果协调的 CompositionLocal 声明。 |
+| [`JournalInputComponents.kt`](../app/src/main/java/com/xike/app/JournalInputComponents.kt) | 此刻与编辑共用的注脚、工具栏和媒体操作组件。 |
+| [`RecordedAtPicker.kt`](../app/src/main/java/com/xike/app/RecordedAtPicker.kt) | 原生日期和时间选择，保留未来时间校验及弹窗协调。 |
+| [`MoodPicker.kt`](../app/src/main/java/com/xike/app/MoodPicker.kt) | 心情选择、说明及私有视觉规则。 |
+| [`JournalTopicPicker.kt`](../app/src/main/java/com/xike/app/JournalTopicPicker.kt) | 主题目录、选择组件和计数说明。 |
+| [`JournalEntryCard.kt`](../app/src/main/java/com/xike/app/JournalEntryCard.kt) | 回望与轨迹复用的记录卡片及私有时间格式。 |
+| [`JournalPhotoUi.kt`](../app/src/main/java/com/xike/app/JournalPhotoUi.kt) | 照片添加入口、缩略图、拼图、图库和预览位图加载。 |
+| [`XikePageComponents.kt`](../app/src/main/java/com/xike/app/XikePageComponents.kt) | 跨页面复用的页头和内容卡片。 |
+| [`MomentScreen.kt`](../app/src/main/java/com/xike/app/MomentScreen.kt) | 此刻页面、草稿与媒体交互及专用辅助组件。 |
+| [`OutdoorContextUi.kt`](../app/src/main/java/com/xike/app/OutdoorContextUi.kt) | 窗外信息、城市选择及相关操作组件。 |
+| [`SettingsScreen.kt`](../app/src/main/java/com/xike/app/SettingsScreen.kt) | 设置页面、专用弹窗、风格预览和辅助组件。 |
+| [`XikeTheme.kt`](../app/src/main/java/com/xike/app/XikeTheme.kt) | 六种主色、三种风格、字体、尺寸规则和共享访问接口。 |
+| [`XikeNavigationBar.kt`](../app/src/main/java/com/xike/app/XikeNavigationBar.kt) | 页面导航标识、底部导航及选中状态展示。 |
+| [`JournalEntryDetailDialog.kt`](../app/src/main/java/com/xike/app/JournalEntryDetailDialog.kt) | 回望与轨迹共用的日记详情及专用展示组件。 |
+| [`JournalEntryEditDialog.kt`](../app/src/main/java/com/xike/app/JournalEntryEditDialog.kt) | 编辑弹窗、专用照片组件及编辑状态与操作协调。 |
+| [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/JournalArchiveUi.kt) | 回望、搜索、筛选、月历和删除界面。 |
+| [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/JournalInsightsUi.kt) | 轨迹页面、周期选择、计算状态与下钻跳转协调。 |
+| [`JournalInsightsCards.kt`](../app/src/main/java/com/xike/app/JournalInsightsCards.kt) | 轨迹概况、周期比较、主题、日期类型及本地回顾入口卡片。 |
+| [`JournalInsightsCharts.kt`](../app/src/main/java/com/xike/app/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |
+| [`JournalInsightsSection.kt`](../app/src/main/java/com/xike/app/JournalInsightsSection.kt) | 轨迹组件共用的分节卡片、比例条与样本说明。 |
+| [`LocalReviewDialog.kt`](../app/src/main/java/com/xike/app/LocalReviewDialog.kt)、[`InsightDrilldownDialog.kt`](../app/src/main/java/com/xike/app/InsightDrilldownDialog.kt) | 本地回顾与原始记录弹窗，继续复用共享日记详情。 |
 | [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 一次前台定位、区与街道查询、城市检索、天气请求和天气快照规范化。 |
 | [`PhotoCapture.kt`](../app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
-| [`VoiceRecording.kt`](../app/src/main/java/com/xike/app/VoiceRecording.kt) | 麦克风录制、真实音量波形、暂停/继续和加密语音试听 UI。 |
+| [`XikeAudioRecorder.kt`](../app/src/main/java/com/xike/app/XikeAudioRecorder.kt) | 既有麦克风录音器、录音文件生成及释放。 |
+| [`VoiceCaptureUi.kt`](../app/src/main/java/com/xike/app/VoiceCaptureUi.kt) | 录音手势、返回处理、波形及待保存录音界面。 |
+| [`VoicePlaybackUi.kt`](../app/src/main/java/com/xike/app/VoicePlaybackUi.kt) | 播放与互斥协调、进度控件、时长显示与临时播放文件清理。 |
+| [`AudioEditServices.kt`](../app/src/main/java/com/xike/app/AudioEditServices.kt) | 既有录音编辑导入与释放接口。 |
 | [`ReminderScheduler.kt`](../app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
 | [`HabitPreferences.kt`](../app/src/main/java/com/xike/app/HabitPreferences.kt) | 提醒、勿扰、暂停和每日一问设置。 |
 | [`AppearancePreferences.kt`](../app/src/main/java/com/xike/app/AppearancePreferences.kt) | 保存非敏感的界面风格与主色镜像，使锁定页在数据库打开前也能保持用户外观。 |
@@ -276,7 +302,7 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 - API 26–36 真机矩阵、动态字体、TalkBack、大屏和低存储验证。
 - 启动、搜索、图片解码和大备份的性能基线。
 
-从代码结构看，`XikeUi.kt`、`JournalArchiveUi.kt`、`JournalInsightsUi.kt` 和 `MainActivity.kt` 体积较大。随着功能继续增长，按功能拆分 UI、状态和数据访问边界会是重要的可维护性工作。
+UI、应用入口和音频文件已按职责提取，所有实现继续使用 `com.xike.app` 和单个 Gradle 模块。页面状态、Effect、认证与系统结果协调保留。存储模型与备份辅助提取及功能包迁移留待后续阶段。
 
 ## 14. 新维护者建议阅读顺序
 

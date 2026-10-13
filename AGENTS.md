@@ -32,16 +32,35 @@
 
 | 文件或目录 | 主要职责 |
 | --- | --- |
-| `MainActivity.kt` | 应用入口、页面组织、应用锁及备份操作协调 |
-| `XikeUi.kt` | 主题、风格、共享 UI、此刻页面和设置页面 |
-| `JournalArchiveUi.kt` | 回望、搜索、筛选、月历、详情和编辑 |
-| `JournalInsightsUi.kt` | 轨迹统计、原始记录查看和本地回望 |
+| `MainActivity.kt` | 系统入口、生命周期、权限、认证与系统结果回调协调 |
+| `XikeApp.kt` | 应用组合入口、导航、页面状态及备份选择与恢复协调 |
+| `AppLockSessionState.kt`、`AppLockUi.kt` | 应用锁会话状态与锁定界面 |
+| `SystemActivityCallbacks.kt` | 系统 Activity 结果协调的 CompositionLocal 声明 |
+| `BackupDialogs.kt` | 备份弹窗及已有导出状态 |
+| `JournalInputComponents.kt`、`RecordedAtPicker.kt` | 此刻与编辑共用的注脚、媒体操作及原生日期时间选择 |
+| `MoodPicker.kt`、`JournalTopicPicker.kt` | 心情选择、说明与视觉规则，以及主题目录与选择组件 |
+| `JournalEntryCard.kt`、`JournalPhotoUi.kt` | 记录卡片、照片缩略图、拼图、图库及预览位图加载 |
+| `XikePageComponents.kt`、`AppOperationDialogs.kt` | 跨页面复用的页头、内容卡片、处理与数据错误弹窗 |
+| `MomentScreen.kt`、`OutdoorContextUi.kt` | 此刻页面、草稿与媒体交互，以及窗外信息与城市选择组件 |
+| `SettingsScreen.kt` | 设置页面、专用弹窗、风格预览和辅助组件 |
+| `XikeTheme.kt` | 主题、风格、字体与尺寸规则 |
+| `XikeNavigationBar.kt` | 底部导航及页面标识 |
+| `JournalEntryDetailDialog.kt` | 回望与轨迹共用的日记详情及专用展示组件 |
+| `JournalEntryEditDialog.kt` | 日记编辑、专用照片组件及编辑状态与操作协调 |
+| `JournalArchiveUi.kt` | 回望、搜索、筛选、月历和删除 |
+| `JournalInsightsUi.kt` | 轨迹页面、周期选择、计算状态与下钻跳转协调 |
+| `JournalAnalytics.kt`、`LocalJournalReview.kt` | 周期统计、证据计算与本地回望内容生成 |
+| `JournalInsightsCards.kt`、`JournalInsightsCharts.kt`、`JournalInsightsSection.kt` | 轨迹卡片、图表及共享分节展示 |
+| `LocalReviewDialog.kt`、`InsightDrilldownDialog.kt` | 本地回顾与原始记录弹窗，继续复用共享日记详情 |
+| `XikeAudioRecorder.kt`、`VoiceCaptureUi.kt`、`VoicePlaybackUi.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
+| `AudioEditServices.kt` | 既有录音导入与释放接口的 CompositionLocal 声明 |
 | `JournalViewModel.kt` | 状态管理、业务调用和草稿持久化协调 |
 | `JournalStore.kt`、`JournalDatabase.kt` | 加密存储、数据库、附件和备份恢复 |
 | `JournalDraft.kt`、`PendingDraftAudioStore.kt` | 草稿与待保存录音的持久化和恢复 |
 | `AppearancePreferences.kt`、`LanguagePreferences.kt` | 外观与语言设置 |
 | `LocalizedStrings.kt`、`JournalTopics.kt` | 本地化映射与主题标识规范化 |
 | `PreviewBitmapCache.kt`、`GalleryImageLoader.kt` | 图片预览缓存与图库加载 |
+| `XikeIcons.kt`、`MoodEmoji.kt`、`XikeNotice.kt`、`DestructiveConfirmationDialog.kt` | 共享图标、心情绘制、提示及确认弹窗 |
 | `app/src/test/`、`app/src/androidTest/` | JVM 测试与设备端测试 |
 | `app/schemas/` | Room 数据库 schema |
 | `docs/`、`.github/workflows/` | 项目说明、验收与发布流程 |
