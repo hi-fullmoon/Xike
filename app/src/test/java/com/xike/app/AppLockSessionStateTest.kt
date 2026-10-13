@@ -102,4 +102,101 @@ class AppLockSessionStateTest {
         assertEquals(5_000L, state.backgroundedAtMillis)
         assertTrue(state.shouldLockOnForeground(65_000L, AppLockTimeout.ONE_MINUTE))
     }
+
+    @Test
+    fun deviceLockImmediatelyLocksForEveryBackgroundTimeout() {
+        AppLockTimeout.entries.forEach { timeout ->
+            val state = AppLockSessionState().apply { isAppLocked = false }
+            state.recordBackgrounded(1_000L)
+            state.recordDeviceLocked()
+
+            assertTrue(state.shouldLockOnForeground(1_001L, timeout))
+        }
+    }
+
+    @Test
+    fun deviceLockDuringSystemActivityCannotBeClearedByItsResult() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity()
+        state.recordDeviceLocked()
+        state.finishSystemActivity()
+
+        assertFalse(state.systemActivityInProgress)
+        assertTrue(state.shouldLockOnForeground(1_001L, AppLockTimeout.THIRTY_MINUTES))
+    }
+
+    @Test
+    fun deviceLockInvalidatesAuthenticationStartedBeforeIt() {
+        LockAuthentication.entries.forEach { action ->
+            val state = AppLockSessionState()
+            state.beginAuthentication(action)
+            assertTrue(state.isCurrentAuthentication())
+
+            state.recordDeviceLocked()
+            assertFalse(state.isCurrentAuthentication())
+            assertTrue(state.isAppLocked)
+        }
+    }
+
+    @Test
+    fun freshAuthenticationAfterDeviceLockIsAcceptedOnlyOnce() {
+        val state = AppLockSessionState()
+        state.recordDeviceLocked()
+        state.beginAuthentication(LockAuthentication.UNLOCK)
+        assertTrue(state.isCurrentAuthentication())
+
+        state.authenticationInProgress = false
+        assertFalse(state.isCurrentAuthentication())
+    }
+
+    @Test
+    fun unobservableSystemActivityRequiresAuthenticationEvenWithLongTimeout() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(watchTaskVisibility = false, requireAuthenticationOnReturn = true)
+        state.recordBackgrounded(1_000L)
+        assertTrue(state.shouldLockOnForeground(2_000L, AppLockTimeout.THIRTY_MINUTES))
+
+        state.finishSystemActivity()
+        assertTrue(state.isAppLocked)
+        assertFalse(state.systemActivityInProgress)
+    }
+
+    @Test
+    fun failedUnobservableLaunchDoesNotLockAnUnlockedSession() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(watchTaskVisibility = false, requireAuthenticationOnReturn = true)
+        state.finishSystemActivity(resultReceived = false)
+
+        assertFalse(state.shouldLockOnForeground(2_000L, AppLockTimeout.IMMEDIATELY))
+        assertFalse(state.systemActivityInProgress)
+        state.recordBackgrounded(3_000L)
+        assertTrue(state.shouldLockOnForeground(3_000L, AppLockTimeout.IMMEDIATELY))
+    }
+
+    @Test
+    fun anotherOperationCannotClearAnUnobservableOperationsAuthenticationRequirement() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, true, "camera")
+        state.beginSystemActivity(true, false, "gallery")
+        state.finishSystemActivity(resultReceived = false, operationId = "gallery")
+
+        assertTrue(state.shouldLockOnForeground(2_000L, AppLockTimeout.THIRTY_MINUTES))
+        state.finishSystemActivity(operationId = "camera")
+        assertTrue(state.isAppLocked)
+        assertFalse(state.systemActivityInProgress)
+    }
+
+    @Test
+    fun repeatedLaunchesRetainTheRequirementUntilAllResultsReturn() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, true, "camera")
+        state.beginSystemActivity(true, false, "camera")
+        state.finishSystemActivity(operationId = "camera")
+        state.isAppLocked = false
+
+        assertTrue(state.shouldLockOnForeground(2_000L, AppLockTimeout.THIRTY_MINUTES))
+        state.finishSystemActivity(operationId = "camera")
+        assertTrue(state.isAppLocked)
+        assertFalse(state.systemActivityInProgress)
+    }
 }
