@@ -1,5 +1,7 @@
 package com.xike.app
 
+import com.xike.app.data.JournalDataException
+
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -17,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
-/** Independent device only; prepare real diaries, photos and audio through the app first. */
+/** Independent device only; run write, restore, undo, reinstall and verify in separate processes. */
 class JournalBackupProcessTest {
     @Test
     fun realRecordsAndMediaSurviveBackupRestoreUndoAcrossProcesses() {
@@ -60,23 +62,52 @@ class JournalBackupProcessTest {
                 assertTrue(summary.imageCount > 0 && summary.audioCount > 0)
                 assertTrue(runCatching { encrypted.inputStream().use { store.inspectBackup(it, "$password-invalid") } }.isFailure)
                 assertTrue(changed == fingerprint(store))
+                val undoAvailable = store.canUndoLastRestore()
+                assertTrue(runCatching { encrypted.inputStream().use { store.restoreBackup(it, "$password-invalid") } }.isFailure)
+                assertTrue(changed == fingerprint(store))
+                assertEquals(undoAvailable, store.canUndoLastRestore())
+
+                // A missing existing attachment must stop undo-snapshot creation before replacement.
+                val audio = requireNotNull(store.entries().firstNotNullOfOrNull { it.audio })
+                val existing = File(context.filesDir, "journal-audios/${audio.fileName}")
+                val held = File(directory, audio.fileName)
+                check(!held.exists())
+                assertTrue(existing.renameTo(held))
+                try {
+                    val failed = runCatching { encrypted.inputStream().use { store.restoreBackup(it, password) } }
+                    assertTrue(failed.exceptionOrNull() is JournalDataException)
+                    assertEquals(undoAvailable, store.canUndoLastRestore())
+                } finally {
+                    assertTrue(held.renameTo(existing))
+                }
+                assertTrue(changed == fingerprint(store))
                 encrypted.inputStream().use { store.restoreBackup(it, password) }
                 assertTrue(original == fingerprint(store))
                 assertTrue(store.canUndoLastRestore())
+            }
+            "undo" -> {
+                assertTrue(checkNotNull(state.getString("original", null)) == fingerprint(store))
+                assertTrue(store.canUndoLastRestore())
                 store.undoLastRestore()
-                assertTrue(changed == fingerprint(store))
+                assertTrue(checkNotNull(state.getString("changed", null)) == fingerprint(store))
+                assertFalse(store.canUndoLastRestore())
+            }
+            "reinstall" -> {
+                assertTrue(checkNotNull(state.getString("changed", null)) == fingerprint(store))
+                assertFalse(store.canUndoLastRestore())
                 plain.inputStream().use { store.restoreBackup(it, null) }
-                assertTrue(original == fingerprint(store))
+                assertTrue(checkNotNull(state.getString("original", null)) == fingerprint(store))
             }
             "verify" -> {
                 assertTrue(checkNotNull(state.getString("original", null)) == fingerprint(store))
                 assertEquals(state.getInt("count", -1), store.entries().size)
+                assertTrue(store.canUndoLastRestore())
                 plain.delete()
                 encrypted.delete()
                 directory.delete()
                 check(state.edit().clear().commit())
             }
-            else -> error("Specify backupProcessPhase write, restore or verify.")
+            else -> error("Specify backupProcessPhase write, restore, undo, reinstall or verify.")
         }
     }
 

@@ -55,7 +55,8 @@
 | `XikeAudioRecorder.kt`、`ui/components/VoiceCaptureUi.kt`、`ui/components/VoicePlaybackUi.kt`、`media/VoiceTemporaryFiles.kt` | 录音器、录音交互、播放交互、播放进度与临时播放文件清理 |
 | `AudioEditServices.kt` | 既有录音导入与释放接口的 CompositionLocal 声明 |
 | `JournalViewModel.kt` | 状态管理、业务调用和草稿持久化协调 |
-| `JournalStore.kt`、`JournalDatabase.kt` | 加密存储、数据库、附件和备份恢复 |
+| `JournalStore.kt`、`JournalDatabase.kt` | 数据库操作、恢复安装、删除与恢复撤销及媒体引用清理 |
+| `media/JournalAttachmentStore.kt`、`data/backup/JournalBackupStorage.kt` | 照片与录音加密读写，备份导出、读取及内容校验 |
 | `data/JournalModels.kt`、`data/JournalBackupModels.kt` | 日记、附件与快照模型，备份摘要及恢复数据归一化 |
 | `data/JournalBackupCodec.kt` | 原有备份 JSON 解析、流校验及加密编码解码辅助能力 |
 | `data/model/JournalDraft.kt`、`data/model/JournalVideo.kt`、`data/model/OutdoorSnapshot.kt` | 草稿、视频和天气快照模型及原有 JSON 转换与校验 |

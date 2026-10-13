@@ -1,57 +1,40 @@
 package com.xike.app
 
+import com.xike.app.media.JournalAttachmentStore
+import com.xike.app.media.MAX_IMAGE_BYTES
+import com.xike.app.media.MAX_BACKUP_AUDIO_BYTES
+import com.xike.app.data.backup.JournalBackupStorage
+import com.xike.app.data.backup.RESTORE_STAGING_PREFIX
+
 import com.xike.app.data.model.JournalVideo
-import com.xike.app.media.MAX_BACKUP_VIDEO_BYTES
 import com.xike.app.media.JournalVideoStore
 import com.xike.app.data.draft.JournalDraftStore
 import com.xike.app.data.model.files
 
 import com.xike.app.data.Mood
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
-import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.MAX_AUDIO_BYTES
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.JournalDataException
 import com.xike.app.data.JournalSnapshot
-import com.xike.app.data.normalizeRestoredEntries
 import com.xike.app.data.BackupSummary
-import com.xike.app.data.BackupValidationException
-import com.xike.app.data.validateBackup
-import com.xike.app.data.readAvailable
-import com.xike.app.data.readUtf8Limited
-import com.xike.app.data.BackupCipher
-import com.xike.app.data.parseBackupEntries
 
 import android.content.Context
 import android.net.Uri
-import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import org.json.JSONArray
-import org.json.JSONObject
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.PushbackInputStream
 import java.security.SecureRandom
 import java.time.ZoneId
 import java.util.Base64
 import java.util.UUID
-import java.util.zip.Deflater
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-private data class PreparedBackup(
-    val stagingDirectory: File,
-    val entries: List<JournalEntry>,
-)
 
 private data class UndoSnapshot(
     val file: File,
@@ -67,9 +50,9 @@ class JournalStore(context: Context) {
     private val appContext = context.applicationContext
     private val videos = JournalVideoStore(appContext)
     private val videoDraftStore by lazy { JournalDraftStore(appContext) }
-    private val imagesDirectory = File(appContext.filesDir, IMAGES_DIRECTORY)
-    private val audiosDirectory = File(appContext.filesDir, AUDIOS_DIRECTORY)
     private val masterKey = MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+    private val attachments = JournalAttachmentStore(appContext, masterKey)
+    private val backups = JournalBackupStorage(appContext, attachments, videos)
     private val database by lazy { JournalDatabase.get(appContext) }
     private val dao by lazy { database.journalDao() }
     private val editAudioPreferences by lazy {
@@ -102,8 +85,7 @@ class JournalStore(context: Context) {
     private var pendingDeletedEntry: JournalEntry? = null
 
     init {
-        check(imagesDirectory.isDirectory || imagesDirectory.mkdirs()) { localizedText("无法创建图片存储目录。") }
-        check(audiosDirectory.isDirectory || audiosDirectory.mkdirs()) { localizedText("无法创建录音存储目录。") }
+        attachments.initializeDirectories()
     }
 
     @Synchronized
@@ -182,15 +164,15 @@ class JournalStore(context: Context) {
 
     @Synchronized
     fun add(entry: JournalEntry, imageUris: List<Uri> = emptyList(), refreshEntries: Boolean = true): List<JournalEntry> {
-        val imported = importImages(imageUris)
+        val imported = attachments.importImages(imageUris)
         return runCatching {
             val storedEntry = entry.copy(imageFileNames = imported)
-            validateAudioReference(storedEntry.audio)
+            attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
             dao.insertJournal(storedEntry.toBundle())
             storedEntry
         }.onFailure {
-            imported.forEach(::deleteImage)
+            imported.forEach(attachments::deleteImage)
         }.getOrElse { error ->
             if (error is JournalDataException) throw error
             throw JournalDataException(localizedText("日记保存失败，请重试。"), error)
@@ -213,14 +195,14 @@ class JournalStore(context: Context) {
             localizedText("每条记录最多添加 9 张图片。")
         }
 
-        val imported = importImages(newImageUris)
+        val imported = attachments.importImages(newImageUris)
         val storedEntry = entry.copy(imageFileNames = retainedImages + imported)
         val previousImages = runCatching {
-            validateAudioReference(storedEntry.audio)
+            attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
             dao.updateJournal(storedEntry.toBundle())
         }
-            .onFailure { imported.forEach(::deleteImage) }
+            .onFailure { imported.forEach(attachments::deleteImage) }
             .getOrElse { error ->
                 if (error is JournalDataException) throw error
                 throw JournalDataException(localizedText("记录修改失败，请重试。"), error)
@@ -228,10 +210,10 @@ class JournalStore(context: Context) {
         val referencedImages = referencedImageFileNames()
         previousImages
             .filterNot { it in storedEntry.imageFileNames || it in referencedImages }
-            .forEach(::deleteImage)
+            .forEach(attachments::deleteImage)
         original.audio?.fileName
             ?.takeIf { it != storedEntry.audio?.fileName && it !in referencedAudioFileNames() }
-            ?.let(::deleteAudio)
+            ?.let(attachments::deleteAudio)
         original.video?.let { deleteUnreferencedVideo(it) }
         return if (refreshEntries) readEntries() else listOf(storedEntry)
     }
@@ -256,10 +238,10 @@ class JournalStore(context: Context) {
             ?.takeIf { it.id == entryId }
             ?: error(localizedText("这条记录的撤销期限已经结束。"))
         val missingImage = deletedEntry.imageFileNames.firstOrNull { fileName ->
-            !File(imagesDirectory, fileName).isFile
+            !File(attachments.imagesDirectory, fileName).isFile
         }
         check(missingImage == null) { localizedText("记录照片已经清理，无法撤销删除。") }
-        val missingAudio = deletedEntry.audio?.fileName?.takeIf { !File(audiosDirectory, it).isFile }
+        val missingAudio = deletedEntry.audio?.fileName?.takeIf { !File(attachments.audiosDirectory, it).isFile }
         check(missingAudio == null) { localizedText("记录语音已经清理，无法撤销删除。") }
         videos.requireReadable(deletedEntry.video)
         dao.insertJournal(deletedEntry.toBundle())
@@ -289,85 +271,21 @@ class JournalStore(context: Context) {
             .getOrElse { error -> throw JournalDataException(localizedText("界面风格保存失败，请重试。"), error) }
     }
 
-    private fun importImages(uris: List<Uri>): List<String> {
-        require(uris.size <= MAX_IMAGES_PER_ENTRY) { localizedText("每条记录最多添加 9 张图片。") }
-        val imported = mutableListOf<String>()
-        return runCatching {
-            uris.forEach { imported += importImage(it) }
-            imported.toList()
-        }.onFailure {
-            imported.forEach(::deleteImage)
-        }.getOrThrow()
-    }
-
-    private fun importImage(uri: Uri): String {
-        val fileName = "${UUID.randomUUID()}.xike-image"
-        val target = File(imagesDirectory, fileName)
-
-        runCatching {
-            appContext.contentResolver.openInputStream(uri)?.use { input ->
-                writeEncryptedImage(target, input, MAX_IMAGE_BYTES, null)
-            } ?: error(localizedText("无法读取所选图片"))
-        }.onFailure {
-            target.delete()
-            throw it
-        }
-        return fileName
-    }
-
-    fun openImage(fileName: String): InputStream? = fileName
-        .takeIf(::isSafeImageFileName)
-        ?.let { File(imagesDirectory, it) }
-        ?.takeIf(File::isFile)
-        ?.let { file -> runCatching { encryptedImage(file).openFileInput() }.getOrNull() }
+    fun openImage(fileName: String): InputStream? = attachments.openImage(fileName)
 
     @Synchronized
-    fun importAudio(source: File, durationMillis: Long): JournalAudio {
-        require(source.isFile && source.length() > 0L) { localizedText("录音文件不可用。") }
-        return FileInputStream(source).use { input -> importAudio(input, durationMillis) }
-    }
+    fun importAudio(source: File, durationMillis: Long): JournalAudio = attachments.importAudio(source, durationMillis)
 
     @Synchronized
-    fun importAudio(input: InputStream, durationMillis: Long): JournalAudio {
-        require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音时长需要在 5 分钟以内。") }
-        val fileName = "${UUID.randomUUID()}.xike-audio"
-        val target = File(audiosDirectory, fileName)
-        runCatching {
-            writeEncryptedAttachment(
-                target = target,
-                input = input,
-                byteLimit = MAX_AUDIO_BYTES,
-                totalBytes = null,
-                itemName = localizedText("录音"),
-                totalName = localizedText("备份录音"),
-                totalLimit = MAX_BACKUP_AUDIO_BYTES,
-            )
-        }.onFailure {
-            target.delete()
-            throw it
-        }
-        return JournalAudio(fileName = fileName, durationMillis = durationMillis)
-    }
+    fun importAudio(input: InputStream, durationMillis: Long): JournalAudio = attachments.importAudio(input, durationMillis)
 
-    fun openAudio(fileName: String): InputStream? = fileName
-        .takeIf(::isSafeAudioFileName)
-        ?.let { File(audiosDirectory, it) }
-        ?.takeIf(File::isFile)
-        ?.let { file -> runCatching { encryptedAudio(file).openFileInput() }.getOrNull() }
+    fun openAudio(fileName: String): InputStream? = attachments.openAudio(fileName)
 
-    internal fun requireReadableAudio(fileName: String) {
-        require(isSafeAudioFileName(fileName)) { localizedText("草稿录音引用无效，原数据已保留。") }
-        val file = File(audiosDirectory, fileName)
-        check(file.isFile) { localizedText("草稿录音文件暂时不可用，原引用已保留。") }
-        encryptedAudio(file).openFileInput().use { input ->
-            val buffer = ByteArray(8192)
-            while (input.read(buffer) != -1) { /* Validate every encrypted segment. */ }
-        }
-    }
+    internal fun requireReadableAudio(fileName: String) = attachments.requireReadableAudio(fileName)
 
     @Synchronized
     fun deleteUnreferencedAudio(fileName: String) {
-        if (fileName !in referencedAudioFileNames()) deleteAudio(fileName)
+        if (fileName !in referencedAudioFileNames()) attachments.deleteAudio(fileName)
     }
 
     @Synchronized
@@ -381,7 +299,7 @@ class JournalStore(context: Context) {
         try {
             check(editAudioPreferences.edit().putBoolean(audio.fileName, true).commit())
         } catch (error: Throwable) {
-            deleteAudio(audio.fileName)
+            attachments.deleteAudio(audio.fileName)
             throw error
         }
         return audio
@@ -400,10 +318,10 @@ class JournalStore(context: Context) {
         val referencedAudios = referencedAudioFileNames() + listOfNotNull(activeDraftAudioFileName)
         val activeUndoFileName = currentUndoSnapshot()?.file?.name
         videos.prune(referencedVideoFiles() + activeDraftVideo.files())
-        imagesDirectory.listFiles()
+        attachments.imagesDirectory.listFiles()
             ?.filter { it.name !in referencedImages }
             ?.forEach(File::delete)
-        audiosDirectory.listFiles()
+        attachments.audiosDirectory.listFiles()
             ?.filter { it.name !in referencedAudios }
             ?.forEach(File::delete)
         appContext.filesDir.listFiles()
@@ -427,117 +345,16 @@ class JournalStore(context: Context) {
     @Synchronized
     fun writeBackup(output: OutputStream, password: String?) {
         if (password != null) require(password.length >= 8) { localizedText("备份密码至少需要 8 位。") }
-        val currentEntries = readEntries()
-        val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
-        val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
-        val videoNames = currentEntries.flatMap { it.video.files() }.distinct()
-        require(currentEntries.mapNotNull { it.video }.distinctBy { it.fileName }.sumOf { it.sizeBytes } <= MAX_BACKUP_VIDEO_BYTES) {
-            tr("备份视频超过 10 GB。", "Backup videos exceed 10 GB.")
-        }
-        val imageExportNames = imageNames.associateWith { name ->
-            val extension = openImage(name)?.use(::imageExtension) ?: error(tr("备份图片无法读取：$name", "Unable to read backup photo: $name"))
-            "${name.removeSuffix(".xike-image")}.$extension"
-        }
-        val audioExportNames = audioNames.associateWith { name ->
-            "${name.removeSuffix(".xike-audio")}.m4a"
-        }
-        val exportedEntries = currentEntries.map { entry ->
-            entry.copy(
-                imageFileNames = entry.imageFileNames.map { imageExportNames.getValue(it) },
-                audio = entry.audio?.let { it.copy(fileName = audioExportNames.getValue(it.fileName)) },
-            )
-        }
-        val manifest = JSONObject()
-            .put("format", "xike")
-            .put("version", STREAMING_BACKUP_VERSION)
-            .put("entries", JSONArray(exportedEntries.map { it.toJson() }))
-            .toString()
-        val html = BackupHtml.render(exportedEntries)
-        val manifestBytes = manifest.toByteArray(Charsets.UTF_8)
-        val htmlBytes = html.toByteArray(Charsets.UTF_8)
-        require(manifestBytes.size <= MAX_MANIFEST_BYTES && htmlBytes.size <= MAX_HTML_BYTES) {
-            localizedText("日记内容超出单个备份文件的大小限制。")
-        }
-
-        val destination = if (password == null) output else BackupCipher.encryptingStream(output, password)
-        ZipOutputStream(BufferedOutputStream(destination)).use { archive ->
-            archive.setLevel(Deflater.BEST_SPEED)
-            archive.putNextEntry(ZipEntry(MANIFEST_ENTRY))
-            archive.write(manifestBytes)
-            archive.closeEntry()
-
-            archive.putNextEntry(ZipEntry(HTML_ENTRY))
-            archive.write(htmlBytes)
-            archive.closeEntry()
-
-            imageNames.forEach { fileName ->
-                (openImage(fileName) ?: error(tr("备份图片无法读取：$fileName", "Unable to read backup photo: $fileName"))).use { image ->
-                    archive.putNextEntry(ZipEntry("$IMAGES_PREFIX${imageExportNames.getValue(fileName)}"))
-                    image.copyTo(archive)
-                    archive.closeEntry()
-                }
-            }
-            audioNames.forEach { fileName ->
-                (openAudio(fileName) ?: error(tr("备份录音无法读取：$fileName", "Unable to read backup audio: $fileName"))).use { audio ->
-                    archive.putNextEntry(ZipEntry("$AUDIOS_PREFIX${audioExportNames.getValue(fileName)}"))
-                    audio.copyTo(archive)
-                    archive.closeEntry()
-                }
-            }
-            val videoArchive = object : java.io.FilterOutputStream(archive) {
-                private var totalBytes = 0L
-                override fun write(bytes: ByteArray, offset: Int, length: Int) {
-                    totalBytes += length
-                    require(totalBytes <= MAX_BACKUP_VIDEO_BYTES) { tr("备份视频超过 10 GB。", "Backup videos exceed 10 GB.") }
-                    out.write(bytes, offset, length)
-                }
-            }
-            videoNames.forEach { fileName ->
-                videos.open(fileName).use { input ->
-                    archive.putNextEntry(ZipEntry("videos/$fileName"))
-                    input.copyTo(videoArchive)
-                    archive.closeEntry()
-                }
-            }
-            archive.putNextEntry(ZipEntry(COMPLETION_ENTRY))
-            archive.write(COMPLETION_MARKER.toByteArray(Charsets.US_ASCII))
-            archive.closeEntry()
-        }
+        backups.writeBackup(readEntries(), output, password)
     }
 
-    fun backupRequiresPassword(input: InputStream): Boolean {
-        val prefix = ByteArray(BackupCipher.magicSize)
-        val count = input.readAvailable(prefix)
-        return when {
-            count == prefix.size && BackupCipher.hasStreamingMagic(prefix) -> true
-            count >= 4 && prefix[0] == 'P'.code.toByte() && prefix[1] == 'K'.code.toByte() &&
-                prefix[2] == 3.toByte() && prefix[3] == 4.toByte() -> false
-            count > 0 && prefix[0] == '{'.code.toByte() -> true
-            else -> throw IllegalArgumentException(localizedText("这不是息刻备份文件。"))
-        }
-    }
+    fun backupRequiresPassword(input: InputStream): Boolean = backups.backupRequiresPassword(input)
 
     @Synchronized
     fun inspectEncryptedBackup(input: InputStream, password: String): BackupSummary = inspectBackup(input, password)
 
     @Synchronized
-    fun inspectBackup(input: InputStream, password: String?): BackupSummary {
-        val prepared = readBackup(input, password)
-        return try {
-            val createdAtValues = prepared.entries.map { it.createdAt }
-            BackupSummary(
-                entryCount = prepared.entries.size,
-                imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
-                audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
-                videoCount = prepared.entries.count { it.video != null },
-                videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
-                oldestCreatedAt = createdAtValues.minOrNull(),
-                newestCreatedAt = createdAtValues.maxOrNull(),
-            )
-        } finally {
-            prepared.stagingDirectory.deleteRecursively()
-        }
-    }
+    fun inspectBackup(input: InputStream, password: String?): BackupSummary = backups.inspectBackup(input, password)
 
     @Synchronized
     fun restoreEncryptedBackup(
@@ -553,7 +370,7 @@ class JournalStore(context: Context) {
         retainedAudioFileNames: Set<String> = emptySet(),
         retainedVideo: JournalVideo? = null,
     ): List<JournalEntry> {
-        val prepared = readBackup(input, password)
+        val prepared = backups.readBackup(input, password)
         return try {
             val snapshotSwap = createUndoSnapshot()
             try {
@@ -576,7 +393,7 @@ class JournalStore(context: Context) {
     fun undoLastRestore(retainedAudioFileNames: Set<String> = emptySet(), retainedVideo: JournalVideo? = null): List<JournalEntry> {
         val snapshot = currentUndoSnapshot() ?: error(localizedText("没有可撤销的恢复操作。"))
         val prepared = snapshot.file.inputStream().use { input ->
-            readBackup(input, snapshot.password)
+            backups.readBackup(input, snapshot.password)
         }
         return try {
             installRestoredData(prepared.stagingDirectory, prepared.entries, retainedAudioFileNames, retainedVideo).also {
@@ -585,254 +402,6 @@ class JournalStore(context: Context) {
         } finally {
             prepared.stagingDirectory.deleteRecursively()
         }
-    }
-
-    private fun readBackup(input: InputStream, password: String?): PreparedBackup {
-        val source = PushbackInputStream(BufferedInputStream(input), BackupCipher.magicSize)
-        val prefix = ByteArray(BackupCipher.magicSize)
-        val prefixSize = source.readAvailable(prefix)
-
-        return if (prefixSize == BackupCipher.magicSize && BackupCipher.hasStreamingMagic(prefix)) {
-            require(!password.isNullOrEmpty()) { localizedText("请输入备份密码。") }
-            readStreamingBackup(source, password, encrypted = true)
-        } else if (prefixSize >= 4 && prefix[0] == 'P'.code.toByte() && prefix[1] == 'K'.code.toByte() &&
-            prefix[2] == 3.toByte() && prefix[3] == 4.toByte()) {
-            source.unread(prefix, 0, prefixSize)
-            readStreamingBackup(source, null, encrypted = false)
-        } else {
-            require(!password.isNullOrEmpty()) { localizedText("请输入备份密码。") }
-            if (prefixSize > 0) source.unread(prefix, 0, prefixSize)
-            readLegacyBackup(source.readUtf8Limited(MAX_LEGACY_BACKUP_BYTES), password)
-        }
-    }
-
-    private fun readStreamingBackup(source: InputStream, password: String?, encrypted: Boolean): PreparedBackup {
-        val stagingDirectory = createStagingDirectory()
-        return try {
-            var parsedEntries: List<JournalEntry>? = null
-            val restoredImages = linkedSetOf<String>()
-            val restoredAudios = linkedSetOf<String>()
-            val restoredVideos = linkedSetOf<String>()
-            var referencedImages = emptySet<String>()
-            var referencedAudios = emptySet<String>()
-            var referencedVideos = emptySet<String>()
-            val totalVideoBytes = longArrayOf(0L)
-            val totalBytes = longArrayOf(0L)
-            val totalAudioBytes = longArrayOf(0L)
-            var version = 0
-            var htmlSeen = false
-            var completionSeen = false
-
-            val archiveSource = if (encrypted) BackupCipher.decryptingStream(source, requireNotNull(password)) else source
-            ZipInputStream(BufferedInputStream(archiveSource)).use { archive ->
-                val manifestEntry = archive.nextEntry
-                validateBackup(manifestEntry?.name == MANIFEST_ENTRY) { localizedText("备份清单缺失或顺序不正确。") }
-                val manifest = JSONObject(archive.readUtf8Limited(MAX_MANIFEST_BYTES))
-                archive.closeEntry()
-                validateBackup(manifest.optString("format") == "xike") { localizedText("这不是息刻备份文件。") }
-                version = manifest.optInt("version")
-                validateBackup(version in MIN_STREAMING_BACKUP_VERSION..STREAMING_BACKUP_VERSION) {
-                    localizedText("暂不支持这个版本的息刻备份。")
-                }
-                validateBackup(encrypted || version == STREAMING_BACKUP_VERSION) {
-                    localizedText("未加密备份格式不受支持。")
-                }
-
-                parsedEntries = parseEntries(manifest.getJSONArray("entries"))
-                referencedImages = parsedEntries.orEmpty()
-                    .flatMap { it.imageFileNames }
-                    .filter(::isSafeImageFileName)
-                    .toSet()
-                validateBackup(referencedImages.size <= MAX_BACKUP_IMAGES) { localizedText("备份包含过多图片。") }
-                referencedAudios = parsedEntries.orEmpty()
-                    .mapNotNull { it.audio?.fileName }
-                    .filter(::isSafeAudioFileName)
-                    .toSet()
-                validateBackup(referencedAudios.size <= MAX_BACKUP_AUDIOS) { localizedText("备份包含过多录音。") }
-                validateBackup(referencedImages.intersect(referencedAudios).isEmpty()) {
-                    localizedText("备份中的图片和录音文件名重复。")
-                }
-
-                referencedVideos = requireNotNull(parsedEntries).flatMap { it.video.files() }.toSet()
-                validateBackup(version >= 8 || referencedVideos.isEmpty()) { tr("备份视频版本无效。", "Invalid video backup version.") }
-                validateBackup((referencedImages + referencedAudios).intersect(referencedVideos).isEmpty()) { tr("备份附件文件名重复。", "Duplicate attachment names.") }
-                var entry = archive.nextEntry
-                while (entry != null) {
-                    validateBackup(!entry.isDirectory) { localizedText("备份中包含未知内容。") }
-                    when {
-                        entry.name == HTML_ENTRY && version >= 7 -> {
-                            validateBackup(!htmlSeen) { localizedText("备份中包含重复的 HTML。") }
-                            archive.readUtf8Limited(MAX_HTML_BYTES)
-                            htmlSeen = true
-                        }
-                        entry.name == COMPLETION_ENTRY && version >= 7 -> {
-                            validateBackup(!completionSeen) { localizedText("备份中包含重复的结束标记。") }
-                            validateBackup(archive.readUtf8Limited(64) == COMPLETION_MARKER) { localizedText("备份文件不完整。") }
-                            completionSeen = true
-                        }
-                        entry.name.startsWith(IMAGES_PREFIX) -> {
-                            val fileName = entry.name.removePrefix(IMAGES_PREFIX)
-                            validateBackup(fileName in referencedImages) { localizedText("备份中包含未引用的图片。") }
-                            validateBackup(fileName !in restoredImages) { localizedText("备份中包含重复图片。") }
-                            writeEncryptedImage(File(stagingDirectory, fileName), archive, MAX_IMAGE_BYTES, totalBytes)
-                            restoredImages += fileName
-                        }
-                        entry.name.startsWith(AUDIOS_PREFIX) -> {
-                            val fileName = entry.name.removePrefix(AUDIOS_PREFIX)
-                            validateBackup(fileName in referencedAudios) { localizedText("备份中包含未引用的录音。") }
-                            validateBackup(fileName !in restoredAudios) { localizedText("备份中包含重复录音。") }
-                            writeEncryptedAttachment(
-                                target = File(stagingDirectory, fileName),
-                                input = archive,
-                                byteLimit = MAX_AUDIO_BYTES,
-                                totalBytes = totalAudioBytes,
-                                itemName = localizedText("录音"),
-                                totalName = localizedText("备份录音"),
-                                totalLimit = MAX_BACKUP_AUDIO_BYTES,
-                            )
-                            restoredAudios += fileName
-                        }
-                        entry.name.startsWith("videos/") && version >= 8 -> {
-                            val fileName = entry.name.removePrefix("videos/")
-                            validateBackup(fileName in referencedVideos && restoredVideos.add(fileName)) { tr("备份视频引用无效或重复。", "Invalid or duplicate backup video.") }
-                            videos.stageBackup(File(stagingDirectory, fileName), archive, totalVideoBytes)
-                        }
-                        else -> validateBackup(false) { localizedText("备份中包含未知内容。") }
-                    }
-                    archive.closeEntry()
-                    entry = archive.nextEntry
-                    validateBackup(!completionSeen || entry == null) { localizedText("备份结束标记后包含多余内容。") }
-                }
-            }
-
-            if (version >= 7) {
-                validateBackup(htmlSeen && completionSeen) { localizedText("备份文件不完整。") }
-                validateBackup(restoredImages == referencedImages && restoredAudios == referencedAudios) {
-                    localizedText("备份缺少图片或录音。")
-                }
-            }
-
-            val restored = normalizeRestoredEntries(
-                requireNotNull(parsedEntries) { localizedText("备份清单缺失。") },
-                restoredImages,
-                restoredAudios,
-                restoredVideos,
-            )
-            validateBackup(restoredVideos == referencedVideos) { tr("备份缺少视频或封面。", "Backup video or cover is missing.") }
-            restored.forEach { it.video?.let { video -> videos.validateStaged(stagingDirectory, video) } }
-            PreparedBackup(stagingDirectory, restored)
-        } catch (error: Throwable) {
-            stagingDirectory.deleteRecursively()
-            throw normalizedBackupError(error)
-        }
-    }
-
-    private fun readLegacyBackup(payload: String, password: String): PreparedBackup {
-        val stagingDirectory = createStagingDirectory()
-        return try {
-            val backup = JSONObject(BackupCipher.decryptLegacy(payload, password))
-            validateBackup(backup.optString("format") == "xike") { localizedText("这不是息刻备份文件。") }
-            validateBackup(backup.optInt("version", 1) in 1..3) { localizedText("暂不支持这个版本的息刻备份。") }
-            val parsedEntries = parseEntries(backup.getJSONArray("entries"))
-            val referencedImages = parsedEntries
-                .flatMap { it.imageFileNames }
-                .filter(::isSafeImageFileName)
-                .toSet()
-            validateBackup(referencedImages.size <= MAX_BACKUP_IMAGES) { localizedText("备份包含过多图片。") }
-
-            val restoredImages = linkedSetOf<String>()
-            val totalBytes = longArrayOf(0L)
-            val images = backup.optJSONObject("images")
-            if (images != null) {
-                val keys = images.keys()
-                while (keys.hasNext()) {
-                    val fileName = keys.next()
-                    if (fileName in referencedImages && isSafeImageFileName(fileName)) {
-                        val encoded = images.getString(fileName)
-                        Base64.getDecoder().wrap(encoded.byteInputStream(Charsets.US_ASCII)).use { decoded ->
-                            writeEncryptedImage(
-                                target = File(stagingDirectory, fileName),
-                                input = decoded,
-                                byteLimit = MAX_IMAGE_BYTES,
-                                totalBytes = totalBytes,
-                            )
-                        }
-                        restoredImages += fileName
-                    }
-                }
-            }
-
-            val restored = normalizeRestoredEntries(parsedEntries, restoredImages, emptySet())
-            PreparedBackup(stagingDirectory, restored)
-        } catch (error: Throwable) {
-            stagingDirectory.deleteRecursively()
-            throw normalizedBackupError(error)
-        }
-    }
-
-    private fun normalizedBackupError(error: Throwable): Throwable = when (error) {
-        is BackupValidationException -> IllegalArgumentException(error.message, error)
-        is JournalDataException -> error
-        else -> IllegalArgumentException(localizedText("密码错误或备份文件已损坏。"), error)
-    }
-
-    private fun parseEntries(values: JSONArray): List<JournalEntry> = parseBackupEntries(
-        values, MAX_BACKUP_ENTRIES, ::isSafeImageFileName, ::isSafeAudioFileName,
-    )
-
-    private fun writeEncryptedImage(
-        target: File,
-        input: InputStream,
-        byteLimit: Long,
-        totalBytes: LongArray?,
-    ) {
-        writeEncryptedAttachment(
-            target = target,
-            input = input,
-            byteLimit = byteLimit,
-            totalBytes = totalBytes,
-            itemName = localizedText("图片"),
-            totalName = localizedText("备份图片"),
-            totalLimit = MAX_BACKUP_IMAGE_BYTES,
-        )
-    }
-
-    private fun writeEncryptedAttachment(
-        target: File,
-        input: InputStream,
-        byteLimit: Long,
-        totalBytes: LongArray?,
-        itemName: String,
-        totalName: String,
-        totalLimit: Long,
-    ) {
-        runCatching {
-            encryptedFile(target).openFileOutput().buffered().use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var itemBytes = 0L
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    itemBytes += count
-                    validateBackup(itemBytes <= byteLimit) { tr("$itemName 超过大小限制。", "$itemName exceeds the size limit.") }
-                    if (totalBytes != null) {
-                        totalBytes[0] += count
-                        validateBackup(totalBytes[0] <= totalLimit) { tr("$totalName 总大小超过限制。", "$totalName exceed the total size limit.") }
-                    }
-                    output.write(buffer, 0, count)
-                }
-            }
-        }.onFailure {
-            target.delete()
-            throw it
-        }
-    }
-
-    private fun createStagingDirectory(): File = File(
-        appContext.filesDir,
-        "$RESTORE_STAGING_PREFIX${UUID.randomUUID()}",
-    ).also { directory ->
-        check(directory.mkdir()) { localizedText("无法创建恢复临时目录。") }
     }
 
     private fun createUndoSnapshot(): UndoSnapshotSwap {
@@ -909,9 +478,9 @@ class JournalStore(context: Context) {
             val audioNames = restoredEntries.mapNotNull { it.audio?.fileName }.toSet()
             val renamedImages = stagedFiles.filter { it.name in imageNames }.associate { stagedFile ->
                 val newName = "${UUID.randomUUID()}.xike-image"
-                val installedFile = File(imagesDirectory, newName)
-                encryptedImage(stagedFile).openFileInput().use { decryptedImage ->
-                    writeEncryptedImage(
+                val installedFile = File(attachments.imagesDirectory, newName)
+                attachments.openEncrypted(stagedFile).use { decryptedImage ->
+                    attachments.writeEncryptedImage(
                         target = installedFile,
                         input = decryptedImage,
                         byteLimit = MAX_IMAGE_BYTES,
@@ -923,9 +492,9 @@ class JournalStore(context: Context) {
             }
             val renamedAudios = stagedFiles.filter { it.name in audioNames }.associate { stagedFile ->
                 val newName = "${UUID.randomUUID()}.xike-audio"
-                val installedFile = File(audiosDirectory, newName)
-                encryptedFile(stagedFile).openFileInput().use { decryptedAudio ->
-                    writeEncryptedAttachment(
+                val installedFile = File(attachments.audiosDirectory, newName)
+                attachments.openEncrypted(stagedFile).use { decryptedAudio ->
+                    attachments.writeEncryptedAttachment(
                         target = installedFile,
                         input = decryptedAudio,
                         byteLimit = MAX_AUDIO_BYTES,
@@ -956,11 +525,11 @@ class JournalStore(context: Context) {
             runCatching { cleanupStaleVideoEdits() }
             videos.prune(installedEntries.flatMap { it.video.files() }.toSet() + protectedVideos)
             val referencedFiles = installedEntries.flatMap { it.imageFileNames }.toSet()
-            imagesDirectory.listFiles()
+            attachments.imagesDirectory.listFiles()
                 ?.filter { it.name !in referencedFiles }
                 ?.forEach(File::delete)
             val referencedAudios = installedEntries.mapNotNull { it.audio?.fileName }.toSet() + retainedAudioFileNames
-            audiosDirectory.listFiles()
+            attachments.audiosDirectory.listFiles()
                 ?.filter { it.name !in referencedAudios }
                 ?.forEach(File::delete)
             stagingDirectory.deleteRecursively()
@@ -968,33 +537,6 @@ class JournalStore(context: Context) {
         } catch (error: Throwable) {
             installedFiles.forEach(File::delete)
             throw error
-        }
-    }
-
-    private fun encryptedFile(file: File): EncryptedFile = EncryptedFile.Builder(
-        appContext,
-        file,
-        masterKey,
-        EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB,
-    ).build()
-
-    private fun encryptedImage(file: File): EncryptedFile = encryptedFile(file)
-
-    private fun encryptedAudio(file: File): EncryptedFile = encryptedFile(file)
-
-    private fun deleteImage(fileName: String) {
-        if (isSafeImageFileName(fileName)) File(imagesDirectory, fileName).delete()
-    }
-
-    private fun deleteAudio(fileName: String) {
-        if (isSafeAudioFileName(fileName)) File(audiosDirectory, fileName).delete()
-    }
-
-    private fun validateAudioReference(audio: JournalAudio?) {
-        if (audio == null) return
-        require(audio.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音时长需要在 5 分钟以内。") }
-        require(isSafeAudioFileName(audio.fileName) && File(audiosDirectory, audio.fileName).isFile) {
-            localizedText("录音文件不可用。")
         }
     }
 
@@ -1036,38 +578,11 @@ class JournalStore(context: Context) {
         val referencedImages = dao.imageFileNames().toSet()
         deletedEntry.imageFileNames
             .filterNot { it in referencedImages }
-            .forEach(::deleteImage)
+            .forEach(attachments::deleteImage)
         deletedEntry.audio?.fileName
             ?.takeIf { it !in referencedAudioFileNames() }
-            ?.let(::deleteAudio)
+            ?.let(attachments::deleteAudio)
         deletedEntry.video?.let(::deleteUnreferencedVideo)
-    }
-
-    private fun isSafeImageFileName(fileName: String): Boolean =
-        fileName.isNotBlank() &&
-            fileName.length <= MAX_FILE_NAME_LENGTH &&
-            File(fileName).name == fileName &&
-            !fileName.contains('/') &&
-            !fileName.contains('\\')
-
-    private fun isSafeAudioFileName(fileName: String): Boolean =
-        isSafeImageFileName(fileName) && (fileName.endsWith(".xike-audio") || fileName.endsWith(".m4a"))
-
-    private fun imageExtension(input: InputStream): String {
-        val header = ByteArray(16)
-        val size = input.readAvailable(header)
-        return when {
-            size >= 3 && header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() -> "jpg"
-            size >= 8 && header.copyOfRange(0, 8).contentEquals(
-                byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A),
-            ) -> "png"
-            size >= 6 && String(header, 0, 3, Charsets.US_ASCII) == "GIF" -> "gif"
-            size >= 12 && String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-                String(header, 8, 4, Charsets.US_ASCII) == "WEBP" -> "webp"
-            size >= 12 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp" &&
-                String(header, 8, 4, Charsets.US_ASCII) in setOf("heic", "heix", "hevc", "mif1") -> "heic"
-            else -> "bin"
-        }
     }
 
     private fun readEntries(): List<JournalEntry> = try {
@@ -1110,27 +625,6 @@ class JournalStore(context: Context) {
         const val THEME_KEY = "theme"
         const val RESTORE_UNDO_FILE_KEY = "undo-file"
         const val RESTORE_UNDO_PASSWORD_KEY = "undo-password"
-        const val IMAGES_DIRECTORY = "journal-images"
-        const val AUDIOS_DIRECTORY = "journal-audios"
-        const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
         const val RESTORE_UNDO_PREFIX = "journal-restore-undo-"
-        const val MANIFEST_ENTRY = "manifest.json"
-        const val HTML_ENTRY = "index.html"
-        const val COMPLETION_ENTRY = "complete.txt"
-        const val COMPLETION_MARKER = "XIKE_BACKUP_COMPLETE"
-        const val IMAGES_PREFIX = "images/"
-        const val AUDIOS_PREFIX = "audios/"
-        const val MIN_STREAMING_BACKUP_VERSION = 4
-        const val STREAMING_BACKUP_VERSION = 8
-        const val MAX_FILE_NAME_LENGTH = 160
-        const val MAX_BACKUP_ENTRIES = 100_000
-        const val MAX_BACKUP_IMAGES = 10_000
-        const val MAX_BACKUP_AUDIOS = 100_000
-        const val MAX_MANIFEST_BYTES = 16L * 1024L * 1024L
-        const val MAX_HTML_BYTES = 64L * 1024L * 1024L
-        const val MAX_LEGACY_BACKUP_BYTES = 320L * 1024L * 1024L
-        const val MAX_IMAGE_BYTES = 20L * 1024L * 1024L
-        const val MAX_BACKUP_IMAGE_BYTES = 1024L * 1024L * 1024L
-        const val MAX_BACKUP_AUDIO_BYTES = 1024L * 1024L * 1024L
     }
 }

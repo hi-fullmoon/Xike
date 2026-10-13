@@ -122,7 +122,9 @@ flowchart TD
 | [`BackupDialogs.kt`](../app/src/main/java/com/xike/app/feature/settings/BackupDialogs.kt) | 导出、密码与恢复确认弹窗，及已有导出请求状态。 |
 | [`AppOperationDialogs.kt`](../app/src/main/java/com/xike/app/ui/components/AppOperationDialogs.kt) | 加载处理和数据错误弹窗。 |
 | [`JournalViewModel.kt`](../app/src/main/java/com/xike/app/JournalViewModel.kt) | 连接 UI 与数据层；编排初始化、草稿、增删改查、天气、备份和恢复。 |
-| [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储；负责数据库访问、附件加密、删除撤销、旧数据迁移、备份与恢复。 |
+| [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储统一入口；负责数据库访问、旧数据迁移、删除撤销、恢复安装、撤销快照及媒体引用清理。 |
+| [`JournalAttachmentStore.kt`](../app/src/main/java/com/xike/app/media/JournalAttachmentStore.kt) | 照片与录音文件的加密导入、读取、校验和有界写入。 |
+| [`JournalBackupStorage.kt`](../app/src/main/java/com/xike/app/data/backup/JournalBackupStorage.kt) | 原有备份格式的导出、解码、内容校验及加密暂存，不执行数据库替换。 |
 | [`JournalModels.kt`](../app/src/main/java/com/xike/app/data/JournalModels.kt) | 心情、日记、录音、快照及数据异常模型，保持原有序列化标识。 |
 | [`JournalBackupModels.kt`](../app/src/main/java/com/xike/app/data/JournalBackupModels.kt) | 备份摘要与原有恢复数据归一化。 |
 | [`JournalBackupCodec.kt`](../app/src/main/java/com/xike/app/data/JournalBackupCodec.kt) | 原有 JSON 条目解析、有界流读取、校验与备份加解密辅助实现。 |
