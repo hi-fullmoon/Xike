@@ -29,7 +29,7 @@ class DraftReturnUiTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun discardAppearsOnlyAfterReturningAndStaysVisibleWhileEditing() {
+    fun discardAppearsForNewInputAndStaysVisibleAfterReturning() {
         val draftActions = localizedText("放弃草稿")
         val noteHint = localizedText("这一刻，有什么想留下？")
         lateinit var model: JournalViewModel
@@ -45,10 +45,11 @@ class DraftReturnUiTest {
         }
         composeRule.onNodeWithText(draftActions).assertDoesNotExist()
         composeRule.onNodeWithText(noteHint).performScrollTo().performTextInput("Draft return check")
-        composeRule.onNodeWithText(draftActions).assertDoesNotExist()
+        composeRule.onNodeWithText(localizedText("完成")).performScrollTo().performClick()
+        composeRule.onNodeWithText(draftActions).performScrollTo().assertIsDisplayed()
 
         composeRule.activityRule.scenario.recreate()
-        composeRule.onNodeWithText(draftActions).assertDoesNotExist()
+        composeRule.onNodeWithText(draftActions).assertIsDisplayed()
         lateinit var activity: MainActivity
         lateinit var lockSession: AppLockSessionState
         composeRule.activityRule.scenario.onActivity {
@@ -57,7 +58,7 @@ class DraftReturnUiTest {
             lockSession = ViewModelProvider(it)[AppLockSessionState::class.java]
         }
 
-        // A real system picker round trip must not turn new input into a resumed draft.
+        // A real system picker round trip keeps the new draft and its discard action.
         composeRule.onNodeWithContentDescription(tr("添加内容", "Add content")).performScrollTo().performClick()
         composeRule.onNodeWithText(localizedText("照片")).performClick()
         composeRule.onNodeWithText(localizedText("从相册选择")).performClick()
@@ -70,7 +71,7 @@ class DraftReturnUiTest {
         }
         check(activity.lifecycle.currentState == Lifecycle.State.RESUMED)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(draftActions).assertDoesNotExist()
+        composeRule.onNodeWithText(draftActions).performScrollTo().assertIsDisplayed()
 
         check(!lockSession.systemActivityInProgress) { "System picker has not completed" }
         check(!model.draft.isEmpty) { "Input was lost before backgrounding" }
@@ -120,8 +121,8 @@ class DraftReturnUiTest {
         composeRule.onNodeWithText(draftActions).assertDoesNotExist()
         check(JournalDraftStore(composeRule.activity).load().isEmpty)
         composeRule.onNodeWithText(noteHint).performScrollTo().performTextInput("New draft check")
-        composeRule.onNodeWithText(draftActions).assertDoesNotExist()
         composeRule.onNodeWithText("New draft check").performTextClearance()
+        composeRule.onNodeWithText(draftActions).assertDoesNotExist()
     }
 
     private fun shell(command: String) {
