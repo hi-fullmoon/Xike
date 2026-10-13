@@ -1323,6 +1323,9 @@ fun MomentScreen(
                 Text(localizedText("此刻窗外"), style = MaterialTheme.typography.titleSmall)
                 OutdoorContextCard(
                     snapshot = draft.outdoor,
+                    contentPadding = XikeContentCardPadding,
+                    minContentHeight = 42.dp,
+                    showLocationIconBackground = true,
                     isBackdated = draft.recordedAt != null,
                     isLoading = outdoorLoading,
                     errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
@@ -1785,6 +1788,9 @@ internal fun OutdoorContextCard(
     onChooseCity: () -> Unit,
     onRemove: () -> Unit,
     showRefresh: Boolean = true,
+    contentPadding: Dp = XikeCardPadding,
+    minContentHeight: Dp = 0.dp,
+    showLocationIconBackground: Boolean = false,
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
     var showActions by remember(snapshot, enabled) { mutableStateOf(false) }
@@ -1800,7 +1806,7 @@ internal fun OutdoorContextCard(
     ) {
         Box(Modifier.fillMaxWidth()) {
             if (snapshot != null) {
-                Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
+                Column(Modifier.fillMaxWidth().padding(contentPadding)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -1856,12 +1862,19 @@ internal fun OutdoorContextCard(
                     }
                 }
             } else {
-                Column(Modifier.fillMaxWidth().padding(XikeCardPadding)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.fillMaxWidth().padding(contentPadding)) {
+                    Row(
+                        modifier = Modifier.heightIn(min = minContentHeight),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Surface(
                             modifier = Modifier.size(42.dp),
-                            shape = XikeShapes.inner,
-                            color = MaterialTheme.colorScheme.surface,
+                            shape = if (showLocationIconBackground && isEmpty) CircleShape else XikeShapes.inner,
+                            color = if (showLocationIconBackground && isEmpty) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 when {
