@@ -38,12 +38,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -728,6 +731,7 @@ internal fun VoicePlaybackCard(
     containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
     showDeleteLabel: Boolean = false,
     showDeleteAtTopEnd: Boolean = false,
+    useActionMenu: Boolean = false,
     shape: androidx.compose.ui.graphics.Shape = XikeShapes.card,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -747,6 +751,7 @@ internal fun VoicePlaybackCard(
     val playbackAttributes = remember(audio.fileName) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_SPEECH) }
     val hasTopEndDelete = showDeleteAtTopEnd && onDelete != null
     val hasTopEndReplace = showDeleteAtTopEnd && onReplace != null
+    var showActions by remember(audio.fileName, hasTopEndDelete, hasTopEndReplace) { mutableStateOf(false) }
 
     fun pausePlayback() {
         player?.let { active ->
@@ -887,7 +892,8 @@ internal fun VoicePlaybackCard(
             Column(Modifier.padding(XikeCardPadding)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(end =
-                        (if (hasTopEndDelete) 32.dp else 0.dp) + (if (hasTopEndReplace) 48.dp else 0.dp)),
+                        if (useActionMenu && (hasTopEndDelete || hasTopEndReplace)) 32.dp
+                        else (if (hasTopEndDelete) 32.dp else 0.dp) + (if (hasTopEndReplace) 48.dp else 0.dp)),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
@@ -1000,7 +1006,43 @@ internal fun VoicePlaybackCard(
                 }
             }
             Row(Modifier.align(Alignment.TopEnd)) {
-                if (hasTopEndReplace) {
+                if (useActionMenu && (hasTopEndDelete || hasTopEndReplace)) {
+                    Box {
+                        IconButton(onClick = { showActions = true }, enabled = !isPreparing, modifier = Modifier.size(48.dp)) {
+                            Surface(Modifier.size(32.dp), shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.MoreVert, tr("录音的更多操作", "More recording actions"), Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                        DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                            if (hasTopEndReplace) DropdownMenuItem(
+                                text = { Text(localizedText("重新录制")) },
+                                enabled = !isPreparing,
+                                onClick = {
+                                    showActions = false
+                                    if (!isPreparing) {
+                                        releasePlayer()
+                                        onReplace?.invoke()
+                                    }
+                                },
+                            )
+                            if (hasTopEndDelete) DropdownMenuItem(
+                                text = { Text(tr("移除录音", "Remove recording")) },
+                                enabled = !isPreparing,
+                                onClick = {
+                                    showActions = false
+                                    if (!isPreparing) {
+                                        releasePlayer()
+                                        onDelete?.invoke()
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+                if (!useActionMenu && hasTopEndReplace) {
                     IconButton(
                         onClick = {
                             releasePlayer()
@@ -1019,7 +1061,7 @@ internal fun VoicePlaybackCard(
                         }
                     }
                 }
-                if (hasTopEndDelete) {
+                if (!useActionMenu && hasTopEndDelete) {
                     IconButton(
                         onClick = {
                             releasePlayer()
