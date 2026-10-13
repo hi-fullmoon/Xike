@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,22 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
     private var store: Deferred<PendingMediaResultStore>? = null
     private var storeKey: String? = null
     private val deliveryMutex = Mutex()
+    private val pendingObservers = mutableSetOf<(Boolean) -> Unit>()
+    private var restoring = false
+    private var pendingWrites = 0
+    internal val hasPendingResult: Boolean
+        get() = restoring || pendingWrites > 0 || pending != null
+
+    internal fun observePending(observer: (Boolean) -> Unit): () -> Unit {
+        val subscription: (Boolean) -> Unit = { observer(it) }
+        pendingObservers += subscription
+        observer(hasPendingResult)
+        return { pendingObservers -= subscription }
+    }
+
+    private fun notifyPending() {
+        pendingObservers.toList().forEach { it(hasPendingResult) }
+    }
 
     internal fun bind(context: Context, key: String, durable: Boolean) {
         this.context = context.applicationContext
@@ -45,17 +62,24 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
         val applicationContext = context.applicationContext
         val loading = viewModelScope.async(Dispatchers.IO) { PendingMediaResultStore(applicationContext) }
         store = loading
+        restoring = true
+        notifyPending()
         viewModelScope.launch {
-            deliveryMutex.withLock {
-                runCatching { withContext(Dispatchers.IO) { loading.await().load(key) } }
-                    .onSuccess { restored ->
-                        if (restored != null) {
-                            @Suppress("UNCHECKED_CAST")
-                            receive(restored.value as T, restored.ownedReadUris)
+            try {
+                deliveryMutex.withLock {
+                    runCatching { withContext(Dispatchers.IO) { loading.await().load(key) } }
+                        .onSuccess { restored ->
+                            if (restored != null) {
+                                @Suppress("UNCHECKED_CAST")
+                                receive(restored.value as T, restored.ownedReadUris)
+                            }
+                        }.onFailure {
+                            XikeNotice.makeText(applicationContext, tr("无法读取待处理的媒体选择，请稍后重试。", "Unable to read the pending media selection. Please try again later."), XikeNotice.LENGTH_LONG).show()
                         }
-                    }.onFailure {
-                        XikeNotice.makeText(applicationContext, tr("无法读取待处理的媒体选择，请稍后重试。", "Unable to read the pending media selection. Please try again later."), XikeNotice.LENGTH_LONG).show()
-                    }
+                }
+            } finally {
+                restoring = false
+                notifyPending()
             }
         }
     }
@@ -65,18 +89,25 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
             receive(value, ownedReadUris)
             return
         }
+        pendingWrites++
+        notifyPending()
         viewModelScope.launch {
-            deliveryMutex.withLock {
-                runCatching {
-                    withContext(Dispatchers.IO) { store!!.await().save(storeKey!!, value, ownedReadUris) }
-                }.onSuccess { receive(value, ownedReadUris) }
-                    .onFailure {
-                        // Keep the selection and grants in memory on a transient write failure.
-                        receive(value, ownedReadUris)
-                        context?.let { applicationContext ->
-                            XikeNotice.makeText(applicationContext, tr("媒体选择暂时无法持久保存，请保持应用开启。", "The media selection could not be preserved yet. Keep the app open."), XikeNotice.LENGTH_LONG).show()
+            try {
+                deliveryMutex.withLock {
+                    runCatching {
+                        withContext(Dispatchers.IO) { store!!.await().save(storeKey!!, value, ownedReadUris) }
+                    }.onSuccess { receive(value, ownedReadUris) }
+                        .onFailure {
+                            // Keep the selection and grants in memory on a transient write failure.
+                            receive(value, ownedReadUris)
+                            context?.let { applicationContext ->
+                                XikeNotice.makeText(applicationContext, tr("媒体选择暂时无法持久保存，请保持应用开启。", "The media selection could not be preserved yet. Keep the app open."), XikeNotice.LENGTH_LONG).show()
+                            }
                         }
-                    }
+                }
+            } finally {
+                pendingWrites--
+                notifyPending()
             }
         }
     }
@@ -100,6 +131,7 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
         savedState["hasResult"] = true
         savedState["ownedReadUris"] = ArrayList(ownedReadUris.map(Uri::toString))
         pending = PendingSystemActivityResult(value)
+        notifyPending()
     }
 
     internal fun consume(): PendingSystemActivityResult<T>? {
@@ -107,6 +139,7 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
         savedState.remove<Any?>("result")
         savedState.remove<Boolean>("hasResult")
         pending = null
+        notifyPending()
         return result
     }
 
@@ -138,15 +171,25 @@ internal fun <I, O> rememberSystemActivityResultLauncher(
     contract: ActivityResultContract<I, O>,
     resultKey: String,
     onResult: (O) -> Unit,
-): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, false, true) { result, _ -> onResult(result); true }
+): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, false, true, {}) { result, _ -> onResult(result); true }
+
+@Composable
+internal fun <I, O> rememberSystemActivityResultLauncherWhenReady(
+    contract: ActivityResultContract<I, O>,
+    resultKey: String,
+    resultsReady: Boolean,
+    onPendingChange: (Boolean) -> Unit,
+    onResult: (O) -> Boolean,
+): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, false, resultsReady, onPendingChange) { result, _ -> onResult(result) }
 
 @Composable
 internal fun <I, O> rememberMediaActivityResultLauncher(
     contract: ActivityResultContract<I, O>,
     resultKey: String,
     resultsReady: Boolean = true,
+    onPendingChange: (Boolean) -> Unit = {},
     onResult: (O, SystemActivityReadAccess) -> Boolean,
-): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, true, resultsReady, onResult)
+): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, true, resultsReady, onPendingChange, onResult)
 
 @Composable
 private fun <I, O> rememberActivityResultWithAccess(
@@ -154,14 +197,20 @@ private fun <I, O> rememberActivityResultWithAccess(
     resultKey: String,
     retainReadAccess: Boolean,
     resultsReady: Boolean,
+    onPendingChange: (Boolean) -> Unit,
     onResult: (O, SystemActivityReadAccess) -> Boolean,
 ): ActivityResultLauncher<I> {
     val context = LocalContext.current
     val callbacks by rememberUpdatedState(LocalSystemActivityCallbacks.current)
     val currentOnResult by rememberUpdatedState(onResult)
+    val currentOnPendingChange by rememberUpdatedState(onPendingChange)
     val key = "system-activity-result/$resultKey"
     val resultState: SystemActivityResultState<O> = viewModel(key = key)
     resultState.bind(context, key, retainReadAccess)
+    DisposableEffect(resultState) {
+        val stopObserving = resultState.observePending { currentOnPendingChange(it) }
+        onDispose { stopObserving() }
+    }
     val launcher = rememberLauncherForActivityResult(contract) { result ->
         callbacks.onResult(key)
         val ownedReadUris = if (retainReadAccess) retainSystemActivityReadAccess(context, result) else emptyList()

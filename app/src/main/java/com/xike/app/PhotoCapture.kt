@@ -184,6 +184,9 @@ internal class JournalImagePickers(
 internal fun rememberJournalImagePickers(
     ownerKey: String = "draft",
     availableSlots: Int = MAX_IMAGES_PER_ENTRY,
+    resultsReady: Boolean = true,
+    retainRejectedCapture: Boolean = false,
+    onPendingChange: (String, Boolean) -> Unit = { _, _ -> },
     onImagesPicked: (List<Uri>, SystemActivityReadAccess) -> Boolean,
 ): JournalImagePickers {
     val context = LocalContext.current
@@ -191,30 +194,47 @@ internal fun rememberJournalImagePickers(
     val photoPicker = rememberMediaActivityResultLauncher(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_ENTRY),
         "photo/$ownerKey/picker",
+        resultsReady = resultsReady,
+        onPendingChange = { onPendingChange("photo/$ownerKey/picker", it) },
     ) { uris, access ->
         onImagesPicked(uris, access)
     }
     val singlePhotoPicker = rememberMediaActivityResultLauncher(
         ActivityResultContracts.PickVisualMedia(),
         "photo/$ownerKey/single-picker",
+        resultsReady = resultsReady,
+        onPendingChange = { onPendingChange("photo/$ownerKey/single-picker", it) },
     ) { uri, access ->
         uri == null || onImagesPicked(listOf(uri), access)
     }
     val photoDocumentPicker = rememberMediaActivityResultLauncher(
         ActivityResultContracts.OpenMultipleDocuments(),
         "photo/$ownerKey/document",
+        resultsReady = resultsReady,
+        onPendingChange = { onPendingChange("photo/$ownerKey/document", it) },
     ) { uris, access ->
         onImagesPicked(uris, access)
     }
-    val cameraLauncher = rememberSystemActivityResultLauncher(ActivityResultContracts.TakePicture(), "photo/$ownerKey/capture") { captured ->
+    val cameraLauncher = rememberSystemActivityResultLauncherWhenReady(
+        ActivityResultContracts.TakePicture(), "photo/$ownerKey/capture",
+        resultsReady = resultsReady,
+        onPendingChange = { onPendingChange("photo/$ownerKey/capture", it) },
+    ) { captured ->
         val captureUri = pendingCameraUriString?.let(Uri::parse)
-        pendingCameraUriString = null
         if (captureUri != null && finalizeCameraCapture(context, captureUri)) {
-            onImagesPicked(listOf(captureUri), SystemActivityReadAccess(context, emptyList()))
-            XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
-        } else if (captureUri != null) {
-            deleteCameraCapture(context, captureUri)
-            if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
+            val accepted = onImagesPicked(listOf(captureUri), SystemActivityReadAccess(context, emptyList()))
+            if (accepted || !retainRejectedCapture) {
+                pendingCameraUriString = null
+                XikeNotice.makeText(context, localizedText("照片已添加并保存到系统相册"), XikeNotice.LENGTH_SHORT).show()
+            }
+            accepted || !retainRejectedCapture
+        } else {
+            pendingCameraUriString = null
+            if (captureUri != null) {
+                deleteCameraCapture(context, captureUri)
+                if (captured) XikeNotice.makeText(context, localizedText("照片保存失败，请重试"), XikeNotice.LENGTH_SHORT).show()
+            }
+            true
         }
     }
     val openPhotoPicker = {

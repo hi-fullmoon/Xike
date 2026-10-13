@@ -9,6 +9,35 @@ import org.junit.Test
 
 class SystemActivityResultStateTest {
     @Test
+    fun rejectedDeliveryKeepsPendingNotificationUntilAccepted() {
+        val state = SystemActivityResultState<Boolean>(SavedStateHandle())
+        val observed = mutableListOf<Boolean>()
+        state.observePending(observed::add)
+        state.receive(true)
+        assertEquals(listOf(false, true), observed)
+        assertEquals(false, state.acceptWhenReady(true) { false })
+        assertEquals(listOf(false, true), observed)
+        state.acceptWhenReady(true) { true }
+        assertEquals(listOf(false, true, false), observed)
+    }
+
+    @Test
+    fun restoredPendingResultBlocksImmediatelyAndDetachedObserverIsNotCalled() {
+        val savedState = SavedStateHandle()
+        SystemActivityResultState<Boolean>(savedState).receive(true)
+        val restored = SystemActivityResultState<Boolean>(restore(savedState))
+        val observed = mutableListOf<Boolean>()
+        val stop = restored.observePending(observed::add)
+        assertEquals(listOf(true), observed)
+        stop()
+        restored.consume()
+        assertEquals(listOf(true), observed)
+        val resumed = mutableListOf<Boolean>()
+        restored.observePending(resumed::add)
+        assertEquals(listOf(false), resumed)
+    }
+
+    @Test
     fun busyConsumerKeepsResultUntilReadyAndAcceptsItOnce() {
         val state = SystemActivityResultState<Boolean>(SavedStateHandle())
         state.receive(true)

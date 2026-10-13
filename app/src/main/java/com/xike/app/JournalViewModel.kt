@@ -14,6 +14,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
@@ -43,6 +45,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
     private var outdoorRequestGeneration = 0L
+    private var outdoorRequestJob: Job? = null
+    private var pendingDraftImageResults by mutableStateOf(emptySet<String>())
+    val isDraftImageResultPending: Boolean
+        get() = pendingDraftImageResults.isNotEmpty()
+
+    internal fun setDraftImageResultPending(key: String, pending: Boolean) {
+        pendingDraftImageResults = if (pending) pendingDraftImageResults + key else pendingDraftImageResults - key
+    }
     var isDraftOutdoorLoading by mutableStateOf(false)
         private set
     private var noteSaveJob: Job? = null
@@ -258,8 +268,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateDraftRecordedAt(recordedAt: Long?) {
         if (isDraftSaving) return
-        if (recordedAt != null) outdoorRequestGeneration++
-        persistDraft(
+        val saved = persistDraft(
             draft.copy(
                 recordedAt = recordedAt,
                 outdoor = draft.outdoor?.let { snapshot ->
@@ -267,11 +276,20 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 },
             ),
         )
+        if (saved) cancelOutdoorRequest()
     }
 
     fun clearDraftOutdoor() {
+        if (isDraftSaving) return
+        if (persistDraft(draft.copy(outdoor = null))) cancelOutdoorRequest()
+    }
+
+    private fun cancelOutdoorRequest() {
         outdoorRequestGeneration++
-        persistDraft(draft.copy(outdoor = null))
+        val request = outdoorRequestJob
+        outdoorRequestJob = null
+        isDraftOutdoorLoading = false
+        request?.cancel()
     }
 
     suspend fun attachCurrentOutdoor(): Result<Unit> = attachOutdoor(
@@ -287,28 +305,39 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun attachOutdoor(
         saveError: String,
         request: suspend () -> OutdoorSnapshot,
-    ): Result<Unit> {
+    ): Result<Unit> = withContext(Dispatchers.Main.immediate) {
         if (isDraftSaving || isDraftOutdoorLoading) {
-            return Result.failure(IllegalStateException(tr("请等待当前操作完成。", "Please wait for the current operation to finish.")))
+            return@withContext Result.failure(IllegalStateException(tr("请等待当前操作完成。", "Please wait for the current operation to finish.")))
+        }
+        if (draft.recordedAt != null) {
+            return@withContext Result.failure(IllegalStateException(localizedText("补记过去时不会附加今天的天气。")))
         }
         val requestDraftGeneration = draftGeneration
         val requestGeneration = ++outdoorRequestGeneration
-        isDraftOutdoorLoading = true
-        try {
-            val result = runOutdoorRequest(request)
-            if (requestDraftGeneration != draftGeneration || requestGeneration != outdoorRequestGeneration) {
-                return Result.success(Unit)
+        coroutineScope {
+            val operation = async(start = CoroutineStart.LAZY) { runOutdoorRequest(request) }
+            outdoorRequestJob = operation
+            isDraftOutdoorLoading = true
+            try {
+                val result = operation.await()
+                if (requestDraftGeneration != draftGeneration || requestGeneration != outdoorRequestGeneration) {
+                    return@coroutineScope Result.success(Unit)
+                }
+                result.mapCatching { snapshot ->
+                    check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
+                    check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
+                }
+            } finally {
+                if (outdoorRequestJob === operation) {
+                    outdoorRequestJob = null
+                    isDraftOutdoorLoading = false
+                }
             }
-            return result.mapCatching { snapshot ->
-                check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
-                check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
-            }
-        } finally {
-            isDraftOutdoorLoading = false
         }
     }
 
     fun addDraftImages(uris: List<Uri>): Boolean {
+        if (isDraftSaving) return false
         val availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size
         val candidates = uris
             .filterNot { it.toString() in draft.imageUriStrings }
@@ -487,10 +516,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun discardDraft() {
-        if (pendingDraftAudio != null || isDraftVideoSaving) return
+        if (isDraftSaving || pendingDraftAudio != null || isDraftVideoSaving) return
         val discardedDraft = draft
         if (persistDraft(JournalDraft())) {
             draftGeneration++
+            cancelOutdoorRequest()
             discardedDraft.imageUriStrings
                 .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
                 .forEach(::releaseDraftImageAccess)
@@ -502,8 +532,26 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    suspend fun saveDraft(): Result<Unit> = withContext(Dispatchers.Main.immediate) {
+        val snapshot = draft
+        val mood = snapshot.mood ?: return@withContext Result.failure(IllegalStateException(localizedText("先选择一种心情")))
+        save(
+            JournalEntry(
+                createdAt = snapshot.recordedAt ?: System.currentTimeMillis(),
+                mood = mood,
+                tags = snapshot.tags.toList(),
+                note = snapshot.note.trim(),
+                audio = snapshot.audio,
+                video = snapshot.video,
+                outdoor = snapshot.outdoor,
+            ),
+            snapshot.imageUriStrings.map(Uri::parse),
+        )
+    }
+
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> = withContext(Dispatchers.Main.immediate) {
         if (isDraftSaving) return@withContext Result.failure(IllegalStateException(tr("正在保存，请稍候。", "Saving. Please wait.")))
+        if (isDraftImageResultPending) return@withContext Result.failure(IllegalStateException(tr("请先等待照片添加完成。", "Please wait for the photos to be added.")))
         if (isDraftOutdoorLoading) return@withContext Result.failure(IllegalStateException(tr("请先等待地点与天气获取完成。", "Please wait for location and weather to finish.")))
         if (isDraftVideoSaving || draft.pendingVideoUri != null) return@withContext Result.failure(IllegalStateException(tr("请先完成视频导入。", "Please finish importing the video first.")))
         isDraftSaving = true

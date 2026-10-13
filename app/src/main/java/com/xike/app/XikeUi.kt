@@ -1004,7 +1004,10 @@ fun MomentScreen(
     onVoiceCaptureStateChange: (Boolean) -> Unit = {},
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     isDraftSaving: Boolean = false,
-    isDraftOutdoorLoading: Boolean = false,
+    isDraftOutdoorLoading: Boolean? = null,
+    isDraftImageResultPending: Boolean = false,
+    draftImageResultsReady: Boolean = true,
+    onDraftImageResultPending: (String, Boolean) -> Unit = { _, _ -> },
     saveFeedbackHandledExternally: Boolean = false,
     onDraftRecordedAtChange: (Long?) -> Unit = {},
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
@@ -1035,7 +1038,7 @@ fun MomentScreen(
     )
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
-    val outdoorLoading = isOutdoorLoading || isDraftOutdoorLoading
+    val outdoorLoading = isDraftOutdoorLoading ?: isOutdoorLoading
     var pendingRecordedAtChange by rememberSaveable { mutableStateOf<Long?>(null) }
     var showRecordedAtChangeConfirmation by rememberSaveable { mutableStateOf(false) }
     val currentDraft by rememberUpdatedState(draft)
@@ -1141,7 +1144,12 @@ fun MomentScreen(
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var showAddContent by rememberSaveable { mutableStateOf(false) }
     var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
-    val imagePickers = rememberJournalImagePickers(availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size) { uris, access ->
+    val imagePickers = rememberJournalImagePickers(
+        availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size,
+        resultsReady = !isSaving && draftImageResultsReady,
+        retainRejectedCapture = true,
+        onPendingChange = onDraftImageResultPending,
+    ) { uris, access ->
         val accepted = onDraftImagesAdded(uris)
         if (accepted) access.transferAll()
         accepted
@@ -1459,7 +1467,7 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving || outdoorLoading || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
+                    if (isSaving || isDraftImageResultPending || outdoorLoading || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
                     dismissKeyboard()
                     localSaving = true
                     scope.launch {
@@ -1487,7 +1495,7 @@ fun MomentScreen(
                         localSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving && !outdoorLoading && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
+                enabled = draft.mood != null && !isSaving && !isDraftImageResultPending && !outdoorLoading && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
                 modifier = Modifier
                     .widthIn(max = XikeContentMaxWidth)
                     .fillMaxWidth()
