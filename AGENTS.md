@@ -33,7 +33,7 @@
 | 文件或目录 | 主要职责 |
 | --- | --- |
 | `MainActivity.kt` | 系统入口、生命周期、权限、认证与系统结果回调协调 |
-| `XikeApp.kt` | 应用组合入口、导航、页面状态及备份选择与恢复协调 |
+| `XikeApp.kt`、`XikeBackupFlow.kt` | 应用组合入口、导航与页面状态，以及备份选择、确认与恢复反馈协调 |
 | `feature/lock/AppLockSessionState.kt`、`feature/lock/AppLockUi.kt` | 应用锁会话状态与锁定界面 |
 | `SystemActivityCallbacks.kt` | 系统 Activity 结果协调的 CompositionLocal 声明 |
 | `feature/settings/BackupDialogs.kt` | 备份弹窗及已有导出状态 |
@@ -41,13 +41,15 @@
 | `ui/components/MoodPicker.kt`、`ui/components/JournalTopicPicker.kt` | 心情选择、说明与视觉规则，以及主题目录与选择组件 |
 | `ui/components/JournalEntryCard.kt`、`ui/components/JournalPhotoUi.kt` | 记录卡片、照片缩略图、拼图、图库及预览位图加载 |
 | `ui/components/XikePageComponents.kt`、`ui/components/AppOperationDialogs.kt` | 跨页面复用的页头、内容卡片、处理与数据错误弹窗 |
-| `feature/moment/MomentScreen.kt`、`feature/moment/OutdoorContextUi.kt` | 此刻页面、草稿与媒体交互，以及窗外信息与城市选择组件 |
+| `feature/moment/MomentScreen.kt`、`feature/moment/OutdoorContextUi.kt` | 此刻页面、草稿与媒体交互，以及城市选择弹窗 |
+| `ui/components/journal/OutdoorContextCard.kt` | 此刻与编辑共用的窗外信息及操作组件 |
 | `feature/settings/SettingsScreen.kt` | 设置页面、专用弹窗、风格预览和辅助组件 |
 | `ui/theme/XikeTheme.kt` | 主题、风格、字体与尺寸规则 |
 | `ui/components/XikeNavigationBar.kt` | 底部导航及页面标识 |
-| `feature/archive/JournalEntryDetailDialog.kt` | 回望与轨迹共用的日记详情及专用展示组件 |
+| `ui/components/journal/JournalEntryDetailDialog.kt` | 回望与轨迹共用的日记详情及专用展示组件 |
 | `feature/archive/JournalEntryEditDialog.kt` | 日记编辑、专用照片组件及编辑状态与操作协调 |
-| `feature/archive/JournalArchiveUi.kt` | 回望、搜索、筛选、月历和删除 |
+| `feature/archive/JournalArchiveUi.kt` | 回望页面、搜索协调、状态恢复、详情与删除 |
+| `feature/archive/JournalArchiveControls.kt`、`feature/archive/JournalArchiveFilters.kt`、`feature/archive/JournalMonthCalendar.kt` | 回望搜索与模式控件、组合筛选与日期规则，以及月历展示 |
 | `feature/insights/JournalInsightsUi.kt` | 轨迹页面、周期选择、计算状态与下钻跳转协调 |
 | `feature/insights/JournalAnalytics.kt`、`feature/insights/LocalJournalReview.kt` | 周期统计、证据计算与本地回望内容生成 |
 | `feature/insights/JournalInsightsCards.kt`、`feature/insights/JournalInsightsCharts.kt`、`feature/insights/JournalInsightsSection.kt` | 轨迹卡片、图表及共享分节展示 |

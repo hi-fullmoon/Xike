@@ -3,7 +3,7 @@ package com.xike.app.feature.insights
 import com.xike.app.data.JournalEntry
 import com.xike.app.localizedText
 
-import com.xike.app.feature.archive.JournalEntryDetailDialog
+import com.xike.app.ui.components.journal.JournalEntryDetailDialog
 
 import com.xike.app.ui.components.JournalEntryCard
 import com.xike.app.ui.components.PhotoGalleryDialog

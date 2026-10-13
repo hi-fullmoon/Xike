@@ -116,7 +116,7 @@ flowchart TD
 | 文件 | 职责 |
 | --- | --- |
 | [`MainActivity.kt`](../app/src/main/java/com/xike/app/MainActivity.kt) | 系统入口；处理权限、生物识别、应用生命周期及系统结果回调协调。 |
-| [`XikeApp.kt`](../app/src/main/java/com/xike/app/XikeApp.kt) | 应用组合入口、底部导航、页面状态、备份文件选择及恢复协调。 |
+| [`XikeApp.kt`](../app/src/main/java/com/xike/app/XikeApp.kt)、[`XikeBackupFlow.kt`](../app/src/main/java/com/xike/app/XikeBackupFlow.kt) | 应用组合入口、底部导航与页面状态；备份选择、确认与恢复反馈独立协调。 |
 | [`AppLockSessionState.kt`](../app/src/main/java/com/xike/app/feature/lock/AppLockSessionState.kt) | 应用锁会话状态、后台时间与系统 Activity 监控状态。 |
 | [`AppLockUi.kt`](../app/src/main/java/com/xike/app/feature/lock/AppLockUi.kt) | 冷启动锁定页与会话锁定层。 |
 | [`BackupDialogs.kt`](../app/src/main/java/com/xike/app/feature/settings/BackupDialogs.kt) | 导出、密码与恢复确认弹窗，及已有导出请求状态。 |
@@ -144,13 +144,14 @@ flowchart TD
 | [`JournalPhotoUi.kt`](../app/src/main/java/com/xike/app/ui/components/JournalPhotoUi.kt) | 照片添加入口、缩略图、拼图、图库和预览位图加载。 |
 | [`XikePageComponents.kt`](../app/src/main/java/com/xike/app/ui/components/XikePageComponents.kt) | 跨页面复用的页头和内容卡片。 |
 | [`MomentScreen.kt`](../app/src/main/java/com/xike/app/feature/moment/MomentScreen.kt) | 此刻页面、草稿与媒体交互及专用辅助组件。 |
-| [`OutdoorContextUi.kt`](../app/src/main/java/com/xike/app/feature/moment/OutdoorContextUi.kt) | 窗外信息、城市选择及相关操作组件。 |
+| [`OutdoorContextUi.kt`](../app/src/main/java/com/xike/app/feature/moment/OutdoorContextUi.kt)、[`OutdoorContextCard.kt`](../app/src/main/java/com/xike/app/ui/components/journal/OutdoorContextCard.kt) | 城市选择弹窗，以及此刻与编辑共用的窗外信息组件。 |
 | [`SettingsScreen.kt`](../app/src/main/java/com/xike/app/feature/settings/SettingsScreen.kt) | 设置页面、专用弹窗、风格预览和辅助组件。 |
 | [`XikeTheme.kt`](../app/src/main/java/com/xike/app/ui/theme/XikeTheme.kt) | 六种主色、三种风格、字体、尺寸规则和共享访问接口。 |
 | [`XikeNavigationBar.kt`](../app/src/main/java/com/xike/app/ui/components/XikeNavigationBar.kt) | 页面导航标识、底部导航及选中状态展示。 |
-| [`JournalEntryDetailDialog.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalEntryDetailDialog.kt) | 回望与轨迹共用的日记详情及专用展示组件。 |
+| [`JournalEntryDetailDialog.kt`](../app/src/main/java/com/xike/app/ui/components/journal/JournalEntryDetailDialog.kt) | 回望与轨迹共用的日记详情及专用展示组件。 |
 | [`JournalEntryEditDialog.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalEntryEditDialog.kt) | 编辑弹窗、专用照片组件及编辑状态与操作协调。 |
-| [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt) | 回望、搜索、筛选、月历和删除界面。 |
+| [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt) | 回望页面与搜索协调、页面状态、详情及删除。 |
+| [`JournalArchiveControls.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveControls.kt)、[`JournalArchiveFilters.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveFilters.kt)、[`JournalMonthCalendar.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalMonthCalendar.kt) | 搜索与模式控件、组合筛选和日期规则，以及月历展示。 |
 | [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsUi.kt) | 轨迹页面、周期选择、计算状态与下钻跳转协调。 |
 | [`JournalInsightsCards.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCards.kt) | 轨迹概况、周期比较、主题、日期类型及本地回顾入口卡片。 |
 | [`JournalInsightsCharts.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |

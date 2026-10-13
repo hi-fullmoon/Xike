@@ -132,7 +132,14 @@ class JournalRefactoringUiTest {
             SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
             !hasTestTag("insights-list"))
             .performScrollToNode(hasTestTag("insight-source-${entry.id}"))
-        rule.onNodeWithTag("insight-source-${entry.id}").performClick()
+        rule.onNode(hasText(entry.note) and hasAnyAncestor(hasTestTag("insight-source-${entry.id}")),
+            useUnmergedTree = true).performScrollTo().performClick()
+        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        try {
+            java.io.File(rule.activity.getExternalFilesDir(null), "insights-detail-refactoring.png").outputStream().use {
+                check(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally { screenshot.recycle() }
         rule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
         rule.onNode(hasText(entry.note) and hasAnyAncestor(hasTestTag("journal-detail-body")))
             .performScrollTo().assertIsDisplayed()

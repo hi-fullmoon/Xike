@@ -1,4 +1,4 @@
-package com.xike.app.feature.archive
+package com.xike.app.ui.components.journal
 
 import com.xike.app.ui.components.JournalPhotoMosaic
 import com.xike.app.ui.components.PhotoGalleryDialog

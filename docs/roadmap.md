@@ -20,7 +20,7 @@
 | 能力 | 当前范围 | 代码依据 |
 | --- | --- | --- |
 | 记录与管理 | 心情、文字、预设主题、照片、语音、补记、编辑、删除与短时撤销、加密草稿 | [JournalViewModel](../app/src/main/java/com/xike/app/JournalViewModel.kt)、[JournalStore](../app/src/main/java/com/xike/app/JournalStore.kt) |
-| 找回记录 | 月历、时间流、本地全文搜索、组合筛选、分页与详情 | [JournalArchiveUi](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt)、[JournalEntryDetailDialog](../app/src/main/java/com/xike/app/feature/archive/JournalEntryDetailDialog.kt)、[JournalSearch](../app/src/main/java/com/xike/app/JournalSearch.kt) |
+| 找回记录 | 月历、时间流、本地全文搜索、组合筛选、分页与详情 | [JournalArchiveUi](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt)、[JournalEntryDetailDialog](../app/src/main/java/com/xike/app/ui/components/journal/JournalEntryDetailDialog.kt)、[JournalSearch](../app/src/main/java/com/xike/app/JournalSearch.kt) |
 | 回望与轨迹 | 心情分布、覆盖度、周期对比、主题变化、工作日与周末对照、原始记录下钻、本地回望文字 | [JournalAnalytics](../app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt)、[JournalInsightsUi](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsUi.kt) |
 | 隐私与应用锁 | 数据库和附件加密、系统身份验证、自动锁定、后台缩略图保护 | [JournalDatabase](../app/src/main/java/com/xike/app/JournalDatabase.kt)、[DatabaseKeyManager](../app/src/main/java/com/xike/app/DatabaseKeyManager.kt)、[MainActivity](../app/src/main/java/com/xike/app/MainActivity.kt) |
 | 备份与恢复 | 密码加密或 ZIP 导出、离线 HTML 阅读、全部附件、旧格式兼容、恢复前摘要与替换确认、恢复后一次撤销 | [JournalStore](../app/src/main/java/com/xike/app/JournalStore.kt)、[BackupHtml](../app/src/main/java/com/xike/app/BackupHtml.kt)、[MainActivity](../app/src/main/java/com/xike/app/MainActivity.kt) |

@@ -1,6 +1,6 @@
 package com.xike.app.feature.archive
 
-import com.xike.app.feature.moment.OutdoorContextCard
+import com.xike.app.ui.components.journal.OutdoorContextCard
 
 import com.xike.app.ui.components.MomentNoteCard
 import com.xike.app.ui.components.MomentContentToolbar
