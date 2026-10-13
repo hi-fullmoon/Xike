@@ -1,6 +1,7 @@
 package com.xike.app
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
@@ -209,6 +210,11 @@ class MainActivity : FragmentActivity() {
                             selectedStyle = journalViewModel.selectedStyle,
                             appLockEnabled = appLockEnabled,
                             appLockTimeout = appLockTimeout,
+                            isAppLocked = appLockEnabled && lockSession.isAppLocked,
+                            onBackupPickerLaunch = {
+                                lockSession.beginSystemActivity()
+                                if (appLockEnabled) lockSession.watchSystemActivity(applicationContext, taskId)
+                            },
                             authenticationAvailable = authenticationAvailable,
                             reminderSettings = reminderSettings,
                             dailyPromptSettings = dailyPromptSettings,
@@ -289,14 +295,10 @@ class MainActivity : FragmentActivity() {
         // Activity results can be delivered from super.onStart(). Capture this first so a camera
         // return never becomes indistinguishable from a normal foreground launch.
         val returningFromSystemActivity = lockSession.systemActivityInProgress
-        super.onStart()
-        if (!returningFromSystemActivity) openedJournalViewModel?.onAppForegrounded()
         appLockEnabled = lockPreferences.enabled
         appLockTimeout = lockPreferences.timeout
         if (appLockEnabled) {
-            if (!returningFromSystemActivity &&
-                lockSession.shouldLockOnForeground(SystemClock.elapsedRealtime(), appLockTimeout)
-            ) {
+            if (lockSession.shouldLockOnForeground(SystemClock.elapsedRealtime(), appLockTimeout)) {
                 lockSession.isAppLocked = true
             } else {
                 lockSession.backgroundedAtMillis = null
@@ -306,6 +308,9 @@ class MainActivity : FragmentActivity() {
             lockSession.journalSessionOpened = true
             lockSession.backgroundedAtMillis = null
         }
+        // Apply the gate before super delivers a pending file-picker result.
+        super.onStart()
+        if (!returningFromSystemActivity) openedJournalViewModel?.onAppForegrounded()
     }
 
     override fun onResume() {
@@ -549,6 +554,7 @@ class AppLockSessionState : ViewModel() {
     internal var systemActivityInProgress = false
     internal var authenticationAction: LockAuthentication? = null
     internal var pendingAuthenticationAfterEnrollment: LockAuthentication? = null
+    private var systemActivityMonitor: SystemActivityLockMonitor? = null
 
     internal fun shouldLockOnForeground(nowMillis: Long, timeout: AppLockTimeout): Boolean =
         isAppLocked || (backgroundedAtMillis != null && shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
@@ -559,12 +565,30 @@ class AppLockSessionState : ViewModel() {
     }
 
     internal fun finishSystemActivity() {
+        systemActivityMonitor?.stop()
         systemActivityInProgress = false
-        backgroundedAtMillis = null
+    }
+
+    internal fun watchSystemActivity(context: Context, taskId: Int) {
+        val monitor = systemActivityMonitor ?: SystemActivityLockMonitor(
+            context, ::interruptSystemActivity,
+        ).also { systemActivityMonitor = it }
+        monitor.start(taskId)
+    }
+
+    internal fun interruptSystemActivity(nowMillis: Long) {
+        if (!systemActivityInProgress) return
+        systemActivityInProgress = false
+        backgroundedAtMillis = backgroundedAtMillis ?: nowMillis
     }
 
     internal fun recordBackgrounded(nowMillis: Long) {
-        backgroundedAtMillis = if (systemActivityInProgress) null else nowMillis
+        if (!systemActivityInProgress && backgroundedAtMillis == null) backgroundedAtMillis = nowMillis
+    }
+
+    override fun onCleared() {
+        systemActivityMonitor?.stop()
+        super.onCleared()
     }
 }
 
@@ -592,9 +616,11 @@ private data class PendingRestore(
 )
 
 internal data class PendingExport(val password: String?)
+internal data class BackupDocumentSelection(val uri: Uri?, val importing: Boolean)
 
 internal class BackupExportState : ViewModel() {
     private var pending: PendingExport? = null
+    var selectedDocument by mutableStateOf<BackupDocumentSelection?>(null)
 
     fun begin(password: String?) { pending = PendingExport(password) }
 
@@ -610,6 +636,8 @@ private fun XikeApp(
     selectedStyle: AppStyle,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
+    isAppLocked: Boolean,
+    onBackupPickerLaunch: () -> Unit,
     authenticationAvailable: Boolean,
     reminderSettings: ReminderSettings,
     dailyPromptSettings: DailyPromptSettings,
@@ -660,6 +688,7 @@ private fun XikeApp(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
     val exportState: BackupExportState = viewModel()
@@ -714,31 +743,47 @@ private fun XikeApp(
 
     val encryptedExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
-        ::handleExportSelection,
-    )
+    ) { uri ->
+        systemActivityCallbacks.onResult()
+        exportState.selectedDocument = BackupDocumentSelection(uri, importing = false)
+    }
     val plainExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
-        ::handleExportSelection,
-    )
+    ) { uri ->
+        systemActivityCallbacks.onResult()
+        exportState.selectedDocument = BackupDocumentSelection(uri, importing = false)
+    }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                busyMessage = localizedText("正在识别备份…")
-                onBackupRequiresPassword(uri)
-                    .onSuccess { requiresPassword ->
-                        busyMessage = null
-                        if (requiresPassword) {
-                            pendingImportUri = uri.toString()
-                            backupAction = BackupAction.IMPORT
-                        } else {
-                            inspectSelectedBackup(uri, null)
+        systemActivityCallbacks.onResult()
+        exportState.selectedDocument = BackupDocumentSelection(uri, importing = true)
+    }
+
+    LaunchedEffect(isAppLocked, exportState.selectedDocument) {
+        val selection = exportState.selectedDocument
+        if (!isAppLocked && selection != null) {
+            exportState.selectedDocument = null
+            val uri = selection.uri
+            if (!selection.importing) {
+                handleExportSelection(uri)
+            } else if (uri != null) {
+                scope.launch {
+                    busyMessage = localizedText("正在识别备份…")
+                    onBackupRequiresPassword(uri)
+                        .onSuccess { requiresPassword ->
+                            busyMessage = null
+                            if (requiresPassword) {
+                                pendingImportUri = uri.toString()
+                                backupAction = BackupAction.IMPORT
+                            } else {
+                                inspectSelectedBackup(uri, null)
+                            }
                         }
-                    }
-                    .onFailure {
-                        busyMessage = null
-                        XikeNotice.makeText(context, it.message ?: localizedText("无法识别备份"), XikeNotice.LENGTH_LONG).show()
-                    }
+                        .onFailure {
+                            busyMessage = null
+                            XikeNotice.makeText(context, it.message ?: localizedText("无法识别备份"), XikeNotice.LENGTH_LONG).show()
+                        }
+                }
             }
         }
     }
@@ -822,7 +867,15 @@ private fun XikeApp(
                     onReminderSettingsChange = onReminderSettingsChange,
                     onDailyPromptSettingsChange = onDailyPromptSettingsChange,
                     onExport = { backupAction = BackupAction.EXPORT },
-                    onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "application/zip", "application/x-zip-compressed")) },
+                    onImport = {
+                        try {
+                            onBackupPickerLaunch()
+                            importLauncher.launch(arrayOf("application/octet-stream", "application/json", "application/zip", "application/x-zip-compressed"))
+                        } catch (error: Exception) {
+                            systemActivityCallbacks.onResult()
+                            throw error
+                        }
+                    },
                     canUndoRestore = canUndoRestore,
                     onUndoRestore = { scope.launch { runUndoRestore() } },
                 )
@@ -839,8 +892,17 @@ private fun XikeApp(
                 encryptedExportRequested = password != null
                 backupAction = null
                 val date = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
-                if (password == null) plainExportLauncher.launch("xike-backup-$date.zip")
-                else encryptedExportLauncher.launch("xike-backup-$date.xike")
+                try {
+                    onBackupPickerLaunch()
+                    if (password == null) plainExportLauncher.launch("xike-backup-$date.zip")
+                    else encryptedExportLauncher.launch("xike-backup-$date.xike")
+                } catch (error: Exception) {
+                    systemActivityCallbacks.onResult()
+                    exportState.take()
+                    exportRequested = false
+                    encryptedExportRequested = false
+                    throw error
+                }
             },
         )
     }
