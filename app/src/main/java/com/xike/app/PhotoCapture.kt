@@ -8,6 +8,7 @@ import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeSheetHorizontalPadding
 import com.xike.app.ui.theme.XikeSheetBottomPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
 
 
@@ -388,7 +389,7 @@ internal fun MediaSourceDialog(
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge)
             description?.let {

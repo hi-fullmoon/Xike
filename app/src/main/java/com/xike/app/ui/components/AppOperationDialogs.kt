@@ -1,6 +1,8 @@
 package com.xike.app.ui.components
 
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogPadding
+import com.xike.app.ui.theme.XikeDialogContentGap
 
 import com.xike.app.localizedText
 
@@ -39,11 +41,11 @@ internal fun ProcessingDialog(message: String) {
             tonalElevation = AlertDialogDefaults.TonalElevation,
         ) {
             Row(
-                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(XikeDialogPadding).verticalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(XikeDialogContentGap))
                 Text(message, style = MaterialTheme.typography.bodyLarge)
             }
         }

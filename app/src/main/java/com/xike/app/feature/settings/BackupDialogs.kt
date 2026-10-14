@@ -8,6 +8,7 @@ import com.xike.app.tr
 import com.xike.app.ui.components.DestructiveConfirmationDialog
 
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
 import com.xike.app.ui.theme.xikeSwitchColors
 
 
@@ -45,7 +46,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import java.time.format.DateTimeFormatter
 
@@ -93,7 +93,7 @@ internal fun RestoreConfirmationDialog(
         dismissText = localizedText("取消"),
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
                 Text(
                     tr("备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片", "The backup contains ${summary.entryCount} entries and ${summary.imageCount} photos") +
@@ -131,7 +131,7 @@ internal fun BackupExportDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
                 Text(tr("备份包含全部日记、照片、录音和视频。", "The backup includes all entries, photos, recordings and videos."), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -214,7 +214,7 @@ internal fun BackupPasswordDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
                 Text(
                     description,

@@ -22,6 +22,7 @@ import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeSheetHorizontalPadding
 import com.xike.app.ui.theme.XikeSheetBottomPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogCompactGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeScreenHorizontalPadding
 import com.xike.app.ui.theme.XikeScreenVerticalPadding
@@ -674,9 +675,9 @@ internal fun JournalEntryEditDialog(
             Column(
                 Modifier.fillMaxWidth().testTag("journal-edit-add-content").verticalScroll(rememberScrollState())
                     .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
             ) {
-                Text(tr("添加内容", "Add content"), Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.titleLarge)
+                Text(tr("添加内容", "Add content"), Modifier.padding(bottom = XikeDialogCompactGap), style = MaterialTheme.typography.titleLarge)
                 MomentMediaAction(
                     if (retainedAudio == null) tr("录音", "Record audio") else tr("替换录音", "Replace audio"),
                     !operationState.busy && pendingAudio == null && pendingStagedAudio == null && !audioRecoveryFailed && !showVoiceCapture,

@@ -3,6 +3,7 @@ package com.xike.app.feature.insights
 import com.xike.app.localizedText
 
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
 
 
 import android.content.Intent
@@ -26,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun LocalReviewDialog(review: LocalJournalReview, scrollState: ScrollState, onOpenSource: (ReviewSource) -> Unit, onDismiss: () -> Unit) {
@@ -36,7 +36,7 @@ internal fun LocalReviewDialog(review: LocalJournalReview, scrollState: ScrollSt
         shape = XikeShapes.dialog,
         title = { Text(localizedText("本地回顾")) },
         text = {
-            Column(modifier = Modifier.verticalScroll(scrollState).testTag("local-review-scroll"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.verticalScroll(scrollState).testTag("local-review-scroll"), verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap)) {
                 Text(review.title, style = MaterialTheme.typography.titleSmall)
                 Text(review.dateRange, style = MaterialTheme.typography.bodySmall)
                 review.sections.forEach { section ->

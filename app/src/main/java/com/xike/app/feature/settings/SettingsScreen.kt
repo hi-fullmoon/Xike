@@ -23,6 +23,8 @@ import com.xike.app.ui.theme.LocalRecordedAtPickerContext
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
+import com.xike.app.ui.theme.XikeDialogOptionPadding
 import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeScreenHorizontalPadding
 import com.xike.app.ui.theme.XikeScreenVerticalPadding
@@ -362,35 +364,13 @@ fun ProfileSettingsScreen(
     }
 
     if (showLanguageDialog) {
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            shape = XikeShapes.dialog,
-            title = { Text(localizedText("应用语言")) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
-                    AppLanguage.entries.forEach { language ->
-                        Row(
-                            Modifier.fillMaxWidth().selectable(
-                                selected = AppLocale.selectedLanguage == language,
-                                role = Role.RadioButton,
-                                onClick = {
-                                    onLanguageChange(language)
-                                    showLanguageDialog = false
-                                },
-                            ).padding(vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = AppLocale.selectedLanguage == language, onClick = null)
-                            Spacer(Modifier.width(10.dp))
-                            Text(language.displayName, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
+        AppLanguageDialog(
+            selected = AppLocale.selectedLanguage,
+            onSelected = {
+                onLanguageChange(it)
+                showLanguageDialog = false
             },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showLanguageDialog = false }, shape = XikeShapes.button) { Text(localizedText("取消")) }
-            },
+            onDismiss = { showLanguageDialog = false },
         )
     }
 
@@ -459,6 +439,43 @@ private fun SettingsToggleRow(
 }
 
 @Composable
+internal fun AppLanguageDialog(
+    selected: AppLanguage,
+    onSelected: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text(localizedText("应用语言")) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
+                AppLanguage.entries.forEach { language ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .selectable(
+                                selected = selected == language,
+                                role = Role.RadioButton,
+                                onClick = { onSelected(language) },
+                            )
+                            .padding(vertical = XikeDialogOptionPadding),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected == language, onClick = null)
+                        Spacer(Modifier.width(10.dp))
+                        Text(language.displayName, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
+        },
+    )
+}
+
+@Composable
 internal fun ReminderScheduleDialog(
     settings: ReminderSettings,
     onConfirm: (ReminderSettings) -> Unit,
@@ -485,7 +502,7 @@ internal fun ReminderScheduleDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -625,7 +642,7 @@ internal fun ReminderScheduleDialog(
 }
 
 @Composable
-private fun DailyPromptStyleDialog(
+internal fun DailyPromptStyleDialog(
     selected: DailyPromptStyle,
     onSelected: (DailyPromptStyle) -> Unit,
     onDismiss: () -> Unit,
@@ -640,12 +657,13 @@ private fun DailyPromptStyleDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                             .selectable(
                                 selected = style == selected,
                                 role = Role.RadioButton,
                                 onClick = { onSelected(style) },
                             )
-                            .padding(vertical = 9.dp),
+                            .padding(vertical = XikeDialogOptionPadding),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = style == selected, onClick = null)
@@ -706,7 +724,7 @@ private fun AppLockToggleRow(
 }
 
 @Composable
-private fun AppLockTimeoutDialog(
+internal fun AppLockTimeoutDialog(
     selected: AppLockTimeout,
     onSelected: (AppLockTimeout) -> Unit,
     onDismiss: () -> Unit,
@@ -721,12 +739,13 @@ private fun AppLockTimeoutDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                             .selectable(
                                 selected = selected == timeout,
                                 role = Role.RadioButton,
                                 onClick = { onSelected(timeout) },
                             )
-                            .padding(vertical = 9.dp),
+                            .padding(vertical = XikeDialogOptionPadding),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = selected == timeout, onClick = null)

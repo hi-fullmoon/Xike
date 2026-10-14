@@ -14,6 +14,8 @@ import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeSheetHorizontalPadding
 import com.xike.app.ui.theme.XikeSheetBottomPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
+import com.xike.app.ui.theme.XikeDialogCompactGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeInlineActionGap
 
@@ -145,13 +147,13 @@ internal fun VoiceCaptureSheet(
                 .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
         ) {
             Text(localizedText("录下这一刻"), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(XikeDialogCompactGap))
             Text(
                 localizedText("录音结束后将加密保存"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(XikeDialogContentGap))
             VoiceCaptureCard(enabled, onRecorded, { closeCapture() }, recorder, { isClosed })
         }
     }

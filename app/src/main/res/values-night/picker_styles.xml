@@ -16,7 +16,16 @@
     <style name="PickerAccent.Terra"><item name="android:colorAccent">#F2E3DC</item><item name="android:colorPrimary">#925B49</item></style>
     <style name="PickerAccent.Amber"><item name="android:colorAccent">#F4E8C8</item><item name="android:colorPrimary">#82611E</item></style>
     <style name="PickerAccent.Rose"><item name="android:colorAccent">#F3E0E4</item><item name="android:colorPrimary">#8B5360</item></style>
-    <style name="PickerSurface.Breathe"><item name="android:colorBackground">#1B211E</item></style>
-    <style name="PickerSurface.Paper"><item name="android:colorBackground">#242019</item></style>
-    <style name="PickerSurface.Focus"><item name="android:colorBackground">#1A1E1C</item></style>
+    <style name="PickerSurface.Breathe">
+        <item name="android:colorBackground">#1B211E</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+    <style name="PickerSurface.Paper">
+        <item name="android:colorBackground">#242019</item>
+        <item name="android:fontFamily">serif</item>
+    </style>
+    <style name="PickerSurface.Focus">
+        <item name="android:colorBackground">#1A1E1C</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
 </resources>

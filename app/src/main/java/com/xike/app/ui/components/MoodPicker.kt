@@ -3,6 +3,7 @@ package com.xike.app.ui.components
 import com.xike.app.ui.theme.XikeContentCardPadding
 import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogCompactGap
 
 import com.xike.app.localizedText
 import com.xike.app.data.Mood
@@ -150,7 +151,7 @@ private fun MoodGuideDialog(onDismiss: () -> Unit) {
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
             ) {
                 Text(
                     localizedText("选择最接近此刻的一种即可，不必把复杂的感受说得很准确。"),

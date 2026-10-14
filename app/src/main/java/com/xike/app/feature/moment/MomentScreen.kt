@@ -25,6 +25,7 @@ import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeSheetHorizontalPadding
 import com.xike.app.ui.theme.XikeSheetBottomPadding
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogCompactGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeScreenHorizontalPadding
 import com.xike.app.ui.theme.XikeScreenVerticalPadding
@@ -721,7 +722,7 @@ fun MomentScreen(
             text = {
                 Column(
                     Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
                 ) {
                     TextButton(
                         onClick = {
@@ -762,11 +763,11 @@ fun MomentScreen(
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
             ) {
                 Text(
                     tr("添加内容", "Add content"),
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = XikeDialogCompactGap),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 MomentMediaAction(

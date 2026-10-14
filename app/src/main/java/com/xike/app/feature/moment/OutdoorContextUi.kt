@@ -1,6 +1,7 @@
 package com.xike.app.feature.moment
 
 import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeDialogContentGap
 import com.xike.app.localizedText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -21,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 
 
@@ -40,7 +40,7 @@ internal fun OutdoorCityDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
                 Text(
                     localizedText("不用提供位置权限。城市名称会发送给 Open-Meteo，用于查找城市和天气。"),

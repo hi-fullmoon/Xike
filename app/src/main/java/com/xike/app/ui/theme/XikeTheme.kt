@@ -246,8 +246,37 @@ internal val XikeCardPadding = 14.dp
 internal val XikeContentCardPadding: Dp
     @Composable get() = LocalXikeStyle.current.contentCardPadding
 internal val XikeInnerCardPadding = 10.dp
-internal val XikeSheetHorizontalPadding = 20.dp
-internal val XikeSheetBottomPadding = 20.dp
+internal val XikeDialogContentGap: Dp
+    @Composable get() = when (LocalXikeStyle.current.style) {
+        AppStyle.BREATHE -> 12.dp
+        AppStyle.PAPER -> 14.dp
+        AppStyle.FOCUS -> 8.dp
+    }
+internal val XikeDialogCompactGap: Dp
+    @Composable get() = when (LocalXikeStyle.current.style) {
+        AppStyle.BREATHE -> 8.dp
+        AppStyle.PAPER -> 10.dp
+        AppStyle.FOCUS -> 6.dp
+    }
+internal val XikeDialogOptionPadding: Dp
+    @Composable get() = when (LocalXikeStyle.current.style) {
+        AppStyle.BREATHE -> 9.dp
+        AppStyle.PAPER -> 11.dp
+        AppStyle.FOCUS -> 6.dp
+    }
+internal val XikeDialogPadding: Dp
+    @Composable get() = when (LocalXikeStyle.current.style) {
+        AppStyle.BREATHE, AppStyle.PAPER -> 24.dp
+        AppStyle.FOCUS -> 20.dp
+    }
+internal val XikeSheetHorizontalPadding: Dp
+    @Composable get() = LocalXikeStyle.current.screenHorizontalPadding
+internal val XikeSheetBottomPadding: Dp
+    @Composable get() = when (LocalXikeStyle.current.style) {
+        AppStyle.BREATHE -> 20.dp
+        AppStyle.PAPER -> 24.dp
+        AppStyle.FOCUS -> 16.dp
+    }
 object XikeShapes {
     val card: RoundedCornerShape
         @Composable get() = RoundedCornerShape(LocalXikeStyle.current.cardCorner)
