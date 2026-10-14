@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
 
 internal class JournalOperationFeedback(val message: String, val isError: Boolean)
 
@@ -56,6 +57,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     val isDraftVideoSaving: Boolean get() = draftMediaOperations.isDraftVideoSaving
     val draftVideoProgress: Float? get() = draftMediaOperations.draftVideoProgress
     private val draftStore = JournalDraftStore(application)
+    private val mediaMutationMutex = Mutex()
     private val draftMediaOperations = JournalDraftMediaOperations(
         application, viewModelScope, store,
         currentDraft = { draft },
@@ -65,6 +67,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         imageInUse = { editOperations.imageInUse(it) },
         onDataError = { dataError = it },
         reportOperation = ::reportOperation,
+        mediaMutationMutex = mediaMutationMutex,
     )
     private val outdoorRepository = OutdoorContextRepository(application)
     private val appearancePreferences = AppearancePreferences(application)
@@ -124,7 +127,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val backupOperations = JournalBackupOperations(
         application, viewModelScope, store,
         currentDraft = { draft },
-        importingDraftVideo = { isDraftVideoSaving },
+        mediaMutationMutex = mediaMutationMutex,
         onRestored = { _, undoAvailable ->
             canUndoRestore = undoAvailable
             dataError = null
@@ -132,6 +135,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         reportOperation = ::reportOperation,
     )
     val isBackupExporting: Boolean get() = backupOperations.isBackupExporting
+    internal val backupRestoreState get() = backupOperations.restoreState
 
     internal var operationFeedback by mutableStateOf(emptyList<JournalOperationFeedback>())
         private set

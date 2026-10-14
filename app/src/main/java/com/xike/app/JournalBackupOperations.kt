@@ -13,6 +13,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal enum class RestoreOperation { RESTORE, UNDO }
+internal class RestoreOutcome(val operation: RestoreOperation, val result: Result<Int>)
+internal class BackupRestoreState {
+    var operation by mutableStateOf<RestoreOperation?>(null)
+        internal set
+    var outcome by mutableStateOf<RestoreOutcome?>(null)
+        internal set
+    fun acknowledge(value: RestoreOutcome) { if (outcome === value) outcome = null }
+}
 
 /** Backup jobs belong to the ViewModel scope; the ViewModel consumes restored entries and feedback. */
 internal class JournalBackupOperations(
@@ -20,13 +32,13 @@ internal class JournalBackupOperations(
     private val scope: CoroutineScope,
     private val store: JournalStore,
     private val currentDraft: () -> JournalDraft,
-    private val importingDraftVideo: () -> Boolean,
+    private val mediaMutationMutex: Mutex,
     private val onRestored: (List<JournalEntry>, Boolean) -> Unit,
     private val reportOperation: (String, Boolean) -> Unit,
 ) {
     private val context = context.applicationContext
     private val draft: JournalDraft get() = currentDraft()
-    private val isDraftVideoSaving: Boolean get() = importingDraftVideo()
+    val restoreState = BackupRestoreState()
     var isBackupExporting by mutableStateOf(false)
         private set
 
@@ -65,26 +77,40 @@ internal class JournalBackupOperations(
         }
     }.await()
 
-    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = scope.async {
-        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再恢复备份。", "Wait for video import to finish before restoring a backup.")))
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    store.restoreBackup(input, password, setOfNotNull(draft.audio?.fileName), draft.video)
-                } ?: error(localizedText("无法读取备份文件"))
-            }
-        }
-        result.onSuccess { onRestored(it, true) }
-        result.map { it.size }
-    }.await()
+    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> = runRestore(RestoreOperation.RESTORE) { snapshot ->
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            store.restoreBackup(input, password, setOfNotNull(snapshot.audio?.fileName), snapshot.video)
+        } ?: error(localizedText("无法读取备份文件"))
+    }
 
-    suspend fun undoRestore(): Result<Int> = scope.async {
-        if (isDraftVideoSaving) return@async Result.failure(IllegalStateException(tr("请等待视频导入完成后再撤销恢复。", "Wait for video import to finish before undoing a restore.")))
-        val result = withContext(Dispatchers.IO) {
-            runCatching { store.undoLastRestore(setOfNotNull(draft.audio?.fileName), draft.video) }
+    suspend fun undoRestore(): Result<Int> = runRestore(RestoreOperation.UNDO) { snapshot ->
+        store.undoLastRestore(setOfNotNull(snapshot.audio?.fileName), snapshot.video)
+    }
+
+    private suspend fun runRestore(operation: RestoreOperation, work: (JournalDraft) -> List<JournalEntry>): Result<Int> = scope.async {
+        if (restoreState.operation != null) return@async Result.failure(IllegalStateException(tr("请等待当前操作完成。", "Please wait for the current operation to finish.")))
+        restoreState.operation = operation
+        try {
+            val result = mediaMutationMutex.withLock {
+                // Read the draft only after any import has published its durable reference.
+                val snapshot = draft
+                withContext(Dispatchers.IO) { runCatching { work(snapshot) } }
+            }
+            result.onSuccess { onRestored(it, operation == RestoreOperation.RESTORE) }
+            result.map { it.size }.also { outcome ->
+                if (operation == RestoreOperation.RESTORE && outcome.isSuccess) {
+                    restoreState.outcome = RestoreOutcome(operation, outcome)
+                } else {
+                    val message = outcome.fold(
+                        onSuccess = { count -> tr("已撤销恢复，找回 $count 条日记", "Restore undone. Recovered $count entries") },
+                        onFailure = { it.message ?: localizedText(if (operation == RestoreOperation.UNDO) "撤销恢复失败" else "恢复失败") },
+                    )
+                    reportOperation(message, outcome.isFailure)
+                }
+            }
+        } finally {
+            restoreState.operation = null
         }
-        result.onSuccess { onRestored(it, false) }
-        result.map { it.size }
     }.await()
 
 }

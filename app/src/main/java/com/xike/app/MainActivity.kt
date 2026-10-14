@@ -244,6 +244,7 @@ class MainActivity : FragmentActivity() {
                             onSave = { _, _ -> journalViewModel.saveDraft() },
                             isDraftSaving = journalViewModel.isDraftSaving,
                             isBackupExporting = journalViewModel.isBackupExporting,
+                            backupRestoreState = journalViewModel.backupRestoreState,
                             onUpdate = journalViewModel::update,
                             onDelete = journalViewModel::delete,
                             onUndoDelete = journalViewModel::undoDelete,

@@ -521,7 +521,9 @@ class JournalStore(context: Context) {
                 )
             }
 
-            val protectedVideos = retainedVideo.files() + videoDraftStore.load().video.files() + videos.editReferences()
+            val preservedDraft = videoDraftStore.load()
+            val protectedVideos = retainedVideo.files() + preservedDraft.video.files() + videos.editReferences()
+            val protectedAudios = retainedAudioFileNames + listOfNotNull(preservedDraft.audio?.fileName) + editAudioPreferences.all.keys
             writeEntries(installedEntries)
             runCatching { cleanupStaleVideoEdits() }
             videos.prune(installedEntries.flatMap { it.video.files() }.toSet() + protectedVideos)
@@ -529,7 +531,7 @@ class JournalStore(context: Context) {
             attachments.imagesDirectory.listFiles()
                 ?.filter { it.name !in referencedFiles }
                 ?.forEach(File::delete)
-            val referencedAudios = installedEntries.mapNotNull { it.audio?.fileName }.toSet() + retainedAudioFileNames
+            val referencedAudios = installedEntries.mapNotNull { it.audio?.fileName }.toSet() + protectedAudios
             attachments.audiosDirectory.listFiles()
                 ?.filter { it.name !in referencedAudios }
                 ?.forEach(File::delete)

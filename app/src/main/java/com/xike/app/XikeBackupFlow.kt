@@ -14,6 +14,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ private data class PendingRestore(
 internal fun XikeBackupFlow(
     localEntryCount: Int,
     isBackupExporting: Boolean,
+    restoreState: BackupRestoreState,
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
     onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
@@ -65,15 +67,23 @@ internal fun XikeBackupFlow(
 
     suspend fun runUndoRestore() {
         snackbarHostState.currentSnackbarData?.dismiss()
-        busyMessage = localizedText("正在撤销上次恢复…")
         onUndoRestore()
-            .onSuccess { count ->
-                XikeNotice.makeText(context, tr("已撤销恢复，找回 $count 条日记", "Restore undone. Recovered $count entries"), XikeNotice.LENGTH_SHORT).show()
-            }
-            .onFailure {
-                XikeNotice.makeText(context, it.message ?: localizedText("撤销恢复失败"), XikeNotice.LENGTH_LONG).show()
-            }
-        busyMessage = null
+    }
+
+    LaunchedEffect(restoreState.outcome) {
+        val outcome = restoreState.outcome ?: return@LaunchedEffect
+        val result = outcome.result
+        if (result.isSuccess && outcome.operation == RestoreOperation.RESTORE) {
+            val count = result.getOrThrow()
+            val action = snackbarHostState.showSnackbar(
+                message = tr("已恢复 $count 条日记", "Restored $count entries"),
+                actionLabel = localizedText("撤销"),
+                withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            )
+            restoreState.acknowledge(outcome)
+            if (action == SnackbarResult.ActionPerformed) scope.launch { runUndoRestore() }
+        }
     }
 
     suspend fun inspectSelectedBackup(uri: Uri, password: String?) {
@@ -189,26 +199,16 @@ internal fun XikeBackupFlow(
             onConfirm = {
                 pendingRestore = null
                 scope.launch {
-                    busyMessage = localizedText("正在创建安全快照并恢复…")
                     onRestoreBackup(request.uri, request.password)
-                        .onSuccess { count ->
-                            busyMessage = null
-                            val result = snackbarHostState.showSnackbar(
-                                message = tr("已恢复 $count 条日记", "Restored $count entries"),
-                                actionLabel = localizedText("撤销"),
-                                withDismissAction = true,
-                                duration = SnackbarDuration.Long,
-                            )
-                            if (result == SnackbarResult.ActionPerformed) runUndoRestore()
-                        }
-                        .onFailure {
-                            XikeNotice.makeText(context, it.message ?: localizedText("恢复失败"), XikeNotice.LENGTH_LONG).show()
-                            busyMessage = null
-                        }
                 }
             },
         )
     }
 
-    (if (isBackupExporting) localizedText("正在创建备份…") else busyMessage)?.let { message -> ProcessingDialog(message) }
+    val operationMessage = when (restoreState.operation) {
+        RestoreOperation.RESTORE -> localizedText("正在创建安全快照并恢复…")
+        RestoreOperation.UNDO -> localizedText("正在撤销上次恢复…")
+        null -> if (isBackupExporting) localizedText("正在创建备份…") else busyMessage
+    }
+    operationMessage?.let { message -> ProcessingDialog(message) }
 }

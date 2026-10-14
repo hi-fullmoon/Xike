@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class PendingDraftAudio(
     val durationMillis: Long,
@@ -34,6 +36,7 @@ internal class JournalDraftMediaOperations(
     private val imageInUse: (Uri) -> Boolean,
     private val onDataError: (String) -> Unit,
     private val reportOperation: (String, Boolean) -> Unit,
+    private val mediaMutationMutex: Mutex,
 ) {
     private val context = context.applicationContext
     private val pendingAudioStore = PendingDraftAudioStore(context)
@@ -65,6 +68,11 @@ internal class JournalDraftMediaOperations(
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean =
         saveDraft(updated, reportError)
+
+    // Keep the imported file, draft publication and staging cleanup in one restore boundary.
+    private fun launchMediaMutation(work: suspend () -> Unit) {
+        scope.launch { mediaMutationMutex.withLock { work() } }
+    }
 
     fun releaseDiscardedMedia(discardedDraft: JournalDraft) {
         discardedDraft.imageUriStrings
@@ -194,7 +202,7 @@ internal class JournalDraftMediaOperations(
         if (isDraftAudioSaving) return
         isDraftAudioSaving = true
         draftAudioSaveError = null
-        scope.launch {
+        launchMediaMutation {
             try {
                 val imported = withContext(Dispatchers.IO) {
                     runCatching {
@@ -282,7 +290,7 @@ internal class JournalDraftMediaOperations(
         val generation = draftGeneration
         isDraftVideoSaving = true
         draftVideoProgress = null
-        scope.launch {
+        launchMediaMutation {
             try {
                 importVideo(uri) { progress -> scope.launch { draftVideoProgress = progress } }
                     .onSuccess { video ->

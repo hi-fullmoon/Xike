@@ -92,6 +92,7 @@ internal fun XikeApp(
     onDailyPromptSettingsChange: (DailyPromptSettings) -> Unit,
     // Backup operations.
     isBackupExporting: Boolean,
+    backupRestoreState: BackupRestoreState,
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
     onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
@@ -114,6 +115,7 @@ internal fun XikeApp(
     XikeBackupFlow(
         localEntryCount = libraryState.totalCount,
         isBackupExporting = isBackupExporting,
+        restoreState = backupRestoreState,
         onExportBackup = onExportBackup,
         onBackupRequiresPassword = onBackupRequiresPassword,
         onInspectBackup = onInspectBackup,
