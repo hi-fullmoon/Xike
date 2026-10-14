@@ -441,7 +441,10 @@ private fun VideoCardContent(
 
 @Composable
 internal fun VideoImportStatus(progress: Float?) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             tr("正在加密导入视频，请稍候", "Encrypting and importing video, please wait"),
             style = MaterialTheme.typography.bodySmall,
