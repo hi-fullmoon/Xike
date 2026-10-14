@@ -312,7 +312,7 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 - API 26–36 真机矩阵、动态字体、TalkBack、大屏和低存储验证。
 - 启动、搜索、图片解码和大备份的性能基线。
 
-文件整理保留单个 Gradle 模块，先按职责拆分文件，再分组调整包结构。页面与共享组件、应用组合入口、应用锁、备份弹窗、轨迹展示及音频实现已按职责提取；主题已迁入 `com.xike.app.ui.theme`，共享组件已迁入 `com.xike.app.ui.components`，此刻页面已迁入 `com.xike.app.feature.moment`，回望、详情与编辑已迁入 `com.xike.app.feature.archive`，轨迹与本地回望已迁入 `com.xike.app.feature.insights`，设置页面与专用弹窗已迁入 `com.xike.app.feature.settings`，应用锁已迁入 `com.xike.app.feature.lock`，已明确职责的数据模型与备份辅助能力已迁入 `com.xike.app.data`。`XikeUi.kt` 与 `VoiceRecording.kt` 已无剩余职责并删除。存储模型与备份 JSON、流和加解密辅助能力已单独提取；Store 仍统一协调 ZIP 校验、暂存、恢复、撤销、清理及同步锁。草稿并发逻辑、数据库迁移、恢复事务及 `JournalDatabase` 的完整类名不改写。
+文件整理保留单个 Gradle 模块，先按职责拆分文件，再分组调整包结构。页面与共享组件、应用组合入口、应用锁、备份弹窗、轨迹展示及音频实现已按职责提取；主题已迁入 `com.xike.app.ui.theme`，共享组件已迁入 `com.xike.app.ui.components`，此刻页面已迁入 `com.xike.app.feature.moment`，回望与编辑已迁入 `com.xike.app.feature.archive`，共享日记详情与窗外卡片已迁入 `com.xike.app.ui.components.journal`，轨迹与本地回望已迁入 `com.xike.app.feature.insights`，设置页面与专用弹窗已迁入 `com.xike.app.feature.settings`，应用锁已迁入 `com.xike.app.feature.lock`，已明确职责的数据模型与备份辅助能力已迁入 `com.xike.app.data`。`XikeUi.kt` 与 `VoiceRecording.kt` 已无剩余职责并删除。存储模型与备份 JSON、流和加解密辅助能力已单独提取；`JournalBackupStorage` 负责备份导出、读取、ZIP 内容校验及恢复暂存，`JournalStore` 仍统一协调数据库操作、恢复安装、撤销、媒体引用清理及同步锁。草稿并发逻辑、数据库迁移、恢复事务及 `JournalDatabase` 的完整类名不改写。
 
 ## 14. 新维护者建议阅读顺序
 
