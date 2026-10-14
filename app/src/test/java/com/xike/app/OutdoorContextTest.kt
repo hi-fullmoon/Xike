@@ -3,6 +3,7 @@ package com.xike.app
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.outdoor.firstNonNullResult
+import com.xike.app.outdoor.hasMixedChinesePlaceName
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.awaitCancellation
@@ -15,6 +16,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OutdoorContextTest {
+    @Test
+    fun `mixed place name requires both Chinese and Latin letters`() {
+        assertTrue(hasMixedChinesePlaceName("Binjiang · 南环路"))
+        org.junit.Assert.assertFalse(hasMixedChinesePlaceName("滨江区 · 南环路"))
+        org.junit.Assert.assertFalse(hasMixedChinesePlaceName("Hangzhou · Binjiang"))
+        org.junit.Assert.assertFalse(hasMixedChinesePlaceName("南环路 · 25"))
+    }
+
     @Test
     fun `snapshot json round trip preserves normalized values`() {
         val snapshot =

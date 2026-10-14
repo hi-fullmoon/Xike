@@ -91,10 +91,7 @@ internal class OutdoorContextRepository(context: Context) {
 
     suspend fun current(): OutdoorSnapshot {
         val location = currentLocation()
-        val placeName =
-            withTimeoutOrNull(NETWORK_TIMEOUT_MILLIS.toLong()) {
-                reverseGeocode(location)
-            } ?: localizedText("当前位置")
+        val placeName = reverseGeocode(location) ?: localizedText("当前位置")
         return fetchWeather(location.latitude, location.longitude, placeName)
     }
 
@@ -187,7 +184,39 @@ internal class OutdoorContextRepository(context: Context) {
 
     private suspend fun reverseGeocode(location: Location): String? {
         if (!Geocoder.isPresent()) return null
-        val geocoder = Geocoder(appContext, AppLocale.locale)
+        val locale = AppLocale.locale
+        val address =
+            withTimeoutOrNull(NETWORK_TIMEOUT_MILLIS.toLong()) {
+                geocodeAddress(location, locale)
+            } ?: return null
+        val includeStreet = canIncludeStreet(location)
+        val label = address.asPlaceLabel(includeStreet) ?: return null
+        if (locale.language != "en" || !hasMixedChinesePlaceName(label)) return label
+        // Keep the usable first result if the native-name lookup fails or times out.
+        val nativeAddress =
+            withTimeoutOrNull(1_500L) {
+                geocodeAddress(location, Locale.SIMPLIFIED_CHINESE)
+                    ?.takeIf {
+                        !includeStreet || address.thoroughfare.isNullOrBlank() ||
+                            !it.thoroughfare.isNullOrBlank()
+                    }
+            }
+        val stillIncludeStreet = includeStreet && canIncludeStreet(location)
+        val nativeLabel = nativeAddress?.asPlaceLabel(stillIncludeStreet)
+        return nativeLabel?.takeIf {
+            it.any { character -> Character.UnicodeScript.of(character.code) == Character.UnicodeScript.HAN } &&
+                !hasMixedChinesePlaceName(it)
+        } ?: address.asPlaceLabel(stillIncludeStreet)
+    }
+
+    private fun canIncludeStreet(location: Location): Boolean =
+        ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED && location.accuracy <= PREFERRED_ACCURACY_METERS
+
+    private suspend fun geocodeAddress(location: Location, locale: Locale): Address? {
+        val geocoder = runCatching { Geocoder(appContext, locale) }.getOrNull() ?: return null
         val address =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 suspendCancellableCoroutine { continuation ->
@@ -236,12 +265,7 @@ internal class OutdoorContextRepository(context: Context) {
                         }
                 }
             }
-        val includeStreet =
-            ContextCompat.checkSelfPermission(
-                appContext,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED && location.accuracy <= PREFERRED_ACCURACY_METERS
-        return address?.asPlaceLabel(includeStreet)
+        return address
     }
 
     private suspend fun fetchWeather(
@@ -345,6 +369,10 @@ internal class OutdoorContextRepository(context: Context) {
             )
     }
 }
+
+internal fun hasMixedChinesePlaceName(label: String): Boolean =
+    label.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN } &&
+        label.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN }
 
 private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
     val district =
