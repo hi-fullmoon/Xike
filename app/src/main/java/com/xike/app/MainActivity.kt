@@ -159,7 +159,9 @@ class MainActivity : FragmentActivity() {
                                 sameTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
                             lockSession.beginSystemActivity(
                                 watchTaskVisibility = observable,
-                                requireAuthenticationOnReturn = appLockEnabled && !observable,
+                                // A picker running in another task is still part of the user's
+                                // operation. Screen-off and Home/recents events interrupt it;
+                                // task visibility alone must not force authentication on return.
                                 operationId = operationId,
                             )
                         },

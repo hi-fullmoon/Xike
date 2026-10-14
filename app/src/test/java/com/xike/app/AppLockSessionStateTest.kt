@@ -165,6 +165,54 @@ class AppLockSessionStateTest {
     }
 
     @Test
+    fun crossTaskPickerReturnStaysUnlockedForEveryTimeout() {
+        AppLockTimeout.entries.forEach { timeout ->
+            val state = AppLockSessionState().apply { isAppLocked = false }
+            state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+            state.recordBackgrounded(1_000L)
+            assertFalse(state.shouldLockOnForeground(1_800_001L, timeout))
+            state.finishSystemActivity(operationId = "media-picker")
+
+            assertFalse(state.shouldLockOnForeground(1_800_001L, timeout))
+        }
+    }
+
+    @Test
+    fun cancelledMediaPickerDoesNotLeaveBackgroundExemptionBehind() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+        state.recordBackgrounded(1_000L)
+        // Cancellation still delivers an Activity result and completes the operation.
+        state.finishSystemActivity(operationId = "media-picker")
+
+        assertFalse(state.shouldLockOnForeground(60_000L, AppLockTimeout.IMMEDIATELY))
+        state.recordBackgrounded(61_000L)
+        assertTrue(state.shouldLockOnForeground(61_000L, AppLockTimeout.IMMEDIATELY))
+    }
+
+    @Test
+    fun leavingCrossTaskPickerStillUsesBackgroundTimeout() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+        state.interruptSystemActivity(5_000L)
+        state.finishSystemActivity(operationId = "media-picker")
+
+        assertTrue(state.shouldLockOnForeground(5_000L, AppLockTimeout.IMMEDIATELY))
+        assertFalse(state.shouldLockOnForeground(64_999L, AppLockTimeout.ONE_MINUTE))
+        assertTrue(state.shouldLockOnForeground(65_000L, AppLockTimeout.ONE_MINUTE))
+    }
+
+    @Test
+    fun deviceLockDuringCrossTaskPickerStillRequiresAuthentication() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+        state.recordDeviceLocked()
+        state.finishSystemActivity(operationId = "media-picker")
+
+        assertTrue(state.shouldLockOnForeground(5_000L, AppLockTimeout.THIRTY_MINUTES))
+    }
+
+    @Test
     fun failedUnobservableLaunchDoesNotLockAnUnlockedSession() {
         val state = AppLockSessionState().apply { isAppLocked = false }
         state.beginSystemActivity(watchTaskVisibility = false, requireAuthenticationOnReturn = true)

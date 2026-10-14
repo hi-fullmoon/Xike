@@ -304,10 +304,12 @@ private fun <I, O> rememberActivityResultWithAccess(
                     check(callbacks.canHandleResult()) { localizedText("解锁息刻") }
                     val intent = launcher.contract.createIntent(context, input)
                     val info = intent.resolveActivityInfo(context.packageManager, 0)
-                    // A camera may run in its own task. Its hidden caller task does not imply
-                    // that the user left the capture flow; Home/recents/screen events still apply.
+                    // Media pickers may hide the caller even when their launch mode suggests
+                    // the same task. Only explicit Home/recents/screen events interrupt selection.
+                    // A camera may also run in its own task.
                     val sameTask =
-                        intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
+                        !retainReadAccess &&
+                            intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
                             (info?.launchMode == ActivityInfo.LAUNCH_MULTIPLE ||
                                 info?.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP)
                     started = true
