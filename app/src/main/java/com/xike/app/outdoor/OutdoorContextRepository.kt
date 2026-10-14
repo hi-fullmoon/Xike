@@ -195,17 +195,18 @@ internal class OutdoorContextRepository(context: Context) {
         // Keep the usable first result if the native-name lookup fails or times out.
         val nativeAddress =
             withTimeoutOrNull(1_500L) {
-                geocodeAddress(location, Locale.SIMPLIFIED_CHINESE)
-                    ?.takeIf {
-                        !includeStreet || address.thoroughfare.isNullOrBlank() ||
-                            !it.thoroughfare.isNullOrBlank()
-                    }
+                geocodeAddress(location, Locale.SIMPLIFIED_CHINESE)?.takeIf {
+                    !includeStreet ||
+                        address.thoroughfare.isNullOrBlank() ||
+                        !it.thoroughfare.isNullOrBlank()
+                }
             }
         val stillIncludeStreet = includeStreet && canIncludeStreet(location)
         val nativeLabel = nativeAddress?.asPlaceLabel(stillIncludeStreet)
         return nativeLabel?.takeIf {
-            it.any { character -> Character.UnicodeScript.of(character.code) == Character.UnicodeScript.HAN } &&
-                !hasMixedChinesePlaceName(it)
+            it.any { character ->
+                Character.UnicodeScript.of(character.code) == Character.UnicodeScript.HAN
+            } && !hasMixedChinesePlaceName(it)
         } ?: address.asPlaceLabel(stillIncludeStreet)
     }
 
