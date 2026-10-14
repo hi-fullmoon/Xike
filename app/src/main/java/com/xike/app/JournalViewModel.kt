@@ -211,8 +211,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
                 viewModelScope.launch {
-                    merge(readRepository.changes().map { true }, readRefreshRequests.map { false })
-                        .map { changed -> readRepository.libraryState(0) to changed }
+                    merge(readRepository.changes().map { Unit }, readRefreshRequests)
+                        .map { readRepository.libraryState(0) }
                         .retryWhen { error, attempt ->
                             if (!observationFailureReported) {
                                 observationFailureReported = true
@@ -221,9 +221,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                             delay((1_000L * (attempt.coerceAtMost(4L) + 1L)))
                             true
                         }
-                        .collect { (latestState, changed) ->
+                        .collect { latestState ->
                             observationFailureReported = false
-                            libraryState = latestState.copy(revision = libraryState.revision + if (changed) 1 else 0)
+                            // Foreground refreshes must also retry failed page and summary reads.
+                            libraryState = latestState.copy(revision = libraryState.revision + 1)
                         }
                 }
             }.onFailure { error ->

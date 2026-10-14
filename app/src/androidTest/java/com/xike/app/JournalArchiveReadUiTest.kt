@@ -29,6 +29,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.xike.app.data.Mood
 import com.xike.app.feature.insights.InsightsPeriod
 import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.feature.archive.asShortChineseDate
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -44,6 +45,40 @@ import org.junit.Test
 /** Requires this task's fresh emulator. Saves through the real UI; no seeded or mocked library. */
 class JournalArchiveReadUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun initialInsightsReadFailureCanRetryWithoutChangingTheDatabase(): Unit = runBlocking {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("archiveReadIsolated") == "true")
+        val model = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
+        rule.waitUntil(20_000) { !model.isLoading }
+        withUnreadableTable("journal_entries") {
+            rule.onNodeWithTag("navigation-insights").performClick()
+            rule.waitUntil(15_000) {
+                rule.onAllNodesWithText(localizedText("我知道了")).fetchSemanticsNodes().isNotEmpty()
+            }
+            dismissReadErrorIfShown()
+            rule.onNodeWithText(tr("重试", "Retry")).assertIsDisplayed()
+            assertTrue(rule.onAllNodesWithContentDescription(localizedText("正在读取…")).fetchSemanticsNodes().isEmpty())
+        }
+        rule.onNodeWithText(tr("重试", "Retry")).performClick()
+        rule.waitUntil(15_000) { rule.onAllNodesWithText(tr("本周", "This week")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("insights-list").assertIsDisplayed()
+        rule.onNodeWithTag("navigation-home").performClick()
+        withUnreadableTable("journal_entries") {
+            rule.onNodeWithTag("navigation-insights").performClick()
+            rule.waitUntil(15_000) {
+                rule.onAllNodesWithText(localizedText("我知道了")).fetchSemanticsNodes().isNotEmpty()
+            }
+            dismissReadErrorIfShown()
+            rule.onNodeWithText(tr("重试", "Retry")).assertIsDisplayed()
+        }
+        val revision = model.libraryState.revision
+        rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        rule.waitUntil(15_000) { model.libraryState.revision > revision }
+        rule.waitUntil(15_000) { rule.onAllNodesWithText(tr("本周", "This week")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("insights-list").assertIsDisplayed()
+    }
 
     @Test
     fun loadMoreShowsTheNextRealSavedRecordAndPreservesEarlierRows(): Unit = runBlocking {
@@ -216,7 +251,10 @@ class JournalArchiveReadUiTest {
             rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty()
         }
         rule.onNodeWithContentDescription(description).performScrollTo().performClick()
-        rule.waitUntil(15_000) { rule.onAllNodesWithText(updatedNote).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(15_000) {
+            rule.onAllNodesWithText(tr("${date.asShortChineseDate()}的记录", "Entries for ${date.asShortChineseDate()}")).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag("archive-list").performScrollToNode(hasText(updatedNote))
         rule.onNodeWithText(updatedNote).assertIsDisplayed()
         withUnreadableTable("journal_entries_fts") {
             assertTrue(journalReadResult { repository.indexPage(JournalSearchQuery(text = "回望"), 0) }.isFailure)
@@ -228,7 +266,27 @@ class JournalArchiveReadUiTest {
             rule.onNodeWithTag("archive-list").performScrollToIndex(5)
             rule.onNodeWithText(updatedNote).assertIsDisplayed()
             assertTrue(rule.onAllNodesWithText(localizedText("没有找到这一刻")).fetchSemanticsNodes().isEmpty())
+            rule.onNodeWithTag("archive-list").performScrollToIndex(0)
+            // Clear the selected day. A failed query must retain the previous day's result heading.
+            rule.onNodeWithContentDescription(description).performScrollTo().performClick()
+            awaitArchiveReadError()
+            rule.onNodeWithTag("archive-list").performScrollToNode(hasText(tr("${date.asShortChineseDate()}的记录", "Entries for ${date.asShortChineseDate()}")))
+            rule.onNodeWithText(tr("${date.asShortChineseDate()}的记录", "Entries for ${date.asShortChineseDate()}")).assertIsDisplayed()
+            rule.onNodeWithTag("archive-list").performScrollToIndex(0)
+            rule.onNode(hasSetTextAction()).performTextReplacement("无匹配 ${java.util.UUID.randomUUID()}")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            awaitArchiveReadError()
+            rule.onNodeWithTag("archive-list").performScrollToNode(hasText(updatedNote))
+            rule.onNodeWithText(updatedNote).assertIsDisplayed()
         }
+        rule.onNodeWithTag("archive-list").performScrollToNode(hasText(tr("重试", "Retry")))
+        rule.onNodeWithText(tr("重试", "Retry")).performClick()
+        rule.waitUntil(15_000) {
+            rule.onAllNodesWithText(localizedText("没有找到这一刻")).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag("archive-list").performScrollToIndex(0)
+        rule.onNode(hasSetTextAction()).performTextReplacement("回望")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         val beforeRecovery = model.libraryState.revision
         touchEntry(saved.id)
         rule.waitUntil(15_000) { model.libraryState.revision > beforeRecovery }
@@ -254,7 +312,7 @@ class JournalArchiveReadUiTest {
     }
 
     private fun readErrors() = rule.onAllNodes(hasText(
-        tr("已使用当前页面内容继续筛选。", "Filtering continues using the entries on this page."), substring = true,
+        tr("当前显示上次成功读取的结果。", "Showing the last successful results."), substring = true,
     ))
 
     private fun awaitArchiveReadError(pagerMayFail: Boolean = false) {
@@ -266,7 +324,10 @@ class JournalArchiveReadUiTest {
         }
         dismissReadErrorIfShown()
         rule.onNodeWithTag("archive-list").performScrollToIndex(2)
-        rule.waitUntil(15_000) { readErrors().fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(15_000) {
+            readErrors().fetchSemanticsNodes().isNotEmpty() &&
+                rule.onAllNodes(hasText(tr("重试", "Retry")) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun dismissReadErrorIfShown() {

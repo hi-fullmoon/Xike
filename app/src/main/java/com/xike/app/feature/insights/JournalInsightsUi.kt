@@ -42,6 +42,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,12 +91,18 @@ fun JournalInsightsScreen(
     var calculatedSummary by remember {
         mutableStateOf<JournalPeriodSummary?>(null)
     }
-    LaunchedEffect(entries, dataRevision, selectedPeriod, today, language) {
+    var readError by remember { mutableStateOf<String?>(null) }
+    var retryRevision by remember { mutableStateOf(0) }
+    LaunchedEffect(entries, dataRevision, selectedPeriod, today, language, retryRevision) {
+        readError = null
         journalReadResult {
             if (readRepository != null) readRepository.insights(selectedPeriod, today)
             else withContext(Dispatchers.Default) { journalPeriodSummary(entries, selectedPeriod, today) }
         }.onSuccess { calculatedSummary = it }
-            .onFailure { onReadError(it.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
+            .onFailure {
+                readError = it.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
+                onReadError(requireNotNull(readError))
+            }
     }
     var drilldown by rememberSaveable(
         stateSaver = listSaver<InsightDrilldown?, String>(
@@ -110,7 +117,16 @@ fun JournalInsightsScreen(
     val summary = calculatedSummary
     if (summary == null) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(Modifier.semantics { contentDescription = localizedText("正在读取…") })
+            if (readError == null) {
+                CircularProgressIndicator(Modifier.semantics { contentDescription = localizedText("正在读取…") })
+            } else {
+                Column(Modifier.padding(XikeScreenHorizontalPadding), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(requireNotNull(readError))
+                    TextButton(onClick = { retryRevision++ }, shape = XikeShapes.button) {
+                        Text(tr("重试", "Retry"))
+                    }
+                }
+            }
         }
         return
     }
@@ -139,10 +155,17 @@ fun JournalInsightsScreen(
                 )
             }
             item(key = "insights-period") {
-                InsightsPeriodSelector(
-                    selected = selectedPeriod,
-                    onSelected = { selectedPeriodName = it.name },
-                )
+                Column {
+                    InsightsPeriodSelector(
+                        selected = selectedPeriod,
+                        onSelected = { selectedPeriodName = it.name },
+                    )
+                    if (readError != null) {
+                        TextButton(onClick = { retryRevision++ }, shape = XikeShapes.button) {
+                            Text(tr("读取失败，重试", "Read failed. Retry"))
+                        }
+                    }
+                }
             }
             item(key = "insights-overview") {
                 InsightsOverviewCard(

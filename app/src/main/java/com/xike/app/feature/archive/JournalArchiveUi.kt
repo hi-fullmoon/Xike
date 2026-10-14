@@ -162,12 +162,16 @@ fun JournalArchiveScreen(
     val retainedEntries = remember(readRepository) { LruCache<String, JournalEntry>(300) }
     val resultEntries = results.entries
     val totalResultCount = results.totalCount
+    val headerCount = if (hasSuccessfulResults) totalResultCount else libraryState.totalCount
     val resultRows = results.rows
     val hasMoreResults = results.hasMore
     var fallbackEntries by remember { mutableStateOf(emptyList<JournalEntry>()) }
     var isSearching by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
+    var calendarError by remember { mutableStateOf<String?>(null) }
+    var retryRevision by remember { mutableIntStateOf(0) }
+    var resultDate by remember { mutableStateOf<LocalDate?>(null) }
     var galleryImages by remember { mutableStateOf<List<String>?>(null) }
     var galleryInitialPage by remember { mutableIntStateOf(0) }
     val entrySaver = Saver<JournalEntry?, String>(
@@ -208,7 +212,7 @@ fun JournalArchiveScreen(
         )
     }
 
-    val requestKey = remember(entries, libraryState.revision, searchQuery) { Any() }
+    val requestKey = remember(entries, libraryState.revision, searchQuery, retryRevision) { Any() }
     var pagingQuery by remember { mutableStateOf(searchQuery) }
     var pagingRequestKey by remember { mutableStateOf<Any?>(null) }
     val pagingFlow = remember(readRepository, pagingQuery, pagingRequestKey) {
@@ -235,6 +239,7 @@ fun JournalArchiveScreen(
         if (entriesLoading) return@LaunchedEffect
         isSearching = true
         isLoadingMore = false
+        searchError = null
         if (searchQuery.normalizedText.isNotEmpty()) delay(220)
         pagedEntries?.itemSnapshotList?.items?.forEach { retainedEntries.put(it.id, it) }
         val firstPage = if (readRepository != null) {
@@ -254,6 +259,7 @@ fun JournalArchiveScreen(
                 results = nextResults
                 hasSuccessfulResults = true
                 resultKey = requestKey
+                resultDate = selectedDate
                 pagingQuery = searchQuery
                 pagingRequestKey = requestKey
                 searchError = null
@@ -290,7 +296,7 @@ fun JournalArchiveScreen(
         else journalReadResult { readRepository.topics() }.onSuccess { availableTags = it }
             .onFailure { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
     }
-    LaunchedEffect(readRepository, entries, libraryState.revision, calendarQuery, visibleMonth, viewMode) {
+    LaunchedEffect(readRepository, entries, libraryState.revision, calendarQuery, visibleMonth, viewMode, retryRevision) {
         if (viewMode != ArchiveViewMode.CALENDAR) return@LaunchedEffect
         val calendarKey = calendarQuery to visibleMonth
         if (calendarResultKey != calendarKey) calendarCounts = emptyMap()
@@ -300,8 +306,8 @@ fun JournalArchiveScreen(
                 filterJournalEntries(entries, calendarQuery).groupingBy { it.createdAt.localDate() }.eachCount()
             }
         }
-        result.onSuccess { calendarCounts = it; calendarResultKey = calendarKey }
-            .onFailure { searchError = it.message ?: localizedText("搜索暂时不可用") }
+        result.onSuccess { calendarCounts = it; calendarResultKey = calendarKey; calendarError = null }
+            .onFailure { calendarError = it.message ?: localizedText("搜索暂时不可用") }
     }
 
     LaunchedEffect(entries, libraryState.revision, detailEntry?.id, entriesLoading) {
@@ -333,7 +339,7 @@ fun JournalArchiveScreen(
         ) {
         item(key = "archive-header") {
             ArchiveHeader(
-                recordLabel = if (searchQuery.isEmpty) tr("${libraryState.totalCount} 条记录", "${libraryState.totalCount} entries") else tr("找到 $totalResultCount 条", "$totalResultCount entries found"),
+                recordLabel = if (pagingQuery.isEmpty) tr("$headerCount 条记录", "$headerCount entries") else tr("找到 $totalResultCount 条", "$totalResultCount entries found"),
             )
         }
 
@@ -408,8 +414,10 @@ fun JournalArchiveScreen(
                 matchingCount = totalResultCount,
                 libraryCount = libraryState.totalCount,
                 isSearching = isSearching,
-                searchError = searchError,
-                selectedDate = selectedDate,
+                searchError = searchError ?: calendarError.takeIf { viewMode == ArchiveViewMode.CALENDAR },
+                selectedDate = resultDate,
+                hasSuccessfulResults = hasSuccessfulResults,
+                onRetry = { retryRevision++ },
             )
         }
 
@@ -670,6 +678,8 @@ private fun ArchiveResultStatus(
     isSearching: Boolean,
     searchError: String?,
     selectedDate: LocalDate?,
+    hasSuccessfulResults: Boolean,
+    onRetry: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp),
@@ -706,10 +716,14 @@ private fun ArchiveResultStatus(
         }
         if (searchError != null) {
             Text(
-                tr("$searchError，已使用当前页面内容继续筛选。", "$searchError. Filtering continues using the entries on this page."),
+                if (hasSuccessfulResults) tr("$searchError\n筛选或刷新未完成，当前显示上次成功读取的结果。", "$searchError\nFiltering or refresh did not finish. Showing the last successful results.")
+                else searchError,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(onClick = onRetry, enabled = !isSearching, shape = XikeShapes.button) {
+                Text(tr("重试", "Retry"))
+            }
         }
     }
 }
