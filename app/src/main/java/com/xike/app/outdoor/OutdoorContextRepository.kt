@@ -375,12 +375,20 @@ internal fun hasMixedChinesePlaceName(label: String): Boolean =
         label.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN }
 
 private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
-    val district =
-        listOf(subLocality, subAdminArea, locality, adminArea).firstNotNullOfOrNull {
-            it?.trim()?.takeIf(String::isNotBlank)
-        }
-    return listOf(district, thoroughfare.takeIf { includeStreet })
-        .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+    val regions =
+        listOf(adminArea, locality, subAdminArea, subLocality)
+            .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+            .distinctBy {
+                when (it.removeSuffix("市")) {
+                    "北京",
+                    "上海",
+                    "天津",
+                    "重庆" -> it.removeSuffix("市")
+                    else -> it
+                }
+            }
+    return (regions + listOfNotNull(thoroughfare.takeIf { includeStreet }))
+        .mapNotNull { it.trim().takeIf(String::isNotBlank) }
         .distinct()
         .joinToString(" · ")
         .takeIf(String::isNotBlank)
