@@ -221,7 +221,6 @@ Xike/
 │       └── androidTest/              # 数据库、迁移与 Compose 仪器测试
 ├── docs/
 │   ├── repository-overview.md        # 本文档
-│   ├── roadmap.md                    # 产品路线图
 │   ├── local-development.md          # 本地开发环境
 │   ├── app-lock-design.md            # 应用锁设计
 │   ├── release-checklist.md          # 发布前检查清单
@@ -301,16 +300,9 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 
 签名构建任务只有仓库只读权限；具备 `contents: write` 权限的发布任务不会接收签名密钥。完整说明见 [`docs/github-release-pipeline.md`](github-release-pipeline.md)。
 
-## 13. 当前工程状态与演进方向
+## 13. 当前工程状态
 
-根据 [`docs/roadmap.md`](roadmap.md)，项目当前仍处于 1.0 前的快速迭代阶段。记录、回望、检索、洞察、加密、应用锁、提醒和发布主链路已经具备，后续重点包括：
-
-- 自定义主题。
-- 更安全、可预览、可合并的备份恢复体验。
-- 用户授权目录中的定期加密备份。
-- Markdown/CSV 明文导出及清晰的隐私警告。
-- API 26–36 真机矩阵、动态字体、TalkBack、大屏和低存储验证。
-- 启动、搜索、图片解码和大备份的性能基线。
+记录、回望、检索、洞察、加密、应用锁、提醒和发布主链路已经具备。
 
 文件整理保留单个 Gradle 模块，先按职责拆分文件，再分组调整包结构。页面与共享组件、应用组合入口、应用锁、备份弹窗、轨迹展示及音频实现已按职责提取；主题已迁入 `com.xike.app.ui.theme`，共享组件已迁入 `com.xike.app.ui.components`，此刻页面已迁入 `com.xike.app.feature.moment`，回望与编辑已迁入 `com.xike.app.feature.archive`，共享日记详情与窗外卡片已迁入 `com.xike.app.ui.components.journal`，轨迹与本地回望已迁入 `com.xike.app.feature.insights`，设置页面与专用弹窗已迁入 `com.xike.app.feature.settings`，应用锁已迁入 `com.xike.app.feature.lock`，已明确职责的数据模型与备份辅助能力已迁入 `com.xike.app.data`。`XikeUi.kt` 与 `VoiceRecording.kt` 已无剩余职责并删除。存储模型与备份 JSON、流和加解密辅助能力已单独提取；`JournalBackupStorage` 负责备份导出、读取、ZIP 内容校验及恢复暂存，`JournalStore` 仍统一协调数据库操作、恢复安装、撤销、媒体引用清理及同步锁。草稿并发逻辑、数据库迁移、恢复事务及 `JournalDatabase` 的完整类名不改写。
 

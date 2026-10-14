@@ -76,7 +76,6 @@ Windows 使用 `gradlew.bat` 执行相同任务；也可以在 Android Studio �
 
 ## 更多文档
 
-- [产品 Roadmap](docs/roadmap.md)：后续功能规划。
 - [仓库说明](docs/repository-overview.md)：技术栈、架构、数据安全边界与目录。
 - [应用锁设计](docs/app-lock-design.md)：身份验证与自动锁定取舍。
 - [备份格式与离线阅读](docs/backup-format.md)：加密选项、ZIP 内容及恢复校验。
