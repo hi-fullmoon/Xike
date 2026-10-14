@@ -81,13 +81,34 @@ class LanguageUiTest {
         composeRule.onNodeWithText("应用语言").performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.CHINESE, LanguagePreferences(context).language)
         assertSystemLanguage(AppLanguage.CHINESE, "记录此刻")
+        composeRule.onNodeWithText("应用语言").performClick()
+        composeRule.onNodeWithText("跟随系统").performClick()
+        composeRule.onNodeWithText(localizedText("应用语言")).performScrollTo().assertIsDisplayed()
+        assertEquals(AppLanguage.SYSTEM, LanguagePreferences(context).language)
+        assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
+        val systemLanguage = AppLocale.language
+        val systemContext = context.forLanguage(AppLanguage.SYSTEM)
+        assertEquals(systemContext.getString(R.string.text_app_language), localizedText("应用语言"))
+        assertEquals(draft, ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.onNodeWithText(localizedText("应用语言")).performScrollTo().assertIsDisplayed()
+        assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
+        assertEquals(systemLanguage, AppLocale.language)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            assertTrue(context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty)
+        }
     }
 
     @Test
-    fun defaultIsChineseAndEveryLocalQuestionHasAnEnglishTranslation() {
+    fun defaultFollowsSystemAndEveryLocalQuestionHasAnEnglishTranslation() {
         preferences.edit().remove("language").commit()
-        assertEquals(AppLanguage.CHINESE, LanguagePreferences(context).language)
+        assertEquals(AppLanguage.SYSTEM, LanguagePreferences(context).language)
         composeRule.runOnUiThread { AppLocale.initialize(context) }
+        assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            assertTrue(context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty)
+        }
+        composeRule.runOnUiThread { AppLocale.select(context, AppLanguage.CHINESE) }
         assertEquals("平静", Mood.CALM.label)
         composeRule.runOnUiThread {
             LanguagePreferences(context).language = AppLanguage.ENGLISH

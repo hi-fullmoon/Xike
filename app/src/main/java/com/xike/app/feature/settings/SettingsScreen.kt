@@ -8,6 +8,7 @@ import com.xike.app.DailyPromptStyle
 import com.xike.app.DailyPromptSettings
 import com.xike.app.ReminderSettings
 import com.xike.app.AppLanguage
+import com.xike.app.displayName
 import com.xike.app.AppLocale
 import com.xike.app.LocalLanguageChange
 import com.xike.app.localizedText
@@ -173,7 +174,7 @@ fun ProfileSettingsScreen(
                 SettingsAction(
                     icon = Icons.Outlined.Language,
                     title = localizedText("应用语言"),
-                    subtitle = AppLocale.language.nativeName,
+                    subtitle = AppLocale.selectedLanguage.displayName,
                     onClick = { showLanguageDialog = true },
                 )
             }
@@ -369,7 +370,7 @@ fun ProfileSettingsScreen(
                     AppLanguage.entries.forEach { language ->
                         Row(
                             Modifier.fillMaxWidth().selectable(
-                                selected = AppLocale.language == language,
+                                selected = AppLocale.selectedLanguage == language,
                                 role = Role.RadioButton,
                                 onClick = {
                                     onLanguageChange(language)
@@ -378,9 +379,9 @@ fun ProfileSettingsScreen(
                             ).padding(vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = AppLocale.language == language, onClick = null)
+                            RadioButton(selected = AppLocale.selectedLanguage == language, onClick = null)
                             Spacer(Modifier.width(10.dp))
-                            Text(language.nativeName, style = MaterialTheme.typography.bodyLarge)
+                            Text(language.displayName, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 enum class AppLanguage(val tag: String, val nativeName: String) {
+    SYSTEM("", "跟随系统"),
     CHINESE("zh-CN", "中文"),
     ENGLISH("en", "English");
 
@@ -36,7 +37,7 @@ internal class LanguagePreferences(context: Context) {
 
     var language: AppLanguage
         get() = AppLanguage.entries.firstOrNull { it.tag == preferences.getString("language", null) }
-            ?: AppLanguage.CHINESE
+            ?: AppLanguage.SYSTEM
         set(value) {
             check(preferences.edit().putString("language", value.tag).commit()) {
                 "Unable to save language preference"
@@ -45,6 +46,9 @@ internal class LanguagePreferences(context: Context) {
 }
 
 internal object AppLocale {
+    var selectedLanguage by mutableStateOf(AppLanguage.SYSTEM)
+        private set
+
     var language by mutableStateOf(AppLanguage.CHINESE)
         private set
 
@@ -54,8 +58,10 @@ internal object AppLocale {
     fun initialize(context: Context) = select(context, LanguagePreferences(context).language)
 
     fun select(context: Context, selected: AppLanguage) {
-        localizedContext = context.applicationContext.forLanguage(selected)
-        language = selected
+        val resolved = context.resolveLanguage(selected)
+        localizedContext = context.applicationContext.forLanguage(resolved)
+        language = resolved
+        selectedLanguage = selected
         synchronizeSystemLanguage(context.applicationContext, selected)
     }
 
@@ -92,10 +98,29 @@ private fun synchronizeSystemLanguage(context: Context, language: AppLanguage) {
 }
 
 internal fun Context.forLanguage(language: AppLanguage): Context {
-    val configuration = Configuration(resources.configuration).apply { setLocale(language.locale) }
+    val configuration = Configuration(resources.configuration).apply { setLocale(resolveLanguage(language).locale) }
     // Retain the Activity in the wrapper chain so native dialogs keep their window token.
     return android.view.ContextThemeWrapper(this, 0).apply { applyOverrideConfiguration(configuration) }
 }
+
+private fun Context.resolveLanguage(selected: AppLanguage): AppLanguage {
+    if (selected != AppLanguage.SYSTEM) return selected
+    val locales = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        getSystemService(LocaleManager::class.java).systemLocales
+    } else {
+        android.content.res.Resources.getSystem().configuration.locales
+    }
+    for (index in 0 until locales.size()) {
+        when (locales[index].language) {
+            "zh" -> return AppLanguage.CHINESE
+            "en" -> return AppLanguage.ENGLISH
+        }
+    }
+    return AppLanguage.CHINESE
+}
+
+internal val AppLanguage.displayName: String
+    get() = if (this == AppLanguage.SYSTEM) tr("跟随系统", "Follow system") else nativeName
 
 internal fun localizedText(source: String): String {
     AppLocale.language // Observe changes in Compose, including labels held in enums.
