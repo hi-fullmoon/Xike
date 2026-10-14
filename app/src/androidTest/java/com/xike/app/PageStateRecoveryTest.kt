@@ -54,7 +54,7 @@ class PageStateRecoveryTest {
                     )
                 }
             }
-            composeRule.onNodeWithText(day.getDisplayName(TextStyle.NARROW, AppLocale.locale)).performClick()
+            composeRule.onNodeWithContentDescription(day.getDisplayName(TextStyle.FULL, AppLocale.locale)).performClick()
             restoration.emulateSavedInstanceStateRestore()
             composeRule.onNodeWithText(localizedText("保存")).performClick()
             assertEquals(expectedDays, HabitPreferences(context).reminder.weekdays)

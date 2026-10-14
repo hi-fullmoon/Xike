@@ -99,6 +99,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -484,7 +485,7 @@ internal fun ReminderScheduleDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -521,34 +522,59 @@ internal fun ReminderScheduleDialog(
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(localizedText("提醒星期"), style = MaterialTheme.typography.titleSmall)
-                    DayOfWeek.entries.chunked(4).forEach { days ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            days.forEach { day ->
-                                val selected = day in selectedDays
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 48.dp)
-                                        .clickable {
-                                            selectedDays = if (selected) selectedDays - day else selectedDays + day
-                                        },
-                                    shape = XikeShapes.button,
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    },
-                                ) {
-                                    Text(
-                                        day.getDisplayName(DateTextStyle.NARROW, AppLocale.locale),
-                                        modifier = Modifier.padding(vertical = 10.dp),
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val textMeasurer = rememberTextMeasurer()
+                        val density = LocalDensity.current
+                        val labelStyle = MaterialTheme.typography.labelLarge
+                        val labelWidth = DayOfWeek.entries.maxOf { day ->
+                            textMeasurer.measure(
+                                day.getDisplayName(DateTextStyle.SHORT, AppLocale.locale),
+                                style = labelStyle,
+                                softWrap = false,
+                            ).size.width
+                        }
+                        val minimumWidth = maxOf(48.dp, with(density) { labelWidth.toDp() } + 8.dp)
+                        val columns = ((maxWidth + 7.dp) / (minimumWidth + 7.dp)).toInt().coerceIn(1, 4)
+                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            DayOfWeek.entries.chunked(columns).forEach { days ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    days.forEach { day ->
+                                        val selected = day in selectedDays
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .toggleable(value = selected, role = Role.Checkbox, onValueChange = {
+                                                    selectedDays = if (selected) selectedDays - day else selectedDays + day
+                                                })
+                                                .semantics {
+                                                    contentDescription = day.getDisplayName(DateTextStyle.FULL, AppLocale.locale)
+                                                },
+                                            shape = XikeShapes.button,
+                                            color = if (selected) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                            },
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    day.getDisplayName(DateTextStyle.SHORT, AppLocale.locale),
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                    style = labelStyle,
+                                                    maxLines = 1,
+                                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    repeat(columns - days.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
-                            repeat(4 - days.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                     if (selectedDays.isEmpty()) {
@@ -573,6 +599,7 @@ internal fun ReminderScheduleDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Spacer(Modifier.width(12.dp))
                     Switch(checked = quietHoursEnabled, onCheckedChange = null, colors = xikeSwitchColors())
                 }
             }
