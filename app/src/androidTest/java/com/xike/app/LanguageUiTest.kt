@@ -14,6 +14,7 @@ import android.content.pm.ShortcutManager
 import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -74,7 +75,10 @@ class LanguageUiTest {
         composeRule.onNodeWithTag("navigation-archive").performClick()
         composeRule.onNodeWithText("Calendar").assertIsDisplayed()
         composeRule.onNodeWithTag("navigation-insights").performClick()
-        composeRule.onNodeWithText("This week").assertIsDisplayed()
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("insights-list").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("This week").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("navigation-settings").performClick()
         composeRule.onNodeWithText("App language").performScrollTo().performClick()
         composeRule.onNodeWithText("中文").performClick()

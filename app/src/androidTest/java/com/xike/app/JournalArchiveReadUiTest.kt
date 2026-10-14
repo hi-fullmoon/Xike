@@ -99,14 +99,15 @@ class JournalArchiveReadUiTest {
                 notes += note
                 rule.onNodeWithText(Mood.CALM.label).performScrollTo().assertIsEnabled().performClick().assertIsSelected()
                 rule.onNodeWithContentDescription(localizedText("此刻的注脚")).performScrollTo().performTextInput(note)
-                rule.onNodeWithText(localizedText("完成")).performScrollTo().performClick()
-                rule.waitUntil(15_000) {
-                    androidx.core.view.ViewCompat.getRootWindowInsets(rule.activity.window.decorView)
-                        ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())?.bottom == 0
-                }
+                // Let Espresso synchronize the native IME instead of polling Compose view insets.
+                androidx.test.espresso.Espresso.closeSoftKeyboard()
                 rule.onNodeWithText(localizedText("记下此刻")).assertIsEnabled().performClick()
                 rule.waitUntil(15_000) {
                     model.libraryState.totalCount == originalCount + index + 1 && !model.isDraftSaving && model.draft.isEmpty
+                }
+                // Let the real notice expire before the next save; it may disappear at any time.
+                rule.waitUntil(15_000) {
+                    rule.onAllNodesWithContentDescription(localizedText("关闭")).fetchSemanticsNodes().isEmpty()
                 }
                 val id = model.readRepository.indexPage(query, 0).entries.first().id
                 assertEquals(note, model.readRepository.entry(id)?.note)
@@ -120,10 +121,7 @@ class JournalArchiveReadUiTest {
             rule.onNodeWithText(tr("时间线", "Timeline")).performClick()
             rule.onNodeWithText(localizedText("搜索注脚或主题")).performTextInput(prefix)
             rule.onNode(hasSetTextAction()).performImeAction()
-            rule.waitUntil(15_000) {
-                androidx.core.view.ViewCompat.getRootWindowInsets(rule.activity.window.decorView)
-                    ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())?.bottom == 0
-            }
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
             rule.waitUntil(15_000) { rule.onAllNodesWithText(tr("找到 61 条", "61 entries found")).fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag("archive-list").performScrollToNode(hasText(localizedText("加载更多记录")))
             rule.waitUntil(15_000) {
