@@ -25,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -197,16 +198,22 @@ class JournalViewModelPersistenceTest {
             }
             SystemClock.sleep(350L)
             assertTrue(draftStore.load().isEmpty)
+            val originalCount = viewModel.libraryState.totalCount
             withContext(Dispatchers.Main) { viewModel.save(entry, emptyList()).getOrThrow() }
-            awaitCondition { viewModel.entries.any { it.id == entry.id } }
+            awaitCondition { viewModel.libraryState.totalCount == originalCount + 1 }
+            assertEquals(entry, viewModel.readRepository.entry(entry.id))
+            val beforeEdit = viewModel.libraryState.revision
             val edited = withContext(Dispatchers.Main) {
                 viewModel.update(entry.copy(note = "走完后心情平静"), emptyList(), emptyList()).getOrThrow()
             }
-            awaitCondition { viewModel.entries.any { it.id == entry.id && it.note == edited.note } }
+            awaitCondition { viewModel.libraryState.revision > beforeEdit }
+            assertEquals(edited, viewModel.readRepository.entry(entry.id))
             withContext(Dispatchers.Main) { viewModel.delete(edited).getOrThrow() }
-            awaitCondition { viewModel.entries.none { it.id == entry.id } }
+            awaitCondition { viewModel.libraryState.totalCount == originalCount }
+            assertNull(viewModel.readRepository.entry(entry.id))
             withContext(Dispatchers.Main) { viewModel.undoDelete(entry.id).getOrThrow() }
-            awaitCondition { viewModel.entries.any { it.id == entry.id && it.note == edited.note } }
+            awaitCondition { viewModel.libraryState.totalCount == originalCount + 1 }
+            assertEquals(edited, viewModel.readRepository.entry(entry.id))
         } finally {
             val store = JournalStore(application)
             if (store.entries().any { it.id == entry.id }) store.delete(entry.id, refreshEntries = false)

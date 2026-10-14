@@ -112,6 +112,10 @@ class JournalDaoTest {
         ).map(JournalEntryRecord::toJournalEntry)
 
         assertEquals(listOf("matching"), results.map { it.id })
+        val repository = JournalReadRepository(database)
+        val query = JournalSearchQuery(text = "工作", moods = setOf(Mood.GOOD), tags = setOf("工作"), imageFilter = JournalImageFilter.WITH_IMAGES)
+        assertEquals(listOf("matching"), dao.entryIndex(repository.sql(query, "e.id, e.created_at", ordered = true, offset = 0)).map { it.id })
+        assertEquals(1, dao.queryCount(repository.sql(query, "COUNT(*)")))
         assertEquals(
             1,
             dao.searchRecordCount(
@@ -174,6 +178,28 @@ class JournalDaoTest {
         val observed = dao.observeRecords().first().map(JournalEntryRecord::toJournalEntry)
 
         assertEquals(listOf("newer", "older"), observed.map { it.id })
+        val repository = JournalReadRepository(database)
+        assertEquals(listOf("newer", "older"), repository.indexPage(JournalSearchQuery(), 0).entries.map { it.id })
+        assertEquals(2, repository.libraryState(1).totalCount)
+        assertEquals("note-older", repository.entry("older")?.note)
+    }
+
+    @Test
+    fun topicAggregationDeduplicatesHistoricalAliasesWithinEachEntry() = runBlocking {
+        dao.insertJournal(entry("aliases", 100L, listOf("社交", "关系", "工作")).toBundle())
+        dao.insertJournal(entry("current", 200L, listOf("工作")).toBundle())
+        assertEquals(listOf("工作", "关系"), JournalReadRepository(database).topics())
+    }
+
+    @Test
+    fun searchIndexRebuildPreservesRelationsAndSearchableText() {
+        val original = entry("rebuild", 100L, listOf("工作"), listOf("existing.xike-image"))
+        dao.insertJournal(original.toBundle())
+        dao.rebuildSearchIndexFromRecords()
+        assertEquals(original, dao.record(original.id)?.toJournalEntry())
+        val repository = JournalReadRepository(database)
+        assertEquals(listOf(original.id), dao.entryIndex(repository.sql(JournalSearchQuery(text = "工作"), "e.id, e.created_at", ordered = true, offset = 0)).map { it.id })
+        assertEquals(SEARCH_INDEX_VERSION, dao.settingValue(SEARCH_INDEX_SETTING))
     }
 
     @Test

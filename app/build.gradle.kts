@@ -117,6 +117,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-paging:2.8.4")
+    implementation("androidx.paging:paging-compose:3.3.6")
     implementation("androidx.sqlite:sqlite:2.6.2")
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("com.google.crypto.tink:tink-android:1.8.0")

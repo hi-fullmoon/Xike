@@ -321,6 +321,11 @@ internal fun entriesWithIds(entries: List<JournalEntry>, entryIds: Collection<St
     return entries.filter { it.id in ids }.sortedByDescending(JournalEntry::createdAt)
 }
 
+internal fun InsightsPeriod.readDateRanges(today: LocalDate): List<Pair<LocalDate, LocalDate>> {
+    val current = bounds(today)
+    return listOf(current.startDate to current.endDateExclusive, previousBounds(today, current))
+}
+
 private fun InsightsPeriod.bounds(today: LocalDate): PeriodBounds {
     val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     val start = when (this) {

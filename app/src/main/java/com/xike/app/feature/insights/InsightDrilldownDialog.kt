@@ -1,6 +1,14 @@
 package com.xike.app.feature.insights
 
 import com.xike.app.data.JournalEntry
+import com.xike.app.JournalReadRepository
+import com.xike.app.journalReadResult
+import androidx.paging.LoadState
+import com.xike.app.JournalSearchQuery
+import com.xike.app.feature.archive.ArchiveReadEntry
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import com.xike.app.localizedText
 
 import com.xike.app.ui.components.journal.JournalEntryDetailDialog
@@ -59,9 +67,28 @@ internal fun InsightDrilldownDialog(
     openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream?,
     onDismiss: () -> Unit,
+    readRepository: JournalReadRepository? = null,
+    entryIds: List<String> = entries.map { it.id },
+    dataRevision: Long = 0,
+    onReadError: (String) -> Unit = {},
 ) {
     var detailEntryId by rememberSaveable { mutableStateOf<String?>(null) }
-    val detailEntry = entries.firstOrNull { it.id == detailEntryId }
+    var loadedDetail by remember { mutableStateOf<JournalEntry?>(null) }
+    val detailEntry = if (readRepository == null) entries.firstOrNull { it.id == detailEntryId } else loadedDetail
+    val flow = remember(readRepository, entryIds, dataRevision) { readRepository?.pages(JournalSearchQuery(), entryIds) }
+    val paged = flow?.collectAsLazyPagingItems()
+    val heights = remember(entryIds, dataRevision) { mutableMapOf<String, Int>() }
+    LaunchedEffect(paged?.loadState) {
+        if (paged?.loadState?.refresh is LoadState.Error || paged?.loadState?.append is LoadState.Error || paged?.loadState?.prepend is LoadState.Error) {
+            onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。"))
+        }
+    }
+    LaunchedEffect(detailEntryId, dataRevision) {
+        val id = detailEntryId
+        if (id == null) loadedDetail = null
+        else if (readRepository != null) journalReadResult { readRepository.entry(id) }.onSuccess { loadedDetail = it }
+            .onFailure { onReadError(it.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
+    }
     var galleryImages by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var galleryInitialPage by rememberSaveable { mutableIntStateOf(0) }
 
@@ -88,9 +115,22 @@ internal fun InsightDrilldownDialog(
                         }
                     }
                 }
-                if (entries.isEmpty()) {
+                if (entryIds.isEmpty()) {
                     item(key = "drilldown-empty") {
                         InsufficientDataNote(localizedText("这个统计项没有对应记录。"))
+                    }
+                } else if (paged != null) {
+                    items(entryIds.size, key = { entryIds[it] }) { index ->
+                        val entry = if (index < paged.itemCount) paged[index] else null
+                        ArchiveReadEntry(entryIds[index], entry?.takeIf { it.id == entryIds[index] }, readRepository, dataRevision, heights, onReadError) { loaded ->
+                            JournalEntryCard(
+                                entry = loaded,
+                                modifier = Modifier.testTag("insight-source-${loaded.id}"),
+                                openImage = openImage,
+                                onImageClick = { imageIndex -> galleryImages = loaded.imageFileNames; galleryInitialPage = imageIndex },
+                                onClick = { loadedDetail = loaded; detailEntryId = loaded.id },
+                            )
+                        }
                     }
                 } else {
                     items(entries, key = JournalEntry::id) { entry ->

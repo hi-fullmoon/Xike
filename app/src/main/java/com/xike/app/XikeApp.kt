@@ -35,7 +35,8 @@ import java.io.File
 @Composable
 internal fun XikeApp(
     // Journal pages and media readers.
-    entries: List<JournalEntry>,
+    readRepository: JournalReadRepository,
+    libraryState: JournalLibraryState,
     entriesLoading: Boolean,
     openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream?,
@@ -99,6 +100,7 @@ internal fun XikeApp(
     onUndoRestore: suspend () -> Result<Int>,
     // Navigation requests.
     quickRecordRequest: Int,
+    onReadError: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
@@ -110,7 +112,7 @@ internal fun XikeApp(
     }
 
     XikeBackupFlow(
-        localEntryCount = entries.size,
+        localEntryCount = libraryState.totalCount,
         isBackupExporting = isBackupExporting,
         onExportBackup = onExportBackup,
         onBackupRequiresPassword = onBackupRequiresPassword,
@@ -138,7 +140,8 @@ internal fun XikeApp(
                 when (screen) {
                     AppScreen.HOME -> MomentScreen(
                         padding = innerPadding,
-                        entries = entries,
+                        entries = emptyList(),
+                        recordedTodayCount = libraryState.todayCount,
                         draft = draft,
                         dailyPromptSettings = dailyPromptSettings,
                         onDraftMoodChange = onDraftMoodChange,
@@ -169,11 +172,14 @@ internal fun XikeApp(
                         isDraftSaving = isDraftSaving,
                         saveFeedbackHandledExternally = true,
                     )
-                    AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, entries, openImage, openAudio)
+                    AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, emptyList(), openImage, openAudio, readRepository, libraryState.revision, onReadError)
                     AppScreen.ARCHIVE -> JournalArchiveScreen(
                         padding = innerPadding,
-                        entries = entries,
+                        entries = emptyList(),
                         entriesLoading = entriesLoading,
+                        readRepository = readRepository,
+                        libraryState = libraryState,
+                        onReadError = onReadError,
                         onSearch = onSearch,
                         onUpdate = onUpdate,
                         onDelete = onDelete,

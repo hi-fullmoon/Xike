@@ -55,14 +55,13 @@ internal class JournalVideoStore(context: Context) {
         check(edits.edit().putString(entry.id, json.toString()).commit()) { tr("视频编辑草稿保存失败。", "Unable to save the video edit draft.") }
     }
     fun clearEdit(entryId: String) { check(edits.edit().remove(entryId).commit()) }
-    fun discardStaleEdits(entries: List<JournalEntry>): List<JournalVideo> {
-        val current = entries.associateBy { it.id }
+    fun discardStaleEdits(current: Map<String, String?>): List<JournalVideo> {
         val removed = mutableListOf<JournalVideo>()
         val editor = edits.edit()
         edits.all.forEach { (id, serialized) ->
             val json = JSONObject(serialized as String)
             val original = json.optString("original").takeIf { it != "null" && it.isNotBlank() }
-            if (id !in current || current[id]?.video?.fileName != original) {
+            if (id !in current || current[id] != original) {
                 editor.remove(id)
                 JournalVideo.fromJson(json.optJSONObject("video"))?.let(removed::add)
             }

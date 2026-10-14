@@ -19,6 +19,15 @@ import com.xike.app.data.JournalEntry
 import com.xike.app.JournalImageFilter
 import com.xike.app.JournalSearchQuery
 import com.xike.app.JournalSearchPage
+import com.xike.app.JournalReadRepository
+import com.xike.app.JournalLibraryState
+import com.xike.app.JournalEntryIndex
+import com.xike.app.JournalIndexPage
+import com.xike.app.journalReadResult
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.LoadState
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.layout.onSizeChanged
 import com.xike.app.filterJournalEntries
 import com.xike.app.canonicalTopics
 import com.xike.app.toggleTopic
@@ -28,6 +37,7 @@ import com.xike.app.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.net.Uri
+import android.util.LruCache
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -73,6 +83,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import java.io.InputStream
@@ -82,6 +93,8 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,6 +102,30 @@ import com.xike.app.ui.components.journal.JournalEntryDetailDialog
 import com.xike.app.ui.components.journal.asDetailChineseDateTime
 
 private const val ARCHIVE_PAGE_SIZE = 60
+
+private sealed interface ArchiveRow {
+    data class DateHeader(val date: LocalDate, val count: Int) : ArchiveRow
+    data class Entry(val reference: JournalEntryIndex, val position: Int) : ArchiveRow
+}
+
+private data class ArchiveResults(
+    val entries: List<JournalEntryIndex> = emptyList(),
+    val rows: List<ArchiveRow> = emptyList(),
+    val totalCount: Int = 0,
+    val hasMore: Boolean = false,
+)
+
+private suspend fun archiveResults(entries: List<JournalEntryIndex>, totalCount: Int): ArchiveResults =
+    withContext(Dispatchers.Default) {
+        val groups = entries.withIndex().groupBy { it.value.createdAt.localDate() }.toList().sortedByDescending { it.first }
+        val rows = buildList {
+            groups.forEach { (date, dayEntries) ->
+                add(ArchiveRow.DateHeader(date, dayEntries.size))
+                dayEntries.forEach { add(ArchiveRow.Entry(it.value, it.index)) }
+            }
+        }
+        ArchiveResults(entries, rows, totalCount, entries.size < totalCount)
+    }
 
 @Composable
 fun JournalArchiveScreen(
@@ -102,6 +139,9 @@ fun JournalArchiveScreen(
     openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream? = { null },
     entriesLoading: Boolean = false,
+    readRepository: JournalReadRepository? = null,
+    libraryState: JournalLibraryState = JournalLibraryState(totalCount = entries.size),
+    onReadError: (String) -> Unit = {},
 ) {
     val today = LocalDate.now()
     val context = LocalContext.current
@@ -117,9 +157,14 @@ fun JournalArchiveScreen(
     var visibleMonthValue by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
     var viewModeName by rememberSaveable { mutableStateOf(ArchiveViewMode.TIMELINE.name) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
-    var resultEntries by remember { mutableStateOf(entries) }
-    var totalResultCount by remember { mutableIntStateOf(entries.size) }
-    var hasMoreResults by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf(ArchiveResults()) }
+    var hasSuccessfulResults by remember { mutableStateOf(false) }
+    val retainedEntries = remember(readRepository) { LruCache<String, JournalEntry>(300) }
+    val resultEntries = results.entries
+    val totalResultCount = results.totalCount
+    val resultRows = results.rows
+    val hasMoreResults = results.hasMore
+    var fallbackEntries by remember { mutableStateOf(emptyList<JournalEntry>()) }
     var isSearching by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
@@ -163,7 +208,17 @@ fun JournalArchiveScreen(
         )
     }
 
-    val requestKey = remember(entries, searchQuery) { Any() }
+    val requestKey = remember(entries, libraryState.revision, searchQuery) { Any() }
+    var pagingQuery by remember { mutableStateOf(searchQuery) }
+    var pagingRequestKey by remember { mutableStateOf<Any?>(null) }
+    val pagingFlow = remember(readRepository, pagingQuery, pagingRequestKey) {
+        if (pagingRequestKey == null) null else readRepository?.pages(pagingQuery)
+    }
+    val pagedEntries = pagingFlow?.collectAsLazyPagingItems()
+    val entryHeights = remember(pagingRequestKey) { mutableMapOf<String, Int>() }
+    LaunchedEffect(pagedEntries?.itemSnapshotList) {
+        pagedEntries?.itemSnapshotList?.items?.forEach { retainedEntries.put(it.id, it) }
+    }
     val currentRequestKey by androidx.compose.runtime.rememberUpdatedState(requestKey)
     var resultKey by remember { mutableStateOf<Any?>(null) }
     val viewMode = ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
@@ -171,27 +226,42 @@ fun JournalArchiveScreen(
     val resultStatusIndex = 2 + (if (showFilters) 1 else 0) + (if (viewMode == ArchiveViewMode.CALENDAR) 1 else 0)
     val currentResultStatusIndex by androidx.compose.runtime.rememberUpdatedState(resultStatusIndex)
 
-    LaunchedEffect(requestKey) {
+    LaunchedEffect(pagedEntries?.loadState) {
+        if (pagedEntries?.loadState?.refresh is LoadState.Error || pagedEntries?.loadState?.append is LoadState.Error || pagedEntries?.loadState?.prepend is LoadState.Error) {
+            onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。"))
+        }
+    }
+    LaunchedEffect(requestKey, entriesLoading) {
+        if (entriesLoading) return@LaunchedEffect
         isSearching = true
         isLoadingMore = false
         if (searchQuery.normalizedText.isNotEmpty()) delay(220)
-        val firstPage = onSearch(searchQuery, 0, ARCHIVE_PAGE_SIZE)
+        pagedEntries?.itemSnapshotList?.items?.forEach { retainedEntries.put(it.id, it) }
+        val firstPage = if (readRepository != null) {
+            journalReadResult { readRepository.indexPage(searchQuery, 0) }
+        } else {
+            onSearch(searchQuery, 0, ARCHIVE_PAGE_SIZE).map { page ->
+                fallbackEntries = page.entries
+                JournalIndexPage(page.entries.map { JournalEntryIndex(it.id, it.createdAt) }, page.totalCount)
+            }
+        }
         if (currentRequestKey !== requestKey) return@LaunchedEffect
         firstPage
             .onSuccess { page ->
-                resultEntries = page.entries
-                totalResultCount = page.totalCount
-                hasMoreResults = page.hasMore
+                val nextResults = archiveResults(page.entries, page.totalCount)
+                if (currentRequestKey !== requestKey) return@LaunchedEffect
+                if (readRepository != null) fallbackEntries = emptyList()
+                results = nextResults
+                hasSuccessfulResults = true
+                resultKey = requestKey
+                pagingQuery = searchQuery
+                pagingRequestKey = requestKey
                 searchError = null
             }
             .onFailure { error ->
-                val fallback = filterJournalEntries(entries, searchQuery)
-                resultEntries = fallback
-                totalResultCount = fallback.size
-                hasMoreResults = false
+                // A failed read cannot replace the last successful snapshot or its paging source.
                 searchError = error.message ?: localizedText("搜索暂时不可用")
             }
-        resultKey = requestKey
         isSearching = false
         if (scrollToSelectedDateResults) {
             withFrameNanos { }
@@ -200,10 +270,7 @@ fun JournalArchiveScreen(
         }
     }
 
-    val groupedResults = remember(resultEntries) {
-        resultEntries.groupBy { it.localDate() }.toList().sortedByDescending { it.first }
-    }
-    val availableTags = remember(entries) {
+    val legacyTags = remember(entries) {
         entries.flatMap { it.tags.canonicalTopics() }
             .groupingBy { it }
             .eachCount()
@@ -214,24 +281,46 @@ fun JournalArchiveScreen(
     val calendarQuery = remember(searchQuery) {
         searchQuery.copy(startDate = null, endDate = null)
     }
-    val calendarEntries = remember(entries, calendarQuery) {
-        filterJournalEntries(entries, calendarQuery)
-    }
-    val calendarEntriesByDate = remember(calendarEntries) {
-        calendarEntries.groupBy { it.localDate() }
-    }
     val visibleMonth = runCatching { YearMonth.parse(visibleMonthValue) }.getOrDefault(YearMonth.from(today))
+    var availableTags by remember { mutableStateOf(legacyTags) }
+    var calendarCounts by remember { mutableStateOf(emptyMap<LocalDate, Int>()) }
+    var calendarResultKey by remember { mutableStateOf<Pair<JournalSearchQuery, YearMonth>?>(null) }
+    LaunchedEffect(readRepository, entries, libraryState.revision) {
+        if (readRepository == null) availableTags = legacyTags
+        else journalReadResult { readRepository.topics() }.onSuccess { availableTags = it }
+            .onFailure { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
+    }
+    LaunchedEffect(readRepository, entries, libraryState.revision, calendarQuery, visibleMonth, viewMode) {
+        if (viewMode != ArchiveViewMode.CALENDAR) return@LaunchedEffect
+        val calendarKey = calendarQuery to visibleMonth
+        if (calendarResultKey != calendarKey) calendarCounts = emptyMap()
+        val result = journalReadResult {
+            if (readRepository != null) readRepository.calendar(calendarQuery, visibleMonth)
+            else withContext(Dispatchers.Default) {
+                filterJournalEntries(entries, calendarQuery).groupingBy { it.createdAt.localDate() }.eachCount()
+            }
+        }
+        result.onSuccess { calendarCounts = it; calendarResultKey = calendarKey }
+            .onFailure { searchError = it.message ?: localizedText("搜索暂时不可用") }
+    }
 
-    LaunchedEffect(entries, detailEntry?.id, entriesLoading) {
+    LaunchedEffect(entries, libraryState.revision, detailEntry?.id, entriesLoading) {
         if (entriesLoading) return@LaunchedEffect
         val selectedId = detailEntry?.id ?: return@LaunchedEffect
-        detailEntry = entries.firstOrNull { it.id == selectedId }
+        if (readRepository == null) detailEntry = entries.firstOrNull { it.id == selectedId }
+        else journalReadResult { readRepository.entry(selectedId) }.onSuccess { detailEntry = it }
+            .onFailure { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
     }
+
+    // Capture structural conditions once per composition; lazy measurement must see one result snapshot.
+    val noResults = hasSuccessfulResults && resultEntries.isEmpty() && !isSearching
+    val filtersVisible = showFilters
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = archiveListState,
             modifier = Modifier
+                .testTag("archive-list")
                 .widthIn(max = XikeContentMaxWidth)
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
@@ -244,7 +333,7 @@ fun JournalArchiveScreen(
         ) {
         item(key = "archive-header") {
             ArchiveHeader(
-                recordLabel = if (searchQuery.isEmpty) tr("${entries.size} 条记录", "${entries.size} entries") else tr("找到 $totalResultCount 条", "$totalResultCount entries found"),
+                recordLabel = if (searchQuery.isEmpty) tr("${libraryState.totalCount} 条记录", "${libraryState.totalCount} entries") else tr("找到 $totalResultCount 条", "$totalResultCount entries found"),
             )
         }
 
@@ -261,7 +350,7 @@ fun JournalArchiveScreen(
             )
         }
 
-        if (showFilters) {
+        if (filtersVisible) {
             item(key = "archive-filters") {
                 ArchiveFilters(
                     selectedMoodNames = selectedMoodNames,
@@ -301,7 +390,7 @@ fun JournalArchiveScreen(
                     month = visibleMonth,
                     today = today,
                     selectedDate = selectedDate,
-                    entriesByDate = calendarEntriesByDate,
+                    countsByDate = calendarCounts,
                     onPreviousMonth = { visibleMonthValue = visibleMonth.minusMonths(1).toString() },
                     onNextMonth = { visibleMonthValue = visibleMonth.plusMonths(1).toString() },
                     onSelectDate = { date ->
@@ -317,14 +406,14 @@ fun JournalArchiveScreen(
             ArchiveResultStatus(
                 shownCount = resultEntries.size,
                 matchingCount = totalResultCount,
-                libraryCount = entries.size,
+                libraryCount = libraryState.totalCount,
                 isSearching = isSearching,
                 searchError = searchError,
                 selectedDate = selectedDate,
             )
         }
 
-        if (entries.isEmpty()) {
+        if (libraryState.totalCount == 0) {
             item(key = "archive-empty") {
                 ArchiveEmptyState(
                     icon = Icons.Outlined.CalendarMonth,
@@ -332,7 +421,7 @@ fun JournalArchiveScreen(
                     description = localizedText("第一条不必完整，选一种心情就够了。"),
                 )
             }
-        } else if (resultEntries.isEmpty() && !isSearching) {
+        } else if (noResults) {
             item(key = "archive-no-results") {
                 ArchiveEmptyState(
                     icon = Icons.Outlined.Search,
@@ -341,18 +430,32 @@ fun JournalArchiveScreen(
                 )
             }
         } else {
-            groupedResults.forEach { (date, dayEntries) ->
-                item(key = "date-$date") { ArchiveDateHeader(date, dayEntries.size) }
-                items(dayEntries, key = { entry -> "entry-${entry.id}" }) { entry ->
-                    ArchiveTimelineEntry(
-                        entry = entry,
-                        openImage = openImage,
-                        onImageClick = { index ->
-                            galleryImages = entry.imageFileNames
-                            galleryInitialPage = index
-                        },
-                        onClick = { detailEntry = entry },
-                    )
+            items(
+                resultRows,
+                key = { row -> when (row) {
+                    is ArchiveRow.DateHeader -> "date-${row.date}"
+                    is ArchiveRow.Entry -> "entry-${row.reference.id}"
+                } },
+                contentType = { row -> if (row is ArchiveRow.DateHeader) "date" else "entry" },
+            ) { row ->
+                if (row is ArchiveRow.DateHeader) {
+                    ArchiveDateHeader(row.date, row.count)
+                } else if (row is ArchiveRow.Entry) {
+                    val reference = row.reference
+                    val paged = if (row.position < (pagedEntries?.itemCount ?: 0)) pagedEntries?.get(row.position) else null
+                    val retained = retainedEntries.get(reference.id) ?: fallbackEntries.firstOrNull { it.id == reference.id }
+                    val entry = paged?.takeIf { it.id == reference.id } ?: retained
+                    ArchiveReadEntry(reference.id, entry, readRepository, libraryState.revision, entryHeights, onReadError) { loaded ->
+                        ArchiveTimelineEntry(
+                            entry = loaded,
+                            openImage = openImage,
+                            onImageClick = { index ->
+                                galleryImages = loaded.imageFileNames
+                                galleryInitialPage = index
+                            },
+                            onClick = { detailEntry = loaded },
+                        )
+                    }
                 }
             }
             if (hasMoreResults) {
@@ -368,13 +471,18 @@ fun JournalArchiveScreen(
                             val pageQuery = searchQuery
                             val baseEntries = resultEntries
                             scope.launch {
-                                val result = onSearch(pageQuery, baseEntries.size, ARCHIVE_PAGE_SIZE)
+                                val result = if (readRepository != null) {
+                                    journalReadResult { readRepository.indexPage(pageQuery, baseEntries.size, totalResultCount) }
+                                } else onSearch(pageQuery, baseEntries.size, ARCHIVE_PAGE_SIZE).map { page ->
+                                    fallbackEntries = fallbackEntries + page.entries
+                                    JournalIndexPage(page.entries.map { JournalEntryIndex(it.id, it.createdAt) }, page.totalCount)
+                                }
                                 if (currentRequestKey !== pageKey) return@launch
                                 result
                                     .onSuccess { page ->
-                                        resultEntries = (baseEntries + page.entries).distinctBy { it.id }
-                                        totalResultCount = page.totalCount
-                                        hasMoreResults = page.hasMore
+                                        val nextResults = archiveResults((baseEntries + page.entries).distinctBy { it.id }, page.totalCount)
+                                        if (currentRequestKey !== pageKey) return@launch
+                                        results = nextResults
                                         searchError = null
                                     }
                                     .onFailure { error ->
@@ -462,8 +570,12 @@ fun JournalArchiveScreen(
                             deleteError = error.message ?: localizedText("删除失败，请重试。")
                         }
                         if (result.isSuccess) {
-                            if (detailEntry?.id == entry.id) detailEntry = null
-                            if (editEntry?.id == entry.id) editEntry = null
+                            if (detailEntry?.id == entry.id) {
+                                detailEntry = null
+                            }
+                            if (editEntry?.id == entry.id) {
+                                editEntry = null
+                            }
                             deleteCandidate = null
                             var deleteWasUndone = false
                             try {
@@ -718,5 +830,30 @@ private fun DeleteJournalDialog(
 
 private fun List<String>.toggle(value: String): List<String> = if (value in this) this - value else this + value
 
-private fun JournalEntry.localDate(zoneId: ZoneId = ZoneId.systemDefault()): LocalDate =
-    Instant.ofEpochMilli(createdAt).atZone(zoneId).toLocalDate()
+private fun Long.localDate(zoneId: ZoneId = ZoneId.systemDefault()): LocalDate =
+    Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
+
+/** Only visible rows hold a fallback record while a dropped Paging page is reloaded. */
+@Composable
+internal fun ArchiveReadEntry(
+    id: String,
+    paged: JournalEntry?,
+    repository: JournalReadRepository?,
+    revision: Long,
+    heights: MutableMap<String, Int>,
+    onReadError: (String) -> Unit = {},
+    content: @Composable (JournalEntry) -> Unit,
+) {
+    val loaded by produceState(paged, id, revision) {
+        if (paged == null && repository != null) {
+            try { value = repository.entry(id) }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
+        }
+    }
+    val entry = paged ?: loaded
+    Box(Modifier.fillMaxWidth().onSizeChanged { if (entry != null) heights[id] = it.height }) {
+        if (entry != null) content(entry)
+        else Spacer(Modifier.height(heights[id]?.let { with(LocalDensity.current) { it.toDp() } } ?: 160.dp))
+    }
+}

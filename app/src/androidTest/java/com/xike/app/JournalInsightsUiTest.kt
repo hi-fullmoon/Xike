@@ -127,7 +127,8 @@ class JournalInsightsUiTest {
             }
         }
 
-        composeRule.onNode(hasContentDescription("3 条记录", substring = true)).performScrollTo().performClick()
+        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasContentDescription("3 条记录", substring = true))
+        composeRule.onNode(hasContentDescription("3 条记录", substring = true)).performClick()
         composeRule.onNodeWithText("趋势里的第一条").assertIsDisplayed()
         composeRule.onNodeWithText("趋势里的第二条").assertIsDisplayed()
     }

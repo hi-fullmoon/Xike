@@ -49,7 +49,7 @@ class JournalRefactoringUiTest {
         rule.waitUntil(20_000) { !model.isLoading }
         check(model.draft.isEmpty) { "Use the independent device with an empty draft." }
         val note = "Xike moment acceptance ${UUID.randomUUID()}"
-        val originalIds = model.entries.map { it.id }.toSet()
+        val originalIds = JournalStore(rule.activity).entries().map { it.id }.toSet()
         rule.onNodeWithTag("navigation-home").performClick()
         rule.onNodeWithText(Mood.CALM.label).performScrollTo().performClick()
         rule.onNodeWithContentDescription(localizedText("此刻的注脚"))
@@ -64,7 +64,7 @@ class JournalRefactoringUiTest {
         rule.onNodeWithContentDescription(localizedText("此刻的注脚"))
             .performScrollTo().assertTextContains(note)
         rule.onNodeWithText(localizedText("记下此刻")).performClick()
-        rule.waitUntil(15_000) { model.entries.any { it.id !in originalIds && it.note == note } }
+        rule.waitUntil(15_000) { model.libraryState.totalCount == originalIds.size + 1 }
         val saved = JournalStore(rule.activity).entries().single { it.id !in originalIds && it.note == note }
         assertEquals(Mood.CALM, saved.mood)
         assertTrue(model.draft.isEmpty)
@@ -76,7 +76,7 @@ class JournalRefactoringUiTest {
         assumeTrue(InstrumentationRegistry.getArguments().getString("refactoringIsolated") == "true")
         val model = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
         rule.waitUntil(20_000) { !model.isLoading }
-        val entry = model.entries.single { it.imageFileNames.isNotEmpty() && it.audio != null }
+        val entry = JournalStore(rule.activity).entries().single { it.imageFileNames.isNotEmpty() && it.audio != null }
         val entryLabel = entry.note.ifBlank { entry.mood.label }
         val entryCard = hasText(entryLabel) and hasText(tr(
             "语音 · ${formatAudioDuration(requireNotNull(entry.audio).durationMillis)}",
@@ -121,8 +121,9 @@ class JournalRefactoringUiTest {
         assumeTrue(InstrumentationRegistry.getArguments().getString("refactoringIsolated") == "true")
         val model = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
         rule.waitUntil(15_000) { !model.isLoading }
-        val entry = model.entries.single { it.imageFileNames.isNotEmpty() && it.audio != null }
-        assertTrue(journalPeriodSummary(model.entries, InsightsPeriod.WEEK).entryIds.contains(entry.id))
+        val storedEntries = JournalStore(rule.activity).entries()
+        val entry = storedEntries.single { it.imageFileNames.isNotEmpty() && it.audio != null }
+        assertTrue(journalPeriodSummary(storedEntries, InsightsPeriod.WEEK).entryIds.contains(entry.id))
         rule.onNodeWithText(localizedText("轨迹")).performClick()
         rule.onNodeWithTag("insights-list", useUnmergedTree = true)
             .performScrollToNode(hasTestTag("insights-overview-headline"))

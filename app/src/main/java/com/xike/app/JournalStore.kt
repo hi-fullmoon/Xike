@@ -55,6 +55,7 @@ class JournalStore(context: Context) {
     private val backups = JournalBackupStorage(appContext, attachments, videos)
     private val database by lazy { JournalDatabase.get(appContext) }
     private val dao by lazy { database.journalDao() }
+    val readRepository by lazy { JournalReadRepository { database } }
     private val editAudioPreferences by lazy {
         EncryptedSharedPreferences.create(
             appContext,
@@ -89,7 +90,7 @@ class JournalStore(context: Context) {
     }
 
     @Synchronized
-    fun initialize(): JournalSnapshot = try {
+    fun initialize(loadEntries: Boolean = true): JournalSnapshot = try {
         if (dao.settingValue(LEGACY_MIGRATION_SETTING) == null) {
             val legacyEntries = readLegacyEntries()
                 .distinctBy { it.id }
@@ -102,7 +103,7 @@ class JournalStore(context: Context) {
         }
         ensureSearchIndex()
         JournalSnapshot(
-            entries = readEntries(),
+            entries = if (loadEntries) readEntries() else emptyList(),
             themeName = dao.settingValue(THEME_SETTING),
             styleName = dao.settingValue(THEME_STYLE_SETTING),
         )
@@ -552,11 +553,12 @@ class JournalStore(context: Context) {
     }
 
     private fun referencedVideoFiles(): Set<String> =
-        dao.records().flatMap { it.toJournalEntry().video.files() }.toSet() + pendingDeletedEntry?.video.files() + videoDraftStore.load().video.files() + videos.editReferences()
+        dao.videoReferences().flatMap { it.video().files() }.toSet() + pendingDeletedEntry?.video.files() + videoDraftStore.load().video.files() + videos.editReferences()
 
     private fun cleanupStaleVideoEdits() {
-        val entries = dao.records().map(JournalEntryRecord::toJournalEntry) + listOfNotNull(pendingDeletedEntry)
-        videos.discardStaleEdits(entries).forEach(::deleteUnreferencedVideo)
+        val references = dao.videoReferences().associate { it.id to it.video()?.fileName }.toMutableMap()
+        pendingDeletedEntry?.let { references[it.id] = it.video?.fileName }
+        videos.discardStaleEdits(references).forEach(::deleteUnreferencedVideo)
     }
 
     @Synchronized
@@ -595,8 +597,7 @@ class JournalStore(context: Context) {
 
     private fun ensureSearchIndex() {
         if (dao.settingValue(SEARCH_INDEX_SETTING) == SEARCH_INDEX_VERSION) return
-        val bundles = dao.records().map { it.toJournalEntry().toBundle() }
-        dao.rebuildSearchIndex(bundles)
+        dao.rebuildSearchIndexFromRecords()
     }
 
     private fun readLegacyEntries(): List<JournalEntry> {

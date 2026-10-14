@@ -22,6 +22,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.paging.PagingSource
+import androidx.sqlite.db.SupportSQLiteQuery
 import androidx.room.Relation
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -143,6 +146,10 @@ internal data class JournalBundle(
     val audio: JournalAudioEntity?,
 )
 
+internal data class JournalVideoReference(val id: String, @ColumnInfo(name = "video_json") val videoJson: String?) {
+    fun video(): JournalVideo? = videoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) }
+}
+
 internal fun JournalBundle.toSearchEntity(): JournalSearchEntity = JournalSearchEntity(
     entryId = entry.id,
     searchableText = journalSearchDocument(entry.note, tags.sortedBy { it.position }.map { it.tag }),
@@ -201,6 +208,33 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry = JournalEntry(
 
 @Dao
 internal abstract class JournalDao {
+    @Query("SELECT id, video_json FROM journal_entries")
+    abstract fun videoReferences(): List<JournalVideoReference>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 60 OFFSET :offset")
+    protected abstract fun indexRebuildPage(offset: Int): List<JournalEntryRecord>
+
+    @Transaction
+    @RawQuery(observedEntities = [JournalEntryEntity::class, JournalTagEntity::class, JournalImageEntity::class, JournalAudioEntity::class])
+    abstract fun pagedRecords(query: SupportSQLiteQuery): PagingSource<Int, JournalEntryRecord>
+
+    @RawQuery
+    abstract fun entryIndex(query: SupportSQLiteQuery): List<JournalEntryIndex>
+
+    @RawQuery
+    abstract fun queryCount(query: SupportSQLiteQuery): Int
+
+    @RawQuery
+    abstract fun dayCounts(query: SupportSQLiteQuery): List<JournalDayCount>
+
+    @RawQuery
+    abstract fun topicCounts(query: SupportSQLiteQuery): List<JournalTopicCount>
+
+    @Transaction
+    @Query("SELECT id, created_at, mood FROM journal_entries WHERE created_at >= :start AND created_at < :end ORDER BY created_at DESC, id DESC")
+    abstract fun analyticsRecords(start: Long, end: Long): List<JournalAnalyticsRecord>
+
     @Transaction
     @Query("SELECT * FROM journal_entries ORDER BY created_at DESC")
     abstract fun records(): List<JournalEntryRecord>
@@ -404,6 +438,18 @@ internal abstract class JournalDao {
     open fun rebuildSearchIndex(bundles: List<JournalBundle>) {
         deleteSearchEntries()
         bundles.forEach { insertSearchEntry(it.toSearchEntity()) }
+        putSetting(AppSettingEntity(SEARCH_INDEX_SETTING, SEARCH_INDEX_VERSION))
+    }
+
+    @Transaction
+    open fun rebuildSearchIndexFromRecords() {
+        deleteSearchEntries()
+        var offset = 0
+        do {
+            val records = indexRebuildPage(offset)
+            records.forEach { insertSearchEntry(it.toJournalEntry().toBundle().toSearchEntity()) }
+            offset += records.size
+        } while (records.size == 60)
         putSetting(AppSettingEntity(SEARCH_INDEX_SETTING, SEARCH_INDEX_VERSION))
     }
 

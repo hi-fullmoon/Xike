@@ -38,7 +38,7 @@ class MomentRaceUiTest {
         val model = readyModel()
         val note = enterDraft()
         val uri = captureScreenPhoto()
-        val originalIds = model.entries.map { it.id }.toSet()
+        val originalIds = JournalStore(rule.activity).entries().map { it.id }.toSet()
         try {
             val state = photoResultState()
             withContext(Dispatchers.Main) {
@@ -48,8 +48,8 @@ class MomentRaceUiTest {
             }
             rule.waitUntil(15_000) { !model.isDraftImageResultPending && uri.toString() in model.draft.imageUriStrings }
             withContext(Dispatchers.Main) { model.saveDraft().getOrThrow() }
-            rule.waitUntil(15_000) { model.entries.any { it.id !in originalIds && it.note == note } }
-            val saved = model.entries.single { it.id !in originalIds && it.note == note }
+            rule.waitUntil(15_000) { model.libraryState.totalCount == originalIds.size + 1 }
+            val saved = JournalStore(rule.activity).entries().single { it.id !in originalIds && it.note == note }
             assertEquals(1, saved.imageFileNames.size)
             JournalStore(rule.activity).openImage(saved.imageFileNames.single()).use { input ->
                 val decoded = requireNotNull(BitmapFactory.decodeStream(requireNotNull(input)))
@@ -69,7 +69,7 @@ class MomentRaceUiTest {
         val model = readyModel()
         val note = enterDraft()
         val uri = captureScreenPhoto()
-        val originalIds = model.entries.map { it.id }.toSet()
+        val originalIds = JournalStore(rule.activity).entries().map { it.id }.toSet()
         try {
             val state = photoResultState()
             withContext(Dispatchers.Main) {
@@ -82,8 +82,8 @@ class MomentRaceUiTest {
                 saving.join()
             }
             rule.waitUntil(15_000) { !model.isDraftImageResultPending && uri.toString() in model.draft.imageUriStrings }
-            rule.waitUntil(15_000) { model.entries.any { it.id !in originalIds && it.note == note } }
-            assertEquals(1, model.entries.count { it.id !in originalIds && it.note == note })
+            rule.waitUntil(15_000) { model.libraryState.totalCount == originalIds.size + 1 }
+            assertEquals(1, JournalStore(rule.activity).entries().count { it.id !in originalIds && it.note == note })
             assertEquals("", model.draft.note)
             assertEquals(null, model.draft.mood)
             assertEquals(listOf(uri.toString()), model.draft.imageUriStrings)
@@ -101,7 +101,7 @@ class MomentRaceUiTest {
     private fun verifyWeatherInvalidation(invalidate: (JournalViewModel) -> Unit) = runBlocking {
         val model = readyModel()
         val note = enterDraft()
-        val originalIds = model.entries.map { it.id }.toSet()
+        val originalIds = JournalStore(rule.activity).entries().map { it.id }.toSet()
         try {
             withContext(Dispatchers.Main) {
                 val request = launch(start = CoroutineStart.UNDISPATCHED) { model.attachOutdoorForCity("上海") }

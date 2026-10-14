@@ -11,6 +11,11 @@ import com.xike.app.ui.theme.XikeTheme
 
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -29,6 +34,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.junit.Rule
 import org.junit.Test
 
@@ -45,7 +53,7 @@ class JournalArchiveUiTest {
         )
 
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = entries,
@@ -86,7 +94,7 @@ class JournalArchiveUiTest {
         val entries = listOf(entry("today", today, emptyList(), "今天的记录"))
 
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = entries,
@@ -137,7 +145,7 @@ class JournalArchiveUiTest {
         }.distinctBy(JournalEntry::id)
 
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = entries,
@@ -184,7 +192,7 @@ class JournalArchiveUiTest {
         var finalizedEntryId: String? = null
 
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = listOf(journal),
@@ -229,7 +237,7 @@ class JournalArchiveUiTest {
         var updatedEntry: JournalEntry? = null
 
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = listOf(journal),
@@ -257,7 +265,7 @@ class JournalArchiveUiTest {
         composeRule.onNode(
             hasSetTextAction() and hasText("准备编辑的记录"),
         ).performTextReplacement("修改后的注脚")
-        composeRule.onNodeWithText("平静").performClick()
+        composeRule.onNodeWithText("平静").performScrollTo().performClick().assertIsSelected()
         composeRule.onNodeWithText("关系").performScrollTo().assertIsSelected()
         composeRule.onNodeWithText("工作").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -279,7 +287,7 @@ class JournalArchiveUiTest {
         val journal = entry("unsaved-edit", LocalDate.now(), emptyList(), "尚未保存的记录")
         var updateCount = 0
         composeRule.setContent {
-            XikeTheme(AppTheme.OCEAN) {
+            ArchiveTestTheme {
                 JournalArchiveScreen(
                     padding = PaddingValues(),
                     entries = listOf(journal),
@@ -301,7 +309,7 @@ class JournalArchiveUiTest {
 
         composeRule.onNodeWithText("尚未保存的记录").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription("编辑记录").performClick()
-        composeRule.onNodeWithText("平静").performClick()
+        composeRule.onNodeWithText("平静").performScrollTo().performClick().assertIsSelected()
         composeRule.onNodeWithContentDescription("取消编辑").performClick()
         composeRule.onNodeWithText("放弃未保存的修改？").assertIsDisplayed()
         composeRule.onNodeWithText("继续编辑").performClick()
@@ -310,6 +318,24 @@ class JournalArchiveUiTest {
         composeRule.onNodeWithText("放弃修改").performClick()
         composeRule.onNodeWithContentDescription("编辑记录").assertIsDisplayed()
         composeRule.runOnIdle { check(updateCount == 0) }
+    }
+
+    @Composable
+    private fun ArchiveTestTheme(content: @Composable () -> Unit) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val store = remember { JournalStore(context) }
+        val operations = remember { JournalEditOperations(context, scope, store) { emptyList() } }
+        XikeTheme(AppTheme.OCEAN) {
+            CompositionLocalProvider(
+                LocalJournalEditOperations provides operations,
+                LocalAudioEditServices provides AudioEditServices(
+                    import = { file, duration -> withContext(Dispatchers.IO) { runCatching { store.importEditAudio(file, duration) } } },
+                    release = { audio -> scope.launch(Dispatchers.IO) { store.releaseEditAudio(audio) } },
+                ),
+                content = content,
+            )
+        }
     }
 
     private fun entry(

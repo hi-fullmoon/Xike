@@ -34,6 +34,8 @@ internal fun searchTopicLabels(term: String): List<String> {
 
 internal fun canonicalTopic(topic: String): String = mergedTopics[topic] ?: topic
 
+internal fun topicAliases(): Map<String, String> = mergedTopics
+
 internal fun Collection<String>.canonicalTopics(): List<String> =
     map(::canonicalTopic).distinct()
 

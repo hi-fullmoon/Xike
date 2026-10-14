@@ -2,6 +2,8 @@ package com.xike.app.feature.insights
 
 import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
+import com.xike.app.JournalReadRepository
+import com.xike.app.journalReadResult
 import com.xike.app.AppLocale
 import com.xike.app.localizedText
 import com.xike.app.tr
@@ -76,6 +78,9 @@ fun JournalInsightsScreen(
     entries: List<JournalEntry>,
     openImage: (String) -> InputStream?,
     openAudio: (String) -> InputStream? = { null },
+    readRepository: JournalReadRepository? = null,
+    dataRevision: Long = 0,
+    onReadError: (String) -> Unit = {},
 ) {
     var selectedPeriodName by rememberSaveable { mutableStateOf(InsightsPeriod.WEEK.name) }
     val selectedPeriod = InsightsPeriod.entries.firstOrNull { it.name == selectedPeriodName }
@@ -85,10 +90,12 @@ fun JournalInsightsScreen(
     var calculatedSummary by remember {
         mutableStateOf<JournalPeriodSummary?>(null)
     }
-    LaunchedEffect(entries, selectedPeriod, today, language) {
-        calculatedSummary = withContext(Dispatchers.Default) {
-            journalPeriodSummary(entries, selectedPeriod, today)
-        }
+    LaunchedEffect(entries, dataRevision, selectedPeriod, today, language) {
+        journalReadResult {
+            if (readRepository != null) readRepository.insights(selectedPeriod, today)
+            else withContext(Dispatchers.Default) { journalPeriodSummary(entries, selectedPeriod, today) }
+        }.onSuccess { calculatedSummary = it }
+            .onFailure { onReadError(it.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
     }
     var drilldown by rememberSaveable(
         stateSaver = listSaver<InsightDrilldown?, String>(
@@ -219,6 +226,10 @@ fun JournalInsightsScreen(
             title = request.title,
             subtitle = request.subtitle,
             entries = entriesWithIds(entries, request.entryIds),
+            readRepository = readRepository,
+            entryIds = request.entryIds,
+            dataRevision = dataRevision,
+            onReadError = onReadError,
             openImage = openImage,
             openAudio = openAudio,
             onDismiss = { drilldown = null },

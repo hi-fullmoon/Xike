@@ -49,7 +49,7 @@ class JournalOrganizationUiTest {
         val model = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
         rule.waitUntil(20_000) { !model.isLoading }
         check(model.draft.isEmpty) { "Use an independent environment with an empty draft." }
-        val entry = model.entries.single { it.imageFileNames.isNotEmpty() && it.audio != null }
+        val entry = JournalStore(rule.activity).entries().single { it.imageFileNames.isNotEmpty() && it.audio != null }
         check(entry.note.isNotBlank()) { "Run the real editor acceptance first." }
         val language = if (arguments.getString("language") == "en") AppLanguage.ENGLISH else AppLanguage.CHINESE
         val style = AppStyle.valueOf(arguments.getString("style") ?: "BREATHE")

@@ -40,11 +40,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 internal class JournalOperationFeedback(val message: String, val isError: Boolean)
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
     private val store = JournalStore(application)
     internal val editOperations by lazy { JournalEditOperations(application, viewModelScope, store) { draft.imageUriStrings } }
@@ -78,8 +82,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val noteSaveScopeJob = SupervisorJob()
     private val noteSaveScope = CoroutineScope(noteSaveScopeJob + Dispatchers.IO)
     private var observationFailureReported = false
+    private val readRefreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
-    var entries by mutableStateOf(emptyList<JournalEntry>())
+    val readRepository get() = store.readRepository
+
+    var libraryState by mutableStateOf(JournalLibraryState())
         private set
 
     var selectedTheme by mutableStateOf(appearancePreferences.current().theme)
@@ -104,6 +111,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             hasResumedDraft = !draft.isEmpty || pendingDraftAudio != null
             draftSessionBackgrounded = false
         }
+        if (!isLoading) readRefreshRequests.tryEmit(Unit)
     }
 
     val pendingDraftAudio: PendingDraftAudio? get() = draftMediaOperations.pendingDraftAudio
@@ -117,8 +125,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         application, viewModelScope, store,
         currentDraft = { draft },
         importingDraftVideo = { isDraftVideoSaving },
-        onRestored = { restored, undoAvailable ->
-            entries = restored
+        onRestored = { _, undoAvailable ->
             canUndoRestore = undoAvailable
             dataError = null
         },
@@ -156,14 +163,16 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
             val draftFlushResult = withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
-            val result = withContext(Dispatchers.IO) { runCatching(store::initialize) }
+            val result = withContext(Dispatchers.IO) {
+                runCatching { store.initialize(loadEntries = false) to readRepository.libraryState(0) }
+            }
             val pendingResult = withContext(Dispatchers.IO) { runCatching(draftMediaOperations::recoverPendingAudio) }
-            result.onSuccess { snapshot ->
+            result.onSuccess { (snapshot, initialState) ->
                 val appearance = appearancePreferences.migrateFromDatabase(
                     themeName = snapshot.themeName,
                     styleName = snapshot.styleName,
                 )
-                entries = snapshot.entries
+                libraryState = initialState.copy(revision = libraryState.revision + 1)
                 selectedTheme = appearance.theme
                 selectedStyle = appearance.style
                 canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
@@ -202,7 +211,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
                 viewModelScope.launch {
-                    store.observeEntries()
+                    merge(readRepository.changes().map { true }, readRefreshRequests.map { false })
+                        .map { changed -> readRepository.libraryState(0) to changed }
                         .retryWhen { error, attempt ->
                             if (!observationFailureReported) {
                                 observationFailureReported = true
@@ -211,9 +221,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                             delay((1_000L * (attempt.coerceAtMost(4L) + 1L)))
                             true
                         }
-                        .collect { latestEntries ->
+                        .collect { (latestState, changed) ->
                             observationFailureReported = false
-                            entries = latestEntries
+                            libraryState = latestState.copy(revision = libraryState.revision + if (changed) 1 else 0)
                         }
                 }
             }.onFailure { error ->
@@ -229,6 +239,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     fun dismissDataError() {
         dataError = null
     }
+
+    fun reportReadError(message: String) { dataError = message }
 
     fun selectTheme(theme: AppTheme) {
         selectedTheme = theme

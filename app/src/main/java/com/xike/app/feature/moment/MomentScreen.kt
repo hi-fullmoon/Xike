@@ -185,6 +185,7 @@ fun MomentScreen(
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
     hasResumedDraft: Boolean = false,
+    recordedTodayCount: Int? = null,
 ) {
     var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
     val videoServices = LocalVideoServices.current
@@ -296,7 +297,7 @@ fun MomentScreen(
         keyboardController?.hide()
     }
     val today = LocalDate.now()
-    val todayEntryCount = entriesOnDate(entries, today)
+    val todayEntryCount = recordedTodayCount ?: entriesOnDate(entries, today)
     val draftHasDetails = draft.tags.isNotEmpty()
     LaunchedEffect(draftHasDetails) {
         if (draftHasDetails) showDetails = true

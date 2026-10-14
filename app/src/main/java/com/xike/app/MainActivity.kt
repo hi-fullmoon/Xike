@@ -193,7 +193,9 @@ class MainActivity : FragmentActivity() {
                         ),
                     ) {
                         XikeApp(
-                            entries = journalViewModel.entries,
+                            readRepository = journalViewModel.readRepository,
+                            libraryState = journalViewModel.libraryState,
+                            onReadError = journalViewModel::reportReadError,
                             entriesLoading = journalViewModel.isLoading,
                             draft = journalViewModel.draft,
                             selectedTheme = journalViewModel.selectedTheme,

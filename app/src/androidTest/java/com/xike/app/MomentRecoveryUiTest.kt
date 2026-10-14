@@ -71,7 +71,7 @@ class MomentRecoveryUiTest {
     fun savingDuringRealWeatherRequestIsRejectedAndCancellationReleasesTheGuard() = runBlocking {
         val model = model()
         val originalDraft = model.draft
-        val originalIds = model.entries.map { it.id }
+        val originalCount = model.libraryState.totalCount
         withContext(Dispatchers.Main) {
             val request = launch(start = CoroutineStart.UNDISPATCHED) { model.attachOutdoorForCity("上海") }
             try {
@@ -80,7 +80,7 @@ class MomentRecoveryUiTest {
                 assertTrue(result.isFailure)
                 assertFalse(model.isDraftSaving)
                 assertEquals(originalDraft, model.draft)
-                assertEquals(originalIds, model.entries.map { it.id })
+                assertEquals(originalCount, model.libraryState.totalCount)
             } finally {
                 request.cancelAndJoin()
             }

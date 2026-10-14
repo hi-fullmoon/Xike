@@ -60,15 +60,15 @@ internal fun JournalMonthCalendar(
     month: YearMonth,
     today: LocalDate,
     selectedDate: LocalDate?,
-    entriesByDate: Map<LocalDate, List<JournalEntry>>,
+    countsByDate: Map<LocalDate, Int>,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
 ) {
     val monthTitle = month.format(DateTimeFormatter.ofPattern(tr("yyyy年 M月", "MMMM yyyy"), AppLocale.locale))
     val cells = remember(month) { monthCalendarCells(month) }
-    val monthEntries = entriesByDate.filterKeys { YearMonth.from(it) == month }
-    val monthEntryCount = monthEntries.values.sumOf(List<JournalEntry>::size)
+    val monthEntries = countsByDate.filterKeys { YearMonth.from(it) == month }
+    val monthEntryCount = monthEntries.values.sum()
     val dayDiameter = 32.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
     val dayHeight = dayDiameter + 16.dp
     Surface(
@@ -131,13 +131,13 @@ internal fun JournalMonthCalendar(
                                 if (date == null) {
                                     Spacer(Modifier.weight(1f).height(dayHeight))
                                 } else {
-                                    val dayEntries = entriesByDate[date].orEmpty()
+                                    val dayCount = countsByDate[date] ?: 0
                                     CalendarDay(
                                         date = date,
-                                        count = dayEntries.size,
+                                        count = dayCount,
                                         isToday = date == today,
                                         isSelected = date == selectedDate,
-                                        enabled = dayEntries.isNotEmpty(),
+                                        enabled = dayCount > 0,
                                         diameter = dayDiameter,
                                         modifier = Modifier.weight(1f),
                                         onClick = { onSelectDate(date) },
