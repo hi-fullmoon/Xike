@@ -1,6 +1,7 @@
 package com.xike.app.ui.components.journal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,13 +35,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -78,6 +82,7 @@ internal fun JournalEntryDetailDialog(
     onRequestDelete: (() -> Unit)? = null,
 ) {
     var photoPage by remember(entry.id) { mutableIntStateOf(-1) }
+    var showFullAddress by remember(entry.id, entry.outdoor) { mutableStateOf(false) }
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -199,7 +204,17 @@ internal fun JournalEntryDetailDialog(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             outdoor.placeName,
+                                            modifier =
+                                                Modifier.clickable(
+                                                    role = Role.Button,
+                                                    onClickLabel =
+                                                        tr("查看完整地址", "View full address"),
+                                                ) {
+                                                    showFullAddress = true
+                                                },
                                             style = MaterialTheme.typography.titleSmall,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
                                             "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
@@ -281,6 +296,14 @@ internal fun JournalEntryDetailDialog(
                     }
                 }
             }
+        }
+    }
+    if (showFullAddress) {
+        entry.outdoor?.let { outdoor ->
+            OutdoorAddressDialog(
+                address = outdoor.fullPlaceName ?: outdoor.placeName,
+                onDismiss = { showFullAddress = false },
+            )
         }
     }
     if (photoPage >= 0 && photoPage < entry.imageFileNames.size) {

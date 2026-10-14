@@ -98,7 +98,7 @@ internal object BackupHtml {
             }
             entry.outdoor?.let { outdoor ->
                 append("<p class=\"weather\">${localizedText("此刻窗外")} · ")
-                append(escape(outdoor.placeName))
+                append(escape(outdoor.fullPlaceName ?: outdoor.placeName))
                 append(" · ")
                 append(outdoor.temperatureCelsius.toInt())
                 append("° · ")

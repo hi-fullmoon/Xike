@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Cloud
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -45,6 +51,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.localizedText
@@ -75,6 +82,8 @@ internal fun OutdoorContextCard(
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
     var showActions by remember(snapshot, enabled) { mutableStateOf(false) }
+    var showFullAddress by
+        remember(snapshot?.placeName, snapshot?.fullPlaceName) { mutableStateOf(false) }
     val cardModifier =
         if (isEmpty && enabled) {
             Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onAdd)
@@ -112,8 +121,16 @@ internal fun OutdoorContextCard(
                             Box(Modifier.fillMaxWidth().padding(end = 34.dp)) {
                                 Text(
                                     snapshot.placeName,
-                                    modifier = Modifier.align(Alignment.CenterStart),
+                                    modifier =
+                                        Modifier.align(Alignment.CenterStart).clickable(
+                                            role = Role.Button,
+                                            onClickLabel = tr("查看完整地址", "View full address"),
+                                        ) {
+                                            showFullAddress = true
+                                        },
                                     style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             FlowRow(
@@ -325,6 +342,37 @@ internal fun OutdoorContextCard(
             }
         }
     }
+    if (showFullAddress && snapshot != null) {
+        OutdoorAddressDialog(
+            address = snapshot.fullPlaceName ?: snapshot.placeName,
+            onDismiss = { showFullAddress = false },
+        )
+    }
+}
+
+@Composable
+internal fun OutdoorAddressDialog(address: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        properties = DialogProperties(decorFitsSystemWindows = false),
+        shape = XikeShapes.dialog,
+        title = { Text(tr("完整地址", "Full address")) },
+        text = {
+            Text(
+                address,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                shape = XikeShapes.button,
+            ) {
+                Text(tr("关闭", "Close"))
+            }
+        },
+    )
 }
 
 @Composable

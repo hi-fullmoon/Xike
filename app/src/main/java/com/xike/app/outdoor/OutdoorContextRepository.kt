@@ -91,15 +91,20 @@ internal class OutdoorContextRepository(context: Context) {
 
     suspend fun current(): OutdoorSnapshot {
         val location = currentLocation()
-        val placeName = reverseGeocode(location) ?: localizedText("当前位置")
-        return fetchWeather(location.latitude, location.longitude, placeName)
+        val place = reverseGeocode(location)
+        return fetchWeather(
+            location.latitude,
+            location.longitude,
+            place?.label ?: localizedText("当前位置"),
+            place?.fullLabel,
+        )
     }
 
     suspend fun city(query: String): OutdoorSnapshot {
         val normalizedQuery = query.trim()
         require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
-        return fetchWeather(city.latitude, city.longitude, city.label)
+        return fetchWeather(city.latitude, city.longitude, city.name, city.label)
     }
 
     private suspend fun currentLocation(): Location {
@@ -182,7 +187,7 @@ internal class OutdoorContextRepository(context: Context) {
                 }
         }
 
-    private suspend fun reverseGeocode(location: Location): String? {
+    private suspend fun reverseGeocode(location: Location): PlaceLabel? {
         if (!Geocoder.isPresent()) return null
         val locale = AppLocale.locale
         val address =
@@ -190,24 +195,23 @@ internal class OutdoorContextRepository(context: Context) {
                 geocodeAddress(location, locale)
             } ?: return null
         val includeStreet = canIncludeStreet(location)
-        val label = address.asPlaceLabel(includeStreet) ?: return null
-        if (locale.language != "en" || !hasMixedChinesePlaceName(label)) return label
-        // Keep the usable first result if the native-name lookup fails or times out.
-        val nativeAddress =
-            withTimeoutOrNull(1_500L) {
-                geocodeAddress(location, Locale.SIMPLIFIED_CHINESE)?.takeIf {
-                    !includeStreet ||
-                        address.thoroughfare.isNullOrBlank() ||
-                        !it.thoroughfare.isNullOrBlank()
+        val fullLabel = address.asPlaceLabel(includeStreet) ?: return null
+        val label =
+            listOf(
+                    address.locality,
+                    address.subAdminArea,
+                    address.subLocality,
+                    address.thoroughfare.takeIf { includeStreet },
+                )
+                .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+                .distinct()
+                .joinToString(" · ")
+                .ifBlank {
+                    address.adminArea?.takeIf(String::isNotBlank)
+                        ?: address.countryName
+                        ?: fullLabel
                 }
-            }
-        val stillIncludeStreet = includeStreet && canIncludeStreet(location)
-        val nativeLabel = nativeAddress?.asPlaceLabel(stillIncludeStreet)
-        return nativeLabel?.takeIf {
-            it.any { character ->
-                Character.UnicodeScript.of(character.code) == Character.UnicodeScript.HAN
-            } && !hasMixedChinesePlaceName(it)
-        } ?: address.asPlaceLabel(stillIncludeStreet)
+        return PlaceLabel(label, fullLabel)
     }
 
     private fun canIncludeStreet(location: Location): Boolean =
@@ -273,6 +277,7 @@ internal class OutdoorContextRepository(context: Context) {
         latitude: Double,
         longitude: Double,
         placeName: String,
+        fullPlaceName: String? = null,
     ): OutdoorSnapshot =
         withContext(Dispatchers.IO) {
             // Weather models do not benefit from street-level coordinates. Rounding here keeps
@@ -290,6 +295,7 @@ internal class OutdoorContextRepository(context: Context) {
                     ?: throw OutdoorContextException(localizedText("天气服务暂时没有返回当前天气。"))
             OutdoorSnapshot(
                     placeName = placeName,
+                    fullPlaceName = fullPlaceName,
                     temperatureCelsius = current.optDouble("temperature_2m", Double.NaN),
                     weatherCode = current.optInt("weather_code", -1),
                     capturedAt = System.currentTimeMillis(),
@@ -315,6 +321,7 @@ internal class OutdoorContextRepository(context: Context) {
             }
         return CityCoordinate(
                 label = label.take(MAX_PLACE_NAME_LENGTH),
+                name = name.ifBlank { query }.take(MAX_PLACE_NAME_LENGTH),
                 latitude = result.optDouble("latitude", Double.NaN),
                 longitude = result.optDouble("longitude", Double.NaN),
             )
@@ -350,9 +357,12 @@ internal class OutdoorContextRepository(context: Context) {
 
     private data class CityCoordinate(
         val label: String,
+        val name: String,
         val latitude: Double,
         val longitude: Double,
     )
+
+    private data class PlaceLabel(val label: String, val fullLabel: String)
 
     private companion object {
         const val LOCATION_TIMEOUT_MILLIS = 12_000L
@@ -371,13 +381,17 @@ internal class OutdoorContextRepository(context: Context) {
     }
 }
 
-internal fun hasMixedChinesePlaceName(label: String): Boolean =
-    label.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN } &&
-        label.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN }
-
 private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
+    if (includeStreet) {
+        val fullAddress =
+            (0..maxAddressLineIndex)
+                .mapNotNull { getAddressLine(it)?.trim()?.takeIf(String::isNotBlank) }
+                .distinct()
+                .joinToString(" · ")
+        if (fullAddress.isNotBlank()) return fullAddress
+    }
     val regions =
-        listOf(adminArea, locality, subAdminArea, subLocality)
+        listOf(countryName, adminArea, locality, subAdminArea, subLocality)
             .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
             .distinctBy {
                 when (it.removeSuffix("市")) {
@@ -388,7 +402,10 @@ private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
                     else -> it
                 }
             }
-    return (regions + listOfNotNull(thoroughfare.takeIf { includeStreet }))
+    val street =
+        if (includeStreet) listOfNotNull(thoroughfare, subThoroughfare, premises, postalCode)
+        else emptyList()
+    return (regions + street)
         .mapNotNull { it.trim().takeIf(String::isNotBlank) }
         .distinct()
         .joinToString(" · ")

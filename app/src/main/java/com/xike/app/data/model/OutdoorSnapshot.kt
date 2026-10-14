@@ -10,6 +10,7 @@ data class OutdoorSnapshot(
     val weatherCode: Int,
     val capturedAt: Long,
     val source: String = OPEN_METEO_SOURCE,
+    val fullPlaceName: String? = null,
 ) {
     fun normalizedOrNull(): OutdoorSnapshot? {
         val normalizedPlace = placeName.trim().take(MAX_PLACE_NAME_LENGTH)
@@ -22,7 +23,12 @@ data class OutdoorSnapshot(
                     capturedAt > 0L &&
                     normalizedSource.isNotBlank()
             }
-            ?.copy(placeName = normalizedPlace, source = normalizedSource)
+            ?.copy(
+                placeName = normalizedPlace,
+                source = normalizedSource,
+                fullPlaceName =
+                    fullPlaceName?.trim()?.take(MAX_PLACE_NAME_LENGTH)?.takeIf(String::isNotBlank),
+            )
     }
 
     fun toJson(): JSONObject =
@@ -32,6 +38,7 @@ data class OutdoorSnapshot(
             .put("weatherCode", weatherCode)
             .put("capturedAt", capturedAt)
             .put("source", source)
+            .apply { fullPlaceName?.let { put("fullPlaceName", it) } }
 
     companion object {
         fun fromJson(json: JSONObject?): OutdoorSnapshot? = json?.let {
@@ -41,6 +48,7 @@ data class OutdoorSnapshot(
                     weatherCode = it.optInt("weatherCode", -1),
                     capturedAt = it.optLong("capturedAt"),
                     source = it.optString("source", OPEN_METEO_SOURCE),
+                    fullPlaceName = it.optString("fullPlaceName").takeIf(String::isNotBlank),
                 )
                 .normalizedOrNull()
         }
@@ -48,7 +56,7 @@ data class OutdoorSnapshot(
 }
 
 internal const val OPEN_METEO_SOURCE = "Open-Meteo"
-internal const val MAX_PLACE_NAME_LENGTH = 80
+internal const val MAX_PLACE_NAME_LENGTH = 512
 private const val MAX_WEATHER_SOURCE_LENGTH = 40
 private const val MIN_TEMPERATURE_CELSIUS = -100.0
 private const val MAX_TEMPERATURE_CELSIUS = 70.0

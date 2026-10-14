@@ -8,6 +8,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -148,5 +150,85 @@ class JournalDatabaseMigrationTest {
         const val TEST_DATABASE_V2 = "xike-migration-v2-v3"
         const val TEST_DATABASE_V3 = "xike-migration-v3-v4"
         const val TEST_DATABASE_V4 = "xike-migration-v4-v5"
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class OutdoorAddressMigrationTest {
+    @get:Rule
+    val helper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            JournalDatabase::class.java,
+        )
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Test
+    fun migrationFrom5To6AddsNullableFullAddressAndPreservesExistingSchema() {
+        val databaseName = "xike-address-migration-${java.util.UUID.randomUUID()}"
+        try {
+            val originalColumns =
+                helper.createDatabase(databaseName, 5).use { db ->
+                    db.query("PRAGMA table_info(journal_entries)").use { cursor ->
+                        buildSet {
+                            while (cursor.moveToNext()) add(
+                                cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                            )
+                        }
+                    }
+                }
+            helper
+                .runMigrationsAndValidate(databaseName, 6, true, JournalDatabase.MIGRATION_5_6)
+                .use { db ->
+                    val columns = mutableSetOf<String>()
+                    db.query("PRAGMA table_info(journal_entries)").use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                            columns.add(name)
+                            if (name == "outdoor_full_place_name") {
+                                assertEquals(
+                                    "TEXT",
+                                    cursor.getString(cursor.getColumnIndexOrThrow("type")),
+                                )
+                                assertEquals(
+                                    0,
+                                    cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                                )
+                                assertNull(
+                                    cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+                                )
+                            }
+                        }
+                    }
+                    assertEquals(originalColumns + "outdoor_full_place_name", columns)
+                    assertTrue("outdoor_full_place_name" in columns)
+                }
+            // Reopen the migrated file and validate the persisted schema again.
+            helper.runMigrationsAndValidate(databaseName, 6, true).close()
+        } finally {
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun migrationFrom1To6ValidatesTheCompleteUpgradePath() {
+        val databaseName = "xike-address-upgrade-${java.util.UUID.randomUUID()}"
+        try {
+            helper.createDatabase(databaseName, 1).close()
+            helper
+                .runMigrationsAndValidate(
+                    databaseName,
+                    6,
+                    true,
+                    JournalDatabase.MIGRATION_1_2,
+                    JournalDatabase.MIGRATION_2_3,
+                    JournalDatabase.MIGRATION_3_4,
+                    JournalDatabase.MIGRATION_4_5,
+                    JournalDatabase.MIGRATION_5_6,
+                )
+                .close()
+        } finally {
+            context.deleteDatabase(databaseName)
+        }
     }
 }
