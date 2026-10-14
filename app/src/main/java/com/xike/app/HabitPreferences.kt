@@ -314,6 +314,21 @@ internal fun nextReminderAt(
     return null
 }
 
+internal fun restoreReminderAt(
+    settings: ReminderSettings,
+    now: ZonedDateTime,
+    pendingAtMillis: Long?,
+): ZonedDateTime? {
+    val next = nextReminderAt(settings, now) ?: return null
+    val pending =
+        pendingAtMillis?.let { java.time.Instant.ofEpochMilli(it).atZone(now.zone) } ?: return next
+    // Recover today's undelivered alarm after reopening or rebooting, without replaying old days.
+    if (pending.toLocalDate() != now.toLocalDate() || pending.isAfter(next)) return next
+    val pausedUntil = settings.pausedUntilEpochDay?.let(LocalDate::ofEpochDay)
+    if (pausedUntil != null && now.toLocalDate().isBefore(pausedUntil)) return next
+    return (if (pending.isAfter(now)) pending else now).afterQuietHours(settings)
+}
+
 internal class HabitPreferences(context: Context) {
     private val preferences =
         context.applicationContext.getSharedPreferences(

@@ -1,0 +1,5 @@
+com.xike.app.ReminderProcessRecoveryTest:.
+
+Time: 0.109
+
+OK (1 test)Starting: Intent { cmp=com.xike.app/.MainActivity }

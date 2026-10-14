@@ -82,7 +82,7 @@ class MainActivity : FragmentActivity() {
         dailyPromptSettings = habitPreferences.dailyPrompt
         notificationPermissionGranted = hasNotificationPermission()
         handleQuickRecordIntent(intent)
-        ReminderScheduler.reconcile(this, reminderSettings)
+        ReminderScheduler.reconcile(this, reminderSettings, restorePending = true)
         if (!lockSession.initialized) {
             lockSession.isAppLocked = appLockEnabled
             lockSession.journalSessionOpened = !appLockEnabled
@@ -336,6 +336,7 @@ class MainActivity : FragmentActivity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         refreshAuthenticationAvailability()
         notificationPermissionGranted = hasNotificationPermission()
+        ReminderScheduler.reconcile(this, reminderSettings, restorePending = true)
 
         val pendingAction = lockSession.pendingAuthenticationAfterEnrollment
         lockSession.pendingAuthenticationAfterEnrollment = null
@@ -577,7 +578,10 @@ class MainActivity : FragmentActivity() {
             ) == PackageManager.PERMISSION_GRANTED
 
     private fun handleQuickRecordIntent(intent: Intent?) {
-        if (intent?.action == ACTION_QUICK_RECORD) quickRecordRequest += 1
+        if (intent?.action == ACTION_QUICK_RECORD) {
+            ReminderScheduler.acknowledge(this, intent)
+            quickRecordRequest += 1
+        }
     }
 
     private fun refreshAuthenticationAvailability() {

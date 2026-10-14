@@ -112,4 +112,58 @@ class HabitPreferencesTest {
             dailyQuestion(date, DailyPromptStyle.AWARENESS),
         )
     }
+
+    @Test
+    fun `opening app after scheduled time recovers undelivered reminder today`() {
+        val due = ZonedDateTime.of(2026, 8, 24, 17, 0, 0, 0, shanghai)
+        val now = due.plusMinutes(30)
+        val settings = ReminderSettings(enabled = true, hour = 17, minute = 0)
+        assertEquals(now, restoreReminderAt(settings, now, due.toInstant().toEpochMilli()))
+        assertEquals(
+            due.plusDays(1),
+            restoreReminderAt(settings, now, null),
+        )
+    }
+
+    @Test
+    fun `recovery does not replay old days or bypass quiet hours and disabled reminders`() {
+        val due = ZonedDateTime.of(2026, 8, 24, 17, 0, 0, 0, shanghai)
+        val settings = ReminderSettings(enabled = true, hour = 17, minute = 0)
+        val pending = due.toInstant().toEpochMilli()
+        assertEquals(
+            due.plusDays(2),
+            restoreReminderAt(settings, due.plusDays(1).plusHours(1), pending),
+        )
+        assertEquals(
+            due.plusDays(1).withHour(8),
+            restoreReminderAt(settings, due.withHour(23), pending),
+        )
+        assertNull(restoreReminderAt(settings.copy(enabled = false), due.plusMinutes(30), pending))
+    }
+
+    @Test
+    fun `future and consumed reminders do not deliver on reopening`() {
+        val due = ZonedDateTime.of(2026, 8, 24, 17, 0, 0, 0, shanghai)
+        val settings = ReminderSettings(enabled = true, hour = 17, minute = 0)
+        assertEquals(
+            due,
+            restoreReminderAt(settings, due.minusHours(1), due.toInstant().toEpochMilli()),
+        )
+        assertEquals(
+            due.plusDays(1),
+            restoreReminderAt(
+                settings,
+                due.plusMinutes(1),
+                due.plusDays(1).toInstant().toEpochMilli(),
+            ),
+        )
+        assertEquals(
+            due.plusDays(7),
+            restoreReminderAt(
+                settings.copy(pausedUntilEpochDay = due.toLocalDate().plusDays(7).toEpochDay()),
+                due.plusMinutes(1),
+                due.toInstant().toEpochMilli(),
+            ),
+        )
+    }
 }

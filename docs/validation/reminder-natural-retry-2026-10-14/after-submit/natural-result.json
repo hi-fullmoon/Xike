@@ -1,0 +1,19 @@
+{
+  "scenario": "after-submit",
+  "passed": true,
+  "elapsedSeconds": 1368.7,
+  "retryAt": 1791977462565,
+  "observerPid": "5561",
+  "notificationCallbacks": [
+    {
+      "tag": "6c70a434-1530-4249-8a62-64bc6dac85cb",
+      "postTime": 1791976562609,
+      "observedAt": 1791976562876
+    }
+  ],
+  "activeKeys": [
+    "0|com.xike.app|402|6c70a434-1530-4249-8a62-64bc6dac85cb|10213"
+  ],
+  "manuallyReopened": false,
+  "manualBroadcast": false
+}

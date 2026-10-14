@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="alarm-token">2eee544d-6876-4a38-a399-eca479fee17c</string>
+    <long name="delivery-next-at" value="1792062960000" />
+    <string name="delivery-id">1707b332-1f5b-47b4-b550-dff9cbed0821</string>
+    <long name="pending-at" value="1791976563312" />
+</map>

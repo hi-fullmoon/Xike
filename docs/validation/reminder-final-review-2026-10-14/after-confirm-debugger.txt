@@ -1,0 +1,12 @@
+Set uncaught java.lang.Throwable
+Set deferred uncaught java.lang.Throwable
+Initializing jdb ...
+> Deferring breakpoint com.xike.app.ReminderScheduler:96.
+It will be set after the class is loaded.
+> > Nothing suspended.
+Ignoring cmd -2147483642/199/1 from the VM
+Set deferred breakpoint com.xike.app.ReminderScheduler:96
+
+Breakpoint hit: "thread=main", com.xike.app.ReminderScheduler.reconcile(), line=96 bci=492
+
+main[1] 

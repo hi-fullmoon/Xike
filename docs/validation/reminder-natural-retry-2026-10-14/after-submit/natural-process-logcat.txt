@@ -1,0 +1,779 @@
+--------- beginning of system
+10-14 19:09:20.806   654   654 I ActivityManager: Memory class: 192
+10-14 19:09:23.848   654   654 D ActivityManager: StatsPullAtomService not ready yet
+10-14 19:09:23.849   654   686 I ActivityManager: Connection with lmkd established
+10-14 19:09:23.849   654   654 D ActivityManager: StatsPullAtomService not ready yet
+10-14 19:09:23.986   654   675 W ActivityTaskManager: Skip updateConfiguration because mWindowManager isn't set
+10-14 19:09:24.128   654   654 D ActivityManager: Freezer timeout set to 10000
+10-14 19:09:24.128   654   654 D ActivityManager: Freezer exemption set to false
+10-14 19:09:24.128   654   684 D ActivityManager: Freezer enabled
+10-14 19:09:24.128   654   684 D ActivityManager: freezer override set to false
+10-14 19:09:24.237   654   654 I ActivityTaskManager: Config changes=20005df8 {1.0 ?mcc0mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port ?uimode ?night finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.2 ?fontWeightAdjustment}
+10-14 19:09:24.249   654   677 D ActivityManager: StatsPullAtomService not ready yet
+10-14 19:09:25.757   654   654 W ActivityManager: Unable to start service Intent { act=android.service.notification.NotificationListenerService cmp=com.google.android.apps.nexuslauncher/com.android.launcher3.notification.NotificationListener } U=0: not found
+10-14 19:09:25.758   654   654 W ActivityManager: Unable to start service Intent { act=android.service.notification.NotificationListenerService cmp=com.google.android.apps.nexuslauncher/com.android.launcher3.notification.NotificationListener } U=0: not found
+10-14 19:09:25.758   654   654 W ActivityManager: Unable to start service Intent { act=android.service.notification.NotificationListenerService cmp=com.google.android.as/com.google.android.apps.miphone.aiai.common.notification.service.AiAiNotificationListenerService } U=0: not found
+10-14 19:09:25.759   654   654 D ActivityManager: StatsPullAtomService not ready yet
+10-14 19:09:25.761   654   654 W ActivityManager: Unable to start service Intent { act=android.service.notification.NotificationAssistantService cmp=com.google.android.as/com.google.android.apps.miphone.aiai.common.notification.service.AiAiNotificationAssistantService } U=0: not found
+10-14 19:09:26.017   654   654 I ActivityTaskManager: Config changes=200 {1.0 ?mcc0mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.4 ?fontWeightAdjustment}
+10-14 19:09:26.248   654   654 I ActivityManager: System now ready
+10-14 19:09:26.251   654   654 I ActivityTaskManager: Config changes=10008000 {1.0 ?mcc0mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.6 fontWeightAdjustment=0}
+10-14 19:09:26.259   654   654 W ActivityManager: Too early to start/bind service in system_server: Phase=550 ComponentInfo{com.android.server.telecom/com.android.server.telecom.components.TelecomService}
+10-14 19:09:26.260   654   654 W ActivityManager: Too early to start/bind service in system_server: Phase=550 ComponentInfo{com.android.server.telecom/com.android.server.telecom.components.TelecomService}
+10-14 19:09:26.315   654   685 W ActivityManager: com.android.systemui inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.315   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.322   654   685 I ActivityManager: Start proc 1051:com.android.systemui/u0a186 for service {com.android.systemui/com.android.systemui.wallpapers.ImageWallpaper}
+10-14 19:09:26.322   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.323   654   685 W ActivityManager: com.google.android.permissioncontroller inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.323   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.327   654   685 I ActivityManager: Start proc 1052:com.google.android.permissioncontroller/u0a196 for service {com.google.android.permissioncontroller/com.android.permissioncontroller.permission.service.PermissionControllerServiceImpl}
+10-14 19:09:26.327   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.406   654   685 W ActivityManager: com.android.DeviceAsWebcam inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.406   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.409   654   654 D ActivityManager: ThemeHomeDelay: Home launch is not delayable, skipping timeout creation
+10-14 19:09:26.417   654   685 I ActivityManager: Start proc 1094:WebViewLoader-arm64-v8a/1037 [android.webkit.WebViewLibraryLoader$RelroFileCreator] for 
+10-14 19:09:26.417   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.469   654   685 W ActivityManager: com.google.android.networkstack inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.469   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.472   654   685 I ActivityManager: Start proc 1128:com.android.networkstack.process/1073 for service {com.google.android.networkstack/com.android.server.NetworkStackService}
+10-14 19:09:26.472   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.479   654   654 I ActivityManager: Current user:0
+10-14 19:09:26.497   654   798 I ActivityManager: Process WebViewLoader-arm64-v8a (pid 1094) has died: psvc PER 
+10-14 19:09:26.627   654   685 W ActivityManager: com.android.bluetooth inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.627   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.641   654   654 W ActivityTaskManager: callingPackage for (uid=-1, pid=0) has no WPC
+10-14 19:09:26.651   654   654 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.googlesdksetup/.DefaultActivity (has extras)} with LAUNCH_MULTIPLE from uid 0 (BAL_ALLOW_ALLOWLISTED_UID) result code=0
+10-14 19:09:26.657   654   685 I ActivityManager: Start proc 1218:com.google.android.bluetooth/1002 for service {com.google.android.bluetooth/com.android.bluetooth.btservice.AdapterService}
+10-14 19:09:26.657   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.657   654   685 W ActivityManager: com.android.se inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.657   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.661   654   685 I ActivityManager: Start proc 1230:com.android.se/1068 for added application com.android.se
+10-14 19:09:26.661   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.661   654   685 W ActivityManager: com.android.phone inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.661   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.664   654   685 I ActivityManager: Start proc 1232:com.android.phone/1001 for added application com.android.phone
+10-14 19:09:26.664   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.664   654   685 W ActivityManager: com.google.android.googlesdksetup inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.664   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.668   654   685 I ActivityManager: Start proc 1241:com.google.android.googlesdksetup/u0a177 for top-activity {com.google.android.googlesdksetup/com.google.android.googlesdksetup.DefaultActivity}
+10-14 19:09:26.668   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.685   654   685 W ActivityManager: com.android.bluetooth inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.685   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.699   654   685 I ActivityManager: Start proc 1273:com.android.bluetooth/1002 for content provider {com.android.bluetooth/com.google.android.bluetooth.BluetoothLegacyMigration}
+10-14 19:09:26.699   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.859   654   685 W ActivityManager: com.android.DeviceAsWebcam inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.859   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.865   654  1161 W ActivityTaskManager: callingPackage for (uid=-1, pid=0) has no WPC
+10-14 19:09:26.867   654   685 I ActivityManager: Start proc 1336:com.android.settings/1000 for broadcast {com.android.settings/com.android.settings.safetycenter.SafetySourceBroadcastReceiver}
+10-14 19:09:26.870   654  1161 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity (has extras)} with LAUNCH_SINGLE_TASK from uid 0 (BAL_ALLOW_ALLOWLISTED_UID) result code=0
+10-14 19:09:26.874   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:26.876   654   685 W ActivityManager: com.google.android.apps.nexuslauncher inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.876   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:26.878   654   654 W ActivityManager: Unable to start service Intent { act=android.service.contentcapture.ContentCaptureService xflg=0x4 cmp=com.google.android.as/com.google.android.apps.miphone.aiai.app.AiAiContentCaptureService } U=0: not found
+10-14 19:09:26.879   654   654 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@5e83f49
+10-14 19:09:26.879   654   654 W ActivityManager: Unable to start service Intent { act=android.service.contentcapture.ContentCaptureService xflg=0x4 cmp=com.google.android.as/com.google.android.apps.miphone.aiai.app.AiAiContentCaptureService } U=0: not found
+10-14 19:09:26.885   654   654 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@51ba514
+10-14 19:09:26.885   654   685 I ActivityManager: Start proc 1349:com.google.android.apps.nexuslauncher/u0a185 for top-activity {com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+10-14 19:09:26.885   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:27.021   654   654 W ActivityManager: Unable to start service Intent { act=android.service.systemcaptions.SystemCaptionsManagerService xflg=0x4 cmp=com.google.android.as/com.google.android.apps.miphone.aiai.captions.SystemCaptionsManagerService } U=0: not found
+10-14 19:09:27.048   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+--------- beginning of main
+10-14 19:09:27.052   654   675 I ActivityTaskManager: Displayed com.google.android.apps.nexuslauncher/.NexusLauncherActivity for user 0: +172ms
+10-14 19:09:27.052   654   685 I ActivityManager: Start proc 1411:com.google.android.gms.persistent/u0a144 for broadcast {com.google.android.gms/com.google.android.gms.chimera.GmsIntentOperationService$PersistentTrustedReceiver}
+10-14 19:09:27.052   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:27.395   654  1192 W ActivityManager: Receiver with filter android.content.IntentFilter@9c6b11b already registered for pid 1051, callerPackage is com.android.systemui
+10-14 19:09:27.598   654  1192 W ActivityManager: pid 1232 com.android.phone sent binder code 58 with flags 2 to frozen apps and got error -74
+10-14 19:09:28.007   654  1458 I ActivityTaskManager: Config changes=3 {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.10 fontWeightAdjustment=0}
+10-14 19:09:28.213   654   675 I ActivityTaskManager: Config changes=80000000 {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.23 fontWeightAdjustment=0}
+10-14 19:09:28.665   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:28.692   654   685 I ActivityManager: Start proc 1546:com.google.android.gms/u0a144 for service {com.google.android.gms/com.google.android.gms.chimera.GmsIntentOperationService}
+10-14 19:09:28.692   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:28.692   654   739 D ActivityManager: ThemeHomeDelay: Home launch is not delayable, ignoring setThemeOverlayReady() call
+10-14 19:09:28.780   654   668 W ActivityManager: Unable to start service Intent { act=com.google.android.chimera.BoundService.START dat=chimera-action: xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService } U=0: not found
+10-14 19:09:28.780   654   668 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@19a2e70
+10-14 19:09:28.846   654  1399 W ActivityManager: Unable to start service Intent { act=com.google.android.chimera.BoundService.START dat=chimera-action: xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService } U=0: not found
+10-14 19:09:28.847   654  1399 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@fce2b32
+10-14 19:09:28.864   654   678 I ActivityManager: About to commit checkpoint
+10-14 19:09:28.864   654   685 W ActivityManager: com.google.android.cellbroadcastreceiver inode == 0 or app uninstalled with keep-data
+10-14 19:09:28.864   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:28.885   654   685 I ActivityManager: Start proc 1584:com.google.android.cellbroadcastreceiver/u0a191 for broadcast {com.google.android.cellbroadcastreceiver/com.android.cellbroadcastreceiver.CellBroadcastReceiver}
+10-14 19:09:28.885   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:28.947   654   685 W ActivityManager: com.google.android.inputmethod.latin inode == 0 or app uninstalled with keep-data
+10-14 19:09:28.947   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:28.953   654   685 I ActivityManager: Start proc 1608:com.google.android.inputmethod.latin/u0a164 for service {com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME}
+10-14 19:09:28.953   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.039   654   678 I ActivityManager: User 0 state changed from BOOTING to RUNNING_LOCKED
+10-14 19:09:29.040   654   678 D ActivityManager: Started unlocking user 0
+10-14 19:09:29.040   654   678 D ActivityManager: Unlocking user 0 progress 0
+10-14 19:09:29.040   654   678 D ActivityManager: Unlocking user 0 progress 5
+10-14 19:09:29.042   654   685 W ActivityManager: com.google.android.ext.services inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.042   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.095   654   685 I ActivityManager: Start proc 1631:com.google.android.ext.services/u0a194 for on-hold
+10-14 19:09:29.095   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: starting to update pids map
+10-14 19:09:29.095   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.095   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: done updating pids map
+10-14 19:09:29.095   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: asking zygote to start proc
+10-14 19:09:29.095   654   685 W ActivityManager: com.google.android.apps.wellbeing inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.095   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.107   654   685 W ActivityManager: Slow operation: 68ms so far, now at startProcess: returned from zygote!
+10-14 19:09:29.107   654   685 W ActivityManager: Slow operation: 68ms so far, now at startProcess: done updating battery stats
+10-14 19:09:29.108   654   685 W ActivityManager: Slow operation: 69ms so far, now at startProcess: building log message
+10-14 19:09:29.108   654   685 I ActivityManager: Start proc 1651:com.google.android.apps.wellbeing/u0a145 for on-hold
+10-14 19:09:29.108   654   685 W ActivityManager: Slow operation: 69ms so far, now at startProcess: starting to update pids map
+10-14 19:09:29.108   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.108   654   685 W ActivityManager: Slow operation: 69ms so far, now at startProcess: done updating pids map
+10-14 19:09:29.310   654   685 W ActivityManager: com.android.cellbroadcastreceiver inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.310   654   685 W ActivityManager: com.google.android.gms inode == 0 or app uninstalled with keep-data
+10-14 19:09:29.367   654   685 W ActivityManager: Slow operation: 58ms so far, now at startProcess: returned from zygote!
+10-14 19:09:29.367   654   685 W ActivityManager: Slow operation: 58ms so far, now at startProcess: done updating battery stats
+10-14 19:09:29.367   654   685 W ActivityManager: Slow operation: 58ms so far, now at startProcess: building log message
+10-14 19:09:29.375   654   685 I ActivityManager: Start proc 1689:com.android.cellbroadcastreceiver/u0a98 for content provider {com.android.cellbroadcastreceiver/com.android.cellbroadcastreceiver.LegacyCellBroadcastContentProvider}
+10-14 19:09:29.375   654   685 W ActivityManager: Slow operation: 66ms so far, now at startProcess: starting to update pids map
+10-14 19:09:29.375   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.375   654   685 W ActivityManager: Slow operation: 66ms so far, now at startProcess: done updating pids map
+10-14 19:09:29.402   654   675 I ActivityManager: User 0 state changed from RUNNING_LOCKED to RUNNING_UNLOCKING
+10-14 19:09:29.402   654   675 D ActivityManager: Unlocking user 0 progress 20
+10-14 19:09:29.511   654   685 I ActivityManager: Start proc 1714:com.google.android.providers.media.module/u0a202 for service {com.google.android.providers.media.module/com.android.providers.media.fuse.ExternalStorageServiceImpl}
+10-14 19:09:29.511   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.608   654   685 I ActivityManager: Start proc 1727:com.google.android.as/u0a139 for service {com.google.android.as/com.google.android.apps.miphone.aiai.app.AiAiContentCaptureService}
+10-14 19:09:29.608   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.618   654   685 I ActivityManager: Start proc 1730:com.google.android.googlequicksearchbox:interactor/u0a147 for service {com.google.android.googlequicksearchbox/com.google.android.voiceinteraction.GsaVoiceInteractionService}
+10-14 19:09:29.618   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.835   654   684 I ActivityManager: User 0 state changed from RUNNING_UNLOCKING to RUNNING_UNLOCKED
+10-14 19:09:29.835   654   675 I ActivityTaskManager: Restoring recents for user 0
+10-14 19:09:29.840   654   685 I ActivityManager: Start proc 1775:com.android.printspooler/u0a121 for service {com.android.printspooler/com.android.printspooler.model.PrintSpoolerService}
+10-14 19:09:29.840   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.914   654   685 W ActivityManager: Slow operation: 75ms so far, now at startProcess: done updating battery stats
+10-14 19:09:29.914   654   685 W ActivityManager: Slow operation: 78ms so far, now at startProcess: building log message
+10-14 19:09:29.916   654   685 I ActivityManager: Start proc 1779:com.android.emulator.multidisplay/1000 for added application com.android.emulator.multidisplay
+10-14 19:09:29.916   654   685 W ActivityManager: Slow operation: 80ms so far, now at startProcess: starting to update pids map
+10-14 19:09:29.916   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:29.916   654   685 W ActivityManager: Slow operation: 80ms so far, now at startProcess: done updating pids map
+10-14 19:09:29.944   654  1770 W ActivityManager: Slow operation: 70ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+10-14 19:09:29.944   654  1770 W ActivityManager: Slow operation: 70ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+10-14 19:09:30.081   654   685 W ActivityManager: Slow operation: 111ms so far, now at startProcess: done updating battery stats
+10-14 19:09:30.135   654   685 W ActivityManager: Slow operation: 166ms so far, now at startProcess: building log message
+10-14 19:09:30.135   654   685 I ActivityManager: Start proc 1810:com.google.android.partnersetup/u0a136 for broadcast {com.google.android.partnersetup/com.google.android.partnersetup.PhoneStateReceiver}
+10-14 19:09:30.135   654   685 W ActivityManager: Slow operation: 166ms so far, now at startProcess: starting to update pids map
+10-14 19:09:30.135   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.135   654   685 W ActivityManager: Slow operation: 166ms so far, now at startProcess: done updating pids map
+10-14 19:09:30.141   654   685 W ActivityManager: Slow operation: 120ms so far, now at startProcess: asking zygote to start proc
+10-14 19:09:30.159   654   685 W ActivityManager: Slow operation: 137ms so far, now at startProcess: returned from zygote!
+10-14 19:09:30.180   654   685 W ActivityManager: Slow operation: 159ms so far, now at startProcess: done updating battery stats
+10-14 19:09:30.181   654   685 W ActivityManager: Slow operation: 159ms so far, now at startProcess: building log message
+10-14 19:09:30.181   654   685 I ActivityManager: Start proc 1842:com.google.android.googlequicksearchbox:search/u0a147 for service {com.google.android.googlequicksearchbox/com.google.android.libraries.assistant.auto.tng.media.mediabrowser.NewsMediaBrowserService}
+10-14 19:09:30.181   654   685 W ActivityManager: Slow operation: 159ms so far, now at startProcess: starting to update pids map
+10-14 19:09:30.181   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.181   654   685 W ActivityManager: Slow operation: 159ms so far, now at startProcess: done updating pids map
+10-14 19:09:30.362   654   685 I ActivityManager: Start proc 1873:com.android.keychain/1000 for service {com.android.keychain/com.android.keychain.KeyChainService}
+10-14 19:09:30.362   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.426   654   685 I ActivityManager: Start proc 1882:com.android.devicelockcontroller/u0a189 for broadcast {com.android.devicelockcontroller/com.android.devicelockcontroller.receivers.RecordBootTimestampReceiver}
+10-14 19:09:30.426   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.476   654   685 I ActivityManager: Start proc 1908:android.process.media/u0a95 for content provider {com.android.providers.media/com.android.providers.media.LegacyMediaProvider}
+10-14 19:09:30.476   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.510   654   759 E ActivityManager: Sending non-protected broadcast android.intent.action.UPDATE_CT_LOGS from system uid 1000 pkg android
+10-14 19:09:30.510   654   759 E ActivityManager: java.lang.Throwable
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.BroadcastController.checkBroadcastFromSystem(BroadcastController.java:2145)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.BroadcastController.broadcastIntentLockedTraced(BroadcastController.java:1646)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.BroadcastController.broadcastIntentLocked(BroadcastController.java:807)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.BroadcastController.broadcastIntentInPackage(BroadcastController.java:774)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.ActivityManagerService$LocalService.broadcastIntentInPackage(ActivityManagerService.java:17221)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.PendingIntentRecord.sendInner(PendingIntentRecord.java:674)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.PendingIntentRecord.sendWithResult(PendingIntentRecord.java:380)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.am.ActivityManagerService.sendIntentSender(ActivityManagerService.java:5618)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at android.app.PendingIntent.sendAndReturnResult(PendingIntent.java:1116)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at android.app.PendingIntent.send(PendingIntent.java:1082)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.alarm.AlarmManagerService$DeliveryTracker.deliverLocked(AlarmManagerService.java:5358)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.alarm.AlarmManagerService.deliverAlarmsLocked(AlarmManagerService.java:4322)
+10-14 19:09:30.510   654   759 E ActivityManager: 	at com.android.server.alarm.AlarmManagerService$AlarmThread.run(AlarmManagerService.java:4598)
+10-14 19:09:30.737   654  1027 W ActivityManager: Unable to start service Intent { act=com.google.android.play.core.splitinstall.BIND_SPLIT_INSTALL_SERVICE xflg=0x4 pkg=com.android.vending } U=0: not found
+10-14 19:09:30.749   654   798 W ActivityManager: Unable to start service Intent { act=com.google.android.play.core.splitinstall.BIND_SPLIT_INSTALL_SERVICE xflg=0x4 pkg=com.android.vending } U=0: not found
+10-14 19:09:30.829   654   668 I ActivityTaskManager: START u0 {act=com.google.android.gms.setupservices.COVERSHEET_WELCOME flg=0x14000000 xflg=0x4 pkg=com.google.android.gms cmp=com.google.android.gms/.setupservices.CoverSheetWelcomeActivity} with LAUNCH_MULTIPLE from uid 10186 (BAL_ALLOW_NON_APP_VISIBLE_WINDOW) result code=0
+10-14 19:09:30.933   654   685 W ActivityManager: Slow operation: 89ms so far, now at startProcess: returned from zygote!
+10-14 19:09:30.934   654   685 W ActivityManager: Slow operation: 91ms so far, now at startProcess: done updating battery stats
+10-14 19:09:30.934   654   685 W ActivityManager: Slow operation: 91ms so far, now at startProcess: building log message
+10-14 19:09:30.934   654   685 I ActivityManager: Start proc 1997:com.google.android.gms.ui/u0a144 for next-top-activity {com.google.android.gms/com.google.android.gms.setupservices.CoverSheetWelcomeActivity}
+10-14 19:09:30.934   654   685 W ActivityManager: Slow operation: 91ms so far, now at startProcess: starting to update pids map
+10-14 19:09:30.941   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:30.941   654   685 W ActivityManager: Slow operation: 98ms so far, now at startProcess: done updating pids map
+10-14 19:09:31.130   654   685 I ActivityManager: Start proc 2080:com.google.android.as.oss/u0a133 for service {com.google.android.as.oss/com.google.android.apps.miphone.astrea.grpc.AstreaGrpcService}
+10-14 19:09:31.130   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:31.303   654   678 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{220664357 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t6}
+10-14 19:09:31.303   654   678 W ActivityTaskManager: Activity pause timeout for ActivityRecord{220664357 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t6}
+10-14 19:09:31.411   654  1192 W ActivityManager: Slow operation: 162ms so far, now at startProcess: done updating battery stats
+10-14 19:09:31.411   654  1192 W ActivityManager: Slow operation: 162ms so far, now at startProcess: building log message
+10-14 19:09:31.411   654  1192 I ActivityManager: Start proc 2109:android.process.acore/u0a94 for content provider {com.android.providers.contacts/com.android.providers.contacts.ContactsProvider2}
+10-14 19:09:31.411   654  1192 W ActivityManager: Slow operation: 162ms so far, now at startProcess: starting to update pids map
+10-14 19:09:31.411   654  1192 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:31.411   654  1192 W ActivityManager: Slow operation: 162ms so far, now at startProcess: done updating pids map
+10-14 19:09:31.446   654   685 W ActivityManager: Slow operation: 51ms so far, now at startProcess: returned from zygote!
+10-14 19:09:31.448   654   685 W ActivityManager: Slow operation: 52ms so far, now at startProcess: done updating battery stats
+10-14 19:09:31.448   654   685 W ActivityManager: Slow operation: 52ms so far, now at startProcess: building log message
+10-14 19:09:31.448   654   685 I ActivityManager: Start proc 2141:com.android.carrierconfig/u0a184 for service {com.android.carrierconfig/com.android.carrierconfig.DefaultCarrierConfigService}
+10-14 19:09:31.448   654   685 W ActivityManager: Slow operation: 53ms so far, now at startProcess: starting to update pids map
+10-14 19:09:31.448   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:31.448   654   685 W ActivityManager: Slow operation: 53ms so far, now at startProcess: done updating pids map
+10-14 19:09:31.724   654   724 I ActivityTaskManager: START u0 {act=com.google.android.apps.tips.action.COVERSHEET flg=0x14000000 xflg=0x4 pkg=com.google.android.apps.tips} with LAUNCH_MULTIPLE from uid 10144 (sr=180243375) result code=-91
+10-14 19:09:32.052   654   685 W ActivityManager: Slow operation: 71ms so far, now at startProcess: returned from zygote!
+10-14 19:09:32.078   654  1398 W ActivityManager: Slow operation: 101ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+10-14 19:09:32.078   654  1398 W ActivityManager: Slow operation: 101ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+10-14 19:09:32.080   654   685 W ActivityManager: Slow operation: 99ms so far, now at startProcess: done updating battery stats
+10-14 19:09:32.080   654   685 W ActivityManager: Slow operation: 99ms so far, now at startProcess: building log message
+10-14 19:09:32.081   654   685 I ActivityManager: Start proc 2193:com.android.managedprovisioning/u0a108 for broadcast {com.android.managedprovisioning/com.android.managedprovisioning.ota.PreBootListener}
+10-14 19:09:32.081   654   685 W ActivityManager: Slow operation: 99ms so far, now at startProcess: starting to update pids map
+10-14 19:09:32.081   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:32.081   654   685 W ActivityManager: Slow operation: 99ms so far, now at startProcess: done updating pids map
+10-14 19:09:32.488   654   725 W ActivityManager: Service lookup failed: association not allowed between packages com.google.android.as.oss and com.google.android.gms
+10-14 19:09:32.527   654   725 I ActivityManager: Broadcasting: Intent { act=com.android.emulator.multidisplay.START flg=0x400000 cmp=com.android.emulator.multidisplay/.MultiDisplayServiceReceiver }
+10-14 19:09:32.548   654   725 I ActivityManager: Enqueued broadcast Intent { act=com.android.emulator.multidisplay.START flg=0x400000 cmp=com.android.emulator.multidisplay/.MultiDisplayServiceReceiver }: 0
+10-14 19:09:33.028   654   685 W ActivityManager: Slow operation: 53ms so far, now at startProcess: returned from zygote!
+10-14 19:09:33.035   654   668 W ActivityManager: Slow operation: 69ms so far, now at startProcess: done updating battery stats
+10-14 19:09:33.037   654   668 W ActivityManager: Slow operation: 135ms so far, now at startProcess: building log message
+10-14 19:09:33.037   654   668 I ActivityManager: Start proc 2285:com.android.localtransport/1000 for service {com.android.localtransport/com.android.localtransport.LocalTransportService}
+10-14 19:09:33.037   654   668 W ActivityManager: Slow operation: 135ms so far, now at startProcess: starting to update pids map
+10-14 19:09:33.041   654   668 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:33.041   654   668 W ActivityManager: Slow operation: 139ms so far, now at startProcess: done updating pids map
+10-14 19:09:33.041   654   668 W ActivityManager: Slow operation: 71ms so far, now at attachApplicationLocked: before bindApplication
+10-14 19:09:33.041   654   668 W ActivityManager: Slow operation: 71ms so far, now at attachApplicationLocked: immediately before bindApplication
+10-14 19:09:33.050   654   668 W ActivityManager: Slow operation: 80ms so far, now at attachApplicationLocked: immediately after bindApplication
+10-14 19:09:33.050   654   668 W ActivityManager: Slow operation: 80ms so far, now at attachApplicationLocked: after updateLruProcessLocked
+10-14 19:09:33.056   654   668 W ActivityManager: Slow operation: 86ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+10-14 19:09:33.062   654  1125 W ActivityManager: Slow operation: 79ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+10-14 19:09:33.064   654  1125 W ActivityManager: Slow operation: 81ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+10-14 19:09:33.254   654  2234 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.LOCKED_BOOT_COMPLETED dispatchLatency:382 completeLatency:4202 dispatchRealLatency:382 completeRealLatency:4202 receiversSize:8 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:33.306   654   685 I ActivityManager: Start proc 2319:com.android.imsserviceentitlement/u0a140 for broadcast {com.android.imsserviceentitlement/com.android.imsserviceentitlement.ImsEntitlementReceiver}
+10-14 19:09:33.306   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:33.432   654   675 I ActivityManager: Broadcast completed: result=0
+10-14 19:09:33.876   654  1766 W ActivityManager: Slow operation: 58ms so far, now at startProcess: done creating new process record
+10-14 19:09:33.876   654  1766 W ActivityManager: Slow operation: 58ms so far, now at startProcess: stepping in to startProcess
+10-14 19:09:34.147   654  1766 W ActivityManager: Slow operation: 271ms so far, now at startProcess: getting gids from package manager
+10-14 19:09:34.159   654  1766 W ActivityManager: Slow operation: 283ms so far, now at startProcess: building args
+10-14 19:09:34.159   654  1766 W ActivityManager: Slow operation: 341ms so far, now at startProcess: done starting proc!
+10-14 19:09:34.166   654   685 W ActivityManager: Slow operation: 290ms so far, now at startProcess: asking zygote to start proc
+10-14 19:09:34.218   654   685 W ActivityManager: Slow operation: 341ms so far, now at startProcess: returned from zygote!
+10-14 19:09:34.219   654   685 W ActivityManager: Slow operation: 343ms so far, now at startProcess: done updating battery stats
+10-14 19:09:34.219   654   685 W ActivityManager: Slow operation: 343ms so far, now at startProcess: building log message
+10-14 19:09:34.219   654   685 I ActivityManager: Start proc 2370:com.google.android.apps.wallpaper/u0a175 for content provider {com.google.android.apps.wallpaper/com.google.android.apps.wallpaper.provider.RecentWallpapersProvider}
+10-14 19:09:34.219   654   685 W ActivityManager: Slow operation: 343ms so far, now at startProcess: starting to update pids map
+10-14 19:09:34.219   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:34.219   654   685 W ActivityManager: Slow operation: 343ms so far, now at startProcess: done updating pids map
+10-14 19:09:34.236   654   685 I ActivityManager: Start proc 2373:com.google.android.photopicker/u0a201 for broadcast {com.google.android.photopicker/com.android.photopicker.PhotopickerDeviceConfigReceiver}
+10-14 19:09:34.236   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:34.286   654   685 I ActivityManager: Start proc 2397:com.google.android.tts/u0a149 for service {com.google.android.tts/com.google.android.apps.speech.tts.googletts.service.GoogleTtsService}
+10-14 19:09:34.286   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:34.387   654   685 I ActivityManager: Start proc 2409:com.google.android.gms.unstable/u0a144 for service {com.google.android.gms/com.google.android.gms.droidguard.DroidGuardService}
+10-14 19:09:34.387   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:34.868   654   685 I ActivityManager: Start proc 2463:com.android.externalstorage/u0a109 for broadcast {com.android.externalstorage/com.android.externalstorage.MountReceiver}
+10-14 19:09:34.868   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:35.563   654   685 I ActivityManager: Start proc 2605:com.android.providers.calendar/u0a103 for broadcast {com.android.providers.calendar/com.android.providers.calendar.CalendarUpgradeReceiver}
+10-14 19:09:35.564   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:35.776   654   685 I ActivityManager: Start proc 2651:com.google.android.dialer/u0a141 for service {com.google.android.dialer/com.android.voicemail.impl.DialerVisualVoicemailService}
+10-14 19:09:35.776   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:35.983   654   685 W ActivityManager: Slow operation: 72ms so far, now at startProcess: returned from zygote!
+10-14 19:09:35.984   654   685 W ActivityManager: Slow operation: 73ms so far, now at startProcess: done updating battery stats
+10-14 19:09:35.984   654   685 W ActivityManager: Slow operation: 73ms so far, now at startProcess: building log message
+10-14 19:09:35.984   654   685 I ActivityManager: Start proc 2671:com.android.chrome/u0a153 for broadcast {com.android.chrome/com.google.android.apps.chrome.rlz.RevenueStatsConfigurationUpdateReceiver}
+10-14 19:09:35.984   654   685 W ActivityManager: Slow operation: 73ms so far, now at startProcess: starting to update pids map
+10-14 19:09:35.984   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:35.984   654   685 W ActivityManager: Slow operation: 73ms so far, now at startProcess: done updating pids map
+10-14 19:09:36.398   654  2113 W ActivityManager: Slow operation: 261ms so far, now at attachApplicationLocked: immediately after bindApplication
+10-14 19:09:36.398   654  2113 W ActivityManager: Slow operation: 261ms so far, now at attachApplicationLocked: after updateLruProcessLocked
+10-14 19:09:36.398   654  2113 W ActivityManager: Slow operation: 261ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+10-14 19:09:36.434   654  1766 I ActivityManager: Process com.google.android.googlesdksetup (pid 1241) has died: cch+65 CEM 
+10-14 19:09:36.454   654  2239 I ActivityManager: Process com.google.android.ext.services (pid 1631) has died: cch+55 CEM 
+10-14 19:09:36.468   654  1458 I ActivityManager: Process com.android.keychain (pid 1873) has died: cch+45 CEM 
+10-14 19:09:36.674   654  2166 W ActivityManager: Slow operation: 58ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+10-14 19:09:37.106   654   685 I ActivityManager: Start proc 2744:com.google.android.documentsui/u0a100 for broadcast {com.google.android.documentsui/com.android.documentsui.PreBootReceiver}
+10-14 19:09:37.106   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:37.682   654   675 I ActivityManager: Posting BOOT_COMPLETED user #0
+10-14 19:09:38.089   654  2234 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:12 completeLatency:1402 dispatchRealLatency:12 completeRealLatency:1402 receiversSize:4 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:38.170   654   685 I ActivityManager: Start proc 2880:com.android.traceur/u0a130 for broadcast {com.android.traceur/com.android.traceur.Receiver}
+10-14 19:09:38.170   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:38.346   654  1398 I ActivityManager: Background started FGS: Allowed [callingPackage: com.google.android.apps.wellbeing; callingUid: 10145; uidState: BTOP; uidBFSL: [BFSL]; intent: Intent { xflg=0x4 cmp=com.google.android.apps.wellbeing/com.google.apps.tiktok.concurrent.InternalForegroundService (has extras) }; code:BACKGROUND_ACTIVITY_PERMISSION; tempAllowListReason:<fc9898a android.intent.action.LOCKED_BOOT_COMPLETED/u0,reasonCode:LOCKED_BOOT_COMPLETED,duration:20000,callingUid:1000>; allowWiu:58; targetSdkVersion:35; callerTargetSdkVersion:35; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+10-14 19:09:38.502   654   685 I ActivityManager: Start proc 2909:com.google.android.onetimeinitializer/u0a143 for broadcast {com.google.android.onetimeinitializer/com.google.android.onetimeinitializer.OneTimeInitializerReceiver}
+10-14 19:09:38.502   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:38.829   654   685 I ActivityManager: Start proc 2990:com.android.camera2/u0a162 for broadcast {com.android.camera2/com.android.camera.SetActivitiesCameraReceiver}
+10-14 19:09:38.829   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:39.193   654   685 I ActivityManager: Start proc 3028:com.android.carrierdefaultapp/u0a124 for broadcast {com.android.carrierdefaultapp/com.android.carrierdefaultapp.CarrierDefaultBroadcastReceiver}
+10-14 19:09:39.203   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:39.395   654   685 I ActivityManager: Start proc 3052:com.android.devicediagnostics/u0a97 for broadcast {com.android.devicediagnostics/com.android.devicediagnostics.BootCompleteReceiver}
+10-14 19:09:39.395   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:39.462   654   711 I ActivityManager: Killing 1882:com.android.devicelockcontroller/u0a189 (adj 100): change com.android.devicelockcontroller
+10-14 19:09:39.468   654   711 W ActivityManager: Scheduling restart of crashed service com.android.devicelockcontroller/androidx.work.impl.background.systemjob.SystemJobService in 10000ms for connection
+10-14 19:09:39.468   654   711 W ActivityManager: Scheduling restart of crashed service com.android.devicelockcontroller/.DeviceLockControllerService in 30000ms for connection
+10-14 19:09:39.474   654   711 I ActivityManager:   Force stopping service ServiceRecord{871ad75 u0 com.android.devicelockcontroller/.DeviceLockControllerService c:android}
+10-14 19:09:39.474   654   711 I ActivityManager:   Force stopping service ServiceRecord{a30f42a u0 com.android.devicelockcontroller/androidx.work.impl.background.systemjob.SystemJobService c:android}
+10-14 19:09:39.567   654  2239 V ActivityManager: Got obituary of 1882:com.android.devicelockcontroller
+10-14 19:09:39.634   654  2239 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:2112 completeLatency:9929 dispatchRealLatency:2112 completeRealLatency:9929 receiversSize:6 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:39.701   654   685 I ActivityManager: Start proc 3092:com.android.dynsystem/1000 for broadcast {com.android.dynsystem/com.android.dynsystem.BootCompletedReceiver}
+10-14 19:09:39.701   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:39.942   654   685 I ActivityManager: Start proc 3111:com.android.dynsystem:dynsystem/1000 for service {com.android.dynsystem/com.android.dynsystem.DynamicSystemInstallationService}
+10-14 19:09:39.942   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:39.990   654   685 I ActivityManager: Start proc 3121:com.android.nfc/1027 for broadcast {com.android.nfc/com.android.nfc.NfcMigrationBootCompleteReceiver}
+10-14 19:09:39.990   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:40.179   654   711 I ActivityManager: Killing 3121:com.android.nfc/1027 (adj 0): change com.android.nfc
+10-14 19:09:40.220   654  2163 V ActivityManager: Got obituary of 3121:com.android.nfc
+10-14 19:09:40.280   654   685 W ActivityManager: Slow operation: 91ms so far, now at startProcess: done updating battery stats
+10-14 19:09:40.284   654   685 W ActivityManager: Slow operation: 96ms so far, now at startProcess: building log message
+10-14 19:09:40.284   654   685 I ActivityManager: Start proc 3145:com.android.shell/2000 for broadcast {com.android.shell/com.android.shell.HeapDumpReceiver}
+10-14 19:09:40.284   654   685 W ActivityManager: Slow operation: 96ms so far, now at startProcess: starting to update pids map
+10-14 19:09:40.284   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:40.285   654   685 W ActivityManager: Slow operation: 96ms so far, now at startProcess: done updating pids map
+10-14 19:09:40.319   654  2236 W ActivityManager: finishReceiver: no app for android.os.BinderProxy@4cd9e4d
+10-14 19:09:40.736   654   685 I ActivityManager: Start proc 3174:com.google.android.configupdater/u0a137 for broadcast {com.google.android.configupdater/com.google.android.configupdater.MainReceiver}
+10-14 19:09:40.736   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.086   654   685 I ActivityManager: Start proc 3194:com.google.android.ext.services/u0a194 for broadcast {com.google.android.ext.services/android.ext.services.common.AdServicesFilesCleanupBootCompleteReceiver}
+10-14 19:09:41.086   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.211   654   711 E ActivityManager: Unable to freeze binder for 3194: -11
+10-14 19:09:41.212   654   711 I ActivityManager: Killing 3194:com.google.android.ext.services/u0a194 (adj 0): change com.google.android.ext.services
+10-14 19:09:41.249   654   739 V ActivityManager: Got obituary of 3194:com.google.android.ext.services
+10-14 19:09:41.276   654   685 I ActivityManager: Start proc 3209:com.google.android.federatedcompute/u0a200 for broadcast {com.google.android.federatedcompute/com.android.federatedcompute.services.FederatedComputeBroadcastReceiver}
+10-14 19:09:41.276   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.435   654   685 I ActivityManager: Start proc 3238:com.google.android.healthconnect.controller/u0a207 for broadcast {com.google.android.healthconnect.controller/com.android.healthconnect.controller.safetycenter.SafetySourceBroadcastReceiver}
+10-14 19:09:41.435   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.726   654   711 I ActivityManager: Killing 3238:com.google.android.healthconnect.controller/u0a207 (adj 0): change com.google.android.healthconnect.controller
+10-14 19:09:41.754   654  2239 W ActivityManager: Slow operation: 68ms so far, now at startProcess: done updating battery stats
+10-14 19:09:41.754   654  2239 W ActivityManager: Slow operation: 68ms so far, now at startProcess: building log message
+10-14 19:09:41.754   654  2239 I ActivityManager: Start proc 3265:com.google.android.nfc/1027 for broadcast {com.google.android.nfc/com.android.nfc.NfcBootCompletedReceiver}
+10-14 19:09:41.754   654  2239 W ActivityManager: Slow operation: 68ms so far, now at startProcess: starting to update pids map
+10-14 19:09:41.755   654  2239 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.755   654  2239 W ActivityManager: Slow operation: 69ms so far, now at startProcess: done updating pids map
+10-14 19:09:41.783   654  2234 W ActivityManager: finishReceiver: no app for android.os.BinderProxy@6dee3e5
+10-14 19:09:41.784   654  1122 V ActivityManager: Got obituary of 3238:com.google.android.healthconnect.controller
+10-14 19:09:41.840   654   685 I ActivityManager: Start proc 3285:com.google.android.ondevicepersonalization.services/u0a199 for broadcast {com.google.android.ondevicepersonalization.services/com.android.ondevicepersonalization.services.OnDevicePersonalizationBroadcastReceiver}
+10-14 19:09:41.840   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:41.842   654   711 I ActivityManager: Killing 3265:com.google.android.nfc/1027 (adj 0): change com.google.android.nfc
+10-14 19:09:41.844   654  2112 W ActivityManager: finishReceiver: no app for android.os.BinderProxy@5921a15
+10-14 19:09:41.863   654  2112 V ActivityManager: Got obituary of 3265:com.google.android.nfc
+10-14 19:09:42.016   654   685 I ActivityManager: Start proc 3301:com.google.android.packageinstaller/u0a104 for broadcast {com.google.android.packageinstaller/com.android.packageinstaller.common.TemporaryFileManager}
+10-14 19:09:42.017   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:42.178   654   685 I ActivityManager: Start proc 3322:com.google.android.projection.gearhead:car/u0a132 for broadcast {com.google.android.projection.gearhead/com.google.android.apps.auto.carservice.gmscorecompatstub.StubComponentInitReceiver}
+10-14 19:09:42.178   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:42.378   654   685 I ActivityManager: Start proc 3345:com.google.android.rkpdapp/u0a193 for broadcast {com.google.android.rkpdapp/com.android.rkpdapp.BootReceiver}
+10-14 19:09:42.378   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:42.636   654   685 I ActivityManager: Start proc 3365:com.google.android.settings.intelligence/u0a138 for broadcast {com.google.android.settings.intelligence/com.google.android.settings.intelligence.libs.instrumentation.snapshot.SnapshotBroadcastReceiver}
+10-14 19:09:42.637   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:42.828   654   684 I ActivityManager: reportOnUserCompletedEvent(0): stored=10, eligible=111
+10-14 19:09:42.982   654   755 D ActivityManager: freezing 2141 com.android.carrierconfig
+10-14 19:09:43.335   654   711 E ActivityManager: Unable to freeze binder for 3365: -11
+10-14 19:09:43.346   654   711 I ActivityManager: Killing 3365:com.google.android.settings.intelligence/u0a138 (adj 0): change com.google.android.settings.intelligence
+10-14 19:09:43.347   654   711 W ActivityManager: Scheduling restart of crashed service com.google.android.settings.intelligence/.modules.routines.impl.PruneDatabaseJobService in 1000ms for connection
+10-14 19:09:43.364   654   684 W ActivityManager: ProcessRecord{a7657b2 0:com.google.android.settings.intelligence/u0a138} is attached to a previous process 3365
+10-14 19:09:43.366   654   683 W ActivityManager: Rescheduling restart of crashed service com.google.android.settings.intelligence/.modules.routines.impl.PruneDatabaseJobService in 19981ms for mem-pressure-event
+10-14 19:09:43.366   654  1122 V ActivityManager: Got obituary of 3365:com.google.android.settings.intelligence
+10-14 19:09:43.367   654   711 I ActivityManager: Killing 0:com.google.android.settings.intelligence/u0a138 (adj -10000): change com.google.android.settings.intelligence
+10-14 19:09:43.372   654   685 W ActivityManager: ProcessRecord{aff5498 0:com.google.android.settings.intelligence/u0a138} start not valid, killing pid=3423, killedByAm=true;No entry in mProcessNames;pendingStart=false;
+10-14 19:09:43.373   654  2163 W ActivityManager: pid 1411 com.google.android.gms.persistent sent binder code 3 with flags 0 to frozen apps and got error -32
+10-14 19:09:43.383   654   685 I ActivityManager: Start proc 3424:com.google.android.settings.intelligence/u0a138 for service {com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.routines.impl.RoutinesJobIntentService}
+10-14 19:09:43.383   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:43.548   654  2236 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:132 completeLatency:5856 dispatchRealLatency:132 completeRealLatency:5856 receiversSize:100 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:43.553   654   675 I ActivityManager: Finished processing BOOT_COMPLETED for u0
+10-14 19:09:44.437   654   755 D ActivityManager: freezing 1775 com.android.printspooler
+10-14 19:09:44.713   654   685 I ActivityManager: Start proc 3509:com.google.android.accessibility.switchaccess/u0a158 for content provider {com.google.android.accessibility.switchaccess/com.google.android.accessibility.switchaccess.systemsettings.search.SwitchAccessSearchIndexablesProvider}
+10-14 19:09:44.714   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:44.729   654   685 I ActivityManager: Start proc 3512:com.google.android.apps.messaging/u0a146 for content provider {com.google.android.apps.messaging/com.google.android.apps.messaging.settings.search.MessagesSearchIndexablesProvider}
+10-14 19:09:44.730   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:44.864   654  2236 W ActivityManager: Slow operation: 55ms so far, now at attachApplicationLocked: before bindApplication
+10-14 19:09:44.864   654  2236 W ActivityManager: Slow operation: 56ms so far, now at attachApplicationLocked: immediately before bindApplication
+10-14 19:09:44.864   654  2236 W ActivityManager: Slow operation: 56ms so far, now at attachApplicationLocked: immediately after bindApplication
+10-14 19:09:44.865   654  2236 W ActivityManager: Slow operation: 56ms so far, now at attachApplicationLocked: after updateLruProcessLocked
+10-14 19:09:44.866   654  2236 W ActivityManager: Slow operation: 58ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+10-14 19:09:44.873   654   685 W ActivityManager: Slow operation: 101ms so far, now at startProcess: done updating battery stats
+10-14 19:09:44.873   654   685 W ActivityManager: Slow operation: 101ms so far, now at startProcess: building log message
+10-14 19:09:44.873   654   685 I ActivityManager: Start proc 3535:com.google.android.apps.safetyhub/u0a134 for content provider {com.google.android.apps.safetyhub/com.google.android.apps.safetyhub.platformsettings.search.EmergencySearchIndexablesProvider}
+10-14 19:09:44.873   654   685 W ActivityManager: Slow operation: 101ms so far, now at startProcess: starting to update pids map
+10-14 19:09:44.873   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:44.873   654   685 W ActivityManager: Slow operation: 101ms so far, now at startProcess: done updating pids map
+10-14 19:09:44.980   654  2234 W ActivityManager: Slow operation: 105ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+10-14 19:09:44.980   654   684 I ActivityManager: Waited long enough for: ServiceRecord{a7347d2 u0 com.google.android.gms/.clearcut.debug.ClearcutDebugDumpService c:com.google.android.gms}
+10-14 19:09:45.060   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: returned from zygote!
+10-14 19:09:45.060   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: done updating battery stats
+10-14 19:09:45.060   654   685 W ActivityManager: Slow operation: 56ms so far, now at startProcess: building log message
+10-14 19:09:45.060   654   685 I ActivityManager: Start proc 3558:com.google.android.healthconnect.controller/u0a207 for content provider {com.google.android.healthconnect.controller/com.android.healthconnect.controller.searchindexables.HealthConnectSearchIndexablesProvider}
+10-14 19:09:45.083   654   685 W ActivityManager: Slow operation: 79ms so far, now at startProcess: starting to update pids map
+10-14 19:09:45.084   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:45.084   654   685 W ActivityManager: Slow operation: 80ms so far, now at startProcess: done updating pids map
+10-14 19:09:45.084   654   685 W ActivityManager: Slow operation: 78ms so far, now at startProcess: asking zygote to start proc
+10-14 19:09:45.113   654   685 W ActivityManager: Slow operation: 107ms so far, now at startProcess: returned from zygote!
+10-14 19:09:45.120   654   685 W ActivityManager: Slow operation: 114ms so far, now at startProcess: done updating battery stats
+10-14 19:09:45.120   654   685 W ActivityManager: Slow operation: 114ms so far, now at startProcess: building log message
+10-14 19:09:45.120   654   685 I ActivityManager: Start proc 3572:com.google.android.marvin.talkback/u0a160 for content provider {com.google.android.marvin.talkback/com.google.android.accessibility.talkback.preference.search.TalkBackSearchIndexablesProvider}
+10-14 19:09:45.120   654   685 W ActivityManager: Slow operation: 114ms so far, now at startProcess: starting to update pids map
+10-14 19:09:45.120   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:45.120   654   685 W ActivityManager: Slow operation: 114ms so far, now at startProcess: done updating pids map
+10-14 19:09:45.151   654   755 D ActivityManager: freezing 2373 com.google.android.photopicker
+10-14 19:09:45.610   654   755 D ActivityManager: freezing 1689 com.android.cellbroadcastreceiver
+10-14 19:09:45.712   654  1458 W ActivityManager: Background start not allowed: service Intent { xflg=0x4 cmp=com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService } to com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService from pid=3512 uid=10146 pkg=com.google.android.apps.messaging startFg?=false
+10-14 19:09:45.718   654   739 W ActivityManager: Background start not allowed: service Intent { xflg=0x4 cmp=com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService } to com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService from pid=3512 uid=10146 pkg=com.google.android.apps.messaging startFg?=false
+10-14 19:09:45.737   654  2164 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:116 completeLatency:870 dispatchRealLatency:116 completeRealLatency:870 receiversSize:2 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:45.746   654  2164 W ActivityManager: Background start not allowed: service Intent { xflg=0x4 cmp=com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService } to com.google.android.apps.messaging/.shared.datamodel.action.execution.ActionExecutorImpl$EmptyService from pid=3512 uid=10146 pkg=com.google.android.apps.messaging startFg?=false
+10-14 19:09:45.879   654   739 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:41 completeLatency:888 dispatchRealLatency:41 completeRealLatency:888 receiversSize:2 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:09:46.132   654   798 I ActivityManager: Background started FGS: Allowed [callingPackage: com.google.android.apps.messaging; callingUid: 10146; uidState: TRNB; uidBFSL: n/a; intent: Intent { xflg=0x4 cmp=com.google.android.apps.messaging/com.google.apps.tiktok.concurrent.InternalForegroundService (has extras) }; code:BACKGROUND_FGS_PERMISSION; tempAllowListReason:<null>; allowWiu:-1; targetSdkVersion:36; callerTargetSdkVersion:36; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+10-14 19:09:46.146   654  2233 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.google.android.apps.messaging/com.google.apps.tiktok.concurrent.InternalForegroundService
+10-14 19:09:46.209   654   685 I ActivityManager: Start proc 3722:com.google.android.apps.messaging:rcs/u0a146 for service {com.google.android.apps.messaging/com.google.android.ims.service.JibeService}
+10-14 19:09:46.209   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:46.232   654  1458 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.google.android.apps.messaging/com.google.apps.tiktok.concurrent.InternalForegroundService
+10-14 19:09:46.232   654  1458 I ActivityManager: Background started FGS: Allowed [callingPackage: com.google.android.apps.messaging; callingUid: 10146; uidState: FGS ; uidBFSL: [BFSL]; intent: Intent { cmp=com.google.android.apps.messaging/com.google.apps.tiktok.concurrent.InternalForegroundService }; code:PROC_STATE_FGS; tempAllowListReason:<null>; allowWiu:-1; targetSdkVersion:36; callerTargetSdkVersion:36; startForegroundCount:1; bindFromPackage:null: isBindService:false] (Called on SHORT_SERVICE)
+10-14 19:09:46.512   654  2113 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:09:46.536   654   669 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@d5ecd86
+10-14 19:09:47.687   654  2236 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:09:47.690   654  1765 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@8282e1f
+10-14 19:09:47.706   654   739 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.google.android.apps.messaging/com.google.apps.tiktok.concurrent.InternalForegroundService
+10-14 19:09:48.347   654  1765 W ActivityManager: pid 1546 com.google.android.gms sent binder code 1 with flags 2 to frozen apps and got error -2147483646
+10-14 19:09:48.348   654  1765 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:09:48.812   654   668 W ActivityManager: Receiver with filter android.content.IntentFilter@5922c95 already registered for pid 3722, callerPackage is com.google.android.apps.messaging
+10-14 19:09:48.814   654   668 W ActivityManager: Receiver with filter android.content.IntentFilter@bec019b already registered for pid 3722, callerPackage is com.google.android.apps.messaging
+10-14 19:09:49.061   654  2164 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:09:49.061   654   725 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@bd4aef
+10-14 19:09:49.410   654   755 D ActivityManager: freezing 3028 com.android.carrierdefaultapp
+10-14 19:09:50.086   654  2236 W ActivityManager: Receiver with filter android.content.IntentFilter@5d32e6a already registered for pid 3722, callerPackage is com.google.android.apps.messaging
+10-14 19:09:50.091   654  2233 W ActivityManager: Receiver with filter android.content.IntentFilter@fedc736 already registered for pid 3722, callerPackage is com.google.android.apps.messaging
+10-14 19:09:51.459   654   684 D ActivityManager: sync unfroze 2373 com.google.android.photopicker for 3
+10-14 19:09:51.957   654  2233 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:09:51.957   654  2233 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@4a4511c
+10-14 19:09:52.662   654   685 I ActivityManager: Start proc 4025:com.google.android.adservices.api/u0a203 for service {com.google.android.adservices.api/com.android.adservices.common.AdServicesCommonService}
+10-14 19:09:52.662   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:09:53.599   654   755 D ActivityManager: freezing 2463 com.android.externalstorage
+10-14 19:09:56.824   654  1027 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:09:56.825   654  1027 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@e11679a
+10-14 19:09:59.118   654   684 I ActivityManager: Waited long enough for: ServiceRecord{affa54e u0 com.android.settings/.SettingsDumpService c:com.android.settings}
+10-14 19:10:02.551   654  1027 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:10:02.551   654  1765 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@3fd3868
+10-14 19:10:03.253   654   755 D ActivityManager: freezing 1273 com.android.bluetooth
+10-14 19:10:06.369   654   755 D ActivityManager: freezing 2373 com.google.android.photopicker
+10-14 19:10:07.664   654   755 D ActivityManager: freezing 2744 com.google.android.documentsui
+10-14 19:10:08.245   654  2233 W ActivityManager: stopServiceToken startId 1000 is last, but have 3 remaining args
+10-14 19:10:08.293   654   755 D ActivityManager: freezing 2671 com.android.chrome
+10-14 19:10:08.535   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:10:08.721   654   755 D ActivityManager: freezing 2909 com.google.android.onetimeinitializer
+10-14 19:10:08.978   654   755 D ActivityManager: freezing 2319 com.android.imsserviceentitlement
+10-14 19:10:08.986   654   755 D ActivityManager: freezing 2193 com.android.managedprovisioning
+10-14 19:10:09.133   654   755 D ActivityManager: freezing 2990 com.android.camera2
+10-14 19:10:09.509   654   755 D ActivityManager: freezing 2605 com.android.providers.calendar
+10-14 19:10:09.683   654   755 D ActivityManager: freezing 3052 com.android.devicediagnostics
+10-14 19:10:09.920   654   755 D ActivityManager: freezing 3111 com.android.dynsystem:dynsystem
+10-14 19:10:09.920   654   755 D ActivityManager: freezing 3092 com.android.dynsystem
+10-14 19:10:09.920   654   755 D ActivityManager: freezing 2285 com.android.localtransport
+10-14 19:10:10.518   654   755 D ActivityManager: freezing 1810 com.google.android.partnersetup
+10-14 19:10:10.700   654   755 D ActivityManager: freezing 3145 com.android.shell
+10-14 19:10:10.950   654   755 D ActivityManager: freezing 2397 com.google.android.tts
+10-14 19:10:11.394   654   755 D ActivityManager: freezing 3209 com.google.android.federatedcompute
+10-14 19:10:12.011   654   755 D ActivityManager: freezing 3285 com.google.android.ondevicepersonalization.services
+10-14 19:10:12.136   654  1027 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:10:12.136   654  1027 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@33f5e6e
+10-14 19:10:12.152   654   755 D ActivityManager: freezing 3301 com.google.android.packageinstaller
+10-14 19:10:12.372   654   755 D ActivityManager: freezing 3322 com.google.android.projection.gearhead:car
+10-14 19:10:12.598   654   755 D ActivityManager: freezing 3345 com.google.android.rkpdapp
+10-14 19:10:15.627   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:10:15.914   654  2257 W ActivityManager: stopServiceToken startId 1182 is last, but have 1 remaining args
+10-14 19:10:16.885   654   755 D ActivityManager: freezing 2370 com.google.android.apps.wallpaper
+10-14 19:10:21.637   654   755 D ActivityManager: freezing 3535 com.google.android.apps.safetyhub
+10-14 19:10:21.640   654   755 D ActivityManager: freezing 3572 com.google.android.marvin.talkback
+10-14 19:10:21.642   654   755 D ActivityManager: freezing 3558 com.google.android.healthconnect.controller
+10-14 19:10:21.642   654   755 D ActivityManager: freezing 3509 com.google.android.accessibility.switchaccess
+10-14 19:10:21.654   654   755 D ActivityManager: freezing 1584 com.google.android.cellbroadcastreceiver
+10-14 19:10:21.655   654   755 D ActivityManager: freezing 2880 com.android.traceur
+10-14 19:10:24.269   654   685 I ActivityManager: Start proc 4245:com.google.android.ext.services/u0a194 for service {com.google.android.ext.services/android.ext.services.storage.CacheQuotaServiceImpl}
+10-14 19:10:24.269   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:25.701   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:10:27.338   654  2112 W ActivityManager: Unable to start service Intent { act=grpc.io.action.BIND xflg=0x4 cmp=com.google.android.apps.stargate/.endpointservice.GrpcEndpointService } U=0: not found
+10-14 19:10:27.339   654  2112 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@c5a455e
+10-14 19:10:28.402   654   755 D ActivityManager: freezing 1908 android.process.media
+10-14 19:10:34.408   654   755 D ActivityManager: freezing 4245 com.google.android.ext.services
+10-14 19:10:34.681   654   685 I ActivityManager: Start proc 4265:com.google.android.googlequicksearchbox:googleapp/u0a147 for service {com.google.android.googlequicksearchbox/com.google.frameworks.client.data.android.server.tiktok.GoogleappProcessEndpointService}
+10-14 19:10:34.681   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:34.960   654   685 I ActivityManager: Start proc 4299:com.google.android.webview:webview_service/u0a168 for service {com.google.android.webview/org.chromium.android_webview.services.VariationsSeedServer}
+10-14 19:10:34.960   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:34.991   654   685 I ActivityManager: Start proc 4311:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0ai9000 for  {com.google.android.googlequicksearchbox/org.chromium.content.app.SandboxedProcessService0:0}
+10-14 19:10:34.991   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:35.158   654   685 I ActivityManager: Start proc 4353:com.google.android.webview:webview_apk/u0a168 for service {com.google.android.webview/org.chromium.android_webview.nonembedded.AwComponentUpdateService}
+10-14 19:10:35.158   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:38.831   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:10:38.833   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:10:41.216   654   684 D ActivityManager: sync unfroze 2370 com.google.android.apps.wallpaper for 3
+10-14 19:10:41.326   654  1124 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:10:46.257   654   755 D ActivityManager: freezing 1052 com.google.android.permissioncontroller
+10-14 19:10:48.397   654   755 D ActivityManager: freezing 3174 com.google.android.configupdater
+10-14 19:10:48.398   654   755 D ActivityManager: freezing 4353 com.google.android.webview:webview_apk
+10-14 19:10:48.398   654   755 D ActivityManager: freezing 4299 com.google.android.webview:webview_service
+10-14 19:10:51.248   654   755 D ActivityManager: freezing 2370 com.google.android.apps.wallpaper
+10-14 19:10:51.381   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:10:53.850   654  1033 D ActivityManager: sync unfroze 1052 com.google.android.permissioncontroller for 6
+10-14 19:10:53.867   654   684 D ActivityManager: sync unfroze 3301 com.google.android.packageinstaller for 3
+10-14 19:10:54.302   654   685 W ActivityManager: Slow operation: 131ms so far, now at startProcess: done updating battery stats
+10-14 19:10:54.302   654   685 W ActivityManager: Slow operation: 131ms so far, now at startProcess: building log message
+10-14 19:10:54.302   654   685 I ActivityManager: Start proc 4554:com.xike.app.test/u0a214 for service {com.xike.app.test/com.xike.app.ReminderNotificationObserver}
+10-14 19:10:54.302   654   685 W ActivityManager: Slow operation: 131ms so far, now at startProcess: starting to update pids map
+10-14 19:10:54.302   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:54.302   654   685 W ActivityManager: Slow operation: 131ms so far, now at startProcess: done updating pids map
+10-14 19:10:54.974   654  1124 W ActivityManager: Slow operation: 76ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+10-14 19:10:54.974   654  1124 W ActivityManager: Slow operation: 76ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+10-14 19:10:55.003   654   725 I ActivityManager: Process com.google.android.googlequicksearchbox:search (pid 1842) has died: cch+5 CEM 
+10-14 19:10:55.023   654   724 W ActivityManager: pid 4265 com.google.android.googlequicksearchbox:googleapp sent binder code 2 with flags 1 to frozen apps and got error -32
+10-14 19:10:55.023   654   724 W ActivityManager: pid 1730 com.google.android.googlequicksearchbox:interactor sent binder code 2 with flags 1 to frozen apps and got error -32
+10-14 19:10:55.024   654   724 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:10:55.093   654   724 I ActivityManager: Background started FGS: Allowed [callingPackage: com.google.android.apps.wellbeing; callingUid: 10145; uidState: BTOP; uidBFSL: [BFSL]; intent: Intent { xflg=0x4 cmp=com.google.android.apps.wellbeing/com.google.apps.tiktok.concurrent.InternalForegroundService (has extras) }; code:BACKGROUND_ACTIVITY_PERMISSION; tempAllowListReason:<null>; allowWiu:58; targetSdkVersion:35; callerTargetSdkVersion:35; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+10-14 19:10:56.938   654   755 D ActivityManager: freezing 2109 android.process.acore
+10-14 19:10:58.310   654   711 E ActivityManager: Unable to freeze binder for 3424: -11
+10-14 19:10:58.317   654   711 I ActivityManager: Killing 3424:com.google.android.settings.intelligence/u0a138 (adj 250): change com.google.android.settings.intelligence
+10-14 19:10:58.329   654   711 W ActivityManager: Scheduling restart of crashed service com.google.android.settings.intelligence/.modules.appsearchindexing.impl.AppSearchIndexUpdateJobService in 10000ms for connection
+10-14 19:10:58.347   654   683 W ActivityManager: Rescheduling restart of crashed service com.google.android.settings.intelligence/.modules.appsearchindexing.impl.AppSearchIndexUpdateJobService in 982ms for mem-pressure-event
+10-14 19:10:58.365   654   724 V ActivityManager: Got obituary of 3424:com.google.android.settings.intelligence
+10-14 19:10:58.382   654   685 I ActivityManager: Start proc 4612:com.google.android.settings.intelligence/u0a138 for service {com.google.android.settings.intelligence/androidx.work.impl.background.systemjob.SystemJobService}
+10-14 19:10:58.382   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:10:58.395   654  2099 W ActivityManager: pid 1411 com.google.android.gms.persistent sent binder code 3 with flags 0 to frozen apps and got error -32
+10-14 19:10:58.395   654  2099 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:10:58.454   654  2233 D ActivityManager: sync unfroze 2109 android.process.acore for 7
+10-14 19:10:58.533   654  2233 W ActivityManager: pid 4612 com.google.android.settings.intelligence sent binder code 6 with flags 2 to frozen apps and got error -74
+10-14 19:10:58.533   654  2233 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:10:58.989   654   724 D ActivityManager: sync unfroze 3509 com.google.android.accessibility.switchaccess for 7
+10-14 19:10:58.998   654  1027 D ActivityManager: sync unfroze 3535 com.google.android.apps.safetyhub for 7
+10-14 19:10:58.999   654  2166 D ActivityManager: sync unfroze 1584 com.google.android.cellbroadcastreceiver for 7
+10-14 19:10:59.001   654  1399 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 7
+10-14 19:10:59.014   654  1398 D ActivityManager: sync unfroze 3558 com.google.android.healthconnect.controller for 7
+10-14 19:10:59.019   654  1161 D ActivityManager: sync unfroze 3572 com.google.android.marvin.talkback for 7
+10-14 19:10:59.033   654  2234 D ActivityManager: sync unfroze 2880 com.android.traceur for 7
+10-14 19:10:59.036   654   685 I ActivityManager: Start proc 4680:com.google.android.googlequicksearchbox:search/u0a147 for content provider {com.google.android.googlequicksearchbox/com.google.android.apps.search.assistant.surfaces.settings.search.AssistantSettingsProvider}
+10-14 19:10:59.036   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:11:04.115   654   755 D ActivityManager: freezing 3301 com.google.android.packageinstaller
+10-14 19:11:04.304   654   683 W ActivityManager: pid 654 system sent binder code 2 with flags 1 to frozen apps and got error -32
+10-14 19:11:04.304   654   683 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:11:04.682   654   683 W ActivityManager: pid 654 system sent binder code 2 with flags 1 to frozen apps and got error -32
+10-14 19:11:04.682   654   683 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+10-14 19:11:05.029   654   755 D ActivityManager: freezing 4265 com.google.android.googlequicksearchbox:googleapp
+10-14 19:11:05.031   654   755 D ActivityManager: freezing 4311 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+10-14 19:11:08.291   654   683 W ActivityManager: pid 654 system sent binder code 2 with flags 1 to frozen apps and got error -32
+10-14 19:11:11.269   654  2110 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: start instr
+10-14 19:11:11.318   654   685 I ActivityManager: Start proc 4929:com.xike.app/u0a213 for added application com.xike.app
+10-14 19:11:11.318   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:11:11.572   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:11:12.322  4929  4948 I TestRunner: run started: 1 tests
+10-14 19:11:12.322  4929  4948 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 19:11:12.410  4929  4948 I System.out: REMINDER_ARMED due=2026-10-14T19:12+08:00[Asia/Shanghai] pid=4929
+10-14 19:11:15.055   654   755 D ActivityManager: freezing 1584 com.google.android.cellbroadcastreceiver
+10-14 19:11:15.064   654   755 D ActivityManager: freezing 3558 com.google.android.healthconnect.controller
+10-14 19:11:15.077   654   755 D ActivityManager: freezing 3509 com.google.android.accessibility.switchaccess
+10-14 19:11:15.083   654   755 D ActivityManager: freezing 2880 com.android.traceur
+10-14 19:11:15.097   654   755 D ActivityManager: freezing 3572 com.google.android.marvin.talkback
+10-14 19:11:15.140   654   755 D ActivityManager: freezing 3535 com.google.android.apps.safetyhub
+10-14 19:11:20.227   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:11:24.287   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:11:24.303   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:11:27.989   654   759 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:11:27.996   654   759 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:11:28.064   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:11:29.389   654  2234 W ActivityManager: Unable to start service Intent { act=com.google.android.play.core.splitinstall.BIND_SPLIT_INSTALL_SERVICE xflg=0x4 pkg=com.android.vending } U=0: not found
+10-14 19:11:29.607   654  1399 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 6
+10-14 19:11:30.641   654   755 D ActivityManager: freezing 2080 com.google.android.as.oss
+10-14 19:11:33.398   654   755 D ActivityManager: freezing 1052 com.google.android.permissioncontroller
+10-14 19:11:34.877   654   755 D ActivityManager: freezing 2109 android.process.acore
+10-14 19:11:38.837   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:11:44.807   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:11:46.502   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:11:46.503   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:11:55.032   654  1027 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:11:55.036   654  1027 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:11:55.132   654   747 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:12:00.156   654  1398 I ActivityManager: Process com.xike.app (pid 4929) has died: fg  FGS 
+10-14 19:12:00.158   654  1398 W ActivityManager: Crash of app com.xike.app running instrumentation ComponentInfo{com.xike.app.test/androidx.test.runner.AndroidJUnitRunner}
+10-14 19:12:00.161   654  1398 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: finished inst
+10-14 19:12:00.375   654  1399 I ActivityManager: Process com.xike.app.test (pid 4554) has died: prcl BFGS
+10-14 19:12:00.375   654  1399 W ActivityManager: Scheduling restart of crashed service com.xike.app.test/com.xike.app.ReminderNotificationObserver in 1000ms for connection
+10-14 19:12:01.390   654   685 I ActivityManager: Start proc 5050:com.xike.app.test/u0a214 for service {com.xike.app.test/com.xike.app.ReminderNotificationObserver}
+10-14 19:12:01.390   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:12:04.811   654   755 D ActivityManager: freezing 4612 com.google.android.settings.intelligence
+10-14 19:12:15.229   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:12:20.088   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:12:20.090   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:12:41.067   654   685 I ActivityManager: Start proc 5092:com.google.android.apps.photos/u0a167 for content provider {com.google.android.apps.photos/com.google.android.apps.photos.cloudpicker.CloudMediaProviderWrapper}
+10-14 19:12:41.067   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:12:41.343   654  1765 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:1 completeLatency:238 dispatchRealLatency:1 completeRealLatency:238 receiversSize:6 userId:0 userType:android.os.usertype.full.SYSTEM
+10-14 19:12:42.313   654  1033 D ActivityManager: sync unfroze 1052 com.google.android.permissioncontroller for 6
+10-14 19:13:02.424   654   755 D ActivityManager: freezing 1052 com.google.android.permissioncontroller
+10-14 19:13:17.321   654   755 D ActivityManager: freezing 5092 com.google.android.apps.photos
+10-14 19:13:40.428   654   684 I ActivityManager: Force stopping com.xike.app.test appid=10214 user=-1: installPackageLI
+10-14 19:13:40.430   654   684 I ActivityManager: Killing 5050:com.xike.app.test/u0a214 (adj 250): stop com.xike.app.test due to installPackageLI
+10-14 19:13:40.456   654   711 I ActivityManager: Force stopping com.xike.app.test appid=10214 user=0: pkg removed
+10-14 19:13:40.546   654   684 D ActivityManager: sync unfroze 1052 com.google.android.permissioncontroller for 3
+10-14 19:13:40.602   654   654 D ActivityManager: sync unfroze 3111 com.android.dynsystem:dynsystem for 10
+10-14 19:13:40.605   654   654 D ActivityManager: sync unfroze 3092 com.android.dynsystem for 10
+10-14 19:13:40.609   654   654 D ActivityManager: sync unfroze 2285 com.android.localtransport for 10
+10-14 19:13:40.681   654   677 D ActivityManager: sync unfroze 4245 com.google.android.ext.services for 6
+10-14 19:13:40.705   654  2234 V ActivityManager: Got obituary of 5050:com.xike.app.test
+10-14 19:13:40.712   654   685 W ActivityManager: Slow operation: 87ms so far, now at startProcess: done updating battery stats
+10-14 19:13:40.712   654   685 W ActivityManager: Slow operation: 87ms so far, now at startProcess: building log message
+10-14 19:13:40.712   654   685 I ActivityManager: Start proc 5181:com.android.keychain/1000 for service {com.android.keychain/com.android.keychain.KeyChainService}
+10-14 19:13:40.713   654   685 W ActivityManager: Slow operation: 87ms so far, now at startProcess: starting to update pids map
+10-14 19:13:40.713   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:13:40.713   654   685 W ActivityManager: Slow operation: 88ms so far, now at startProcess: done updating pids map
+10-14 19:13:40.768   654   685 I ActivityManager: Start proc 5196:com.xike.app.test/u0a214 for service {com.xike.app.test/com.xike.app.ReminderNotificationObserver}
+10-14 19:13:40.768   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:13:40.994   654  2110 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:13:41.010   654  2166 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:13:41.017   654  2166 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:13:46.569   654  1161 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: start instr
+10-14 19:13:46.579   654   685 I ActivityManager: Start proc 5268:com.xike.app/u0a213 for added application com.xike.app
+10-14 19:13:46.579   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:13:47.369  5268  5282 I TestRunner: run started: 1 tests
+10-14 19:13:47.370  5268  5282 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 19:13:47.521  5268  5282 I System.out: REMINDER_ARMED due=2026-10-14T19:14+08:00[Asia/Shanghai] pid=5268
+10-14 19:13:47.521  5268  5282 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 19:13:47.550  5268  5282 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 19:13:47.580   654  1122 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: finished inst
+10-14 19:13:47.581   654  1122 E ActivityManager: Unable to freeze binder for 5268: -11
+10-14 19:13:47.582   654  1122 I ActivityManager: Killing 5268:com.xike.app/u0a213 (adj 0): stop com.xike.app due to finished inst
+10-14 19:13:47.604   654  1399 V ActivityManager: Got obituary of 5268:com.xike.app
+10-14 19:13:48.422   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:13:48.647   654  1765 D ActivityManager: sync unfroze 2109 android.process.acore for 7
+10-14 19:13:50.802   654   755 D ActivityManager: freezing 4245 com.google.android.ext.services
+10-14 19:13:51.094   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:13:55.246   654  2166 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 6
+10-14 19:13:58.987   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:13:58.988   654   755 D ActivityManager: freezing 2109 android.process.acore
+10-14 19:14:01.517   654   678 I ActivityManager: Force stopping com.xike.app appid=10213 user=-1: set debug app
+10-14 19:14:01.524   654  2166 W ActivityTaskManager: callingPackage for (uid=2000, pid=5387) has no WPC
+10-14 19:14:01.542   654  2166 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.xike.app/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+10-14 19:14:01.569   654   685 I ActivityManager: Start proc 5390:com.xike.app/u0a213 for next-top-activity {com.xike.app/com.xike.app.MainActivity}
+10-14 19:14:01.578   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:14:01.728   654   747 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:14:02.830   654   676 W ActivityTaskManager: callingPackage for (uid=-1, pid=0) has no WPC
+10-14 19:14:02.833   654   676 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity (has extras)} with LAUNCH_SINGLE_TASK from uid 0 (BAL_ALLOW_ALLOWLISTED_UID) result code=2
+10-14 19:14:02.936   654  1161 I ActivityManager: Process com.xike.app (pid 5390) has died: prcp TOP 
+10-14 19:14:03.085   654  2110 I ActivityManager: Process com.xike.app.test (pid 5196) has died: prcl BFGS
+10-14 19:14:03.085   654  2110 W ActivityManager: Scheduling restart of crashed service com.xike.app.test/com.xike.app.ReminderNotificationObserver in 1000ms for connection
+10-14 19:14:03.331   654   678 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{167027313 u0 com.xike.app/.MainActivity t8}
+10-14 19:14:03.591   654   683 W ActivityManager: Rescheduling restart of crashed service com.xike.app.test/com.xike.app.ReminderNotificationObserver in 9495ms for mem-pressure-event
+10-14 19:14:06.898   654   683 W ActivityManager: Rescheduling restart of crashed service com.xike.app.test/com.xike.app.ReminderNotificationObserver in 0ms for mem-pressure-event
+10-14 19:14:06.907   654   685 I ActivityManager: Start proc 5485:com.xike.app.test/u0a214 for service {com.xike.app.test/com.xike.app.ReminderNotificationObserver}
+10-14 19:14:06.907   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:14:08.423   654   755 D ActivityManager: freezing 1052 com.google.android.permissioncontroller
+10-14 19:14:10.321   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:14:11.914   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:14:20.269   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:14:20.271   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:14:20.475   654   755 D ActivityManager: freezing 5181 com.android.keychain
+10-14 19:14:20.475   654   755 D ActivityManager: freezing 3111 com.android.dynsystem:dynsystem
+10-14 19:14:20.476   654   755 D ActivityManager: freezing 3092 com.android.dynsystem
+10-14 19:14:20.476   654   755 D ActivityManager: freezing 2285 com.android.localtransport
+10-14 19:14:27.171   654   755 D ActivityManager: freezing 3512 com.google.android.apps.messaging
+10-14 19:14:34.174   654   684 D ActivityManager: sync unfroze 2373 com.google.android.photopicker for 3
+10-14 19:14:37.621   654   684 D ActivityManager: sync unfroze 1546 com.google.android.gms for 10
+10-14 19:14:37.623   654   684 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 10
+10-14 19:14:37.624   654   684 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 10
+10-14 19:14:37.626   654   684 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 10
+10-14 19:14:44.352   654   755 D ActivityManager: freezing 2373 com.google.android.photopicker
+10-14 19:15:07.639   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:15:07.647   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:15:07.649   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:15:07.651   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:15:26.664   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:15:33.337   654   684 I ActivityManager: Force stopping com.xike.app.test appid=10214 user=-1: installPackageLI
+10-14 19:15:33.345   654   684 I ActivityManager: Killing 5485:com.xike.app.test/u0a214 (adj 250): stop com.xike.app.test due to installPackageLI
+10-14 19:15:33.388   654   711 I ActivityManager: Force stopping com.xike.app.test appid=10214 user=0: pkg removed
+10-14 19:15:33.428   654  1027 V ActivityManager: Got obituary of 5485:com.xike.app.test
+10-14 19:15:33.441   654   654 D ActivityManager: sync unfroze 5181 com.android.keychain for 10
+10-14 19:15:33.454   654   654 D ActivityManager: sync unfroze 3111 com.android.dynsystem:dynsystem for 10
+10-14 19:15:33.456   654   654 D ActivityManager: sync unfroze 3092 com.android.dynsystem for 10
+10-14 19:15:33.456   654   654 D ActivityManager: sync unfroze 2285 com.android.localtransport for 10
+10-14 19:15:33.535   654   684 D ActivityManager: sync unfroze 1052 com.google.android.permissioncontroller for 3
+10-14 19:15:33.574   654   677 D ActivityManager: sync unfroze 4245 com.google.android.ext.services for 6
+10-14 19:15:33.648   654   685 I ActivityManager: Start proc 5561:com.xike.app.test/u0a214 for service {com.xike.app.test/com.xike.app.ReminderNotificationObserver}
+10-14 19:15:33.648   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:15:33.967   654  1398 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:15:33.972   654  1398 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:15:33.989   654  1161 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:15:34.492   654  2099 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: start instr
+10-14 19:15:34.558   654   685 I ActivityManager: Start proc 5622:com.xike.app/u0a213 for added application com.xike.app
+10-14 19:15:34.558   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:15:35.939  5622  5635 I TestRunner: run started: 1 tests
+10-14 19:15:35.940  5622  5635 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 19:15:36.037  5622  5635 I System.out: REMINDER_ARMED due=2026-10-14T19:16+08:00[Asia/Shanghai] pid=5622
+10-14 19:15:36.037  5622  5635 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 19:15:36.048  5622  5635 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 19:15:36.065   654  1398 I ActivityManager: Force stopping com.xike.app appid=10213 user=0: finished inst
+10-14 19:15:36.065   654  1398 E ActivityManager: Unable to freeze binder for 5622: -11
+10-14 19:15:36.067   654  1398 I ActivityManager: Killing 5622:com.xike.app/u0a213 (adj 0): stop com.xike.app due to finished inst
+10-14 19:15:36.116   654  2099 V ActivityManager: Got obituary of 5622:com.xike.app
+10-14 19:15:36.783   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:15:41.400   654  1122 D ActivityManager: sync unfroze 5092 com.google.android.apps.photos for 7
+10-14 19:15:43.676   654   755 D ActivityManager: freezing 4245 com.google.android.ext.services
+10-14 19:15:44.112   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:15:57.027   654   755 D ActivityManager: freezing 1052 com.google.android.permissioncontroller
+10-14 19:15:59.637   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:15:59.751   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:16:01.244   654   678 I ActivityManager: Force stopping com.xike.app appid=10213 user=-1: set debug app
+10-14 19:16:01.275   654  1122 W ActivityTaskManager: callingPackage for (uid=2000, pid=5757) has no WPC
+10-14 19:16:01.304   654  1122 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.xike.app/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+10-14 19:16:01.427   654   685 W ActivityManager: Slow operation: 96ms so far, now at startProcess: returned from zygote!
+10-14 19:16:01.429   654   685 W ActivityManager: Slow operation: 97ms so far, now at startProcess: done updating battery stats
+10-14 19:16:01.429   654   685 W ActivityManager: Slow operation: 98ms so far, now at startProcess: building log message
+10-14 19:16:01.429   654   685 I ActivityManager: Start proc 5761:com.xike.app/u0a213 for next-top-activity {com.xike.app/com.xike.app.MainActivity}
+10-14 19:16:01.429   654   685 W ActivityManager: Slow operation: 98ms so far, now at startProcess: starting to update pids map
+10-14 19:16:01.429   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:16:01.429   654   685 W ActivityManager: Slow operation: 98ms so far, now at startProcess: done updating pids map
+10-14 19:16:01.624   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:16:01.816   654  1027 D ActivityManager: sync unfroze 2109 android.process.acore for 7
+10-14 19:16:02.706   654   676 W ActivityTaskManager: callingPackage for (uid=-1, pid=0) has no WPC
+10-14 19:16:02.715   654   676 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity (has extras)} with LAUNCH_SINGLE_TASK from uid 0 (BAL_ALLOW_ALLOWLISTED_UID) result code=2
+10-14 19:16:03.030   654  1398 I ActivityManager: Process com.xike.app (pid 5761) has died: prcp TOP 
+10-14 19:16:03.214   654   678 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{132825589 u0 com.xike.app/.MainActivity t9}
+10-14 19:16:11.867   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:16:11.870   654   755 D ActivityManager: freezing 2109 android.process.acore
+10-14 19:16:13.439   654   755 D ActivityManager: freezing 5181 com.android.keychain
+10-14 19:16:13.440   654   755 D ActivityManager: freezing 3111 com.android.dynsystem:dynsystem
+10-14 19:16:13.441   654   755 D ActivityManager: freezing 3092 com.android.dynsystem
+10-14 19:16:13.442   654   755 D ActivityManager: freezing 2285 com.android.localtransport
+10-14 19:16:17.470   654   755 D ActivityManager: freezing 5092 com.google.android.apps.photos
+10-14 19:16:19.154   654  1398 D ActivityManager: sync unfroze 1546 com.google.android.gms for 4
+10-14 19:16:19.155   654  1398 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 4
+10-14 19:16:29.237   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:16:29.238   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:18:41.478   654  2110 D ActivityManager: sync unfroze 5092 com.google.android.apps.photos for 7
+10-14 19:19:02.990   654   747 D ActivityManager: sync unfroze 3512 com.google.android.apps.messaging for 6
+10-14 19:19:03.009   654   747 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:19:03.040   654  1161 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 6
+10-14 19:19:03.622   654  1027 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:19:03.624   654  1027 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:19:06.519   654   684 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 10
+10-14 19:19:13.206   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:19:14.030   654   755 D ActivityManager: freezing 3512 com.google.android.apps.messaging
+10-14 19:19:17.513   654   755 D ActivityManager: freezing 5092 com.google.android.apps.photos
+10-14 19:19:36.575   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:19:36.576   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:19:36.579   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:19:36.579   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:24:25.231   654   684 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 10
+10-14 19:24:25.237   654   684 D ActivityManager: sync unfroze 1546 com.google.android.gms for 10
+10-14 19:24:25.238   654   684 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 10
+10-14 19:24:25.239   654   684 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 10
+10-14 19:24:55.298   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:24:55.300   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:24:55.304   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:24:55.306   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:29:43.361   654   684 D ActivityManager: sync unfroze 3174 com.google.android.configupdater for 3
+10-14 19:29:43.390   654   747 D ActivityManager: sync unfroze 2651 com.google.android.dialer for 6
+10-14 19:29:43.401   654   747 D ActivityManager: sync unfroze 4680 com.google.android.googlequicksearchbox:search for 6
+10-14 19:29:43.410   654   747 D ActivityManager: sync unfroze 3512 com.google.android.apps.messaging for 6
+10-14 19:29:43.421   654   747 D ActivityManager: sync unfroze 1546 com.google.android.gms for 6
+10-14 19:29:43.442   654   747 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 6
+10-14 19:29:43.509   654  1161 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 6
+10-14 19:29:43.944   654   684 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 10
+10-14 19:29:53.603   654   755 D ActivityManager: freezing 4680 com.google.android.googlequicksearchbox:search
+10-14 19:29:53.645   654   755 D ActivityManager: freezing 3174 com.google.android.configupdater
+10-14 19:29:53.661   654   755 D ActivityManager: freezing 2651 com.google.android.dialer
+10-14 19:29:53.782   654   755 D ActivityManager: freezing 3512 com.google.android.apps.messaging
+10-14 19:30:13.970   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:30:13.972   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:30:13.975   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:30:13.976   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui
+10-14 19:35:02.085   654   685 I ActivityManager: Start proc 6455:com.xike.app/u0a213 for broadcast {com.xike.app/com.xike.app.ReminderReceiver}
+10-14 19:35:02.085   654   685 I ActivityManager: ProcessObserver broadcast disabled
+10-14 19:35:02.600   654   684 D ActivityManager: sync unfroze 2409 com.google.android.gms.unstable for 10
+10-14 19:35:02.603   654   684 D ActivityManager: sync unfroze 1546 com.google.android.gms for 10
+10-14 19:35:02.604   654   684 D ActivityManager: sync unfroze 4025 com.google.android.adservices.api for 10
+10-14 19:35:02.605   654   684 D ActivityManager: sync unfroze 1997 com.google.android.gms.ui for 10
+10-14 19:35:12.685   654   755 D ActivityManager: freezing 6455 com.xike.app
+10-14 19:35:32.665   654   755 D ActivityManager: freezing 2409 com.google.android.gms.unstable
+10-14 19:35:32.666   654   755 D ActivityManager: freezing 1546 com.google.android.gms
+10-14 19:35:32.666   654   755 D ActivityManager: freezing 4025 com.google.android.adservices.api
+10-14 19:35:32.667   654   755 D ActivityManager: freezing 1997 com.google.android.gms.ui

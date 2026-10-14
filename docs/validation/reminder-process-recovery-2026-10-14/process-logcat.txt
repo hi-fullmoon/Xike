@@ -1,0 +1,52 @@
+--------- beginning of main
+10-14 18:10:56.523  4856  4875 I TestRunner: run started: 1 tests
+10-14 18:10:56.524  4856  4875 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:10:56.598  4856  4875 I System.out: REMINDER_ARMED due=2026-10-14T18:11+08:00[Asia/Shanghai] pid=4856
+10-14 18:11:21.519  4907  4926 I TestRunner: run started: 1 tests
+10-14 18:11:21.521  4907  4926 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:11:21.593  4907  4926 I System.out: REMINDER_ARMED due=2026-10-14T18:12+08:00[Asia/Shanghai] pid=4907
+10-14 18:12:01.548  4994  5008 I TestRunner: run started: 1 tests
+10-14 18:12:01.549  4994  5008 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:12:01.618  4994  5008 I System.out: REMINDER_RECOVERED tag=d7488869-862f-4203-b970-a6599d2ce169 unchangedPostTime=1791972721586 pid=4994
+10-14 18:12:01.618  4994  5008 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:12:01.620  4994  5008 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 18:12:02.797  5028  5063 I TestRunner: run started: 1 tests
+10-14 18:12:02.798  5028  5063 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:12:02.910  5028  5063 I System.out: REMINDER_ARMED due=2026-10-14T18:13+08:00[Asia/Shanghai] pid=5028
+10-14 18:13:01.394  5216  5235 I TestRunner: run started: 1 tests
+10-14 18:13:01.394  5216  5235 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:13:01.452  5216  5235 I System.out: REMINDER_RECOVERED tag=46871ab9-cbaa-4625-ad0b-ca6e1bd8ace4 unchangedPostTime=1791972780030 pid=5216
+10-14 18:13:01.453  5216  5235 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:13:01.454  5216  5235 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 18:13:02.286  5254  5272 I TestRunner: run started: 1 tests
+10-14 18:13:02.288  5254  5272 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:13:02.394  5254  5272 I System.out: REMINDER_ARMED due=2026-10-14T18:14+08:00[Asia/Shanghai] pid=5254
+10-14 18:14:01.399  5416  5436 I TestRunner: run started: 1 tests
+10-14 18:14:01.400  5416  5436 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:14:01.444  5416  5436 I System.out: REMINDER_RECOVERED tag=4a1871e4-e6eb-4193-906e-71046488e774 unchangedPostTime=1791972840062 pid=5416
+10-14 18:14:01.444  5416  5436 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:14:01.445  5416  5436 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 18:14:37.188  5490  5509 I TestRunner: run started: 1 tests
+10-14 18:14:37.190  5490  5509 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:14:37.267  5490  5509 I System.out: REMINDER_ARMED due=2026-10-14T18:15+08:00[Asia/Shanghai] pid=5490
+10-14 18:15:01.386  5539  5554 I TestRunner: run started: 1 tests
+10-14 18:15:01.386  5539  5554 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:15:01.440  5539  5554 I System.out: REMINDER_RECOVERED tag=7ed1410e-b978-4942-9cd1-00376240d58b unchangedPostTime=1791972901420 pid=5539
+10-14 18:15:01.440  5539  5554 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:15:01.442  5539  5554 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 18:15:02.430  5574  5603 I TestRunner: run started: 1 tests
+10-14 18:15:02.431  5574  5603 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:15:02.556  5574  5603 I System.out: REMINDER_ARMED due=2026-10-14T18:16+08:00[Asia/Shanghai] pid=5574
+10-14 18:16:01.487  5676  5695 I TestRunner: run started: 1 tests
+10-14 18:16:01.488  5676  5695 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:16:01.549  5676  5695 I System.out: REMINDER_RECOVERED tag=a5c2afed-9c87-47a0-aac2-15cb8ce3071d unchangedPostTime=1791972960083 pid=5676
+10-14 18:16:01.549  5676  5695 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:16:01.550  5676  5695 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored
+10-14 18:16:02.372  5716  5734 I TestRunner: run started: 1 tests
+10-14 18:16:02.373  5716  5734 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:16:02.476  5716  5734 I System.out: REMINDER_ARMED due=2026-10-14T18:17+08:00[Asia/Shanghai] pid=5716
+10-14 18:17:01.463  5779  5798 I TestRunner: run started: 1 tests
+10-14 18:17:01.464  5779  5798 I TestRunner: started: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:17:01.515  5779  5798 I System.out: REMINDER_RECOVERED tag=37b38a18-a2fd-4870-8196-4dfafda3f41b unchangedPostTime=1791973020071 pid=5779
+10-14 18:17:01.516  5779  5798 I TestRunner: finished: recoverAcrossProcessDeath(com.xike.app.ReminderProcessRecoveryTest)
+10-14 18:17:01.518  5779  5798 I TestRunner: run finished: 1 tests, 0 failed, 0 ignored

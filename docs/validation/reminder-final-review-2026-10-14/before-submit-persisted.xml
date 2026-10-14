@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="settings">{&quot;enabled&quot;:true,&quot;hour&quot;:19,&quot;minute&quot;:51,&quot;weekdays&quot;:[&quot;MONDAY&quot;,&quot;TUESDAY&quot;,&quot;WEDNESDAY&quot;,&quot;THURSDAY&quot;,&quot;FRIDAY&quot;,&quot;SATURDAY&quot;,&quot;SUNDAY&quot;],&quot;pausedUntil&quot;:null,&quot;quietHoursEnabled&quot;:false,&quot;quietHoursStart&quot;:22,&quot;quietHoursEnd&quot;:8}</string>
+    <string name="alarm-token">33020566-9072-46b8-a348-210ead9c6002</string>
+    <long name="delivery-next-at" value="1792065060000" />
+    <string name="delivery-id">f102ac34-f692-4034-843c-02c8a34121c0</string>
+    <long name="pending-at" value="1791978660042" />
+</map>
