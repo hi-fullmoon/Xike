@@ -1,14 +1,11 @@
 package com.xike.app
 
-import com.xike.app.ui.components.XikeNotice
-
-
+import android.app.LocaleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.content.res.Configuration
-import android.app.LocaleManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.LocaleList
@@ -22,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import com.xike.app.ui.components.XikeNotice
 import java.util.Locale
 
 enum class AppLanguage(val tag: String, val nativeName: String) {
@@ -29,15 +27,18 @@ enum class AppLanguage(val tag: String, val nativeName: String) {
     CHINESE("zh-CN", "中文"),
     ENGLISH("en", "English");
 
-    val locale: Locale get() = Locale.forLanguageTag(tag)
+    val locale: Locale
+        get() = Locale.forLanguageTag(tag)
 }
 
 internal class LanguagePreferences(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences("xike-language", Context.MODE_PRIVATE)
+    private val preferences =
+        context.applicationContext.getSharedPreferences("xike-language", Context.MODE_PRIVATE)
 
     var language: AppLanguage
-        get() = AppLanguage.entries.firstOrNull { it.tag == preferences.getString("language", null) }
-            ?: AppLanguage.SYSTEM
+        get() =
+            AppLanguage.entries.firstOrNull { it.tag == preferences.getString("language", null) }
+                ?: AppLanguage.SYSTEM
         set(value) {
             check(preferences.edit().putString("language", value.tag).commit()) {
                 "Unable to save language preference"
@@ -52,7 +53,9 @@ internal object AppLocale {
     var language by mutableStateOf(AppLanguage.CHINESE)
         private set
 
-    val locale: Locale get() = language.locale
+    val locale: Locale
+        get() = language.locale
+
     private var localizedContext: Context? = null
 
     fun initialize(context: Context) = select(context, LanguagePreferences(context).language)
@@ -82,34 +85,43 @@ private fun synchronizeSystemLanguage(context: Context, language: AppLanguage) {
     // Dynamic shortcuts accept explicit labels on Android 8–12 as well as Android 13+.
     // Manifest shortcuts are immutable and otherwise follow the system locale.
     val localized = context.forLanguage(language)
-    val shortcut = ShortcutInfo.Builder(context, "quick_record")
-        .setShortLabel(localized.getString(R.string.shortcut_quick_record_short))
-        .setLongLabel(localized.getString(R.string.shortcut_quick_record_long))
-        .setDisabledMessage(localized.getString(R.string.shortcut_quick_record_disabled))
-        .setIcon(Icon.createWithResource(context, R.drawable.ic_launcher_foreground))
-        .setIntent(Intent(context, MainActivity::class.java).setAction(ACTION_QUICK_RECORD))
-        .build()
+    val shortcut =
+        ShortcutInfo.Builder(context, "quick_record")
+            .setShortLabel(localized.getString(R.string.shortcut_quick_record_short))
+            .setLongLabel(localized.getString(R.string.shortcut_quick_record_long))
+            .setDisabledMessage(localized.getString(R.string.shortcut_quick_record_disabled))
+            .setIcon(Icon.createWithResource(context, R.drawable.ic_launcher_foreground))
+            .setIntent(Intent(context, MainActivity::class.java).setAction(ACTION_QUICK_RECORD))
+            .build()
     val shortcuts = context.getSystemService(ShortcutManager::class.java)
     // Skip publishing when the existing labels already match.
     val current = shortcuts.dynamicShortcuts.firstOrNull { it.id == shortcut.id }
-    if (current == null || current.shortLabel != shortcut.shortLabel || current.longLabel != shortcut.longLabel) {
+    if (
+        current == null ||
+            current.shortLabel != shortcut.shortLabel ||
+            current.longLabel != shortcut.longLabel
+    ) {
         shortcuts.addDynamicShortcuts(listOf(shortcut))
     }
 }
 
 internal fun Context.forLanguage(language: AppLanguage): Context {
-    val configuration = Configuration(resources.configuration).apply { setLocale(resolveLanguage(language).locale) }
+    val configuration =
+        Configuration(resources.configuration).apply { setLocale(resolveLanguage(language).locale) }
     // Retain the Activity in the wrapper chain so native dialogs keep their window token.
-    return android.view.ContextThemeWrapper(this, 0).apply { applyOverrideConfiguration(configuration) }
+    return android.view.ContextThemeWrapper(this, 0).apply {
+        applyOverrideConfiguration(configuration)
+    }
 }
 
 private fun Context.resolveLanguage(selected: AppLanguage): AppLanguage {
     if (selected != AppLanguage.SYSTEM) return selected
-    val locales = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        getSystemService(LocaleManager::class.java).systemLocales
-    } else {
-        android.content.res.Resources.getSystem().configuration.locales
-    }
+    val locales =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getSystemService(LocaleManager::class.java).systemLocales
+        } else {
+            android.content.res.Resources.getSystem().configuration.locales
+        }
     for (index in 0 until locales.size()) {
         when (locales[index].language) {
             "zh" -> return AppLanguage.CHINESE
@@ -138,13 +150,22 @@ internal fun ComponentActivity.setLocalizedContent(content: @Composable () -> Un
         val languageContext = remember(language) { forLanguage(language) }
         CompositionLocalProvider(
             LocalContext provides languageContext,
-            LocalLanguageChange provides { selected ->
-                runCatching { LanguagePreferences(this).language = selected }
-                    .onSuccess { AppLocale.select(this, selected) }
-                    .onFailure {
-                        XikeNotice.makeText(this, tr("语言设置保存失败，请重试。", "Unable to save language. Please try again."), XikeNotice.LENGTH_LONG).show()
-                    }
-            },
+            LocalLanguageChange provides
+                { selected ->
+                    runCatching { LanguagePreferences(this).language = selected }
+                        .onSuccess { AppLocale.select(this, selected) }
+                        .onFailure {
+                            XikeNotice.makeText(
+                                    this,
+                                    tr(
+                                        "语言设置保存失败，请重试。",
+                                        "Unable to save language. Please try again.",
+                                    ),
+                                    XikeNotice.LENGTH_LONG,
+                                )
+                                .show()
+                        }
+                },
             content = content,
         )
     }

@@ -1,13 +1,12 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,29 +19,33 @@ class JournalStoreMigrationTest {
     fun encryptedSharedPreferencesAreMigratedWithoutBeingDeleted() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val database = JournalDatabase.get(context)
-        val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-        val legacyPreferences = EncryptedSharedPreferences.create(
-            context,
-            "xike-journal",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+        val masterKey =
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+        val legacyPreferences =
+            EncryptedSharedPreferences.create(
+                context,
+                "xike-journal",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
         database.clearAllTables()
         legacyPreferences.edit().clear().commit()
-        val legacyEntry = JournalEntry(
-            id = "legacy-four-images",
-            createdAt = 1_777_777L,
-            mood = Mood.JOYFUL,
-            tags = listOf("生活", "旅行"),
-            note = "旧版加密存储",
-            imageFileNames = (1..4).map { "legacy-$it.xike-image" },
-        )
+        val legacyEntry =
+            JournalEntry(
+                id = "legacy-four-images",
+                createdAt = 1_777_777L,
+                mood = Mood.JOYFUL,
+                tags = listOf("生活", "旅行"),
+                note = "旧版加密存储",
+                imageFileNames = (1..4).map { "legacy-$it.xike-image" },
+            )
         assertTrue(
-            legacyPreferences.edit()
+            legacyPreferences
+                .edit()
                 .putString("entries", JSONArray(listOf(legacyEntry.toJson())).toString())
                 .putString("theme", "SUNSET")
-                .commit(),
+                .commit()
         )
 
         try {

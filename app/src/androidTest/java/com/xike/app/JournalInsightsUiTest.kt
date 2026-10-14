@@ -1,14 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-
-import com.xike.app.feature.insights.JournalInsightsScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -24,6 +15,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.feature.insights.JournalInsightsScreen
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertTrue
@@ -31,8 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class JournalInsightsUiTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun emptyInsightsExplainEvidenceAndDisableLocalReview() {
@@ -55,7 +50,9 @@ class JournalInsightsUiTest {
     fun largeFontOverviewKeepsHeadlineClearOfMoodBadge() {
         composeRule.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale = 2f)
+            ) {
                 XikeTheme(AppTheme.OCEAN) {
                     JournalInsightsScreen(
                         padding = PaddingValues(),
@@ -66,37 +63,55 @@ class JournalInsightsUiTest {
             }
         }
 
-        val headlineBounds = composeRule
-            .onNodeWithTag("insights-overview-headline", useUnmergedTree = true)
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-            .boundsInRoot
-        val badgeBounds = composeRule
-            .onNodeWithTag("insights-overview-badge", useUnmergedTree = true)
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-            .boundsInRoot
+        val headlineBounds =
+            composeRule
+                .onNodeWithTag("insights-overview-headline", useUnmergedTree = true)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val badgeBounds =
+            composeRule
+                .onNodeWithTag("insights-overview-badge", useUnmergedTree = true)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
 
-        assertTrue("Large-font headline should be placed below the mood badge", headlineBounds.top >= badgeBounds.bottom)
+        assertTrue(
+            "Large-font headline should be placed below the mood badge",
+            headlineBounds.top >= badgeBounds.bottom,
+        )
 
-        val description = composeRule.onAllNodesWithText(
-            localizedText("还没有记录，因此不生成趋势判断。"), useUnmergedTree = true,
-        ).onFirst()
+        val description =
+            composeRule
+                .onAllNodesWithText(
+                    localizedText("还没有记录，因此不生成趋势判断。"),
+                    useUnmergedTree = true,
+                )
+                .onFirst()
         description.performScrollTo().assertIsDisplayed()
         val descriptionBounds = description.fetchSemanticsNode().boundsInRoot
-        val evidenceBounds = composeRule.onNodeWithText(
-            localizedText("暂无样本"), useUnmergedTree = true,
-        ).fetchSemanticsNode().boundsInRoot
-        assertTrue("Large-font evidence description should use its own row", descriptionBounds.top >= evidenceBounds.bottom)
+        val evidenceBounds =
+            composeRule
+                .onNodeWithText(
+                    localizedText("暂无样本"),
+                    useUnmergedTree = true,
+                )
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(
+            "Large-font evidence description should use its own row",
+            descriptionBounds.top >= evidenceBounds.bottom,
+        )
     }
 
     @Test
     fun moodDistributionDrillsDownToItsOriginalEntries() {
-        val entries = listOf(
-            entry("good-1", Mood.GOOD, "第一条可追溯记录"),
-            entry("good-2", Mood.GOOD, "第二条可追溯记录"),
-            entry("calm", Mood.CALM, "平静记录"),
-        )
+        val entries =
+            listOf(
+                entry("good-1", Mood.GOOD, "第一条可追溯记录"),
+                entry("good-2", Mood.GOOD, "第二条可追溯记录"),
+                entry("calm", Mood.CALM, "平静记录"),
+            )
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 JournalInsightsScreen(
@@ -116,18 +131,21 @@ class JournalInsightsUiTest {
 
     @Test
     fun trendPointStillOpensItsOriginalEntries() {
-        val entries = listOf(
-            entry("trend-1", Mood.GOOD, "趋势里的第一条"),
-            entry("trend-2", Mood.CALM, "趋势里的第二条"),
-            entry("trend-3", Mood.TIRED, "趋势里的第三条"),
-        )
+        val entries =
+            listOf(
+                entry("trend-1", Mood.GOOD, "趋势里的第一条"),
+                entry("trend-2", Mood.CALM, "趋势里的第二条"),
+                entry("trend-3", Mood.TIRED, "趋势里的第三条"),
+            )
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 JournalInsightsScreen(PaddingValues(), entries, openImage = { null })
             }
         }
 
-        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasContentDescription("3 条记录", substring = true))
+        composeRule
+            .onNodeWithTag("insights-list")
+            .performScrollToNode(hasContentDescription("3 条记录", substring = true))
         composeRule.onNode(hasContentDescription("3 条记录", substring = true)).performClick()
         composeRule.onNodeWithText("趋势里的第一条").assertIsDisplayed()
         composeRule.onNodeWithText("趋势里的第二条").assertIsDisplayed()
@@ -157,14 +175,17 @@ class JournalInsightsUiTest {
         composeRule.onNodeWithText("息刻不会自动上传", substring = true).assertIsDisplayed()
     }
 
-    private fun entry(id: String, mood: Mood, note: String): JournalEntry = JournalEntry(
-        id = id,
-        createdAt = LocalDate.now().atTime(12, 0)
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli(),
-        mood = mood,
-        tags = listOf("自我"),
-        note = note,
-    )
+    private fun entry(id: String, mood: Mood, note: String): JournalEntry =
+        JournalEntry(
+            id = id,
+            createdAt =
+                LocalDate.now()
+                    .atTime(12, 0)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli(),
+            mood = mood,
+            tags = listOf("自我"),
+            note = note,
+        )
 }

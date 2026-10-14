@@ -1,8 +1,5 @@
 package com.xike.app
 
-import com.xike.app.ui.components.XikeNotice
-
-
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -11,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import com.xike.app.ui.components.XikeNotice
 import java.io.File
 import java.util.zip.ZipFile
 import org.junit.Assert.assertEquals
@@ -62,9 +60,12 @@ class BackupExportLifecycleTest {
     @Test
     fun realWriteFailureIsRetainedUntilTheNoticeIsDismissed() {
         val model = model()
-        val directory = File(rule.activity.cacheDir, "export-directory-${System.nanoTime()}").apply { mkdirs() }
+        val directory =
+            File(rule.activity.cacheDir, "export-directory-${System.nanoTime()}").apply { mkdirs() }
         try {
-            rule.activityRule.scenario.onActivity { model.startBackupExport(Uri.fromFile(directory), null) }
+            rule.activityRule.scenario.onActivity {
+                model.startBackupExport(Uri.fromFile(directory), null)
+            }
             rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             rule.waitUntil(10_000) { !model.isBackupExporting }
             val feedback = model.operationFeedback.single()
@@ -83,16 +84,23 @@ class BackupExportLifecycleTest {
     @Test
     fun transientNoticeDoesNotConsumeTheRetainedResult() {
         val model = model()
-        val directory = File(rule.activity.cacheDir, "export-interruption-${System.nanoTime()}").apply { mkdirs() }
+        val directory =
+            File(rule.activity.cacheDir, "export-interruption-${System.nanoTime()}").apply {
+                mkdirs()
+            }
         try {
-            rule.activityRule.scenario.onActivity { model.startBackupExport(Uri.fromFile(directory), null) }
+            rule.activityRule.scenario.onActivity {
+                model.startBackupExport(Uri.fromFile(directory), null)
+            }
             rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             rule.waitUntil(10_000) { !model.isBackupExporting }
             val feedback = model.operationFeedback.single()
             rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
             rule.onNodeWithText(feedback.message).assertIsDisplayed()
             val transient = localizedText("请先完成或取消录音")
-            rule.runOnIdle { XikeNotice.makeText(rule.activity, transient, XikeNotice.LENGTH_LONG).show() }
+            rule.runOnIdle {
+                XikeNotice.makeText(rule.activity, transient, XikeNotice.LENGTH_LONG).show()
+            }
             rule.onNodeWithText(transient).assertIsDisplayed()
             rule.onNodeWithText(feedback.message).assertDoesNotExist()
             assertTrue(model.operationFeedback.single() === feedback)
@@ -107,7 +115,9 @@ class BackupExportLifecycleTest {
 
     private fun model(): JournalViewModel {
         lateinit var model: JournalViewModel
-        rule.activityRule.scenario.onActivity { model = ViewModelProvider(it)[JournalViewModel::class.java] }
+        rule.activityRule.scenario.onActivity {
+            model = ViewModelProvider(it)[JournalViewModel::class.java]
+        }
         rule.waitUntil(10_000) { !model.isLoading }
         return model
     }

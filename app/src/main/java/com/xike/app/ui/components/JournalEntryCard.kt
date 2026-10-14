@@ -1,17 +1,5 @@
 package com.xike.app.ui.components
 
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeShapes
-
-import com.xike.app.localizedText
-import com.xike.app.tr
-import com.xike.app.AppLocale
-import com.xike.app.data.JournalEntry
-import com.xike.app.weatherConditionLabel
-import com.xike.app.ui.components.formatAudioDuration
-import com.xike.app.VideoCard
-
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +29,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xike.app.AppLocale
+import com.xike.app.VideoCard
+import com.xike.app.data.JournalEntry
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.components.formatAudioDuration
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.weatherConditionLabel
 import java.io.InputStream
 import java.time.Instant
 import java.time.ZoneId
@@ -62,12 +59,17 @@ internal fun JournalEntryCard(
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
-            if (!compactMedia) entry.video?.let { VideoCard(it, previewOnly = true, onOpen = onClick) }
+            if (!compactMedia)
+                entry.video?.let { VideoCard(it, previewOnly = true, onOpen = onClick) }
             if (!compactMedia && entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
             }
             Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
-                Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f)) {
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f),
+                ) {
                     Box(contentAlignment = Alignment.Center) {
                         MoodEmoji(entry.mood, size = 24.dp)
                     }
@@ -77,11 +79,19 @@ internal fun JournalEntryCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(entry.mood.label, style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.weight(1f))
-                        Text(entry.createdAt.asChineseTime(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            entry.createdAt.asChineseTime(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     if (entry.tags.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
-                        Text(entry.tags.joinToString("  ·  ") { localizedText(it) }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            entry.tags.joinToString("  ·  ") { localizedText(it) },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                     entry.outdoor?.let { outdoor ->
                         Spacer(Modifier.height(7.dp))
@@ -104,7 +114,13 @@ internal fun JournalEntryCard(
                     }
                     if (entry.note.isNotBlank()) {
                         Spacer(Modifier.height(9.dp))
-                        Text(entry.note, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            entry.note,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     entry.audio?.let { audio ->
                         Spacer(Modifier.height(9.dp))
@@ -117,7 +133,10 @@ internal fun JournalEntryCard(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                tr("语音 · ${formatAudioDuration(audio.durationMillis)}", "Audio · ${formatAudioDuration(audio.durationMillis)}"),
+                                tr(
+                                    "语音 · ${formatAudioDuration(audio.durationMillis)}",
+                                    "Audio · ${formatAudioDuration(audio.durationMillis)}",
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -129,7 +148,9 @@ internal fun JournalEntryCard(
                 val mediaCount = entry.imageFileNames.size + if (entry.video != null) 1 else 0
                 val hasMedia = mediaCount > 0
                 if (hasMedia) {
-                    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)) {
+                    BoxWithConstraints(
+                        Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding)
+                    ) {
                         val thumbnailWidth = (maxWidth - 16.dp) / 3
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -151,7 +172,10 @@ internal fun JournalEntryCard(
                                 SavedJournalImage(
                                     fileName = fileName,
                                     openStream = { openImage(fileName) },
-                                    modifier = Modifier.width(thumbnailWidth).aspectRatio(1f).clip(XikeShapes.inner),
+                                    modifier =
+                                        Modifier.width(thumbnailWidth)
+                                            .aspectRatio(1f)
+                                            .clip(XikeShapes.inner),
                                     order = index + 1,
                                     onClick = { onImageClick(index) },
                                 )
@@ -160,8 +184,12 @@ internal fun JournalEntryCard(
                     }
                     if (mediaCount > 3) {
                         Text(
-                            tr("共 $mediaCount 项媒体 · 左右滑动查看", "$mediaCount media items · Swipe to view"),
-                            modifier = Modifier.padding(horizontal = XikeCardPadding).padding(top = 8.dp),
+                            tr(
+                                "共 $mediaCount 项媒体 · 左右滑动查看",
+                                "$mediaCount media items · Swipe to view",
+                            ),
+                            modifier =
+                                Modifier.padding(horizontal = XikeCardPadding).padding(top = 8.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -173,6 +201,6 @@ internal fun JournalEntryCard(
     }
 }
 
-
-private fun Long.asChineseTime(): String = DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
-    .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))
+private fun Long.asChineseTime(): String =
+    DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
+        .format(Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()))

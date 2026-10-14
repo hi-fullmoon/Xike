@@ -1,14 +1,11 @@
 package com.xike.app.ui.components
 
-import com.xike.app.ui.theme.XikeShapes
-
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -24,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xike.app.ui.theme.XikeShapes
 
 @Composable
 internal fun DestructiveConfirmationDialog(
@@ -61,14 +59,17 @@ internal fun DestructiveConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(enabled = !isProcessing, onClick = onDismiss, shape = XikeShapes.button) { Text(dismissText) }
+            TextButton(enabled = !isProcessing, onClick = onDismiss, shape = XikeShapes.button) {
+                Text(dismissText)
+            }
         },
         confirmButton = {
             TextButton(
                 shape = XikeShapes.button,
                 enabled = !isProcessing,
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                colors =
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) {
                 if (isProcessing) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)

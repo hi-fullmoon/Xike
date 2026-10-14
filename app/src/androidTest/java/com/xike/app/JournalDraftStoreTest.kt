@@ -1,13 +1,11 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.data.draft.JournalDraftStore
-
-import com.xike.app.data.Mood
-
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.data.Mood
+import com.xike.app.data.draft.JournalDraftStore
+import com.xike.app.data.model.JournalDraft
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,22 +81,24 @@ class JournalDraftStoreTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = JournalDraftStore(context)
         val secretNote = "只属于我的草稿-987654"
-        val draft = JournalDraft(
-            mood = Mood.CALM,
-            note = secretNote,
-            tags = setOf("自我"),
-            updatedAt = 987_654L,
-        )
+        val draft =
+            JournalDraft(
+                mood = Mood.CALM,
+                note = secretNote,
+                tags = setOf("自我"),
+                updatedAt = 987_654L,
+            )
         store.save(JournalDraft())
 
         try {
             store.save(draft)
 
             assertEquals(draft, JournalDraftStore(context).load())
-            val preferencesFile = File(
-                context.applicationInfo.dataDir,
-                "shared_prefs/xike-journal-draft.xml",
-            )
+            val preferencesFile =
+                File(
+                    context.applicationInfo.dataDir,
+                    "shared_prefs/xike-journal-draft.xml",
+                )
             assertTrue(preferencesFile.isFile)
             assertFalse(preferencesFile.readText().contains(secretNote))
         } finally {

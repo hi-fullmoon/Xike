@@ -51,17 +51,25 @@ class LanguageLockDraftUiTest {
             assertTrue(lockPreferences.enabled)
             assertEquals(AppLanguage.SYSTEM, LanguagePreferences(context).language)
             assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
-            val expectedLanguage = InstrumentationRegistry.getArguments().getString("expectedLanguage")
+            val expectedLanguage =
+                InstrumentationRegistry.getArguments().getString("expectedLanguage")
             if (expectedLanguage != null) {
                 val expected = AppLanguage.valueOf(expectedLanguage)
                 check(expected != AppLanguage.SYSTEM)
                 assertEquals(expected, AppLocale.language)
                 rule.onNodeWithTag("navigation-settings").performClick()
-                rule.onNodeWithText(if (expected == AppLanguage.CHINESE) "应用语言" else "App language")
-                    .performScrollTo().assertIsDisplayed()
+                rule
+                    .onNodeWithText(if (expected == AppLanguage.CHINESE) "应用语言" else "App language")
+                    .performScrollTo()
+                    .assertIsDisplayed()
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                assertTrue(context.getSystemService(android.app.LocaleManager::class.java).applicationLocales.isEmpty)
+                assertTrue(
+                    context
+                        .getSystemService(android.app.LocaleManager::class.java)
+                        .applicationLocales
+                        .isEmpty
+                )
             }
             assertFalse(JournalDraftStore(context).hasPendingWrite)
             assertEquals(NOTE, JournalDraftStore(context).load().note)
@@ -76,20 +84,26 @@ class LanguageLockDraftUiTest {
         }
         rule.onNodeWithTag("navigation-home").performClick()
         if (model.draft.isEmpty) {
-            rule.onNodeWithContentDescription(localizedText("此刻的注脚"))
-                .performScrollTo().performTextInput(NOTE)
+            rule
+                .onNodeWithContentDescription(localizedText("此刻的注脚"))
+                .performScrollTo()
+                .performTextInput(NOTE)
             rule.onNodeWithText(localizedText("完成")).performScrollTo().performClick()
         }
         val draft = model.draft
         assertEquals(NOTE, draft.note)
         rule.onNodeWithTag("navigation-settings").performClick()
         if (lockPreferences.enabled) {
-            rule.onNode(hasText(localizedText("应用锁")) and isToggleable())
-                .performScrollTo().performClick()
+            rule
+                .onNode(hasText(localizedText("应用锁")) and isToggleable())
+                .performScrollTo()
+                .performClick()
             authenticateDeviceCredential { !lockPreferences.enabled }
         }
-        rule.onNode(hasText(localizedText("应用锁")) and isToggleable())
-            .performScrollTo().performClick()
+        rule
+            .onNode(hasText(localizedText("应用锁")) and isToggleable())
+            .performScrollTo()
+            .performClick()
         authenticateDeviceCredential { lockPreferences.enabled && !lock.isAppLocked }
         assertEquals(AppLockTimeout.IMMEDIATELY, lockPreferences.timeout)
 
@@ -116,7 +130,9 @@ class LanguageLockDraftUiTest {
 
         shell("input keyevent KEYCODE_HOME")
         awaitCondition { lock.backgroundedAtMillis != null }
-        shell("am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.xike.app/.MainActivity")
+        shell(
+            "am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.xike.app/.MainActivity"
+        )
         awaitCondition { lock.isAppLocked }
         authenticateDeviceCredential { !lock.isAppLocked }
         assertEquals(draft, model.draft)
@@ -132,20 +148,37 @@ class LanguageLockDraftUiTest {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         awaitCondition {
             val root = automation.rootInActiveWindow
-            root?.packageName?.toString() in setOf("com.android.settings", "com.android.systemui") &&
-                root?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT) != null
+            root?.packageName?.toString() in
+                setOf("com.android.settings", "com.android.systemui") &&
+                root?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT) !=
+                    null
         }
         automation.waitForIdle(300, 5_000)
-        val field = checkNotNull(automation.rootInActiveWindow?.findFocus(
-            android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT,
-        ))
-        assertTrue(field.performAction(
-            android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT,
-            android.os.Bundle().apply {
-                putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "2468")
-            },
-        ))
-        assertTrue(field.performAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id))
+        val field =
+            checkNotNull(
+                automation.rootInActiveWindow?.findFocus(
+                    android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT
+                )
+            )
+        assertTrue(
+            field.performAction(
+                android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT,
+                android.os.Bundle().apply {
+                    putCharSequence(
+                        android.view.accessibility.AccessibilityNodeInfo
+                            .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                        "2468",
+                    )
+                },
+            )
+        )
+        assertTrue(
+            field.performAction(
+                android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
+                    .ACTION_IME_ENTER
+                    .id
+            )
+        )
         awaitCondition(accepted)
     }
 
@@ -156,9 +189,12 @@ class LanguageLockDraftUiTest {
     }
 
     private fun shell(command: String) {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use { descriptor ->
-            java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }
-        }
+        InstrumentationRegistry.getInstrumentation()
+            .uiAutomation
+            .executeShellCommand(command)
+            .use { descriptor ->
+                java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }
+            }
     }
 
     private companion object {

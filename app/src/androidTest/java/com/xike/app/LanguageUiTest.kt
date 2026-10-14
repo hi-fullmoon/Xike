@@ -1,15 +1,7 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
-
-import com.xike.app.ui.components.journalTopics
-
-import com.xike.app.ui.theme.AppTheme
-
-
-
-import android.content.Context
 import android.app.LocaleManager
+import android.content.Context
 import android.content.pm.ShortcutManager
 import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,27 +13,33 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ApplicationProvider
+import com.xike.app.data.Mood
+import com.xike.app.ui.components.journalTopics
+import com.xike.app.ui.theme.AppTheme
+import java.time.LocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.LocalDate
 
 class LanguageUiTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val preferences = context.getSharedPreferences("xike-language", Context.MODE_PRIVATE)
     private val originalLanguage = preferences.getString("language", null)
 
-    @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
     @After
     fun restoreLanguage() {
-        preferences.edit().apply {
-            if (originalLanguage == null) remove("language") else putString("language", originalLanguage)
-        }.commit()
+        preferences
+            .edit()
+            .apply {
+                if (originalLanguage == null) remove("language")
+                else putString("language", originalLanguage)
+            }
+            .commit()
         composeRule.runOnUiThread { AppLocale.initialize(context) }
     }
 
@@ -65,7 +63,10 @@ class LanguageUiTest {
         assertEquals("Pine", AppTheme.PINE.title)
         assertEquals("Work", localizedText("工作"))
         assertEquals("工作", journalTopics.first().label)
-        assertEquals(draft, ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft)
+        assertEquals(
+            draft,
+            ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft,
+        )
 
         composeRule.activityRule.scenario.recreate()
         composeRule.onNodeWithText("App language").performScrollTo().assertIsDisplayed()
@@ -93,13 +94,18 @@ class LanguageUiTest {
         val systemLanguage = AppLocale.language
         val systemContext = context.forLanguage(AppLanguage.SYSTEM)
         assertEquals(systemContext.getString(R.string.text_app_language), localizedText("应用语言"))
-        assertEquals(draft, ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft)
+        assertEquals(
+            draft,
+            ViewModelProvider(composeRule.activity)[JournalViewModel::class.java].draft,
+        )
         composeRule.activityRule.scenario.recreate()
         composeRule.onNodeWithText(localizedText("应用语言")).performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
         assertEquals(systemLanguage, AppLocale.language)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            assertTrue(context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty)
+            assertTrue(
+                context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty
+            )
         }
     }
 
@@ -110,7 +116,9 @@ class LanguageUiTest {
         composeRule.runOnUiThread { AppLocale.initialize(context) }
         assertEquals(AppLanguage.SYSTEM, AppLocale.selectedLanguage)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            assertTrue(context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty)
+            assertTrue(
+                context.getSystemService(LocaleManager::class.java).applicationLocales.isEmpty
+            )
         }
         composeRule.runOnUiThread { AppLocale.select(context, AppLanguage.CHINESE) }
         assertEquals("平静", Mood.CALM.label)
@@ -126,18 +134,32 @@ class LanguageUiTest {
         }
         DailyPromptStyle.entries.forEach { style ->
             style.questions.forEach { question ->
-                assertFalse(question, localizedText(question).any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN })
+                assertFalse(
+                    question,
+                    localizedText(question).any {
+                        Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN
+                    },
+                )
             }
-            assertFalse(dailyQuestion(LocalDate.now(), style).any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN })
+            assertFalse(
+                dailyQuestion(LocalDate.now(), style).any {
+                    Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN
+                }
+            )
         }
     }
 
     private fun assertSystemLanguage(language: AppLanguage, shortcutLabel: String) {
-        val shortcut = context.getSystemService(ShortcutManager::class.java).dynamicShortcuts
-            .single { it.id == "quick_record" }
+        val shortcut =
+            context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.single {
+                it.id == "quick_record"
+            }
         assertEquals(shortcutLabel, shortcut.shortLabel.toString())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            assertEquals(language.locale, context.getSystemService(LocaleManager::class.java).applicationLocales[0])
+            assertEquals(
+                language.locale,
+                context.getSystemService(LocaleManager::class.java).applicationLocales[0],
+            )
         }
     }
 }

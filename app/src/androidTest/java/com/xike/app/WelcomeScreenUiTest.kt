@@ -1,10 +1,5 @@
 package com.xike.app
 
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeTheme
-
-
 import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,11 +8,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
 
 class WelcomeScreenUiTest {
     @get:Rule val composeRule = createComposeRule()
@@ -49,12 +47,16 @@ class WelcomeScreenUiTest {
         footer.assertIsDisplayed()
         val messageBounds = message.getUnclippedBoundsInRoot()
         val footerBounds = footer.getUnclippedBoundsInRoot()
-        assertTrue(messageBounds.left >= screenBounds.left && messageBounds.right <= screenBounds.right)
+        assertTrue(
+            messageBounds.left >= screenBounds.left && messageBounds.right <= screenBounds.right
+        )
         assertTrue(messageBounds.bottom < footerBounds.top)
         assertTrue(footerBounds.bottom <= screenBounds.bottom)
         val destination = File(context.getExternalFilesDir(null), "welcome-screen.png")
         destination.outputStream().use {
-            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            InstrumentationRegistry.getInstrumentation()
+                .uiAutomation
+                .takeScreenshot()
                 .compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         composeRule.mainClock.advanceTimeBy(1500)

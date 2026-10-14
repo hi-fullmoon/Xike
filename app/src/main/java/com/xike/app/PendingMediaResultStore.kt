@@ -11,13 +11,16 @@ internal data class StoredMediaResult(val value: Any?, val ownedReadUris: List<U
 
 /** Durable URI metadata only. Media bytes and backup passwords are never stored here. */
 internal class PendingMediaResultStore(context: Context) {
-    private val preferences = EncryptedSharedPreferences.create(
-        context.applicationContext,
-        "xike-pending-media-results",
-        MasterKey.Builder(context.applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    private val preferences =
+        EncryptedSharedPreferences.create(
+            context.applicationContext,
+            "xike-pending-media-results",
+            MasterKey.Builder(context.applicationContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
 
     fun save(key: String, value: Any?, ownedReadUris: List<Uri>) {
         val json = JSONObject().put("version", 1)
@@ -31,26 +34,32 @@ internal class PendingMediaResultStore(context: Context) {
             else -> error("Unsupported media result")
         }
         json.put("ownedReadUris", JSONArray(ownedReadUris.map(Uri::toString)))
-        check(preferences.edit().putString(key, json.toString()).commit()) { "Could not preserve pending media selection" }
+        check(preferences.edit().putString(key, json.toString()).commit()) {
+            "Could not preserve pending media selection"
+        }
     }
 
     fun load(key: String): StoredMediaResult? {
         val raw = preferences.getString(key, null) ?: return null
         val json = JSONObject(raw)
         require(json.getInt("version") == 1)
-        val value = when (json.getString("kind")) {
-            "null" -> null
-            "uri" -> Uri.parse(json.getString("value"))
-            "uris" -> json.getJSONArray("value").let { array ->
-                List(array.length()) { Uri.parse(array.getString(it)) }
+        val value =
+            when (json.getString("kind")) {
+                "null" -> null
+                "uri" -> Uri.parse(json.getString("value"))
+                "uris" ->
+                    json.getJSONArray("value").let { array ->
+                        List(array.length()) { Uri.parse(array.getString(it)) }
+                    }
+                else -> error("Unsupported media result")
             }
-            else -> error("Unsupported media result")
-        }
         val grants = json.getJSONArray("ownedReadUris")
         return StoredMediaResult(value, List(grants.length()) { Uri.parse(grants.getString(it)) })
     }
 
     fun remove(key: String) {
-        check(preferences.edit().remove(key).commit()) { "Could not acknowledge pending media selection" }
+        check(preferences.edit().remove(key).commit()) {
+            "Could not acknowledge pending media selection"
+        }
     }
 }

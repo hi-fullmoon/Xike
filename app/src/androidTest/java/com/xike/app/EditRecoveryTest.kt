@@ -1,14 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.JournalAudio
-
-import com.xike.app.feature.archive.JournalArchiveScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import android.content.Context
 import android.media.MediaRecorder
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,14 +8,18 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.JournalAudio
+import com.xike.app.feature.archive.JournalArchiveScreen
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertNull
@@ -43,12 +38,14 @@ class EditRecoveryTest {
         assumeTrue(arguments.getString("editRecoveryIsolated") == "true")
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = JournalStore(context).also { it.initialize() }
-        val state = EncryptedSharedPreferences.create(
-            context, "edit-recovery-test",
-            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+        val state =
+            EncryptedSharedPreferences.create(
+                context,
+                "edit-recovery-test",
+                MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
         when (arguments.getString("editRecoveryPhase")) {
             "write" -> {
                 check(!state.contains("audio"))
@@ -72,11 +69,18 @@ class EditRecoveryTest {
                 }
             }
             "read" -> {
-                val audio = requireNotNull(JournalAudio.fromJson(JSONObject(requireNotNull(state.getString("audio", null)))))
+                val audio =
+                    requireNotNull(
+                        JournalAudio.fromJson(
+                            JSONObject(requireNotNull(state.getString("audio", null)))
+                        )
+                    )
                 try {
                     store.removeOrphanedMedia()
                     store.requireReadableAudio(audio.fileName)
-                    assertTrue(store.openAudio(audio.fileName)!!.use { it.readBytes().isNotEmpty() })
+                    assertTrue(
+                        store.openAudio(audio.fileName)!!.use { it.readBytes().isNotEmpty() }
+                    )
                 } finally {
                     store.releaseEditAudio(audio)
                     check(state.edit().clear().commit())
@@ -89,7 +93,9 @@ class EditRecoveryTest {
 
     @Test
     fun detailRemainsOpenWhileRealEntriesReload() {
-        assumeTrue(InstrumentationRegistry.getArguments().getString("editRecoveryIsolated") == "true")
+        assumeTrue(
+            InstrumentationRegistry.getArguments().getString("editRecoveryIsolated") == "true"
+        )
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = JournalStore(context).also { it.initialize() }
         val entry = store.entries().firstOrNull()
@@ -100,32 +106,62 @@ class EditRecoveryTest {
         restoration.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 JournalArchiveScreen(
-                    PaddingValues(), entries.value, storeSearch(store),
-                    onUpdate = { updated, retained, added -> runCatching { store.update(updated, retained, added).first { it.id == updated.id } } },
-                    onDelete = { runCatching { store.delete(it.id); Unit } },
-                    onUndoDelete = { runCatching { store.undoDelete(it); Unit } },
+                    PaddingValues(),
+                    entries.value,
+                    storeSearch(store),
+                    onUpdate = { updated, retained, added ->
+                        runCatching {
+                            store.update(updated, retained, added).first { it.id == updated.id }
+                        }
+                    },
+                    onDelete = {
+                        runCatching {
+                            store.delete(it.id)
+                            Unit
+                        }
+                    },
+                    onUndoDelete = {
+                        runCatching {
+                            store.undoDelete(it)
+                            Unit
+                        }
+                    },
                     onFinalizeDelete = { runCatching { store.finalizeDelete(it) } },
-                    openImage = store::openImage, openAudio = store::openAudio,
+                    openImage = store::openImage,
+                    openAudio = store::openAudio,
                     entriesLoading = loading.value,
                 )
             }
         }
-        composeRule.onAllNodesWithText(requireNotNull(entry).mood.label)[0].performScrollTo().performClick()
+        composeRule
+            .onAllNodesWithText(requireNotNull(entry).mood.label)[0]
+            .performScrollTo()
+            .performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).isDisplayed()
         }
         composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
-        composeRule.runOnIdle { loading.value = true; entries.value = emptyList() }
+        composeRule.runOnIdle {
+            loading.value = true
+            entries.value = emptyList()
+        }
         restoration.emulateSavedInstanceStateRestore()
         composeRule.waitUntil(5_000) {
             composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).isDisplayed()
         }
         composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
         val reloadedEntries = store.entries()
-        composeRule.runOnIdle { entries.value = reloadedEntries; loading.value = false }
+        composeRule.runOnIdle {
+            entries.value = reloadedEntries
+            loading.value = false
+        }
         composeRule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
     }
 
-    private fun storeSearch(store: JournalStore): suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage> =
-        { query, offset, limit -> runCatching { store.search(query, offset, limit) } }
+    private fun storeSearch(
+        store: JournalStore
+    ): suspend (JournalSearchQuery, Int, Int) -> Result<JournalSearchPage> =
+        { query, offset, limit ->
+            runCatching { store.search(query, offset, limit) }
+        }
 }

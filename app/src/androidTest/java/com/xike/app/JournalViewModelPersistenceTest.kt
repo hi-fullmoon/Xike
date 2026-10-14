@@ -1,15 +1,9 @@
 package com.xike.app
 
-import com.xike.app.data.draft.JournalDraftStore
-
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalAudio
-import com.xike.app.data.JournalEntry
-
-import android.app.Application
 import android.Manifest
-import android.media.MediaRecorder
+import android.app.Application
 import android.graphics.Bitmap
+import android.media.MediaRecorder
 import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.ViewModelProvider
@@ -17,17 +11,21 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.filters.SdkSuppress
+import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.data.draft.JournalDraftStore
 import java.io.File
 import java.util.UUID
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -44,7 +42,9 @@ class JournalViewModelPersistenceTest {
         try {
             val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
             try {
-                photo.outputStream().use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                photo.outputStream().use {
+                    assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
+                }
             } finally {
                 screenshot.recycle()
             }
@@ -101,7 +101,10 @@ class JournalViewModelPersistenceTest {
     fun unavailableRecordingRetainsDraftReferenceAndCanBeReadAfterFileReturns() {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.uiAutomation.grantRuntimePermission(application.packageName, Manifest.permission.RECORD_AUDIO)
+        instrumentation.uiAutomation.grantRuntimePermission(
+            application.packageName,
+            Manifest.permission.RECORD_AUDIO,
+        )
         val original = JournalDraftStore(application).load()
         val source = File.createTempFile("draft-recording-", ".m4a", application.cacheDir)
         val recorder = MediaRecorder(application)
@@ -149,7 +152,8 @@ class JournalViewModelPersistenceTest {
             store.requireReadableAudio(audio.fileName)
         } finally {
             recorder.release()
-            if (heldFile?.exists() == true) assertTrue(heldFile.renameTo(requireNotNull(encryptedFile)))
+            if (heldFile?.exists() == true)
+                assertTrue(heldFile.renameTo(requireNotNull(encryptedFile)))
             instrumentation.runOnMainSync { owner.viewModelStore.clear() }
             JournalDraftStore(application).save(original)
             audio?.let { store.deleteUnreferencedAudio(it.fileName) }
@@ -175,7 +179,9 @@ class JournalViewModelPersistenceTest {
             awaitCondition { !draftStore.hasPendingWrite }
             assertEquals("今天走了一段路", draftStore.load().note)
         } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { owner.viewModelStore.clear() }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                owner.viewModelStore.clear()
+            }
             draftStore.save(original)
         }
     }
@@ -203,9 +209,12 @@ class JournalViewModelPersistenceTest {
             awaitCondition { viewModel.libraryState.totalCount == originalCount + 1 }
             assertEquals(entry, viewModel.readRepository.entry(entry.id))
             val beforeEdit = viewModel.libraryState.revision
-            val edited = withContext(Dispatchers.Main) {
-                viewModel.update(entry.copy(note = "走完后心情平静"), emptyList(), emptyList()).getOrThrow()
-            }
+            val edited =
+                withContext(Dispatchers.Main) {
+                    viewModel
+                        .update(entry.copy(note = "走完后心情平静"), emptyList(), emptyList())
+                        .getOrThrow()
+                }
             awaitCondition { viewModel.libraryState.revision > beforeEdit }
             assertEquals(edited, viewModel.readRepository.entry(entry.id))
             withContext(Dispatchers.Main) { viewModel.delete(edited).getOrThrow() }
@@ -216,19 +225,26 @@ class JournalViewModelPersistenceTest {
             assertEquals(edited, viewModel.readRepository.entry(entry.id))
         } finally {
             val store = JournalStore(application)
-            if (store.entries().any { it.id == entry.id }) store.delete(entry.id, refreshEntries = false)
+            if (store.entries().any { it.id == entry.id })
+                store.delete(entry.id, refreshEntries = false)
             store.finalizeDelete(entry.id)
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { owner.viewModelStore.clear() }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                owner.viewModelStore.clear()
+            }
             draftStore.save(original)
         }
     }
 
-    private fun owner() = object : ViewModelStoreOwner {
-        override val viewModelStore = ViewModelStore()
-    }
+    private fun owner() =
+        object : ViewModelStoreOwner {
+            override val viewModelStore = ViewModelStore()
+        }
 
     private fun viewModel(application: Application, owner: ViewModelStoreOwner): JournalViewModel =
-        ViewModelProvider(owner, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[JournalViewModel::class.java]
+        ViewModelProvider(
+            owner,
+            ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+        )[JournalViewModel::class.java]
 
     private fun awaitCondition(condition: () -> Boolean) {
         val deadline = SystemClock.elapsedRealtime() + 10_000L

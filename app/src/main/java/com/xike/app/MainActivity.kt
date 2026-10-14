@@ -1,24 +1,5 @@
 package com.xike.app
 
-import com.xike.app.feature.lock.AppLockDialog
-import com.xike.app.feature.lock.AppLockScreen
-import com.xike.app.feature.lock.LockAuthentication
-import com.xike.app.feature.lock.AppLockSessionState
-import com.xike.app.feature.lock.AppLockTimeout
-import com.xike.app.feature.lock.AppLockPreferences
-
-import com.xike.app.ui.components.ProcessingDialog
-import com.xike.app.ui.components.DataErrorDialog
-import com.xike.app.ui.components.XikeNotice
-import com.xike.app.ui.components.NoticeMessage
-import com.xike.app.ui.components.LocalRetainedNotice
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import android.Manifest
 import android.app.KeyguardManager
 import android.content.Intent
@@ -48,6 +29,20 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xike.app.feature.lock.AppLockDialog
+import com.xike.app.feature.lock.AppLockPreferences
+import com.xike.app.feature.lock.AppLockScreen
+import com.xike.app.feature.lock.AppLockSessionState
+import com.xike.app.feature.lock.AppLockTimeout
+import com.xike.app.feature.lock.LockAuthentication
+import com.xike.app.ui.components.DataErrorDialog
+import com.xike.app.ui.components.LocalRetainedNotice
+import com.xike.app.ui.components.NoticeMessage
+import com.xike.app.ui.components.ProcessingDialog
+import com.xike.app.ui.components.XikeNotice
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -98,32 +93,46 @@ class MainActivity : FragmentActivity() {
         createBiometricPrompt()
 
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            statusBarStyle =
+                SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            navigationBarStyle =
+                SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
         )
         setLocalizedContent {
             PlaybackOutputGuard()
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission(),
-            ) { granted ->
-                notificationPermissionGranted = granted
-                if (granted) {
-                    persistReminderSettings(reminderSettings.copy(enabled = true))
-                } else {
-                    XikeNotice.makeText(this, localizedText("没有开启通知，记录功能仍可正常使用"), XikeNotice.LENGTH_LONG).show()
+            val notificationPermissionLauncher =
+                rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+                    granted ->
+                    notificationPermissionGranted = granted
+                    if (granted) {
+                        persistReminderSettings(reminderSettings.copy(enabled = true))
+                    } else {
+                        XikeNotice.makeText(
+                                this,
+                                localizedText("没有开启通知，记录功能仍可正常使用"),
+                                XikeNotice.LENGTH_LONG,
+                            )
+                            .show()
+                    }
                 }
-            }
-            // Prepare the existing store during the animation only when the lock already permits it.
-            val preparedJournal = if (lockSession.journalSessionOpened) viewModel<JournalViewModel>() else null
+            // Prepare the existing store during the animation only when the lock already permits
+            // it.
+            val preparedJournal =
+                if (lockSession.journalSessionOpened) viewModel<JournalViewModel>() else null
             openedJournalViewModel = preparedJournal
             if (welcomeSession.visible) {
                 XikeTheme(lockScreenTheme, lockScreenStyle) {
-                    WelcomeScreen(onFinished = {
-                        welcomeSession.finish()
-                        if (appLockEnabled && lockSession.isAppLocked) {
-                            requestAuthentication(LockAuthentication.UNLOCK, openSettingsWhenUnavailable = false)
+                    WelcomeScreen(
+                        onFinished = {
+                            welcomeSession.finish()
+                            if (appLockEnabled && lockSession.isAppLocked) {
+                                requestAuthentication(
+                                    LockAuthentication.UNLOCK,
+                                    openSettingsWhenUnavailable = false,
+                                )
+                            }
                         }
-                    })
+                    )
                 }
             } else if (!lockSession.journalSessionOpened) {
                 XikeTheme(lockScreenTheme, lockScreenStyle) {
@@ -146,7 +155,8 @@ class MainActivity : FragmentActivity() {
                 val systemActivityCallbacks =
                     SystemActivityCallbacks(
                         onLaunch = { operationId, sameTask ->
-                            val observable = sameTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
+                            val observable =
+                                sameTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
                             lockSession.beginSystemActivity(
                                 watchTaskVisibility = observable,
                                 requireAuthenticationOnReturn = appLockEnabled && !observable,
@@ -159,38 +169,47 @@ class MainActivity : FragmentActivity() {
                         },
                         onLaunchFailed = { operationId ->
                             refreshLockMonitor()
-                            lockSession.finishSystemActivity(resultReceived = false, operationId = operationId)
+                            lockSession.finishSystemActivity(
+                                resultReceived = false,
+                                operationId = operationId,
+                            )
                         },
                         isLocked = appLockEnabled && lockSession.isAppLocked,
                         resultsReady = journalViewModel.systemActivityResultsReady,
                         canHandleResult = {
                             journalViewModel.systemActivityResultsReady &&
-                                (!appLockEnabled || (!lockSession.isAppLocked && isDeviceInteractiveAndUnlocked()))
+                                (!appLockEnabled ||
+                                    (!lockSession.isAppLocked && isDeviceInteractiveAndUnlocked()))
                         },
                     )
 
-                JournalTheme(journalViewModel, noticesBlocked = appLockEnabled && lockSession.isAppLocked) {
+                JournalTheme(
+                    journalViewModel,
+                    noticesBlocked = appLockEnabled && lockSession.isAppLocked,
+                ) {
                     CompositionLocalProvider(
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,
                         LocalJournalEditOperations provides journalViewModel.editOperations,
-                        LocalAudioEditServices provides AudioEditServices(
-                            import = journalViewModel::importEditAudio,
-                            release = journalViewModel::releaseEditAudio,
-                        ),
-                        LocalVideoServices provides VideoServices(
-                            import = journalViewModel::importVideo,
-                            release = journalViewModel::releaseVideo,
-                            source = journalViewModel::videoDataSource,
-                            cover = journalViewModel::openVideoCover,
-                            addDraft = journalViewModel::queueDraftVideo,
-                            removeDraft = journalViewModel::removeDraftVideo,
-                            cancelPendingDraft = journalViewModel::cancelPendingDraftVideo,
-                            draftSaving = journalViewModel.isDraftVideoSaving,
-                            draftProgress = journalViewModel.draftVideoProgress,
-                            editDraft = journalViewModel::videoEditDraft,
-                            saveEdit = journalViewModel::saveVideoEditDraft,
-                            clearEdit = journalViewModel::clearVideoEditDraft,
-                        ),
+                        LocalAudioEditServices provides
+                            AudioEditServices(
+                                import = journalViewModel::importEditAudio,
+                                release = journalViewModel::releaseEditAudio,
+                            ),
+                        LocalVideoServices provides
+                            VideoServices(
+                                import = journalViewModel::importVideo,
+                                release = journalViewModel::releaseVideo,
+                                source = journalViewModel::videoDataSource,
+                                cover = journalViewModel::openVideoCover,
+                                addDraft = journalViewModel::queueDraftVideo,
+                                removeDraft = journalViewModel::removeDraftVideo,
+                                cancelPendingDraft = journalViewModel::cancelPendingDraftVideo,
+                                draftSaving = journalViewModel.isDraftVideoSaving,
+                                draftProgress = journalViewModel.draftVideoProgress,
+                                editDraft = journalViewModel::videoEditDraft,
+                                saveEdit = journalViewModel::saveVideoEditDraft,
+                                clearEdit = journalViewModel::clearVideoEditDraft,
+                            ),
                     ) {
                         XikeApp(
                             readRepository = journalViewModel.readRepository,
@@ -221,7 +240,8 @@ class MainActivity : FragmentActivity() {
                             onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
                             onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
                             onDraftImagesAdded = journalViewModel::addDraftImages,
-                            onDraftImageResultPending = journalViewModel::setDraftImageResultPending,
+                            onDraftImageResultPending =
+                                journalViewModel::setDraftImageResultPending,
                             isDraftImageResultPending = journalViewModel.isDraftImageResultPending,
                             draftImageResultsReady = journalViewModel.dataError == null,
                             onDraftImageRemoved = journalViewModel::removeDraftImage,
@@ -236,7 +256,9 @@ class MainActivity : FragmentActivity() {
                             hasResumedDraft = journalViewModel.hasResumedDraft,
                             onReminderEnabledChange = { enabled ->
                                 changeReminderEnabled(enabled) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    notificationPermissionLauncher.launch(
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    )
                                 }
                             },
                             onReminderSettingsChange = ::persistReminderSettings,
@@ -319,7 +341,10 @@ class MainActivity : FragmentActivity() {
             window.decorView.post { requestAuthentication(pendingAction) }
         } else if (!welcomeSession.visible && appLockEnabled && lockSession.isAppLocked) {
             window.decorView.post {
-                requestAuthentication(LockAuthentication.UNLOCK, openSettingsWhenUnavailable = false)
+                requestAuthentication(
+                    LockAuthentication.UNLOCK,
+                    openSettingsWhenUnavailable = false,
+                )
             }
         }
     }
@@ -352,45 +377,57 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun createBiometricPrompt() {
-        biometricPrompt = BiometricPrompt(
-            this,
-            ContextCompat.getMainExecutor(this),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    val current = lockSession.isCurrentAuthentication() && isDeviceInteractiveAndUnlocked()
-                    lockSession.authenticationInProgress = false
-                    if (!current) {
-                        lockSession.authenticationAction = null
-                        return
-                    }
-                    when (lockSession.authenticationAction) {
-                        LockAuthentication.UNLOCK -> {
-                            lockSession.isAppLocked = false
-                            lockSession.journalSessionOpened = true
-                            lockSession.backgroundedAtMillis = null
-                        }
-
-                        LockAuthentication.ENABLE -> updateAppLockEnabled(true)
-                        LockAuthentication.DISABLE -> updateAppLockEnabled(false)
-                        null -> Unit
-                    }
-                    lockSession.authenticationAction = null
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    lockSession.authenticationInProgress = false
-                    lockSession.authenticationAction = null
-                    if (errorCode !in setOf(
-                            BiometricPrompt.ERROR_CANCELED,
-                            BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-                            BiometricPrompt.ERROR_USER_CANCELED,
-                        )
+        biometricPrompt =
+            BiometricPrompt(
+                this,
+                ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(
+                        result: BiometricPrompt.AuthenticationResult
                     ) {
-                        XikeNotice.makeText(this@MainActivity, errString, XikeNotice.LENGTH_SHORT).show()
+                        val current =
+                            lockSession.isCurrentAuthentication() &&
+                                isDeviceInteractiveAndUnlocked()
+                        lockSession.authenticationInProgress = false
+                        if (!current) {
+                            lockSession.authenticationAction = null
+                            return
+                        }
+                        when (lockSession.authenticationAction) {
+                            LockAuthentication.UNLOCK -> {
+                                lockSession.isAppLocked = false
+                                lockSession.journalSessionOpened = true
+                                lockSession.backgroundedAtMillis = null
+                            }
+
+                            LockAuthentication.ENABLE -> updateAppLockEnabled(true)
+                            LockAuthentication.DISABLE -> updateAppLockEnabled(false)
+                            null -> Unit
+                        }
+                        lockSession.authenticationAction = null
                     }
-                }
-            },
-        )
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        lockSession.authenticationInProgress = false
+                        lockSession.authenticationAction = null
+                        if (
+                            errorCode !in
+                                setOf(
+                                    BiometricPrompt.ERROR_CANCELED,
+                                    BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+                                    BiometricPrompt.ERROR_USER_CANCELED,
+                                )
+                        ) {
+                            XikeNotice.makeText(
+                                    this@MainActivity,
+                                    errString,
+                                    XikeNotice.LENGTH_SHORT,
+                                )
+                                .show()
+                        }
+                    }
+                },
+            )
     }
 
     private fun requestAuthentication(
@@ -415,18 +452,18 @@ class MainActivity : FragmentActivity() {
                         LockAuthentication.UNLOCK -> localizedText("解锁息刻")
                         LockAuthentication.ENABLE -> localizedText("开启应用锁")
                         LockAuthentication.DISABLE -> localizedText("关闭应用锁")
-                    },
+                    }
                 )
                 .setSubtitle(localizedText("使用面容、指纹或设备密码验证身份"))
                 .setAllowedAuthenticators(allowedAuthenticators)
-                .build(),
+                .build()
         )
     }
 
     private fun changeAppLock(enabled: Boolean) {
         if (enabled == appLockEnabled) return
         requestAuthentication(
-            if (enabled) LockAuthentication.ENABLE else LockAuthentication.DISABLE,
+            if (enabled) LockAuthentication.ENABLE else LockAuthentication.DISABLE
         )
     }
 
@@ -439,13 +476,19 @@ class MainActivity : FragmentActivity() {
                 lockSession.backgroundedAtMillis = null
                 refreshLockMonitor()
                 XikeNotice.makeText(
-                    this,
-                    if (enabled) localizedText("应用锁已开启") else localizedText("应用锁已关闭"),
-                    XikeNotice.LENGTH_SHORT,
-                ).show()
+                        this,
+                        if (enabled) localizedText("应用锁已开启") else localizedText("应用锁已关闭"),
+                        XikeNotice.LENGTH_SHORT,
+                    )
+                    .show()
             }
             .onFailure { error ->
-                XikeNotice.makeText(this, error.message ?: localizedText("应用锁设置保存失败"), XikeNotice.LENGTH_SHORT).show()
+                XikeNotice.makeText(
+                        this,
+                        error.message ?: localizedText("应用锁设置保存失败"),
+                        XikeNotice.LENGTH_SHORT,
+                    )
+                    .show()
             }
     }
 
@@ -464,7 +507,12 @@ class MainActivity : FragmentActivity() {
         runCatching { lockPreferences.timeout = timeout }
             .onSuccess { appLockTimeout = timeout }
             .onFailure { error ->
-                XikeNotice.makeText(this, error.message ?: localizedText("自动锁定设置保存失败"), XikeNotice.LENGTH_SHORT).show()
+                XikeNotice.makeText(
+                        this,
+                        error.message ?: localizedText("自动锁定设置保存失败"),
+                        XikeNotice.LENGTH_SHORT,
+                    )
+                    .show()
             }
     }
 
@@ -497,7 +545,12 @@ class MainActivity : FragmentActivity() {
                 ReminderScheduler.reconcile(this, settings)
             }
             .onFailure { error ->
-                XikeNotice.makeText(this, error.message ?: localizedText("提醒设置保存失败"), XikeNotice.LENGTH_LONG).show()
+                XikeNotice.makeText(
+                        this,
+                        error.message ?: localizedText("提醒设置保存失败"),
+                        XikeNotice.LENGTH_LONG,
+                    )
+                    .show()
             }
     }
 
@@ -505,7 +558,12 @@ class MainActivity : FragmentActivity() {
         runCatching { habitPreferences.dailyPrompt = settings }
             .onSuccess { dailyPromptSettings = settings }
             .onFailure { error ->
-                XikeNotice.makeText(this, error.message ?: localizedText("每日一问设置保存失败"), XikeNotice.LENGTH_LONG).show()
+                XikeNotice.makeText(
+                        this,
+                        error.message ?: localizedText("每日一问设置保存失败"),
+                        XikeNotice.LENGTH_LONG,
+                    )
+                    .show()
             }
     }
 
@@ -521,48 +579,63 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun refreshAuthenticationAvailability() {
-        authenticationAvailable = BiometricManager.from(this)
-            .canAuthenticate(allowedAuthenticators) == BiometricManager.BIOMETRIC_SUCCESS
+        authenticationAvailable =
+            BiometricManager.from(this).canAuthenticate(allowedAuthenticators) ==
+                BiometricManager.BIOMETRIC_SUCCESS
     }
 
     private fun openDeviceSecuritySettings(action: LockAuthentication) {
         lockSession.pendingAuthenticationAfterEnrollment = action
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Intent(Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
-                Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
-                allowedAuthenticators,
-            )
-        } else {
-            Intent(Settings.ACTION_SECURITY_SETTINGS)
-        }
+        val intent =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Intent(Settings.ACTION_BIOMETRIC_ENROLL)
+                    .putExtra(
+                        Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                        allowedAuthenticators,
+                    )
+            } else {
+                Intent(Settings.ACTION_SECURITY_SETTINGS)
+            }
         runCatching { startActivity(intent) }
             .onFailure {
                 lockSession.pendingAuthenticationAfterEnrollment = null
-                XikeNotice.makeText(this, localizedText("无法打开系统安全设置"), XikeNotice.LENGTH_SHORT).show()
+                XikeNotice.makeText(this, localizedText("无法打开系统安全设置"), XikeNotice.LENGTH_SHORT)
+                    .show()
             }
     }
 
     private val allowedAuthenticators: Int
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        } else {
-            BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        }
+        get() =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            } else {
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            }
 }
 
 @Composable
-private fun JournalTheme(journal: JournalViewModel, noticesBlocked: Boolean, content: @Composable () -> Unit) {
+private fun JournalTheme(
+    journal: JournalViewModel,
+    noticesBlocked: Boolean,
+    content: @Composable () -> Unit,
+) {
     val feedback = journal.operationFeedback.firstOrNull()
-    val retainedNotice = remember(feedback) {
-        feedback?.let {
-            NoticeMessage(it.message, if (it.isError) XikeNotice.LENGTH_LONG else XikeNotice.LENGTH_SHORT) {
-                journal.acknowledgeFeedback(it)
+    val retainedNotice =
+        remember(feedback) {
+            feedback?.let {
+                NoticeMessage(
+                    it.message,
+                    if (it.isError) XikeNotice.LENGTH_LONG else XikeNotice.LENGTH_SHORT,
+                ) {
+                    journal.acknowledgeFeedback(it)
+                }
             }
         }
-    }
-    CompositionLocalProvider(LocalRetainedNotice provides retainedNotice.takeUnless { noticesBlocked }) {
+    CompositionLocalProvider(
+        LocalRetainedNotice provides retainedNotice.takeUnless { noticesBlocked }
+    ) {
         XikeTheme(journal.selectedTheme, journal.selectedStyle, content = content)
     }
 }

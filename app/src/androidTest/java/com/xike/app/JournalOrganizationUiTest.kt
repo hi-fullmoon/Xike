@@ -7,11 +7,11 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
@@ -49,14 +49,23 @@ class JournalOrganizationUiTest {
         val model = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
         rule.waitUntil(20_000) { !model.isLoading }
         check(model.draft.isEmpty) { "Use an independent environment with an empty draft." }
-        val entry = JournalStore(rule.activity).entries().single { it.imageFileNames.isNotEmpty() && it.audio != null }
+        val entry =
+            JournalStore(rule.activity).entries().single {
+                it.imageFileNames.isNotEmpty() && it.audio != null
+            }
         check(entry.note.isNotBlank()) { "Run the real editor acceptance first." }
-        val language = if (arguments.getString("language") == "en") AppLanguage.ENGLISH else AppLanguage.CHINESE
+        val language =
+            if (arguments.getString("language") == "en") AppLanguage.ENGLISH
+            else AppLanguage.CHINESE
         val style = AppStyle.valueOf(arguments.getString("style") ?: "BREATHE")
         rule.onNodeWithTag("navigation-settings").performClick()
         rule.onNodeWithText(localizedText("应用语言")).performScrollTo().performClick()
-        rule.onNode(hasText(language.nativeName) and
-            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)).performClick()
+        rule
+            .onNode(
+                hasText(language.nativeName) and
+                    SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+            )
+            .performClick()
         rule.onNodeWithText(style.title).performScrollTo().performClick()
         assertEquals(style, model.selectedStyle)
 
@@ -72,14 +81,28 @@ class JournalOrganizationUiTest {
             rule.onNodeWithText(localizedText("取消")).performClick()
 
             rule.onNodeWithTag("navigation-archive").performClick()
-            rule.onNodeWithContentDescription(localizedText("打开筛选")).performScrollTo().performClick()
-            val calm = hasText(Mood.CALM.label) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+            rule
+                .onNodeWithContentDescription(localizedText("打开筛选"))
+                .performScrollTo()
+                .performClick()
+            val calm =
+                hasText(Mood.CALM.label) and
+                    SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
             showInArchive(calm).performClick().assertIsSelected()
-            showInArchive(hasText(JournalImageFilter.WITH_IMAGES.label)).performClick().assertIsSelected()
+            showInArchive(hasText(JournalImageFilter.WITH_IMAGES.label))
+                .performClick()
+                .assertIsSelected()
             capture("filters")
             showInArchive(hasTestTag("archive-mode-calendar")).performClick().assertIsSelected()
-            val date = Instant.ofEpochMilli(entry.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()
-            val spokenDate = date.format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"), AppLocale.locale))
+            val date =
+                Instant.ofEpochMilli(entry.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()
+            val spokenDate =
+                date.format(
+                    DateTimeFormatter.ofPattern(
+                        tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"),
+                        AppLocale.locale,
+                    )
+                )
             val day = "$spokenDate，${tr("1 条记录", "1 entries")}"
             showDay(day).performClick()
             rule.activityRule.scenario.recreate()
@@ -91,15 +114,20 @@ class JournalOrganizationUiTest {
             rule.onNodeWithTag("navigation-insights").performClick()
             rule.onNodeWithTag("navigation-archive").performClick()
             showDay(day).assertIsSelected()
-            rule.onNode(hasScrollToIndexAction() and
-                SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            rule
+                .onNode(
+                    hasScrollToIndexAction() and
+                        SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)
+                )
                 .performScrollToNode(hasText(entry.note))
             rule.onNodeWithText(entry.note, useUnmergedTree = true).performScrollTo().performClick()
             rule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
             capture("detail")
             rule.activityRule.scenario.recreate()
-            rule.onNode(hasText(entry.note) and hasAnyAncestor(hasTestTag("journal-detail-body")))
-                .performScrollTo().assertIsDisplayed()
+            rule
+                .onNode(hasText(entry.note) and hasAnyAncestor(hasTestTag("journal-detail-body")))
+                .performScrollTo()
+                .assertIsDisplayed()
             rule.onNodeWithContentDescription(localizedText("关闭记录详情")).performClick()
             assertEquals(entry, JournalStore(rule.activity).entries().single { it.id == entry.id })
         } finally {
@@ -112,22 +140,29 @@ class JournalOrganizationUiTest {
     }
 
     private fun showInArchive(matcher: SemanticsMatcher): SemanticsNodeInteraction {
-        val list = rule.onNode(hasScrollToIndexAction() and
-            SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+        val list =
+            rule.onNode(
+                hasScrollToIndexAction() and
+                    SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)
+            )
         list.performScrollToNode(matcher)
         val node = rule.onNode(matcher)
         node.performScrollTo()
         repeat(6) {
             val bounds = node.getUnclippedBoundsInRoot()
             val viewport = list.getBoundsInRoot()
-            val bottom = minOf(viewport.bottom.value,
-                rule.onNodeWithTag("navigation-archive").getBoundsInRoot().top.value) - 8f
+            val bottom =
+                minOf(
+                    viewport.bottom.value,
+                    rule.onNodeWithTag("navigation-archive").getBoundsInRoot().top.value,
+                ) - 8f
             val top = viewport.top.value + 8f
-            val delta = when {
-                bounds.bottom.value > bottom -> bounds.bottom.value - bottom
-                bounds.top.value < top -> bounds.top.value - top
-                else -> return node.assertIsDisplayed()
-            }
+            val delta =
+                when {
+                    bounds.bottom.value > bottom -> bounds.bottom.value - bottom
+                    bounds.top.value < top -> bounds.top.value - top
+                    else -> return node.assertIsDisplayed()
+                }
             list.performSemanticsAction(SemanticsActions.ScrollBy) {
                 it(0f, delta * rule.activity.resources.displayMetrics.density)
             }
@@ -139,12 +174,18 @@ class JournalOrganizationUiTest {
         val configuration = rule.activity.resources.configuration
         val night = configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         val style = ViewModelProvider(rule.activity)[JournalViewModel::class.java].selectedStyle
-        val name = "organization-${AppLocale.language.name}-$night-${configuration.fontScale}-${style.name}-$part.png"
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        val name =
+            "organization-${AppLocale.language.name}-$night-${configuration.fontScale}-${style.name}-$part.png"
+        val screenshot =
+            requireNotNull(
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            )
         try {
             File(rule.activity.getExternalFilesDir(null), name).outputStream().use {
                 check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
-        } finally { screenshot.recycle() }
+        } finally {
+            screenshot.recycle()
+        }
     }
 }

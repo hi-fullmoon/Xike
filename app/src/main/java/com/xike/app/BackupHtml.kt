@@ -1,23 +1,30 @@
 package com.xike.app
 
 import com.xike.app.data.JournalEntry
-
+import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.net.URI
 
-/** A static, offline reading copy of the archive. The manifest remains the source for restoration. */
+/**
+ * A static, offline reading copy of the archive. The manifest remains the source for restoration.
+ */
 internal object BackupHtml {
     fun render(entries: List<JournalEntry>): String = buildString {
         val scriptNonce = java.util.UUID.randomUUID().toString()
-        val dateFormat = DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
+        val dateFormat =
+            DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
         val timeFormat = DateTimeFormatter.ofPattern("HH:mm", AppLocale.locale)
-        append("""<!doctype html><html lang="${AppLocale.language.tag}"><head><meta charset="utf-8">""")
+        append(
+            """<!doctype html><html lang="${AppLocale.language.tag}"><head><meta charset="utf-8">"""
+        )
         append("""<meta name="viewport" content="width=device-width,initial-scale=1">""")
-        append("""<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file: data:; media-src file:; style-src 'unsafe-inline'; script-src 'nonce-$scriptNonce'; base-uri 'none'; form-action 'none'">""")
+        append(
+            """<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file: data:; media-src file:; style-src 'unsafe-inline'; script-src 'nonce-$scriptNonce'; base-uri 'none'; form-action 'none'">"""
+        )
         append("<title>${tr("息刻 · 日记备份", "Xike · Journal backup")}</title><style>")
-        append("""
+        append(
+            """
             :root{color-scheme:light dark;--canvas:#f5f3ef;--paper:#fffefc;--ink:#303742;--muted:#6f7480;--line:#e4e1db;--soft:#edf1f5;--accent:#435d78;--ornament:#b38d66}
             *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:16px/1.8 system-ui,-apple-system,"Noto Sans SC",sans-serif;-webkit-font-smoothing:antialiased}
             main{max-width:800px;margin:0 auto;padding:32px 24px 40px}header{position:relative;overflow:hidden;padding:24px 28px;margin-bottom:22px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:0 3px 16px #333b4905}
@@ -49,19 +56,27 @@ internal object BackupHtml {
             @media(max-width:540px){.timeline-entry{margin-left:18px;padding-bottom:16px}.timeline-entry::before{left:-13px}.timeline-entry::after{left:-17px}.timeline-date strong{font-size:15px}.timeline-clock{font-size:12px}}
             @media(max-width:540px){main{padding:16px 14px 28px}header{padding:20px;margin-bottom:18px;border-radius:10px}article{padding:14px;margin:12px 0;border-radius:8px}h1{font-size:24px}header p{font-size:12px}.top{gap:8px 12px}.photos{gap:6px}.photo{border-radius:6px}.viewer{padding:12px}footer{margin-top:20px;padding:14px 4px 0}}
             @media(prefers-color-scheme:dark){:root{--canvas:#191d23;--paper:#22272f;--ink:#e3e6eb;--muted:#a7afbc;--line:#353b45;--soft:#2e3846;--accent:#bdcfe4;--ornament:#c8a582}header,article{box-shadow:none}}
-        """.trimIndent())
-        append("</style></head><body><main><header><h1>${tr("息刻 · 日记备份", "Xike · Journal backup")}</h1><p>")
+            """
+                .trimIndent()
+        )
+        append(
+            "</style></head><body><main><header><h1>${tr("息刻 · 日记备份", "Xike · Journal backup")}</h1><p>"
+        )
         append(entries.size)
         append(tr(" 条记录 · 解压备份包后可离线阅读", " entries · Extract the backup to read offline"))
         append("</p></header>")
         entries.sortedByDescending(JournalEntry::createdAt).forEach { entry ->
             val instant = Instant.ofEpochMilli(entry.createdAt)
             val date = instant.atZone(ZoneId.systemDefault())
-            append("<section class=\"timeline-entry\"><time class=\"timeline-date\" datetime=\"$instant\"><strong>")
+            append(
+                "<section class=\"timeline-entry\"><time class=\"timeline-date\" datetime=\"$instant\"><strong>"
+            )
             append(escape(dateFormat.format(date)))
             append("</strong><span class=\"timeline-clock\">")
             append(escape(timeFormat.format(date)))
-            append("</span></time><article><div class=\"top\"><span class=\"mood\"><span class=\"mood-emoji\">")
+            append(
+                "</span></time><article><div class=\"top\"><span class=\"mood\"><span class=\"mood-emoji\">"
+            )
             append(entry.mood.emoji)
             append("</span>")
             append(escape(entry.mood.label))
@@ -94,7 +109,9 @@ internal object BackupHtml {
                 append("<div class=\"photos\" data-count=\"${entry.imageFileNames.size}\">")
                 entry.imageFileNames.forEachIndexed { index, fileName ->
                     val url = mediaUrl("images", fileName)
-                    append("<a class=\"photo\" href=\"$url\" aria-label=\"${tr("放大查看图片", "Enlarge photo")} ${index + 1}\"><img loading=\"lazy\" alt=\"${tr("日记图片", "Journal photo")} ")
+                    append(
+                        "<a class=\"photo\" href=\"$url\" aria-label=\"${tr("放大查看图片", "Enlarge photo")} ${index + 1}\"><img loading=\"lazy\" alt=\"${tr("日记图片", "Journal photo")} "
+                    )
                     append(index + 1)
                     append("\" src=\"")
                     append(url)
@@ -105,19 +122,30 @@ internal object BackupHtml {
             entry.audio?.let { audio ->
                 append("<audio controls preload=\"none\" src=\"")
                 append(mediaUrl("audios", audio.fileName))
-                append("\">${tr("浏览器无法播放这段录音。", "Your browser cannot play this recording.")}</audio>")
+                append(
+                    "\">${tr("浏览器无法播放这段录音。", "Your browser cannot play this recording.")}</audio>"
+                )
             }
             entry.video?.let { video ->
                 val url = mediaUrl("videos", video.fileName)
-                append("<video controls preload=\"none\" style=\"width:100%;max-height:480px\" poster=\"")
+                append(
+                    "<video controls preload=\"none\" style=\"width:100%;max-height:480px\" poster=\""
+                )
                 append(mediaUrl("videos", video.coverFileName))
-                append("\" src=\"$url\"></video><a href=\"$url\">${tr("打开视频原文件", "Open original video")}</a>")
+                append(
+                    "\" src=\"$url\"></video><a href=\"$url\">${tr("打开视频原文件", "Open original video")}</a>"
+                )
             }
             append("</article></section>")
         }
-        append("<footer>${tr("此页面保存在本地。未加密备份中的文字、照片、录音和视频可被拿到文件的人直接查看。", "This page is stored locally. Anyone with an unencrypted backup can view its text, photos, recordings and videos.")}</footer></main>")
-        append("""<dialog class="viewer" aria-label="${tr("图片预览", "Photo preview")}"><div class="viewer-bar"><span class="viewer-count" aria-live="polite"></span><button class="viewer-close" autofocus>${tr("关闭", "Close")} ×</button></div><img class="viewer-image" alt=""><p class="viewer-error" role="status" hidden>${tr("图片无法显示，文件可能缺失或浏览器不支持此格式。", "Unable to display this photo. The file may be missing or its format unsupported.")} <a target="_blank" rel="noopener">${tr("打开原文件", "Open original file")}</a></p><div class="viewer-nav"><button class="viewer-prev" aria-label="${tr("上一张", "Previous photo")}">←</button><button class="viewer-next" aria-label="${tr("下一张", "Next photo")}">→</button></div></dialog>""")
-        append("""<script nonce="$scriptNonce">
+        append(
+            "<footer>${tr("此页面保存在本地。未加密备份中的文字、照片、录音和视频可被拿到文件的人直接查看。", "This page is stored locally. Anyone with an unencrypted backup can view its text, photos, recordings and videos.")}</footer></main>"
+        )
+        append(
+            """<dialog class="viewer" aria-label="${tr("图片预览", "Photo preview")}"><div class="viewer-bar"><span class="viewer-count" aria-live="polite"></span><button class="viewer-close" autofocus>${tr("关闭", "Close")} ×</button></div><img class="viewer-image" alt=""><p class="viewer-error" role="status" hidden>${tr("图片无法显示，文件可能缺失或浏览器不支持此格式。", "Unable to display this photo. The file may be missing or its format unsupported.")} <a target="_blank" rel="noopener">${tr("打开原文件", "Open original file")}</a></p><div class="viewer-nav"><button class="viewer-prev" aria-label="${tr("上一张", "Previous photo")}">←</button><button class="viewer-next" aria-label="${tr("下一张", "Next photo")}">→</button></div></dialog>"""
+        )
+        append(
+            """<script nonce="$scriptNonce">
             (() => {
                 const viewer = document.querySelector('.viewer');
                 const image = viewer.querySelector('.viewer-image');
@@ -166,22 +194,27 @@ internal object BackupHtml {
                     if (opener) opener.focus({preventScroll:true});
                 });
             })();
-        </script></body></html>""".trimIndent())
+        </script></body></html>"""
+                .trimIndent()
+        )
     }
 
     private fun mediaUrl(directory: String, fileName: String): String =
         escape(URI(null, null, "$directory/$fileName", null).toASCIIString())
 
-    private fun escape(value: String): String = buildString(value.length) {
-        value.forEach { char ->
-            append(when (char) {
-                '&' -> "&amp;"
-                '<' -> "&lt;"
-                '>' -> "&gt;"
-                '"' -> "&quot;"
-                '\'' -> "&#39;"
-                else -> char.toString()
-            })
+    private fun escape(value: String): String =
+        buildString(value.length) {
+            value.forEach { char ->
+                append(
+                    when (char) {
+                        '&' -> "&amp;"
+                        '<' -> "&lt;"
+                        '>' -> "&gt;"
+                        '"' -> "&quot;"
+                        '\'' -> "&#39;"
+                        else -> char.toString()
+                    }
+                )
+            }
         }
-    }
 }

@@ -1,10 +1,8 @@
 package com.xike.app
 
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-
-
 import android.content.Context
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
 
 internal data class AppearanceSettings(
     val theme: AppTheme,
@@ -12,21 +10,25 @@ internal data class AppearanceSettings(
 )
 
 /**
- * Keeps the non-sensitive appearance choice available before the encrypted journal is opened.
- * The database remains a compatibility mirror for installs upgrading from the original theme setting.
+ * Keeps the non-sensitive appearance choice available before the encrypted journal is opened. The
+ * database remains a compatibility mirror for installs upgrading from the original theme setting.
  */
 internal class AppearancePreferences(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences(
-        PREFERENCES_NAME,
-        Context.MODE_PRIVATE,
-    )
+    private val preferences =
+        context.applicationContext.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE,
+        )
 
-    fun current(): AppearanceSettings = AppearanceSettings(
-        theme = AppTheme.entries.firstOrNull { it.name == preferences.getString(THEME_KEY, null) }
-            ?: AppTheme.OCEAN,
-        style = AppStyle.entries.firstOrNull { it.name == preferences.getString(STYLE_KEY, null) }
-            ?: AppStyle.BREATHE,
-    )
+    fun current(): AppearanceSettings =
+        AppearanceSettings(
+            theme =
+                AppTheme.entries.firstOrNull { it.name == preferences.getString(THEME_KEY, null) }
+                    ?: AppTheme.OCEAN,
+            style =
+                AppStyle.entries.firstOrNull { it.name == preferences.getString(STYLE_KEY, null) }
+                    ?: AppStyle.BREATHE,
+        )
 
     fun saveTheme(theme: AppTheme) {
         preferences.edit().putString(THEME_KEY, theme.name).apply()
@@ -39,10 +41,14 @@ internal class AppearancePreferences(context: Context) {
     fun migrateFromDatabase(themeName: String?, styleName: String?): AppearanceSettings {
         val editor = preferences.edit()
         if (!preferences.contains(THEME_KEY)) {
-            AppTheme.entries.firstOrNull { it.name == themeName }?.let { editor.putString(THEME_KEY, it.name) }
+            AppTheme.entries
+                .firstOrNull { it.name == themeName }
+                ?.let { editor.putString(THEME_KEY, it.name) }
         }
         if (!preferences.contains(STYLE_KEY)) {
-            AppStyle.entries.firstOrNull { it.name == styleName }?.let { editor.putString(STYLE_KEY, it.name) }
+            AppStyle.entries
+                .firstOrNull { it.name == styleName }
+                ?.let { editor.putString(STYLE_KEY, it.name) }
         }
         editor.apply()
         return current()

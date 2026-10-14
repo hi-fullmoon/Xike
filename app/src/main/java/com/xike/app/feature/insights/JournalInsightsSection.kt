@@ -1,11 +1,5 @@
 package com.xike.app.feature.insights
 
-import com.xike.app.ui.theme.XikeContentCardPadding
-import com.xike.app.ui.theme.XikeInnerCardPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeSectionTitleStyle
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.xike.app.ui.theme.XikeContentCardPadding
+import com.xike.app.ui.theme.XikeInnerCardPadding
+import com.xike.app.ui.theme.XikeSectionTitleStyle
+import com.xike.app.ui.theme.XikeShapes
 
 @Composable
 internal fun InsightSectionCard(
@@ -45,12 +43,20 @@ internal fun InsightSectionCard(
         Column(Modifier.padding(XikeContentCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(index, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        index,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Spacer(Modifier.height(3.dp))
                     Text(title, style = XikeSectionTitleStyle)
                 }
                 if (trailing != null) {
-                    Text(trailing, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        trailing,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.width(10.dp))
                 Icon(
@@ -69,26 +75,28 @@ internal fun InsightSectionCard(
 @Composable
 internal fun RatioBar(ratio: Double, description: String) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(8.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .semantics { contentDescription = description },
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth(ratio.toFloat().coerceIn(0f, 1f))
+        modifier =
+            Modifier.fillMaxWidth()
                 .height(8.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .semantics { contentDescription = description }
+    ) {
+        Box(
+            Modifier.fillMaxWidth(ratio.toFloat().coerceIn(0f, 1f))
+                .height(8.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
         )
     }
 }
 
 @Composable
 internal fun InsufficientDataNote(message: String) {
-    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)) {
+    Surface(
+        shape = XikeShapes.inner,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+    ) {
         Text(
             message,
             modifier = Modifier.fillMaxWidth().padding(XikeInnerCardPadding),

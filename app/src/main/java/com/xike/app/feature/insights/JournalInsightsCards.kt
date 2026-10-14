@@ -1,21 +1,5 @@
 package com.xike.app.feature.insights
 
-import com.xike.app.data.Mood
-import com.xike.app.AppLocale
-import com.xike.app.localizedText
-import com.xike.app.tr
-
-import com.xike.app.ui.components.XikeIcons
-import com.xike.app.ui.components.MoodEmoji
-
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeContentCardPadding
-import com.xike.app.ui.theme.XikeInnerCardPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.xikeButtonElevation
-
-
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,8 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,6 +35,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.xike.app.AppLocale
+import com.xike.app.data.Mood
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.components.MoodEmoji
+import com.xike.app.ui.components.XikeIcons
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeContentCardPadding
+import com.xike.app.ui.theme.XikeInnerCardPadding
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.xikeButtonElevation
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -58,13 +53,16 @@ import kotlin.math.roundToInt
 @Composable
 internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> Unit) {
     val stackContent = LocalDensity.current.fontScale >= 1.5f
-    val headline = when {
-        summary.entryCount == 0 -> localizedText("等待第一条心情记录")
-        !summary.evidence.canDescribePatterns -> tr("已留下 ${summary.entryCount} 条心情记录", "${summary.entryCount} mood entries kept")
-        else -> summary.averageScore?.let(::moodBandLabel) ?: localizedText("等待第一条心情记录")
-    }
+    val headline =
+        when {
+            summary.entryCount == 0 -> localizedText("等待第一条心情记录")
+            !summary.evidence.canDescribePatterns ->
+                tr("已留下 ${summary.entryCount} 条心情记录", "${summary.entryCount} mood entries kept")
+            else -> summary.averageScore?.let(::moodBandLabel) ?: localizedText("等待第一条心情记录")
+        }
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
+        modifier =
+            Modifier.fillMaxWidth().clickable(enabled = summary.entryCount > 0, onClick = onClick),
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.primaryContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
@@ -73,7 +71,10 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
             if (stackContent) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        tr("${summary.period.contextName} · 心情", "${summary.period.contextName} · Mood"),
+                        tr(
+                            "${summary.period.contextName} · 心情",
+                            "${summary.period.contextName} · Mood",
+                        ),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
@@ -91,7 +92,10 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            tr("${summary.period.contextName} · 心情", "${summary.period.contextName} · Mood"),
+                            tr(
+                                "${summary.period.contextName} · 心情",
+                                "${summary.period.contextName} · Mood",
+                            ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -111,7 +115,9 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
                 when {
                     summary.entryCount == 0 -> localizedText("记录此刻的心情，让轨迹从这里开始。")
                     !summary.evidence.canDescribePatterns -> localizedText("先看看留下的记录，积累更多片段后再回顾变化。")
-                    else -> summary.averageScore?.let(::moodSummary) ?: localizedText("记录此刻的心情，让轨迹从这里开始。")
+                    else ->
+                        summary.averageScore?.let(::moodSummary)
+                            ?: localizedText("记录此刻的心情，让轨迹从这里开始。")
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
@@ -119,8 +125,16 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
             Spacer(Modifier.height(18.dp))
             if (stackContent) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.fillMaxWidth())
-                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.fillMaxWidth())
+                    OverviewMetric(
+                        localizedText("记录"),
+                        tr("${summary.entryCount} 次", "${summary.entryCount} entries"),
+                        Modifier.fillMaxWidth(),
+                    )
+                    OverviewMetric(
+                        localizedText("留下痕迹"),
+                        tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"),
+                        Modifier.fillMaxWidth(),
+                    )
                     OverviewMetric(
                         localizedText("日期覆盖"),
                         "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
@@ -128,9 +142,20 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
                     )
                 }
             } else {
-                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OverviewMetric(localizedText("记录"), tr("${summary.entryCount} 次", "${summary.entryCount} entries"), Modifier.weight(1f).fillMaxHeight())
-                    OverviewMetric(localizedText("留下痕迹"), tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"), Modifier.weight(1f).fillMaxHeight())
+                Row(
+                    Modifier.height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OverviewMetric(
+                        localizedText("记录"),
+                        tr("${summary.entryCount} 次", "${summary.entryCount} entries"),
+                        Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    OverviewMetric(
+                        localizedText("留下痕迹"),
+                        tr("${summary.recordedDayCount} 天", "${summary.recordedDayCount} days"),
+                        Modifier.weight(1f).fillMaxHeight(),
+                    )
                     OverviewMetric(
                         localizedText("日期覆盖"),
                         "${(summary.evidence.coverageRatio * 100).roundToInt()}%",
@@ -141,7 +166,11 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
             Spacer(Modifier.height(14.dp))
             RatioBar(
                 ratio = summary.evidence.coverageRatio,
-                description = tr("数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录", "Data coverage: entries on ${summary.evidence.recordedDayCount} of ${summary.evidence.elapsedDayCount} days"),
+                description =
+                    tr(
+                        "数据覆盖：${summary.evidence.elapsedDayCount} 天中有 ${summary.evidence.recordedDayCount} 天存在记录",
+                        "Data coverage: entries on ${summary.evidence.recordedDayCount} of ${summary.evidence.elapsedDayCount} days",
+                    ),
             )
             Spacer(Modifier.height(9.dp))
             FlowRow(
@@ -150,7 +179,10 @@ internal fun InsightsOverviewCard(summary: JournalPeriodSummary, onClick: () -> 
                 maxItemsInEachRow = if (stackContent) 1 else 2,
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                ) {
                     Text(
                         summary.evidence.level.label,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -188,7 +220,11 @@ private fun OverviewMoodBadge(summary: JournalPeriodSummary) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (summary.averageScore == null) {
-                Text("—", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "—",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             } else {
                 MoodEmoji(summary.averageScore.averageMood(), size = 29.dp)
             }
@@ -202,15 +238,25 @@ private fun OverviewMetric(label: String, value: String, modifier: Modifier) {
         modifier = modifier,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+        )
         Spacer(Modifier.height(4.dp))
-        Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(
+            value,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
-
 @Composable
-internal fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previous: Boolean) -> Unit) {
+internal fun PeriodComparisonCard(
+    comparison: PeriodComparison,
+    onClick: (previous: Boolean) -> Unit,
+) {
     val stackMetrics = LocalDensity.current.fontScale >= 1.5f
     InsightSectionCard(
         icon = Icons.AutoMirrored.Outlined.CompareArrows,
@@ -225,31 +271,42 @@ internal fun PeriodComparisonCard(comparison: PeriodComparison, onClick: (previo
                     comparison.currentRecordedDayCount,
                     comparison.currentAverageScore,
                     Modifier.fillMaxWidth(),
-                ) { onClick(false) }
+                ) {
+                    onClick(false)
+                }
                 ComparisonMetric(
                     localizedText("前期"),
                     comparison.entryCount,
                     comparison.recordedDayCount,
                     comparison.averageScore,
                     Modifier.fillMaxWidth(),
-                ) { onClick(true) }
+                ) {
+                    onClick(true)
+                }
             }
         } else {
-            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 ComparisonMetric(
                     localizedText("当前"),
                     comparison.currentEntryCount,
                     comparison.currentRecordedDayCount,
                     comparison.currentAverageScore,
                     Modifier.weight(1f).fillMaxHeight(),
-                ) { onClick(false) }
+                ) {
+                    onClick(false)
+                }
                 ComparisonMetric(
                     localizedText("前期"),
                     comparison.entryCount,
                     comparison.recordedDayCount,
                     comparison.averageScore,
                     Modifier.weight(1f).fillMaxHeight(),
-                ) { onClick(true) }
+                ) {
+                    onClick(true)
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -280,7 +337,14 @@ private fun ComparisonMetric(
             InsightMetricLabel(label, clickable = count > 0)
             Spacer(Modifier.height(6.dp))
             Text(tr("$count 次", "$count entries"), style = MaterialTheme.typography.titleLarge)
-            Text(tr("$days 天 · 均值 ${average?.oneDecimal() ?: "—"}", "$days days · Average ${average?.oneDecimal() ?: "—"}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                tr(
+                    "$days 天 · 均值 ${average?.oneDecimal() ?: "—"}",
+                    "$days days · Average ${average?.oneDecimal() ?: "—"}",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -301,13 +365,20 @@ internal fun TagTrendsCard(
         } else {
             tags.forEach { tag ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { onClick(tag) }.padding(vertical = 9.dp),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clickable { onClick(tag) }
+                            .padding(vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(localizedText(tag.tag), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            tr("当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次", "Current ${tag.entryCount} · Previous ${tag.previousEntryCount}"),
+                            tr(
+                                "当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次",
+                                "Current ${tag.entryCount} · Previous ${tag.previousEntryCount}",
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -318,7 +389,11 @@ internal fun TagTrendsCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.width(5.dp))
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
             if (!evidence.canDescribePatterns) {
@@ -350,7 +425,10 @@ internal fun DayTypeCard(
                 DayTypeMetric(weekend, Modifier.fillMaxWidth()) { onClick(weekend) }
             }
         } else {
-            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 DayTypeMetric(weekday, Modifier.weight(1f).fillMaxHeight()) { onClick(weekday) }
                 DayTypeMetric(weekend, Modifier.weight(1f).fillMaxHeight()) { onClick(weekend) }
             }
@@ -379,9 +457,15 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
         Column(Modifier.padding(XikeInnerCardPadding)) {
             InsightMetricLabel(insight.type.label, clickable = insight.entryCount > 0)
             Spacer(Modifier.height(6.dp))
-            Text(tr("${insight.entryCount} 次", "${insight.entryCount} entries"), style = MaterialTheme.typography.titleLarge)
             Text(
-                tr("${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}", "${insight.recordedDayCount} / ${insight.elapsedDayCount} days · Average ${insight.averageScore?.oneDecimal() ?: "—"}"),
+                tr("${insight.entryCount} 次", "${insight.entryCount} entries"),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                tr(
+                    "${insight.recordedDayCount} / ${insight.elapsedDayCount} 天 · 均值 ${insight.averageScore?.oneDecimal() ?: "—"}",
+                    "${insight.recordedDayCount} / ${insight.elapsedDayCount} days · Average ${insight.averageScore?.oneDecimal() ?: "—"}",
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
             )
@@ -391,8 +475,16 @@ private fun DayTypeMetric(insight: DayTypeInsight, modifier: Modifier, onClick: 
 
 @Composable
 private fun InsightMetricLabel(label: String, clickable: Boolean) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         if (clickable) {
             Spacer(Modifier.width(7.dp))
             Icon(
@@ -444,7 +536,10 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
             }
             Spacer(Modifier.height(13.dp))
             Text(
-                tr("整理心情变化、常见主题和值得回看的片段，形成一份有记录依据的回顾。", "Review mood changes, recurring topics and moments worth revisiting, grounded in your entries."),
+                tr(
+                    "整理心情变化、常见主题和值得回看的片段，形成一份有记录依据的回顾。",
+                    "Review mood changes, recurring topics and moments worth revisiting, grounded in your entries.",
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
             )
@@ -453,12 +548,15 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
                 onClick = onOpen,
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.52f),
-                ),
+                colors =
+                    androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor =
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
+                        disabledContentColor =
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.52f),
+                    ),
                 elevation = xikeButtonElevation(),
             ) {
                 Text(if (enabled) localizedText("查看本地回顾") else localizedText("有记录后可生成"))
@@ -467,68 +565,81 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
     }
 }
 
-
 internal fun JournalPeriodSummary.dateRangeLabel(): String = startDate.asDateRange(endDate)
 
 internal fun PeriodComparison.dateRangeLabel(): String = startDate.asDateRange(endDate)
 
-internal fun MoodTrendPoint.dateRangeLabel(): String = startDate.asDateRange(endDateExclusive.minusDays(1))
+internal fun MoodTrendPoint.dateRangeLabel(): String =
+    startDate.asDateRange(endDateExclusive.minusDays(1))
 
-private fun LocalDate.asDateRange(end: LocalDate): String = if (this == end) {
-    format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale))
-} else if (year == end.year) {
-    tr(
-        "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日",
-        "${format(DateTimeFormatter.ofPattern("MMM d", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
-    )
-} else {
-    tr(
-        "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日",
-        "${format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
-    )
-}
+private fun LocalDate.asDateRange(end: LocalDate): String =
+    if (this == end) {
+        format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale))
+    } else if (year == end.year) {
+        tr(
+            "$year · ${monthValue}月${dayOfMonth}日 — ${end.monthValue}月${end.dayOfMonth}日",
+            "${format(DateTimeFormatter.ofPattern("MMM d", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+        )
+    } else {
+        tr(
+            "${year}年${monthValue}月${dayOfMonth}日 — ${end.year}年${end.monthValue}月${end.dayOfMonth}日",
+            "${format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))} — ${end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", AppLocale.locale))}",
+        )
+    }
 
-private fun moodBandLabel(average: Double): String = when {
-    average >= 4.5 -> localizedText("愉悦时刻更多")
-    average >= 3.5 -> localizedText("整体更轻松")
-    average >= 2.5 -> localizedText("大多比较平静")
-    average >= 1.5 -> localizedText("疲惫感停留较多")
-    else -> localizedText("低落时刻较多")
-}
+private fun moodBandLabel(average: Double): String =
+    when {
+        average >= 4.5 -> localizedText("愉悦时刻更多")
+        average >= 3.5 -> localizedText("整体更轻松")
+        average >= 2.5 -> localizedText("大多比较平静")
+        average >= 1.5 -> localizedText("疲惫感停留较多")
+        else -> localizedText("低落时刻较多")
+    }
 
-private fun Double.averageMood(): Mood = when {
-    this >= 4.5 -> Mood.JOYFUL
-    this >= 3.5 -> Mood.GOOD
-    this >= 2.5 -> Mood.CALM
-    this >= 1.5 -> Mood.TIRED
-    else -> Mood.LOW
-}
+private fun Double.averageMood(): Mood =
+    when {
+        this >= 4.5 -> Mood.JOYFUL
+        this >= 3.5 -> Mood.GOOD
+        this >= 2.5 -> Mood.CALM
+        this >= 1.5 -> Mood.TIRED
+        else -> Mood.LOW
+    }
 
-private fun moodSummary(average: Double): String = when {
-    average >= 4.5 -> localizedText("记录里较多是开心而舒展的时刻。")
-    average >= 3.5 -> localizedText("记录里轻松的时刻更多。")
-    average >= 2.5 -> localizedText("记录里平静与起伏都曾出现。")
-    average >= 1.5 -> localizedText("记录里疲惫和低落停留得更多。")
-    else -> localizedText("记录里低落时刻较多，记得照顾自己。")
-}
+private fun moodSummary(average: Double): String =
+    when {
+        average >= 4.5 -> localizedText("记录里较多是开心而舒展的时刻。")
+        average >= 3.5 -> localizedText("记录里轻松的时刻更多。")
+        average >= 2.5 -> localizedText("记录里平静与起伏都曾出现。")
+        average >= 1.5 -> localizedText("记录里疲惫和低落停留得更多。")
+        else -> localizedText("记录里低落时刻较多，记得照顾自己。")
+    }
 
 private fun comparisonDescription(comparison: PeriodComparison): String = buildString {
-    append(tr("记录次数${comparison.entryCountDelta.deltaPhrase()}，记录天数${comparison.recordedDayDelta.deltaPhrase()}", "Entries ${comparison.entryCountDelta.deltaPhrase()}, days recorded ${comparison.recordedDayDelta.deltaPhrase()}"))
-    comparison.averageScoreDelta?.let { delta -> append(tr("，均值${delta.oneDecimalSigned()}", ", average ${delta.oneDecimalSigned()}")) }
+    append(
+        tr(
+            "记录次数${comparison.entryCountDelta.deltaPhrase()}，记录天数${comparison.recordedDayDelta.deltaPhrase()}",
+            "Entries ${comparison.entryCountDelta.deltaPhrase()}, days recorded ${comparison.recordedDayDelta.deltaPhrase()}",
+        )
+    )
+    comparison.averageScoreDelta?.let { delta ->
+        append(tr("，均值${delta.oneDecimalSigned()}", ", average ${delta.oneDecimalSigned()}"))
+    }
     append(localizedText("。这些是描述性差异，不代表原因。"))
 }
 
-private fun Int.deltaPhrase(): String = when {
-    this > 0 -> tr("增加 $this", "increased by $this")
-    this < 0 -> tr("减少 ${-this}", "decreased by ${-this}")
-    else -> localizedText("相同")
-}
+private fun Int.deltaPhrase(): String =
+    when {
+        this > 0 -> tr("增加 $this", "increased by $this")
+        this < 0 -> tr("减少 ${-this}", "decreased by ${-this}")
+        else -> localizedText("相同")
+    }
 
-private fun Int.deltaLabel(): String = when {
-    this > 0 -> "+$this"
-    this < 0 -> toString()
-    else -> localizedText("持平")
-}
+private fun Int.deltaLabel(): String =
+    when {
+        this > 0 -> "+$this"
+        this < 0 -> toString()
+        else -> localizedText("持平")
+    }
 
 internal fun Double.oneDecimal(): String = String.format(AppLocale.locale, "%.1f", this)
 

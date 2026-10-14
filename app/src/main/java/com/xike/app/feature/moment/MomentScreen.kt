@@ -1,66 +1,5 @@
 package com.xike.app.feature.moment
 
-import com.xike.app.ui.components.journal.OutdoorContextCard
-import com.xike.app.ui.components.journal.OutdoorCardAction
-
-import com.xike.app.ui.components.MomentNoteCard
-import com.xike.app.ui.components.MomentContentToolbar
-import com.xike.app.ui.components.MomentMediaAction
-import com.xike.app.ui.components.showRecordedAtPicker
-import com.xike.app.ui.components.MoodPicker
-import com.xike.app.ui.components.MomentTopicsHeader
-import com.xike.app.ui.components.TopicChoices
-import com.xike.app.ui.components.AddPhotoTile
-import com.xike.app.ui.components.PhotoGalleryDialog
-import com.xike.app.ui.components.rememberPreviewBitmap
-import com.xike.app.ui.components.PaperCard
-import com.xike.app.ui.components.XikeIcons
-import com.xike.app.ui.components.XikeNotice
-import com.xike.app.ui.components.DestructiveConfirmationDialog
-
-import com.xike.app.ui.theme.LocalRecordedAtPickerContext
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeContentCardPadding
-import com.xike.app.ui.theme.XikeInnerCardPadding
-import com.xike.app.ui.theme.XikeSheetHorizontalPadding
-import com.xike.app.ui.theme.XikeSheetBottomPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeDialogCompactGap
-import com.xike.app.ui.theme.XikeContentMaxWidth
-import com.xike.app.ui.theme.XikeScreenHorizontalPadding
-import com.xike.app.ui.theme.XikeScreenVerticalPadding
-import com.xike.app.ui.theme.XikePageTitleStyle
-import com.xike.app.ui.theme.XikeEyebrowStyle
-import com.xike.app.ui.theme.xikeButtonElevation
-
-import com.xike.app.rememberVideoChooser
-import com.xike.app.data.model.retainOutdoorForEditedTime
-import com.xike.app.feature.insights.entriesOnDate
-import com.xike.app.VideoImportStatus
-import com.xike.app.canTakePhoto
-import com.xike.app.dailyQuestion
-import com.xike.app.localizedText
-import com.xike.app.tr
-import com.xike.app.AppLocale
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.PendingDraftAudio
-import com.xike.app.DailyPromptStyle
-import com.xike.app.DailyPromptSettings
-import com.xike.app.data.MAX_IMAGES_PER_ENTRY
-import com.xike.app.ui.components.VoiceCaptureSheet
-import com.xike.app.ui.components.VoicePendingSaveCard
-import com.xike.app.ui.components.VoicePlaybackCard
-import com.xike.app.LocalVideoServices
-import com.xike.app.VideoCard
-import com.xike.app.PhotoSourceDialog
-import com.xike.app.rememberJournalImagePickers
-
-
-
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -73,17 +12,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -104,24 +43,26 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -132,12 +73,65 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.xike.app.AppLocale
+import com.xike.app.DailyPromptSettings
+import com.xike.app.DailyPromptStyle
+import com.xike.app.LocalVideoServices
+import com.xike.app.PendingDraftAudio
+import com.xike.app.PhotoSourceDialog
+import com.xike.app.VideoCard
+import com.xike.app.VideoImportStatus
+import com.xike.app.canTakePhoto
+import com.xike.app.dailyQuestion
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.Mood
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.retainOutdoorForEditedTime
+import com.xike.app.feature.insights.entriesOnDate
+import com.xike.app.localizedText
+import com.xike.app.rememberJournalImagePickers
+import com.xike.app.rememberVideoChooser
+import com.xike.app.tr
+import com.xike.app.ui.components.AddPhotoTile
+import com.xike.app.ui.components.DestructiveConfirmationDialog
+import com.xike.app.ui.components.MomentContentToolbar
+import com.xike.app.ui.components.MomentMediaAction
+import com.xike.app.ui.components.MomentNoteCard
+import com.xike.app.ui.components.MomentTopicsHeader
+import com.xike.app.ui.components.MoodPicker
+import com.xike.app.ui.components.PaperCard
+import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.components.TopicChoices
+import com.xike.app.ui.components.VoiceCaptureSheet
+import com.xike.app.ui.components.VoicePendingSaveCard
+import com.xike.app.ui.components.VoicePlaybackCard
+import com.xike.app.ui.components.XikeIcons
+import com.xike.app.ui.components.XikeNotice
+import com.xike.app.ui.components.journal.OutdoorCardAction
+import com.xike.app.ui.components.journal.OutdoorContextCard
+import com.xike.app.ui.components.rememberPreviewBitmap
+import com.xike.app.ui.components.showRecordedAtPicker
+import com.xike.app.ui.theme.LocalRecordedAtPickerContext
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeContentCardPadding
+import com.xike.app.ui.theme.XikeContentMaxWidth
+import com.xike.app.ui.theme.XikeDialogCompactGap
+import com.xike.app.ui.theme.XikeEyebrowStyle
+import com.xike.app.ui.theme.XikeInnerCardPadding
+import com.xike.app.ui.theme.XikePageTitleStyle
+import com.xike.app.ui.theme.XikeScreenHorizontalPadding
+import com.xike.app.ui.theme.XikeScreenVerticalPadding
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.XikeSheetBottomPadding
+import com.xike.app.ui.theme.XikeSheetHorizontalPadding
+import com.xike.app.ui.theme.xikeButtonElevation
 import java.io.File
 import java.io.InputStream
 import java.time.LocalDate
@@ -146,7 +140,6 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 private const val ADD_PHOTO_TILE = "__add_photo__"
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,14 +189,15 @@ fun MomentScreen(
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var localSaving by remember { mutableStateOf(false) }
     val isSaving = localSaving || isDraftSaving
-    val chooseVideo = rememberVideoChooser(
-        enabled = !isSaving && !videoServices.draftSaving,
-        onPicked = { uri, access ->
-            val accepted = videoServices.addDraft(uri)
-            if (accepted) access.transferAll()
-            accepted
-        },
-    )
+    val chooseVideo =
+        rememberVideoChooser(
+            enabled = !isSaving && !videoServices.draftSaving,
+            onPicked = { uri, access ->
+                val accepted = videoServices.addDraft(uri)
+                if (accepted) access.transferAll()
+                accepted
+            },
+        )
     var isNoteFocused by remember { mutableStateOf(false) }
     var isOutdoorLoading by remember { mutableStateOf(false) }
     val outdoorLoading = isDraftOutdoorLoading ?: isOutdoorLoading
@@ -215,7 +209,14 @@ fun MomentScreen(
     val selectRecordedAt: (Long?) -> Unit = { selected ->
         if (!currentIsSaving) {
             val snapshot = currentDraft.outdoor
-            if (snapshot != null && retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, selected ?: System.currentTimeMillis()) == null) {
+            if (
+                snapshot != null &&
+                    retainOutdoorForEditedTime(
+                        snapshot,
+                        snapshot.capturedAt,
+                        selected ?: System.currentTimeMillis(),
+                    ) == null
+            ) {
                 pendingRecordedAtChange = selected
                 showRecordedAtChangeConfirmation = true
             } else {
@@ -225,9 +226,10 @@ fun MomentScreen(
     }
     var outdoorPermissionDenied by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val locationPreferences = remember(context) {
-        context.getSharedPreferences("xike-location", Context.MODE_PRIVATE)
-    }
+    val locationPreferences =
+        remember(context) {
+            context.getSharedPreferences("xike-location", Context.MODE_PRIVATE)
+        }
     var locationPermissionRequested by rememberSaveable {
         mutableStateOf(locationPreferences.getBoolean("permission_requested", false))
     }
@@ -247,31 +249,36 @@ fun MomentScreen(
                 try {
                     onAttachCurrentOutdoor()
                         .onSuccess { outdoorPermissionDenied = false }
-                        .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。") }
+                        .onFailure { error ->
+                            outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。")
+                        }
                 } finally {
                     isOutdoorLoading = false
                 }
             }
         }
     }
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        outdoorPermissionDenied = !granted
-        if (granted) {
-            locationPreferences.edit().putBoolean("permission_requested", true).apply()
-            loadCurrentOutdoor()
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            permissions ->
+            val granted =
+                permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                    permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            outdoorPermissionDenied = !granted
+            if (granted) {
+                locationPreferences.edit().putBoolean("permission_requested", true).apply()
+                loadCurrentOutdoor()
+            }
         }
-    }
     val requestCurrentOutdoor: () -> Unit = {
         if (
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED ||
+                PackageManager.PERMISSION_GRANTED ||
                 (locationPermissionRequested &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-                    PackageManager.PERMISSION_GRANTED)
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    ) == PackageManager.PERMISSION_GRANTED)
         ) {
             loadCurrentOutdoor()
         } else {
@@ -286,7 +293,9 @@ fun MomentScreen(
                 try {
                     onAttachOutdoorForCity(city)
                         .onSuccess { outdoorPermissionDenied = false }
-                        .onFailure { error -> outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。") }
+                        .onFailure { error ->
+                            outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。")
+                        }
                 } finally {
                     isOutdoorLoading = false
                 }
@@ -305,36 +314,42 @@ fun MomentScreen(
     }
     LaunchedEffect(revealDetailsRequest) {
         if (revealDetailsRequest > 0) {
-            withFrameNanos { }
+            withFrameNanos {}
             detailsAnchor.bringIntoView()
         }
     }
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var showAddContent by rememberSaveable { mutableStateOf(false) }
     var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
-    val imagePickers = rememberJournalImagePickers(
-        availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size,
-        resultsReady = !isSaving && draftImageResultsReady,
-        retainRejectedCapture = true,
-        onPendingChange = onDraftImageResultPending,
-    ) { uris, access ->
-        val accepted = onDraftImagesAdded(uris)
-        if (accepted) access.transferAll()
-        accepted
-    }
-    val microphonePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            showVoiceCapture = true
-        } else {
-            XikeNotice.makeText(context, localizedText("没有麦克风权限，仍可使用文字和照片记录"), XikeNotice.LENGTH_LONG).show()
+    val imagePickers =
+        rememberJournalImagePickers(
+            availableSlots = MAX_IMAGES_PER_ENTRY - draft.imageUriStrings.size,
+            resultsReady = !isSaving && draftImageResultsReady,
+            retainRejectedCapture = true,
+            onPendingChange = onDraftImageResultPending,
+        ) { uris, access ->
+            val accepted = onDraftImagesAdded(uris)
+            if (accepted) access.transferAll()
+            accepted
         }
-    }
+    val microphonePermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                showVoiceCapture = true
+            } else {
+                XikeNotice.makeText(
+                        context,
+                        localizedText("没有麦克风权限，仍可使用文字和照片记录"),
+                        XikeNotice.LENGTH_LONG,
+                    )
+                    .show()
+            }
+        }
     val beginVoiceCapture = {
         dismissKeyboard()
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
         ) {
             showVoiceCapture = true
             Unit
@@ -346,26 +361,32 @@ fun MomentScreen(
         onVoiceCaptureStateChange(showVoiceCapture)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()
+    ) {
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .widthIn(max = XikeContentMaxWidth)
-                .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
-                .verticalScroll(rememberScrollState())
-                .padding(
-                    start = XikeScreenHorizontalPadding,
-                    end = XikeScreenHorizontalPadding,
-                    top = XikeScreenVerticalPadding,
-                    bottom = XikeScreenVerticalPadding,
-                ),
+            modifier =
+                Modifier.weight(1f)
+                    .widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        start = XikeScreenHorizontalPadding,
+                        end = XikeScreenHorizontalPadding,
+                        top = XikeScreenVerticalPadding,
+                        bottom = XikeScreenVerticalPadding,
+                    ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             BrandHeader(
                 today = today,
                 hasDraft = !draft.isEmpty,
-                canDiscard = !isSaving && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving,
+                canDiscard =
+                    !isSaving &&
+                        !showVoiceCapture &&
+                        pendingDraftAudio == null &&
+                        !videoServices.draftSaving,
                 onDiscard = {
                     dismissKeyboard()
                     showDiscardConfirmation = true
@@ -385,7 +406,11 @@ fun MomentScreen(
                 Spacer(Modifier.height(7.dp))
                 Text(
                     if (todayEntryCount == 0) localizedText("不用解释，先感受自己。")
-                    else tr("今天已经停下来听见自己 $todayEntryCount 次。", "You have paused to listen to yourself $todayEntryCount times today."),
+                    else
+                        tr(
+                            "今天已经停下来听见自己 $todayEntryCount 次。",
+                            "You have paused to listen to yourself $todayEntryCount times today.",
+                        ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -402,8 +427,15 @@ fun MomentScreen(
             )
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(localizedText("写下一点点"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        localizedText("写下一点点"),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
                 MomentNoteCard(
@@ -432,11 +464,12 @@ fun MomentScreen(
                         },
                     )
                 }
-                val draftSecurityStatus = when {
-                    showVoiceCapture -> localizedText("录音结束后将加密保存")
-                    pendingDraftAudio != null -> localizedText("录音仍待加密保存")
-                    else -> localizedText("草稿自动加密保存在本机")
-                }
+                val draftSecurityStatus =
+                    when {
+                        showVoiceCapture -> localizedText("录音结束后将加密保存")
+                        pendingDraftAudio != null -> localizedText("录音仍待加密保存")
+                        else -> localizedText("草稿自动加密保存在本机")
+                    }
                 Spacer(Modifier.height(8.dp))
                 DraftSecurityRow(statusText = draftSecurityStatus)
             }
@@ -448,32 +481,42 @@ fun MomentScreen(
             ) {
                 Column {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(
-                                enabled = !isSaving,
-                                onClickLabel = if (showDetails) localizedText("收起主题") else localizedText("展开主题"),
-                                role = Role.Button,
-                            ) {
-                                if (showDetails) dismissKeyboard()
-                                showDetails = !showDetails
-                                if (showDetails) revealDetailsRequest++
-                            }
-                            .padding(XikeContentCardPadding)
-                            .heightIn(min = 42.dp),
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .clickable(
+                                    enabled = !isSaving,
+                                    onClickLabel =
+                                        if (showDetails) localizedText("收起主题")
+                                        else localizedText("展开主题"),
+                                    role = Role.Button,
+                                ) {
+                                    if (showDetails) dismissKeyboard()
+                                    showDetails = !showDetails
+                                    if (showDetails) revealDetailsRequest++
+                                }
+                                .padding(XikeContentCardPadding)
+                                .heightIn(min = 42.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(localizedText("再留下一点"), style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                localizedText("再留下一点"),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
                             Text(
                                 if (draft.tags.isEmpty()) localizedText("选主题 · 可选")
-                                else tr("已选 ${draft.tags.size} 个主题", "${draft.tags.size} topics selected"),
+                                else
+                                    tr(
+                                        "已选 ${draft.tags.size} 个主题",
+                                        "${draft.tags.size} topics selected",
+                                    ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Icon(
-                            if (showDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                            if (showDetails) Icons.Outlined.ExpandLess
+                            else Icons.Outlined.ExpandMore,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -484,7 +527,10 @@ fun MomentScreen(
                             modifier = Modifier.padding(horizontal = XikeContentCardPadding),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
                         )
-                        Column(Modifier.bringIntoViewRequester(detailsAnchor).padding(XikeContentCardPadding)) {
+                        Column(
+                            Modifier.bringIntoViewRequester(detailsAnchor)
+                                .padding(XikeContentCardPadding)
+                        ) {
                             MomentTopicsHeader(draft.tags.size)
                             Spacer(Modifier.height(8.dp))
                             TopicChoices(draft.tags) { topic ->
@@ -504,11 +550,13 @@ fun MomentScreen(
                     showLocationIconBackground = true,
                     isBackdated = draft.recordedAt != null,
                     isLoading = outdoorLoading,
-                    errorMessage = outdoorError ?: if (outdoorPermissionDenied) {
-                        localizedText("没有位置权限，也可以只选择城市。")
-                    } else {
-                        null
-                    },
+                    errorMessage =
+                        outdoorError
+                            ?: if (outdoorPermissionDenied) {
+                                localizedText("没有位置权限，也可以只选择城市。")
+                            } else {
+                                null
+                            },
                     enabled = !isSaving,
                     onAdd = requestCurrentOutdoor,
                     showRefresh = draft.recordedAt == null,
@@ -523,7 +571,7 @@ fun MomentScreen(
             if (pendingDraftAudio != null || draft.audio != null) {
                 val voiceAnchor = remember { BringIntoViewRequester() }
                 LaunchedEffect(draft.audio?.fileName) {
-                    withFrameNanos { }
+                    withFrameNanos {}
                     voiceAnchor.bringIntoView()
                 }
                 Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(voiceAnchor)) {
@@ -537,7 +585,8 @@ fun MomentScreen(
                     Spacer(Modifier.height(3.dp))
                     Text(
                         when {
-                            pendingDraftAudio != null && isDraftAudioSaving -> localizedText("正在加密保存到草稿")
+                            pendingDraftAudio != null && isDraftAudioSaving ->
+                                localizedText("正在加密保存到草稿")
                             pendingDraftAudio != null -> localizedText("保存失败，录音仍暂存在本机")
                             else -> localizedText("录音已加密保存在本机")
                         },
@@ -559,7 +608,9 @@ fun MomentScreen(
                                 audio = audio,
                                 openAudio = openAudio,
                                 onDelete = if (isSaving) null else onDraftAudioRemoved,
-                                onReplace = if (isSaving || isDraftAudioSaving || showVoiceCapture) null else beginVoiceCapture,
+                                onReplace =
+                                    if (isSaving || isDraftAudioSaving || showVoiceCapture) null
+                                    else beginVoiceCapture,
                                 showBorder = false,
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 showDeleteAtTopEnd = true,
@@ -574,11 +625,14 @@ fun MomentScreen(
             if (draft.imageUriStrings.isNotEmpty()) {
                 val previewAnchor = remember { BringIntoViewRequester() }
                 LaunchedEffect(draft.imageUriStrings) {
-                    withFrameNanos { }
+                    withFrameNanos {}
                     previewAnchor.bringIntoView()
                 }
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(tr("这一刻的照片", "Photos of this moment"), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        tr("这一刻的照片", "Photos of this moment"),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
                     PaperCard {
                         MultiImagePicker(
                             selectedUris = draft.imageUriStrings,
@@ -601,26 +655,41 @@ fun MomentScreen(
 
             if (videoServices.draftSaving || draft.video != null || draft.pendingVideoUri != null) {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(tr("这一刻的视频", "Video of this moment"), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        tr("这一刻的视频", "Video of this moment"),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
                     if (videoServices.draftSaving) VideoImportStatus(videoServices.draftProgress)
                     draft.video?.let { video ->
-                        val canChangeVideo = !isSaving && !videoServices.draftSaving && draft.pendingVideoUri == null
+                        val canChangeVideo =
+                            !isSaving && !videoServices.draftSaving && draft.pendingVideoUri == null
                         VideoCard(
                             video,
-                            onRemove = if (isSaving || videoServices.draftSaving) null else videoServices.removeDraft,
+                            onRemove =
+                                if (isSaving || videoServices.draftSaving) null
+                                else videoServices.removeDraft,
                             onReplace = if (canChangeVideo) chooseVideo else null,
                             useActionMenu = true,
                         )
                     }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {
                         Text(
-                            tr("视频导入尚未完成，原视频已保留。", "Video import is incomplete. The previous video is preserved."),
+                            tr(
+                                "视频导入尚未完成，原视频已保留。",
+                                "Video import is incomplete. The previous video is preserved.",
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) { videoServices.addDraft(Uri.parse(draft.pendingVideoUri)) }
-                            OutdoorCardAction(tr("取消本次导入", "Cancel this import"), !isSaving, videoServices.cancelPendingDraft)
+                            OutdoorCardAction(tr("重试导入", "Retry import"), !isSaving) {
+                                videoServices.addDraft(Uri.parse(draft.pendingVideoUri))
+                            }
+                            OutdoorCardAction(
+                                tr("取消本次导入", "Cancel this import"),
+                                !isSaving,
+                                videoServices.cancelPendingDraft,
+                            )
                         }
                     }
                 }
@@ -635,56 +704,90 @@ fun MomentScreen(
             Button(
                 onClick = {
                     val mood = draft.mood ?: return@Button
-                    if (isSaving || isDraftImageResultPending || outdoorLoading || showVoiceCapture || pendingDraftAudio != null || videoServices.draftSaving || draft.pendingVideoUri != null) return@Button
+                    if (
+                        isSaving ||
+                            isDraftImageResultPending ||
+                            outdoorLoading ||
+                            showVoiceCapture ||
+                            pendingDraftAudio != null ||
+                            videoServices.draftSaving ||
+                            draft.pendingVideoUri != null
+                    )
+                        return@Button
                     dismissKeyboard()
                     localSaving = true
                     scope.launch {
                         onSave(
-                            JournalEntry(
-                                createdAt = draft.recordedAt ?: System.currentTimeMillis(),
-                                mood = mood,
-                                tags = draft.tags.toList(),
-                                note = draft.note.trim(),
-                                audio = draft.audio,
-                                video = draft.video,
-                                outdoor = draft.outdoor,
-                            ),
-                            draft.imageUriStrings.map(Uri::parse),
-                        ).onSuccess {
-                            showDetails = false
-                            if (!saveFeedbackHandledExternally) XikeNotice.makeText(
-                                context,
-                                if (draft.recordedAt == null) localizedText("这一刻，已经好好收下了") else localizedText("那一刻，已经好好收下了"),
-                                XikeNotice.LENGTH_SHORT,
-                            ).show()
-                        }.onFailure { error ->
-                            if (!saveFeedbackHandledExternally) XikeNotice.makeText(context, error.message ?: localizedText("保存失败，请重试"), XikeNotice.LENGTH_LONG).show()
-                        }
+                                JournalEntry(
+                                    createdAt = draft.recordedAt ?: System.currentTimeMillis(),
+                                    mood = mood,
+                                    tags = draft.tags.toList(),
+                                    note = draft.note.trim(),
+                                    audio = draft.audio,
+                                    video = draft.video,
+                                    outdoor = draft.outdoor,
+                                ),
+                                draft.imageUriStrings.map(Uri::parse),
+                            )
+                            .onSuccess {
+                                showDetails = false
+                                if (!saveFeedbackHandledExternally)
+                                    XikeNotice.makeText(
+                                            context,
+                                            if (draft.recordedAt == null)
+                                                localizedText("这一刻，已经好好收下了")
+                                            else localizedText("那一刻，已经好好收下了"),
+                                            XikeNotice.LENGTH_SHORT,
+                                        )
+                                        .show()
+                            }
+                            .onFailure { error ->
+                                if (!saveFeedbackHandledExternally)
+                                    XikeNotice.makeText(
+                                            context,
+                                            error.message ?: localizedText("保存失败，请重试"),
+                                            XikeNotice.LENGTH_LONG,
+                                        )
+                                        .show()
+                            }
                         localSaving = false
                     }
                 },
-                enabled = draft.mood != null && !isSaving && !isDraftImageResultPending && !outdoorLoading && !showVoiceCapture && pendingDraftAudio == null && !videoServices.draftSaving && draft.pendingVideoUri == null,
-                modifier = Modifier
-                    .widthIn(max = XikeContentMaxWidth)
-                    .fillMaxWidth()
-                    .align(Alignment.CenterHorizontally)
-                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = 8.dp)
-                    .heightIn(min = 48.dp),
+                enabled =
+                    draft.mood != null &&
+                        !isSaving &&
+                        !isDraftImageResultPending &&
+                        !outdoorLoading &&
+                        !showVoiceCapture &&
+                        pendingDraftAudio == null &&
+                        !videoServices.draftSaving &&
+                        draft.pendingVideoUri == null,
+                modifier =
+                    Modifier.widthIn(max = XikeContentMaxWidth)
+                        .fillMaxWidth()
+                        .align(Alignment.CenterHorizontally)
+                        .padding(horizontal = XikeScreenHorizontalPadding, vertical = 8.dp)
+                        .heightIn(min = 48.dp),
                 shape = XikeShapes.button,
                 elevation = xikeButtonElevation(),
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor =
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    ),
             ) {
                 Text(
                     when {
                         isSaving -> localizedText("正在收下…")
                         outdoorLoading -> tr("正在获取地点与天气…", "Getting location and weather…")
                         showVoiceCapture -> localizedText("请先完成录音")
-                        pendingDraftAudio != null -> if (isDraftAudioSaving) localizedText("正在保存语音…") else localizedText("请先处理录音")
+                        pendingDraftAudio != null ->
+                            if (isDraftAudioSaving) localizedText("正在保存语音…")
+                            else localizedText("请先处理录音")
                         videoServices.draftSaving -> tr("正在导入视频…", "Importing video…")
-                        draft.pendingVideoUri != null -> tr("请先处理视频", "Please resolve the video import")
+                        draft.pendingVideoUri != null ->
+                            tr("请先处理视频", "Please resolve the video import")
                         draft.mood == null -> localizedText("先选择一种心情")
                         draft.recordedAt != null -> localizedText("补记这一刻")
                         else -> localizedText("记下此刻")
@@ -732,7 +835,9 @@ fun MomentScreen(
                         enabled = !isSaving,
                         modifier = Modifier.fillMaxWidth(),
                         shape = XikeShapes.button,
-                    ) { Text(tr("修改日期时间", "Change date and time")) }
+                    ) {
+                        Text(tr("修改日期时间", "Change date and time"))
+                    }
                     TextButton(
                         onClick = {
                             showRecordedAtOptions = false
@@ -741,7 +846,9 @@ fun MomentScreen(
                         enabled = !isSaving,
                         modifier = Modifier.fillMaxWidth(),
                         shape = XikeShapes.button,
-                    ) { Text(localizedText("改为现在")) }
+                    ) {
+                        Text(localizedText("改为现在"))
+                    }
                 }
             },
             confirmButton = {
@@ -761,8 +868,10 @@ fun MomentScreen(
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                    .padding(horizontal = XikeSheetHorizontalPadding).padding(bottom = XikeSheetBottomPadding),
+                Modifier.fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = XikeSheetHorizontalPadding)
+                    .padding(bottom = XikeSheetBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
             ) {
                 Text(
@@ -772,7 +881,10 @@ fun MomentScreen(
                 )
                 MomentMediaAction(
                     tr("录音", "Record audio"),
-                    !isSaving && draft.audio == null && pendingDraftAudio == null && !showVoiceCapture,
+                    !isSaving &&
+                        draft.audio == null &&
+                        pendingDraftAudio == null &&
+                        !showVoiceCapture,
                 ) {
                     showAddContent = false
                     beginVoiceCapture()
@@ -837,18 +949,32 @@ fun MomentScreen(
             title = { Text(tr("修改记录日期？", "Change the entry date?")) },
             text = {
                 Text(
-                    tr("改为其他日期会移除已添加的地点与天气；改回现在也不会自动恢复。", "Changing to another date removes the added location and weather. Returning to now will not restore them automatically."),
+                    tr(
+                        "改为其他日期会移除已添加的地点与天气；改回现在也不会自动恢复。",
+                        "Changing to another date removes the added location and weather. Returning to now will not restore them automatically.",
+                    ),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (!isSaving) onDraftRecordedAtChange(pendingRecordedAtChange)
-                    showRecordedAtChangeConfirmation = false
-                }, enabled = !isSaving, shape = XikeShapes.button) { Text(tr("修改日期", "Change date")) }
+                TextButton(
+                    onClick = {
+                        if (!isSaving) onDraftRecordedAtChange(pendingRecordedAtChange)
+                        showRecordedAtChangeConfirmation = false
+                    },
+                    enabled = !isSaving,
+                    shape = XikeShapes.button,
+                ) {
+                    Text(tr("修改日期", "Change date"))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showRecordedAtChangeConfirmation = false }, shape = XikeShapes.button) { Text(localizedText("取消")) }
+                TextButton(
+                    onClick = { showRecordedAtChangeConfirmation = false },
+                    shape = XikeShapes.button,
+                ) {
+                    Text(localizedText("取消"))
+                }
             },
         )
     }
@@ -860,8 +986,9 @@ fun MomentScreen(
             title = { Text(localizedText("添加此刻窗外？")) },
             text = {
                 Text(
-                    localizedText("息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。系统地址服务会使用坐标查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。") +
-                        localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
+                    localizedText(
+                        "息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。系统地址服务会使用坐标查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。"
+                    ) + localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -873,7 +1000,9 @@ fun MomentScreen(
                         showOutdoorDisclosure = false
                         showOutdoorCityDialog = true
                     },
-                ) { Text(localizedText("手动选城市")) }
+                ) {
+                    Text(localizedText("手动选城市"))
+                }
             },
             confirmButton = {
                 TextButton(
@@ -881,12 +1010,16 @@ fun MomentScreen(
                     onClick = {
                         showOutdoorDisclosure = false
                         locationPermissionRequested = true
-                        locationPermissionLauncher.launch(arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                        ))
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            )
+                        )
                     },
-                ) { Text(localizedText("允许定位")) }
+                ) {
+                    Text(localizedText("允许定位"))
+                }
             },
         )
     }
@@ -902,20 +1035,17 @@ fun MomentScreen(
     }
 }
 
-
 @Composable
-private fun DraftSecurityRow(
-    statusText: String,
-) {
-    val defaultFirstLineHeight = with(LocalDensity.current) {
-        MaterialTheme.typography.bodySmall.lineHeight.toDp()
-    }
-    var firstLineCenter by remember(statusText, defaultFirstLineHeight) {
-        mutableStateOf<Float?>(null)
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+private fun DraftSecurityRow(statusText: String) {
+    val defaultFirstLineHeight =
+        with(LocalDensity.current) {
+            MaterialTheme.typography.bodySmall.lineHeight.toDp()
+        }
+    var firstLineCenter by
+        remember(statusText, defaultFirstLineHeight) {
+            mutableStateOf<Float?>(null)
+        }
+    Row(modifier = Modifier.fillMaxWidth()) {
         Box(
             Modifier.height(defaultFirstLineHeight).alignBy { it.measuredHeight / 2 },
             contentAlignment = Alignment.Center,
@@ -930,9 +1060,10 @@ private fun DraftSecurityRow(
         Spacer(Modifier.width(4.dp))
         Text(
             statusText,
-            modifier = Modifier.weight(1f).alignBy {
-                firstLineCenter?.roundToInt() ?: (it.measuredHeight / 2)
-            },
+            modifier =
+                Modifier.weight(1f).alignBy {
+                    firstLineCenter?.roundToInt() ?: (it.measuredHeight / 2)
+                },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             onTextLayout = { layout ->
@@ -942,7 +1073,6 @@ private fun DraftSecurityRow(
     }
 }
 
-
 @Composable
 private fun BrandHeader(
     today: LocalDate,
@@ -951,7 +1081,11 @@ private fun BrandHeader(
     onDiscard: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+        Surface(
+            modifier = Modifier.size(32.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+        ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     XikeIcons.Mark,
@@ -970,7 +1104,9 @@ private fun BrandHeader(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                today.format(DateTimeFormatter.ofPattern(tr("M月d日 · E", "MMM d · E"), AppLocale.locale)),
+                today.format(
+                    DateTimeFormatter.ofPattern(tr("M月d日 · E", "MMM d · E"), AppLocale.locale)
+                ),
                 modifier = Modifier.align(Alignment.CenterVertically),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -981,7 +1117,10 @@ private fun BrandHeader(
                     enabled = canDiscard,
                     modifier = Modifier.heightIn(min = 48.dp).align(Alignment.CenterVertically),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
                 ) {
                     Text(localizedText("放弃草稿"))
                 }
@@ -989,7 +1128,6 @@ private fun BrandHeader(
         }
     }
 }
-
 
 @Composable
 private fun MultiImagePicker(
@@ -1006,23 +1144,50 @@ private fun MultiImagePicker(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         ) {
-            Row(Modifier.padding(XikeInnerCardPadding), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
+            Row(
+                Modifier.padding(XikeInnerCardPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            Icons.Outlined.AddPhotoAlternate,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
                     Text(localizedText("添加照片"), style = MaterialTheme.typography.titleSmall)
-                    Text(tr("最多 $MAX_IMAGES_PER_ENTRY 张 · 仅保存在本机", "Up to $MAX_IMAGES_PER_ENTRY photos · Stored only on this device"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        tr(
+                            "最多 $MAX_IMAGES_PER_ENTRY 张 · 仅保存在本机",
+                            "Up to $MAX_IMAGES_PER_ENTRY photos · Stored only on this device",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(
+                    Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     } else {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(localizedText("加密保存在本机"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                localizedText("加密保存在本机"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.weight(1f))
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                 Text(
@@ -1040,7 +1205,10 @@ private fun MultiImagePicker(
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             tiles.chunked(3).forEach { rowTiles ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     rowTiles.forEach { tile ->
                         if (tile == ADD_PHOTO_TILE) {
                             AddPhotoTile(
@@ -1054,8 +1222,13 @@ private fun MultiImagePicker(
                                 order = selectedUris.indexOf(tile) + 1,
                                 onRemove = { onRemove(tile) },
                                 onPreview = { onPreview(tile) },
-                                modifier = Modifier.weight(1f).aspectRatio(1f)
-                                    .then(if (tile == selectedUris.first()) firstPhotoModifier else Modifier),
+                                modifier =
+                                    Modifier.weight(1f)
+                                        .aspectRatio(1f)
+                                        .then(
+                                            if (tile == selectedUris.first()) firstPhotoModifier
+                                            else Modifier
+                                        ),
                             )
                         }
                     }
@@ -1066,7 +1239,6 @@ private fun MultiImagePicker(
     }
 }
 
-
 @Composable
 private fun SelectedPhotoTile(
     uriString: String,
@@ -1076,14 +1248,17 @@ private fun SelectedPhotoTile(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val bitmap = rememberPreviewBitmap(uriString) {
-        context.contentResolver.openInputStream(Uri.parse(uriString))
-    }
+    val bitmap =
+        rememberPreviewBitmap(uriString) {
+            context.contentResolver.openInputStream(Uri.parse(uriString))
+        }
     Box(
-        modifier = modifier.clip(XikeShapes.inner)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClickLabel = localizedText("预览照片"), onClick = onPreview)
-            .semantics { contentDescription = tr("待保存的第 $order 张照片", "Unsaved photo $order") },
+        modifier =
+            modifier
+                .clip(XikeShapes.inner)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClickLabel = localizedText("预览照片"), onClick = onPreview)
+                .semantics { contentDescription = tr("待保存的第 $order 张照片", "Unsaved photo $order") }
     ) {
         if (bitmap != null) {
             Image(
@@ -1107,10 +1282,10 @@ private fun SelectedPhotoTile(
         }
         IconButton(
             onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(48.dp)
-                .semantics { contentDescription = tr("移除第 $order 张照片", "Remove photo $order") },
+            modifier =
+                Modifier.align(Alignment.TopEnd).size(48.dp).semantics {
+                    contentDescription = tr("移除第 $order 张照片", "Remove photo $order")
+                },
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Surface(
@@ -1134,12 +1309,25 @@ private fun SelectedPhotoTile(
 
 @Composable
 private fun DailyQuestion(today: LocalDate, style: DailyPromptStyle) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+    ) {
         Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
-            Icon(XikeIcons.Mark, contentDescription = null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                XikeIcons.Mark,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
             Spacer(Modifier.width(11.dp))
             Column {
-                Text(localizedText("今日一刻"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    localizedText("今日一刻"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(dailyQuestion(today, style), style = MaterialTheme.typography.bodyMedium)
             }

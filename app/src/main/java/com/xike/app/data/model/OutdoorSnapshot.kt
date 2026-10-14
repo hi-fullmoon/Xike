@@ -1,8 +1,8 @@
 package com.xike.app.data.model
 
-import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
+import org.json.JSONObject
 
 data class OutdoorSnapshot(
     val placeName: String,
@@ -15,31 +15,34 @@ data class OutdoorSnapshot(
         val normalizedPlace = placeName.trim().take(MAX_PLACE_NAME_LENGTH)
         val normalizedSource = source.trim().take(MAX_WEATHER_SOURCE_LENGTH)
         return takeIf {
-            normalizedPlace.isNotBlank() &&
-                temperatureCelsius.isFinite() &&
-                temperatureCelsius in MIN_TEMPERATURE_CELSIUS..MAX_TEMPERATURE_CELSIUS &&
-                weatherCode in MIN_WEATHER_CODE..MAX_WEATHER_CODE &&
-                capturedAt > 0L &&
-                normalizedSource.isNotBlank()
-        }?.copy(placeName = normalizedPlace, source = normalizedSource)
+                normalizedPlace.isNotBlank() &&
+                    temperatureCelsius.isFinite() &&
+                    temperatureCelsius in MIN_TEMPERATURE_CELSIUS..MAX_TEMPERATURE_CELSIUS &&
+                    weatherCode in MIN_WEATHER_CODE..MAX_WEATHER_CODE &&
+                    capturedAt > 0L &&
+                    normalizedSource.isNotBlank()
+            }
+            ?.copy(placeName = normalizedPlace, source = normalizedSource)
     }
 
-    fun toJson(): JSONObject = JSONObject()
-        .put("placeName", placeName)
-        .put("temperatureCelsius", temperatureCelsius)
-        .put("weatherCode", weatherCode)
-        .put("capturedAt", capturedAt)
-        .put("source", source)
+    fun toJson(): JSONObject =
+        JSONObject()
+            .put("placeName", placeName)
+            .put("temperatureCelsius", temperatureCelsius)
+            .put("weatherCode", weatherCode)
+            .put("capturedAt", capturedAt)
+            .put("source", source)
 
     companion object {
         fun fromJson(json: JSONObject?): OutdoorSnapshot? = json?.let {
             OutdoorSnapshot(
-                placeName = it.optString("placeName"),
-                temperatureCelsius = it.optDouble("temperatureCelsius", Double.NaN),
-                weatherCode = it.optInt("weatherCode", -1),
-                capturedAt = it.optLong("capturedAt"),
-                source = it.optString("source", OPEN_METEO_SOURCE),
-            ).normalizedOrNull()
+                    placeName = it.optString("placeName"),
+                    temperatureCelsius = it.optDouble("temperatureCelsius", Double.NaN),
+                    weatherCode = it.optInt("weatherCode", -1),
+                    capturedAt = it.optLong("capturedAt"),
+                    source = it.optString("source", OPEN_METEO_SOURCE),
+                )
+                .normalizedOrNull()
         }
     }
 }

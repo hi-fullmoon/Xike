@@ -30,12 +30,14 @@ internal data class VoiceWaveformTimeline(
     }
 
     fun nextSampleDelay(durationMillis: Long): Long =
-        (((lastSlot + 1L) * SLOT_DURATION_UNITS + SPEED_UNITS - 1L) / SPEED_UNITS -
-            durationMillis).coerceAtLeast(1L)
+        (((lastSlot + 1L) * SLOT_DURATION_UNITS + SPEED_UNITS - 1L) / SPEED_UNITS - durationMillis)
+            .coerceAtLeast(1L)
 
-    private fun slotAt(durationMillis: Long): Long = scaledDuration(durationMillis) / SLOT_DURATION_UNITS
+    private fun slotAt(durationMillis: Long): Long =
+        scaledDuration(durationMillis) / SLOT_DURATION_UNITS
 
-    private fun scaledDuration(durationMillis: Long): Long = durationMillis.coerceAtLeast(0L) * SPEED_UNITS
+    private fun scaledDuration(durationMillis: Long): Long =
+        durationMillis.coerceAtLeast(0L) * SPEED_UNITS
 
     private companion object {
         // 1.4 / 75 milliseconds equals exactly 7 / 375.

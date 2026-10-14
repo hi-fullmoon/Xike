@@ -1,17 +1,15 @@
 package com.xike.app
 
-import com.xike.app.data.model.OutdoorSnapshot
-
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-import com.xike.app.data.BackupCipher
-
 import android.content.Context
 import android.net.Uri
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.data.BackupCipher
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.data.model.OutdoorSnapshot
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -54,19 +52,23 @@ class JournalStoreBackupTest {
 
     @Test
     fun backupWithMultipleImagesCanBeInspectedRestoredAndUndone() {
-        val imageContents = listOf(
-            "first image".toByteArray(),
-            ByteArray(32 * 1024) { index -> (index % 251).toByte() },
-            "third image".toByteArray(),
-        )
-        val source = entry("source", 1_700_000_000_000L, "含多图的备份").copy(
-            outdoor = OutdoorSnapshot(
-                placeName = "上海 · 浦东",
-                temperatureCelsius = 27.2,
-                weatherCode = 2,
-                capturedAt = 1_700_000_000_000L,
-            ),
-        )
+        val imageContents =
+            listOf(
+                "first image".toByteArray(),
+                ByteArray(32 * 1024) { index -> (index % 251).toByte() },
+                "third image".toByteArray(),
+            )
+        val source =
+            entry("source", 1_700_000_000_000L, "含多图的备份")
+                .copy(
+                    outdoor =
+                        OutdoorSnapshot(
+                            placeName = "上海 · 浦东",
+                            temperatureCelsius = 27.2,
+                            weatherCode = 2,
+                            capturedAt = 1_700_000_000_000L,
+                        )
+                )
         val storedSource = store.add(source, imageUris(imageContents)).single()
         val backup = encryptedBackup()
 
@@ -95,30 +97,33 @@ class JournalStoreBackupTest {
     @Test
     fun encryptedAudioIsIncludedInBackupAndRestore() {
         val audioContents = ByteArray(48 * 1024) { index -> (index % 239).toByte() }
-        val sourceFile = File(context.cacheDir, "backup-test-audio.m4a").also { it.writeBytes(audioContents) }
+        val sourceFile =
+            File(context.cacheDir, "backup-test-audio.m4a").also { it.writeBytes(audioContents) }
         val audio = store.importAudio(sourceFile, 12_500L)
         store.add(entry("voice-source", 1_700_000_000_500L, "有一段语音").copy(audio = audio))
         val backup = encryptedBackup()
         assertTrue(store.backupRequiresPassword(backup.inputStream()))
-        val encryptedInput = backup.inputStream().also { input ->
-            val magic = ByteArray(BackupCipher.magicSize)
-            assertEquals(magic.size, input.read(magic))
-            assertTrue(BackupCipher.hasStreamingMagic(magic))
-        }
-        ZipInputStream(BufferedInputStream(BackupCipher.decryptingStream(encryptedInput, PASSWORD))).use { archive ->
-            val names = mutableListOf<String>()
-            var item = archive.nextEntry
-            while (item != null) {
-                names += item.name
-                val contents = archive.readBytes()
-                if (item.name == "index.html") {
-                    assertTrue(contents.toString(Charsets.UTF_8).contains("有一段语音"))
-                }
-                archive.closeEntry()
-                item = archive.nextEntry
+        val encryptedInput =
+            backup.inputStream().also { input ->
+                val magic = ByteArray(BackupCipher.magicSize)
+                assertEquals(magic.size, input.read(magic))
+                assertTrue(BackupCipher.hasStreamingMagic(magic))
             }
-            assertEquals(listOf("manifest.json", "index.html"), names.take(2))
-        }
+        ZipInputStream(BufferedInputStream(BackupCipher.decryptingStream(encryptedInput, PASSWORD)))
+            .use { archive ->
+                val names = mutableListOf<String>()
+                var item = archive.nextEntry
+                while (item != null) {
+                    names += item.name
+                    val contents = archive.readBytes()
+                    if (item.name == "index.html") {
+                        assertTrue(contents.toString(Charsets.UTF_8).contains("有一段语音"))
+                    }
+                    archive.closeEntry()
+                    item = archive.nextEntry
+                }
+                assertEquals(listOf("manifest.json", "index.html"), names.take(2))
+            }
 
         replaceWithLocalEntry()
 
@@ -127,22 +132,31 @@ class JournalStoreBackupTest {
         val restored = store.restoreEncryptedBackup(backup.inputStream(), PASSWORD).single()
 
         assertEquals(12_500L, restored.audio?.durationMillis)
-        val restoredBytes = store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() }
+        val restoredBytes =
+            store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() }
         assertArrayEquals(audioContents, restoredBytes)
     }
 
     @Test
     fun unencryptedBackupContainsReadableHtmlAndRestoresAllMedia() {
-        val imageContents = java.util.Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jX/0AAAAASUVORK5CYII=",
-        )
+        val imageContents =
+            java.util.Base64.getDecoder()
+                .decode(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jX/0AAAAASUVORK5CYII="
+                )
         val audioContents = ByteArray(1024) { it.toByte() }
-        val audioFile = File(context.cacheDir, "backup-test-audio-plain.m4a").also { it.writeBytes(audioContents) }
+        val audioFile =
+            File(context.cacheDir, "backup-test-audio-plain.m4a").also {
+                it.writeBytes(audioContents)
+            }
         val audio = store.importAudio(audioFile, 2_000L)
-        val source = store.add(
-            entry("plain", 1_700_000_000_000L, "浏览器可读 <内容>").copy(audio = audio),
-            imageUris(listOf(imageContents)),
-        ).single()
+        val source =
+            store
+                .add(
+                    entry("plain", 1_700_000_000_000L, "浏览器可读 <内容>").copy(audio = audio),
+                    imageUris(listOf(imageContents)),
+                )
+                .single()
         val backup = ByteArrayOutputStream().also { store.writeBackup(it, null) }.toByteArray()
 
         assertFalse(store.backupRequiresPassword(backup.inputStream()))
@@ -170,7 +184,10 @@ class JournalStoreBackupTest {
         val restored = store.restoreBackup(backup.inputStream(), null).single()
         assertEquals(source.note, restored.note)
         assertImageContents(restored, listOf(imageContents))
-        assertArrayEquals(audioContents, store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() })
+        assertArrayEquals(
+            audioContents,
+            store.openAudio(requireNotNull(restored.audio).fileName)?.use { it.readBytes() },
+        )
         assertTrue(store.canUndoLastRestore())
         assertEquals("设备上的原记录", store.undoLastRestore().single().note)
     }
@@ -178,12 +195,21 @@ class JournalStoreBackupTest {
     @Test
     fun incompleteUnencryptedBackupDoesNotReplaceExistingData() {
         replaceWithLocalEntry()
-        val manifest = JSONObject()
-            .put("format", "xike")
-            .put("version", 7)
-            .put("entries", JSONArray(listOf(entry("missing", 300L, "缺少图片")
-                .copy(imageFileNames = listOf("missing.png")).toJson())))
-            .toString()
+        val manifest =
+            JSONObject()
+                .put("format", "xike")
+                .put("version", 7)
+                .put(
+                    "entries",
+                    JSONArray(
+                        listOf(
+                            entry("missing", 300L, "缺少图片")
+                                .copy(imageFileNames = listOf("missing.png"))
+                                .toJson()
+                        )
+                    ),
+                )
+                .toString()
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { archive ->
             archive.putNextEntry(ZipEntry("manifest.json"))
@@ -211,17 +237,19 @@ class JournalStoreBackupTest {
 
     @Test
     fun version4StreamingBackupRemainsRestorable() {
-        val manifest = JSONObject()
-            .put("format", "xike")
-            .put("version", 4)
-            .put("entries", JSONArray(listOf(entry("legacy-v4", 150L, "旧版流式备份").toJson())))
-            .toString()
+        val manifest =
+            JSONObject()
+                .put("format", "xike")
+                .put("version", 4)
+                .put("entries", JSONArray(listOf(entry("legacy-v4", 150L, "旧版流式备份").toJson())))
+                .toString()
         val output = ByteArrayOutputStream()
-        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, PASSWORD))).use { archive ->
-            archive.putNextEntry(ZipEntry("manifest.json"))
-            archive.write(manifest.toByteArray())
-            archive.closeEntry()
-        }
+        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, PASSWORD)))
+            .use { archive ->
+                archive.putNextEntry(ZipEntry("manifest.json"))
+                archive.write(manifest.toByteArray())
+                archive.closeEntry()
+            }
 
         val restored = store.restoreEncryptedBackup(output.toByteArray().inputStream(), PASSWORD)
 
@@ -249,14 +277,18 @@ class JournalStoreBackupTest {
 
     @Test
     fun finalizedDeleteRemovesRecordSearchIndexAndPrivateImageCopy() {
-        val audioFile = File(context.cacheDir, "backup-test-audio-delete.m4a").also {
-            it.writeBytes("private audio".toByteArray())
-        }
+        val audioFile =
+            File(context.cacheDir, "backup-test-audio-delete.m4a").also {
+                it.writeBytes("private audio".toByteArray())
+            }
         val audio = store.importAudio(audioFile, 2_000L)
-        val stored = store.add(
-            entry("delete-me", 300L, "待删除标记").copy(audio = audio),
-            imageUris(listOf("private image".toByteArray())),
-        ).single()
+        val stored =
+            store
+                .add(
+                    entry("delete-me", 300L, "待删除标记").copy(audio = audio),
+                    imageUris(listOf("private image".toByteArray())),
+                )
+                .single()
         val imageFileName = stored.imageFileNames.single()
 
         store.openImage(imageFileName).use { input -> assertNotNull(input) }
@@ -283,36 +315,41 @@ class JournalStoreBackupTest {
         store.add(entry("local", 200L, "设备上的原记录"))
     }
 
-    private fun encryptedBackup(): ByteArray = ByteArrayOutputStream().also { output ->
-        store.writeEncryptedBackup(output, PASSWORD)
-    }.toByteArray()
+    private fun encryptedBackup(): ByteArray =
+        ByteArrayOutputStream()
+            .also { output ->
+                store.writeEncryptedBackup(output, PASSWORD)
+            }
+            .toByteArray()
 
     private fun backupWithOversizedImage(): ByteArray {
         val fileName = "oversized.xike-image"
-        val manifest = JSONObject()
-            .put("format", "xike")
-            .put("version", 4)
-            .put(
-                "entries",
-                JSONArray(
-                    listOf(
-                        entry("oversized", 300L, "超限图片")
-                            .copy(imageFileNames = listOf(fileName))
-                            .toJson(),
+        val manifest =
+            JSONObject()
+                .put("format", "xike")
+                .put("version", 4)
+                .put(
+                    "entries",
+                    JSONArray(
+                        listOf(
+                            entry("oversized", 300L, "超限图片")
+                                .copy(imageFileNames = listOf(fileName))
+                                .toJson()
+                        )
                     ),
-                ),
-            )
-            .toString()
+                )
+                .toString()
         val output = ByteArrayOutputStream()
-        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, PASSWORD))).use { archive ->
-            archive.putNextEntry(ZipEntry("manifest.json"))
-            archive.write(manifest.toByteArray())
-            archive.closeEntry()
-            archive.putNextEntry(ZipEntry("images/$fileName"))
-            val chunk = ByteArray(1024 * 1024)
-            repeat(21) { archive.write(chunk) }
-            archive.closeEntry()
-        }
+        ZipOutputStream(BufferedOutputStream(BackupCipher.encryptingStream(output, PASSWORD)))
+            .use { archive ->
+                archive.putNextEntry(ZipEntry("manifest.json"))
+                archive.write(manifest.toByteArray())
+                archive.closeEntry()
+                archive.putNextEntry(ZipEntry("images/$fileName"))
+                val chunk = ByteArray(1024 * 1024)
+                repeat(21) { archive.write(chunk) }
+                archive.closeEntry()
+            }
         return output.toByteArray()
     }
 
@@ -322,7 +359,8 @@ class JournalStoreBackupTest {
 
         val failure = runCatching {
             store.restoreBackup(backup.inputStream(), password)
-        }.exceptionOrNull()
+        }
+            .exceptionOrNull()
 
         assertNotNull("恢复应当失败", failure)
         assertEquals(beforeEntries, store.entries())
@@ -333,37 +371,44 @@ class JournalStoreBackupTest {
         }
         assertFalse(store.canUndoLastRestore())
         assertTrue(
-            context.filesDir.listFiles().orEmpty()
-                .none { it.isDirectory && it.name.startsWith("journal-images-restore-") },
+            context.filesDir.listFiles().orEmpty().none {
+                it.isDirectory && it.name.startsWith("journal-images-restore-")
+            }
         )
     }
 
-    private fun storedImageContents(entries: List<JournalEntry>): Map<String, ByteArray> = entries
-        .flatMap { it.imageFileNames }
-        .associateWith { fileName ->
-            store.openImage(fileName)?.use { it.readBytes() } ?: error("图片无法读取：$fileName")
-        }
+    private fun storedImageContents(entries: List<JournalEntry>): Map<String, ByteArray> =
+        entries
+            .flatMap { it.imageFileNames }
+            .associateWith { fileName ->
+                store.openImage(fileName)?.use { it.readBytes() } ?: error("图片无法读取：$fileName")
+            }
 
     private fun assertImageContents(entry: JournalEntry, expected: List<ByteArray>) {
-        val actual = entry.imageFileNames.map { fileName ->
-            store.openImage(fileName)?.use { it.readBytes() } ?: error("图片无法读取：$fileName")
-        }
+        val actual =
+            entry.imageFileNames.map { fileName ->
+                store.openImage(fileName)?.use { it.readBytes() } ?: error("图片无法读取：$fileName")
+            }
         assertEquals(expected.size, actual.size)
         expected.zip(actual).forEach { (expectedBytes, actualBytes) ->
             assertArrayEquals(expectedBytes, actualBytes)
         }
     }
 
-    private fun imageUris(contents: List<ByteArray>): List<Uri> = contents.mapIndexed { index, bytes ->
-        File(context.cacheDir, "backup-test-image-$index").also { it.writeBytes(bytes) }.let(Uri::fromFile)
-    }
+    private fun imageUris(contents: List<ByteArray>): List<Uri> =
+        contents.mapIndexed { index, bytes ->
+            File(context.cacheDir, "backup-test-image-$index")
+                .also { it.writeBytes(bytes) }
+                .let(Uri::fromFile)
+        }
 
     private fun clearStoredData() {
         if (::dao.isInitialized) JournalDatabase.get(context).clearAllTables()
         if (::context.isInitialized) {
             journalImagesDirectory().listFiles()?.forEach(File::delete)
             journalAudiosDirectory().listFiles()?.forEach(File::delete)
-            context.filesDir.listFiles()
+            context.filesDir
+                .listFiles()
                 ?.filter {
                     it.name.startsWith("journal-images-restore-") ||
                         it.name.startsWith("journal-restore-undo-")
@@ -371,8 +416,12 @@ class JournalStoreBackupTest {
                 ?.forEach { file ->
                     if (file.isDirectory) file.deleteRecursively() else file.delete()
                 }
-            context.cacheDir.listFiles()
-                ?.filter { it.name.startsWith("backup-test-image-") || it.name.startsWith("backup-test-audio") }
+            context.cacheDir
+                .listFiles()
+                ?.filter {
+                    it.name.startsWith("backup-test-image-") ||
+                        it.name.startsWith("backup-test-audio")
+                }
                 ?.forEach(File::delete)
             restorePreferences().edit().clear().commit()
         }
@@ -382,21 +431,23 @@ class JournalStoreBackupTest {
 
     private fun journalAudiosDirectory(): File = File(context.filesDir, "journal-audios")
 
-    private fun restorePreferences() = EncryptedSharedPreferences.create(
-        context,
-        "xike-restore",
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    private fun restorePreferences() =
+        EncryptedSharedPreferences.create(
+            context,
+            "xike-restore",
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
 
-    private fun entry(id: String, createdAt: Long, note: String) = JournalEntry(
-        id = id,
-        createdAt = createdAt,
-        mood = Mood.GOOD,
-        tags = listOf("测试"),
-        note = note,
-    )
+    private fun entry(id: String, createdAt: Long, note: String) =
+        JournalEntry(
+            id = id,
+            createdAt = createdAt,
+            mood = Mood.GOOD,
+            tags = listOf("测试"),
+            note = note,
+        )
 
     private companion object {
         const val PASSWORD = "correct-password"

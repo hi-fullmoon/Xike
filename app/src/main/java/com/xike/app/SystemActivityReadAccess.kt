@@ -10,17 +10,31 @@ internal class SystemActivityReadAccess(context: Context, ownedUris: Collection<
     private val owned = ownedUris.toMutableSet()
     private var deferred = false
 
-    fun transfer(uris: Collection<Uri>) { owned.removeAll(uris.toSet()) }
-    fun transferAll() { owned.clear() }
+    fun transfer(uris: Collection<Uri>) {
+        owned.removeAll(uris.toSet())
+    }
+
+    fun transferAll() {
+        owned.clear()
+    }
 
     /** The async consumer must call release() in its completion/failure path. */
-    fun deferRelease() { deferred = true }
+    fun deferRelease() {
+        deferred = true
+    }
 
-    fun closeUnlessDeferred() { if (!deferred) release() }
+    fun closeUnlessDeferred() {
+        if (!deferred) release()
+    }
 
     fun release() {
         owned.toList().forEach { uri ->
-            runCatching { resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            runCatching {
+                resolver.releasePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
                 .onSuccess { owned.remove(uri) }
         }
     }
@@ -28,14 +42,19 @@ internal class SystemActivityReadAccess(context: Context, ownedUris: Collection<
 
 /** Acquires metadata-only read access before authentication; no media contents are opened. */
 internal fun retainSystemActivityReadAccess(context: Context, result: Any?): List<Uri> {
-    val uris = when (result) {
-        is Uri -> listOf(result)
-        is List<*> -> result.filterIsInstance<Uri>()
-        else -> emptyList()
-    }.distinct()
+    val uris =
+        when (result) {
+            is Uri -> listOf(result)
+            is List<*> -> result.filterIsInstance<Uri>()
+            else -> emptyList()
+        }.distinct()
     val resolver = context.applicationContext.contentResolver
-    val existing = resolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri }.toSet()
+    val existing =
+        resolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri }.toSet()
     return uris.filterNot(existing::contains).filter { uri ->
-        runCatching { resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }.isSuccess
+        runCatching {
+            resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+            .isSuccess
     }
 }

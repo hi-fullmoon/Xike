@@ -1,25 +1,23 @@
 package com.xike.app
 
-import com.xike.app.feature.insights.InsightsPeriod
-import com.xike.app.feature.insights.InsightEvidenceLevel
-import com.xike.app.feature.insights.JournalPeriodSummary
-import com.xike.app.feature.insights.journalPeriodSummary
-import com.xike.app.feature.insights.weeklyJournalSummary
-import com.xike.app.feature.insights.entriesOnDate
-import com.xike.app.feature.insights.localReviewText
-import com.xike.app.feature.insights.localJournalReview
-
-import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
-
+import com.xike.app.data.Mood
+import com.xike.app.feature.insights.InsightEvidenceLevel
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.JournalPeriodSummary
+import com.xike.app.feature.insights.entriesOnDate
+import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.feature.insights.localJournalReview
+import com.xike.app.feature.insights.localReviewText
+import com.xike.app.feature.insights.weeklyJournalSummary
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.system.measureTimeMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.system.measureTimeMillis
 
 class JournalAnalyticsTest {
     private val zone = ZoneId.of("Asia/Shanghai")
@@ -27,13 +25,14 @@ class JournalAnalyticsTest {
 
     @Test
     fun `weekly summary uses the calendar week instead of the latest seven entries`() {
-        val entries = listOf(
-            entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("工作")),
-            entry(LocalDate.of(2026, 8, 19), Mood.JOYFUL, listOf("工作", "运动")),
-            entry(LocalDate.of(2026, 8, 19), Mood.LOW, listOf("睡眠")),
-            entry(LocalDate.of(2026, 8, 16), Mood.JOYFUL, listOf("朋友")),
-            entry(LocalDate.of(2026, 8, 24), Mood.JOYFUL, listOf("朋友")),
-        )
+        val entries =
+            listOf(
+                entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("工作")),
+                entry(LocalDate.of(2026, 8, 19), Mood.JOYFUL, listOf("工作", "运动")),
+                entry(LocalDate.of(2026, 8, 19), Mood.LOW, listOf("睡眠")),
+                entry(LocalDate.of(2026, 8, 16), Mood.JOYFUL, listOf("朋友")),
+                entry(LocalDate.of(2026, 8, 24), Mood.JOYFUL, listOf("朋友")),
+            )
 
         val summary = weeklyJournalSummary(entries, today, zone)
 
@@ -45,14 +44,15 @@ class JournalAnalyticsTest {
 
     @Test
     fun `weekly summary contains all seven days including empty days`() {
-        val summary = weeklyJournalSummary(
-            listOf(
-                entry(LocalDate.of(2026, 8, 19), Mood.GOOD),
-                entry(LocalDate.of(2026, 8, 19), Mood.TIRED),
-            ),
-            today,
-            zone,
-        )
+        val summary =
+            weeklyJournalSummary(
+                listOf(
+                    entry(LocalDate.of(2026, 8, 19), Mood.GOOD),
+                    entry(LocalDate.of(2026, 8, 19), Mood.TIRED),
+                ),
+                today,
+                zone,
+            )
 
         assertEquals(7, summary.days.size)
         assertEquals(2, summary.days[2].entryCount)
@@ -62,12 +62,18 @@ class JournalAnalyticsTest {
 
     @Test
     fun `entries on date respects the supplied timezone`() {
-        val lateUtcEntry = JournalEntry(
-            createdAt = LocalDate.of(2026, 8, 22).atTime(16, 30).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli(),
-            mood = Mood.CALM,
-            tags = emptyList(),
-            note = "",
-        )
+        val lateUtcEntry =
+            JournalEntry(
+                createdAt =
+                    LocalDate.of(2026, 8, 22)
+                        .atTime(16, 30)
+                        .atZone(ZoneId.of("UTC"))
+                        .toInstant()
+                        .toEpochMilli(),
+                mood = Mood.CALM,
+                tags = emptyList(),
+                note = "",
+            )
 
         assertEquals(1, entriesOnDate(listOf(lateUtcEntry), today, zone))
         assertEquals(0, entriesOnDate(listOf(lateUtcEntry), today, ZoneId.of("UTC")))
@@ -75,31 +81,39 @@ class JournalAnalyticsTest {
 
     @Test
     fun `insight presets use inclusive calendar boundaries`() {
-        val entries = listOf(
-            entry(today, Mood.GOOD),
-            entry(LocalDate.of(2026, 8, 17), Mood.CALM),
-            entry(today.minusDays(29), Mood.GOOD),
-            entry(today.minusDays(30), Mood.LOW),
-            entry(today.minusDays(89), Mood.JOYFUL),
-            entry(today.minusDays(90), Mood.TIRED),
-            entry(LocalDate.of(2026, 1, 1), Mood.CALM),
-            entry(LocalDate.of(2025, 12, 31), Mood.JOYFUL),
-            entry(today.plusDays(1), Mood.JOYFUL),
-        )
+        val entries =
+            listOf(
+                entry(today, Mood.GOOD),
+                entry(LocalDate.of(2026, 8, 17), Mood.CALM),
+                entry(today.minusDays(29), Mood.GOOD),
+                entry(today.minusDays(30), Mood.LOW),
+                entry(today.minusDays(89), Mood.JOYFUL),
+                entry(today.minusDays(90), Mood.TIRED),
+                entry(LocalDate.of(2026, 1, 1), Mood.CALM),
+                entry(LocalDate.of(2025, 12, 31), Mood.JOYFUL),
+                entry(today.plusDays(1), Mood.JOYFUL),
+            )
 
         assertEquals(2, journalPeriodSummary(entries, InsightsPeriod.WEEK, today, zone).entryCount)
-        assertEquals(3, journalPeriodSummary(entries, InsightsPeriod.DAYS_30, today, zone).entryCount)
-        assertEquals(5, journalPeriodSummary(entries, InsightsPeriod.DAYS_90, today, zone).entryCount)
+        assertEquals(
+            3,
+            journalPeriodSummary(entries, InsightsPeriod.DAYS_30, today, zone).entryCount,
+        )
+        assertEquals(
+            5,
+            journalPeriodSummary(entries, InsightsPeriod.DAYS_90, today, zone).entryCount,
+        )
         assertEquals(7, journalPeriodSummary(entries, InsightsPeriod.YEAR, today, zone).entryCount)
     }
 
     @Test
     fun `insight presets generate readable trend buckets`() {
-        val entries = listOf(
-            entry(today, Mood.GOOD),
-            entry(today, Mood.JOYFUL),
-            entry(today.minusDays(6), Mood.LOW),
-        )
+        val entries =
+            listOf(
+                entry(today, Mood.GOOD),
+                entry(today, Mood.JOYFUL),
+                entry(today.minusDays(6), Mood.LOW),
+            )
 
         val week = journalPeriodSummary(entries, InsightsPeriod.WEEK, today, zone)
         val month = journalPeriodSummary(entries, InsightsPeriod.DAYS_30, today, zone)
@@ -117,12 +131,13 @@ class JournalAnalyticsTest {
 
     @Test
     fun `deep insight reports distributions tags and day types without double counting tags`() {
-        val entries = listOf(
-            entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("工作", "工作")),
-            entry(LocalDate.of(2026, 8, 22), Mood.LOW, listOf("休息")),
-            entry(LocalDate.of(2026, 8, 23), Mood.JOYFUL, listOf("工作")),
-            entry(LocalDate.of(2026, 8, 23), Mood.CALM, listOf("家庭")),
-        )
+        val entries =
+            listOf(
+                entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("工作", "工作")),
+                entry(LocalDate.of(2026, 8, 22), Mood.LOW, listOf("休息")),
+                entry(LocalDate.of(2026, 8, 23), Mood.JOYFUL, listOf("工作")),
+                entry(LocalDate.of(2026, 8, 23), Mood.CALM, listOf("家庭")),
+            )
 
         val summary = journalPeriodSummary(entries, InsightsPeriod.DAYS_30, today, zone)
 
@@ -145,18 +160,20 @@ class JournalAnalyticsTest {
 
     @Test
     fun `insights combine retired topics per entry and across periods`() {
-        val currentFirst = entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("关系", "社交"))
-            .copy(id = "current-first")
-        val currentSecond = entry(LocalDate.of(2026, 8, 18), Mood.LOW, listOf("社交"))
-            .copy(id = "current-second")
+        val currentFirst =
+            entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("关系", "社交"))
+                .copy(id = "current-first")
+        val currentSecond =
+            entry(LocalDate.of(2026, 8, 18), Mood.LOW, listOf("社交")).copy(id = "current-second")
         val previous = entry(LocalDate.of(2026, 8, 10), Mood.CALM, listOf("关系"))
 
-        val summary = journalPeriodSummary(
-            listOf(currentFirst, currentSecond, previous),
-            InsightsPeriod.WEEK,
-            today,
-            zone,
-        )
+        val summary =
+            journalPeriodSummary(
+                listOf(currentFirst, currentSecond, previous),
+                InsightsPeriod.WEEK,
+                today,
+                zone,
+            )
         val relationships = summary.topTags.single { it.tag == "关系" }
 
         assertEquals(2, relationships.entryCount)
@@ -170,24 +187,28 @@ class JournalAnalyticsTest {
 
     @Test
     fun `period comparison uses the immediately preceding equal window`() {
-        val currentEntries = listOf(
-            entry(today.minusDays(2), Mood.GOOD),
-            entry(today.minusDays(1), Mood.CALM),
-            entry(today, Mood.JOYFUL),
-            entry(today, Mood.GOOD),
-        )
-        val previousEntries = listOf(
-            entry(today.minusDays(32), Mood.LOW),
-            entry(today.minusDays(31), Mood.TIRED),
-            entry(today.minusDays(30), Mood.CALM),
-        )
+        val currentEntries =
+            listOf(
+                entry(today.minusDays(2), Mood.GOOD),
+                entry(today.minusDays(1), Mood.CALM),
+                entry(today, Mood.JOYFUL),
+                entry(today, Mood.GOOD),
+            )
+        val previousEntries =
+            listOf(
+                entry(today.minusDays(32), Mood.LOW),
+                entry(today.minusDays(31), Mood.TIRED),
+                entry(today.minusDays(30), Mood.CALM),
+            )
 
-        val comparison = journalPeriodSummary(
-            currentEntries + previousEntries,
-            InsightsPeriod.DAYS_30,
-            today,
-            zone,
-        ).comparison
+        val comparison =
+            journalPeriodSummary(
+                    currentEntries + previousEntries,
+                    InsightsPeriod.DAYS_30,
+                    today,
+                    zone,
+                )
+                .comparison
 
         assertEquals(3, comparison.entryCount)
         assertEquals(4, comparison.currentEntryCount)
@@ -200,12 +221,13 @@ class JournalAnalyticsTest {
     @Test
     fun `empty and single-entry periods disclose limited evidence`() {
         val empty = journalPeriodSummary(emptyList(), InsightsPeriod.WEEK, today, zone)
-        val single = journalPeriodSummary(
-            listOf(entry(today, Mood.CALM)),
-            InsightsPeriod.WEEK,
-            today,
-            zone,
-        )
+        val single =
+            journalPeriodSummary(
+                listOf(entry(today, Mood.CALM)),
+                InsightsPeriod.WEEK,
+                today,
+                zone,
+            )
 
         assertEquals(InsightEvidenceLevel.NONE, empty.evidence.level)
         assertEquals(0.0, empty.evidence.coverageRatio, 0.0)
@@ -220,11 +242,12 @@ class JournalAnalyticsTest {
     @Test
     fun `rolling period crosses new year without dropping December entries`() {
         val januaryToday = LocalDate.of(2027, 1, 10)
-        val entries = listOf(
-            entry(LocalDate.of(2026, 12, 12), Mood.GOOD),
-            entry(LocalDate.of(2027, 1, 10), Mood.CALM),
-            entry(LocalDate.of(2026, 12, 11), Mood.LOW),
-        )
+        val entries =
+            listOf(
+                entry(LocalDate.of(2026, 12, 12), Mood.GOOD),
+                entry(LocalDate.of(2027, 1, 10), Mood.CALM),
+                entry(LocalDate.of(2026, 12, 11), Mood.LOW),
+            )
 
         val summary = journalPeriodSummary(entries, InsightsPeriod.DAYS_30, januaryToday, zone)
 
@@ -236,13 +259,14 @@ class JournalAnalyticsTest {
     @Test
     fun `year comparison uses the previous calendar year to the equivalent date`() {
         val leapToday = LocalDate.of(2024, 3, 1)
-        val entries = listOf(
-            entry(LocalDate.of(2024, 1, 1), Mood.GOOD),
-            entry(LocalDate.of(2024, 3, 1), Mood.CALM),
-            entry(LocalDate.of(2023, 1, 1), Mood.LOW),
-            entry(LocalDate.of(2023, 3, 1), Mood.TIRED),
-            entry(LocalDate.of(2023, 3, 2), Mood.JOYFUL),
-        )
+        val entries =
+            listOf(
+                entry(LocalDate.of(2024, 1, 1), Mood.GOOD),
+                entry(LocalDate.of(2024, 3, 1), Mood.CALM),
+                entry(LocalDate.of(2023, 1, 1), Mood.LOW),
+                entry(LocalDate.of(2023, 3, 1), Mood.TIRED),
+                entry(LocalDate.of(2023, 3, 2), Mood.JOYFUL),
+            )
 
         val summary = journalPeriodSummary(entries, InsightsPeriod.YEAR, leapToday, zone)
 
@@ -256,25 +280,28 @@ class JournalAnalyticsTest {
     fun `day grouping stays correct across daylight saving transition`() {
         val newYork = ZoneId.of("America/New_York")
         val dstToday = LocalDate.of(2026, 3, 8)
-        val beforeJump = JournalEntry(
-            createdAt = dstToday.atTime(1, 30).atZone(newYork).toInstant().toEpochMilli(),
-            mood = Mood.TIRED,
-            tags = emptyList(),
-            note = "",
-        )
-        val afterJump = JournalEntry(
-            createdAt = dstToday.atTime(3, 30).atZone(newYork).toInstant().toEpochMilli(),
-            mood = Mood.GOOD,
-            tags = emptyList(),
-            note = "",
-        )
+        val beforeJump =
+            JournalEntry(
+                createdAt = dstToday.atTime(1, 30).atZone(newYork).toInstant().toEpochMilli(),
+                mood = Mood.TIRED,
+                tags = emptyList(),
+                note = "",
+            )
+        val afterJump =
+            JournalEntry(
+                createdAt = dstToday.atTime(3, 30).atZone(newYork).toInstant().toEpochMilli(),
+                mood = Mood.GOOD,
+                tags = emptyList(),
+                note = "",
+            )
 
-        val summary = journalPeriodSummary(
-            listOf(beforeJump, afterJump),
-            InsightsPeriod.WEEK,
-            dstToday,
-            newYork,
-        )
+        val summary =
+            journalPeriodSummary(
+                listOf(beforeJump, afterJump),
+                InsightsPeriod.WEEK,
+                dstToday,
+                newYork,
+            )
 
         assertEquals(2, summary.entryCount)
         assertEquals(1, summary.recordedDayCount)
@@ -283,12 +310,13 @@ class JournalAnalyticsTest {
 
     @Test
     fun `local review states sample limits and avoids causal claims`() {
-        val summary = journalPeriodSummary(
-            listOf(entry(today, Mood.CALM, listOf("自我"))),
-            InsightsPeriod.WEEK,
-            today,
-            zone,
-        )
+        val summary =
+            journalPeriodSummary(
+                listOf(entry(today, Mood.CALM, listOf("自我"))),
+                InsightsPeriod.WEEK,
+                today,
+                zone,
+            )
 
         val review = localReviewText(summary)
 
@@ -296,19 +324,22 @@ class JournalAnalyticsTest {
         assertTrue(review.contains("不代表原因、诊断或建议"))
         assertTrue(review.contains("目前不判断时间趋势"))
         assertFalse(review.contains("值得回看的片段"))
-        val sources = localJournalReview(summary).sections.flatMap { it.sources }.flatMap { it.entryIds }
+        val sources =
+            localJournalReview(summary).sections.flatMap { it.sources }.flatMap { it.entryIds }
         assertTrue(sources.all { it in summary.entryIds })
     }
 
     @Test
     fun `ten thousand entry insight remains within local performance baseline`() {
-        val entries = List(10_000) { index ->
-            entry(
-                today.minusDays((index % 90).toLong()),
-                Mood.entries[index % Mood.entries.size],
-                listOf("主题${index % 12}"),
-            ).copy(id = "insight-$index")
-        }
+        val entries =
+            List(10_000) { index ->
+                entry(
+                        today.minusDays((index % 90).toLong()),
+                        Mood.entries[index % Mood.entries.size],
+                        listOf("主题${index % 12}"),
+                    )
+                    .copy(id = "insight-$index")
+            }
         lateinit var summary: JournalPeriodSummary
 
         val elapsed = measureTimeMillis {
@@ -319,10 +350,11 @@ class JournalAnalyticsTest {
         assertTrue("10k insight took ${elapsed}ms", elapsed < 5_000L)
     }
 
-    private fun entry(date: LocalDate, mood: Mood, tags: List<String> = emptyList()) = JournalEntry(
-        createdAt = date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
-        mood = mood,
-        tags = tags,
-        note = "",
-    )
+    private fun entry(date: LocalDate, mood: Mood, tags: List<String> = emptyList()) =
+        JournalEntry(
+            createdAt = date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
+            mood = mood,
+            tags = tags,
+            note = "",
+        )
 }

@@ -1,8 +1,7 @@
 package com.xike.app.feature.lock
 
-import com.xike.app.localizedText
-
 import android.content.Context
+import com.xike.app.localizedText
 
 enum class AppLockTimeout(
     val durationMillis: Long,
@@ -13,12 +12,12 @@ enum class AppLockTimeout(
     FIVE_MINUTES(5 * 60_000L, "5 分钟后"),
     THIRTY_MINUTES(30 * 60_000L, "30 分钟后");
 
-    val label: String get() = localizedText(sourceLabel)
+    val label: String
+        get() = localizedText(sourceLabel)
 
     companion object {
-        fun fromStorage(value: String?): AppLockTimeout = entries
-            .firstOrNull { it.name == value }
-            ?: IMMEDIATELY
+        fun fromStorage(value: String?): AppLockTimeout =
+            entries.firstOrNull { it.name == value } ?: IMMEDIATELY
     }
 }
 
@@ -26,8 +25,8 @@ internal fun shouldLockApp(
     backgroundedAtMillis: Long?,
     nowMillis: Long,
     timeout: AppLockTimeout,
-): Boolean = backgroundedAtMillis == null ||
-    nowMillis - backgroundedAtMillis >= timeout.durationMillis
+): Boolean =
+    backgroundedAtMillis == null || nowMillis - backgroundedAtMillis >= timeout.durationMillis
 
 /**
  * App-lock preferences intentionally live outside the journal database: the lock gate must be
@@ -35,10 +34,11 @@ internal fun shouldLockApp(
  * included when a journal backup is restored on another device.
  */
 internal class AppLockPreferences(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences(
-        PREFERENCES_NAME,
-        Context.MODE_PRIVATE,
-    )
+    private val preferences =
+        context.applicationContext.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE,
+        )
 
     var enabled: Boolean
         get() = preferences.getBoolean(ENABLED, false)

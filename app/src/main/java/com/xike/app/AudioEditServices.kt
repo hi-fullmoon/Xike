@@ -1,7 +1,6 @@
 package com.xike.app
 
 import com.xike.app.data.JournalAudio
-
 import java.io.File
 
 internal data class AudioEditServices(
@@ -9,6 +8,7 @@ internal data class AudioEditServices(
     val release: (JournalAudio) -> Unit,
 )
 
-internal val LocalAudioEditServices = androidx.compose.runtime.compositionLocalOf<AudioEditServices> {
-    error("Audio edit service unavailable")
-}
+internal val LocalAudioEditServices =
+    androidx.compose.runtime.compositionLocalOf<AudioEditServices> {
+        error("Audio edit service unavailable")
+    }

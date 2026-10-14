@@ -1,18 +1,17 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-import com.xike.app.data.JournalDataException
-
 import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.data.JournalDataException
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
 import java.io.File
 import java.util.UUID
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,12 +27,13 @@ class JournalStoreDeleteUndoTest {
         source.writeBytes("encrypted photo lifecycle".toByteArray())
         database.clearAllTables()
         store.removeOrphanedImages()
-        val entry = JournalEntry(
-            id = "undo-${UUID.randomUUID()}",
-            mood = Mood.CALM,
-            tags = listOf("自我"),
-            note = "可撤销的记录",
-        )
+        val entry =
+            JournalEntry(
+                id = "undo-${UUID.randomUUID()}",
+                mood = Mood.CALM,
+                tags = listOf("自我"),
+                note = "可撤销的记录",
+            )
 
         try {
             val stored = store.add(entry, listOf(Uri.fromFile(source))).single()

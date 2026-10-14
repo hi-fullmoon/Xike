@@ -29,27 +29,38 @@ class JournalDraftMediaProcessTest {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val store = JournalStore(application)
         val drafts = JournalDraftStore(application)
-        val metadata = EncryptedSharedPreferences.create(
-            application, "draft-media-process-test",
-            MasterKey.Builder(application).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-        val owner = object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() }
+        val metadata =
+            EncryptedSharedPreferences.create(
+                application,
+                "draft-media-process-test",
+                MasterKey.Builder(application).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
         lateinit var model: JournalViewModel
         instrumentation.runOnMainSync {
-            model = ViewModelProvider(
-                owner, ViewModelProvider.AndroidViewModelFactory.getInstance(application),
-            )[JournalViewModel::class.java]
+            model =
+                ViewModelProvider(
+                    owner,
+                    ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+                )[JournalViewModel::class.java]
         }
         try {
             awaitCondition { !model.isLoading }
             when (arguments.getString("draftMediaPhase")) {
                 "write" -> {
-                    check(!metadata.contains("original")) { "An earlier media process test requires cleanup." }
+                    check(!metadata.contains("original")) {
+                        "An earlier media process test requires cleanup."
+                    }
                     val original = drafts.load()
                     check(original.isEmpty) { "Use an independent device with an empty draft." }
-                    check(metadata.edit().putString("original", original.toJson().toString()).commit())
+                    check(
+                        metadata.edit().putString("original", original.toJson().toString()).commit()
+                    )
                     val recorder = XikeAudioRecorder(application)
                     try {
                         recorder.start {}
@@ -59,36 +70,62 @@ class JournalDraftMediaProcessTest {
                         val duration = SystemClock.elapsedRealtime() - startedAt
                         val expected = digest(recording.readBytes())
                         try {
-                            instrumentation.runOnMainSync { model.queueDraftAudio(recording, duration) }
-                            awaitCondition { !model.isDraftAudioSaving && model.pendingDraftAudio == null }
-                            val audio = checkNotNull(model.draft.audio) { model.dataError ?: "Recording was not imported." }
+                            instrumentation.runOnMainSync {
+                                model.queueDraftAudio(recording, duration)
+                            }
+                            awaitCondition {
+                                !model.isDraftAudioSaving && model.pendingDraftAudio == null
+                            }
+                            val audio =
+                                checkNotNull(model.draft.audio) {
+                                    model.dataError ?: "Recording was not imported."
+                                }
                             assertFalse(recording.exists())
-                            assertEquals(expected, store.openAudio(audio.fileName)!!.use { digest(it.readBytes()) })
-                            check(metadata.edit().putString("hash", expected).putString("audio", audio.toJson().toString()).commit())
-                        } finally { recording.delete() }
+                            assertEquals(
+                                expected,
+                                store.openAudio(audio.fileName)!!.use { digest(it.readBytes()) },
+                            )
+                            check(
+                                metadata
+                                    .edit()
+                                    .putString("hash", expected)
+                                    .putString("audio", audio.toJson().toString())
+                                    .commit()
+                            )
+                        } finally {
+                            recording.delete()
+                        }
                     } catch (error: Throwable) {
                         instrumentation.runOnMainSync { model.removeDraftAudio() }
                         drafts.save(original)
                         check(metadata.edit().clear().commit())
                         throw error
-                    } finally { recorder.cancel() }
+                    } finally {
+                        recorder.cancel()
+                    }
                     instrumentation.runOnMainSync { owner.viewModelStore.clear() }
                     awaitCondition { !drafts.hasPendingWrite }
                 }
                 "read" -> {
-                    val original = parseJournalDraft(checkNotNull(metadata.getString("original", null)))
+                    val original =
+                        parseJournalDraft(checkNotNull(metadata.getString("original", null)))
                     try {
                         assertFalse(drafts.hasPendingWrite)
                         val audio = checkNotNull(drafts.load().audio)
                         assertEquals(metadata.getString("audio", null), audio.toJson().toString())
                         assertEquals(audio, model.draft.audio)
                         assertTrue(model.hasResumedDraft)
-                        assertEquals(metadata.getString("hash", null), store.openAudio(audio.fileName)!!.use { digest(it.readBytes()) })
+                        assertEquals(
+                            metadata.getString("hash", null),
+                            store.openAudio(audio.fileName)!!.use { digest(it.readBytes()) },
+                        )
                     } finally {
                         val importedAudio = model.draft.audio
                         instrumentation.runOnMainSync { model.removeDraftAudio() }
                         importedAudio?.let { audio ->
-                            awaitCondition { store.openAudio(audio.fileName)?.use { false } ?: true }
+                            awaitCondition {
+                                store.openAudio(audio.fileName)?.use { false } ?: true
+                            }
                         }
                         instrumentation.runOnMainSync { owner.viewModelStore.clear() }
                         awaitCondition { !drafts.hasPendingWrite }
@@ -98,7 +135,9 @@ class JournalDraftMediaProcessTest {
                 }
                 else -> error("draftMediaPhase must be write or read")
             }
-        } finally { instrumentation.runOnMainSync { owner.viewModelStore.clear() } }
+        } finally {
+            instrumentation.runOnMainSync { owner.viewModelStore.clear() }
+        }
     }
 
     private fun digest(bytes: ByteArray): String =

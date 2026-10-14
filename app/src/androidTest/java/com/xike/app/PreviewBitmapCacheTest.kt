@@ -1,19 +1,15 @@
 package com.xike.app
 
-import com.xike.app.ui.components.rememberPreviewBitmap
-import com.xike.app.ui.components.PreviewBitmapCache
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.ui.components.PreviewBitmapCache
+import com.xike.app.ui.components.rememberPreviewBitmap
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -26,10 +22,10 @@ import org.junit.Rule
 import org.junit.Test
 
 class PreviewBitmapCacheTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
-    private fun openImage() = InstrumentationRegistry.getInstrumentation().context.assets.open("moment.png")
+    private fun openImage() =
+        InstrumentationRegistry.getInstrumentation().context.assets.open("moment.png")
 
     @Test
     fun disposedPhotoReturnsWithoutOpeningItsSourceAgain() {
@@ -38,10 +34,11 @@ class PreviewBitmapCacheTest {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 if (visible.value) {
-                    val bitmap = rememberPreviewBitmap("platform-icon", 360) {
-                        reads.incrementAndGet()
-                        openImage()
-                    }
+                    val bitmap =
+                        rememberPreviewBitmap("platform-icon", 360) {
+                            reads.incrementAndGet()
+                            openImage()
+                        }
                     bitmap?.let { Image(it, "photo") }
                 }
             }
@@ -62,14 +59,15 @@ class PreviewBitmapCacheTest {
         val cache = PreviewBitmapCache()
         val reads = AtomicInteger()
         coroutineScope {
-            val requests = List(8) {
-                async {
-                    cache.load("platform-icon", 360) {
-                        reads.incrementAndGet()
-                        openImage()
+            val requests =
+                List(8) {
+                    async {
+                        cache.load("platform-icon", 360) {
+                            reads.incrementAndGet()
+                            openImage()
+                        }
                     }
                 }
-            }
             val bitmaps = requests.map { it.await() }
             assertNotNull(bitmaps.first())
             bitmaps.forEach { assertSame(bitmaps.first(), it) }
@@ -117,10 +115,11 @@ class PreviewBitmapCacheTest {
         val probe = PreviewBitmapCache()
         val firstGallery = probe.load("moment.png", 2048) { assets.open("moment.png") }!!
         val secondGallery = probe.load("archive.png", 2048) { assets.open("archive.png") }!!
-        val galleryBudget = maxOf(
-            firstGallery.asAndroidBitmap().allocationByteCount,
-            secondGallery.asAndroidBitmap().allocationByteCount,
-        )
+        val galleryBudget =
+            maxOf(
+                firstGallery.asAndroidBitmap().allocationByteCount,
+                secondGallery.asAndroidBitmap().allocationByteCount,
+            )
         val cache = PreviewBitmapCache(galleryBudget * 4)
         val reads = AtomicInteger()
         val openThumbnail = {

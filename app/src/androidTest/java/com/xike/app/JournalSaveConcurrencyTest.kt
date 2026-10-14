@@ -1,9 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.draft.JournalDraftStore
-
-import com.xike.app.data.JournalEntry
-
 import android.app.Application
 import android.net.Uri
 import android.os.SystemClock
@@ -12,8 +8,10 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import java.util.UUID
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.draft.JournalDraftStore
 import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -32,17 +30,37 @@ class JournalSaveConcurrencyTest {
         val source = store.entries().firstOrNull()
         assumeTrue("A real existing entry is required", source != null)
         val draftStore = JournalDraftStore(application)
-        assumeTrue("The verification environment must have an empty draft", draftStore.load().isEmpty)
-        val firstEntry = requireNotNull(source).copy(id = UUID.randomUUID().toString(), imageFileNames = emptyList(), audio = null, video = null)
+        assumeTrue(
+            "The verification environment must have an empty draft",
+            draftStore.load().isEmpty,
+        )
+        val firstEntry =
+            requireNotNull(source)
+                .copy(
+                    id = UUID.randomUUID().toString(),
+                    imageFileNames = emptyList(),
+                    audio = null,
+                    video = null,
+                )
         val secondEntry = firstEntry.copy(id = UUID.randomUUID().toString())
-        val owner = object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() }
-        val model = withContext(Dispatchers.Main) {
-            ViewModelProvider(owner, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[JournalViewModel::class.java]
-        }
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
+        val model =
+            withContext(Dispatchers.Main) {
+                ViewModelProvider(
+                    owner,
+                    ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+                )[JournalViewModel::class.java]
+            }
         try {
             awaitCondition { !model.isLoading }
             withContext(Dispatchers.Main) {
-                val requester = async(start = CoroutineStart.UNDISPATCHED) { model.save(firstEntry, emptyList()) }
+                val requester =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        model.save(firstEntry, emptyList())
+                    }
                 assertTrue(model.isDraftSaving)
                 requester.cancel()
                 assertTrue(model.save(secondEntry, emptyList()).isFailure)
@@ -52,9 +70,12 @@ class JournalSaveConcurrencyTest {
             assertTrue(ids.contains(firstEntry.id))
             assertFalse(ids.contains(secondEntry.id))
         } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { owner.viewModelStore.clear() }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                owner.viewModelStore.clear()
+            }
             listOf(firstEntry, secondEntry).forEach { entry ->
-                if (store.entries().any { it.id == entry.id }) store.delete(entry.id, refreshEntries = false)
+                if (store.entries().any { it.id == entry.id })
+                    store.delete(entry.id, refreshEntries = false)
                 store.finalizeDelete(entry.id)
             }
         }
@@ -72,17 +93,31 @@ class JournalSaveConcurrencyTest {
         val store = JournalStore(application)
         val source = store.entries().firstOrNull()
         assumeTrue("A real existing entry is required", source != null)
-        assumeTrue("The verification environment must have an empty draft", JournalDraftStore(application).load().isEmpty)
+        assumeTrue(
+            "The verification environment must have an empty draft",
+            JournalDraftStore(application).load().isEmpty,
+        )
         val entry = requireNotNull(source).copy(id = UUID.randomUUID().toString())
-        val directory = File(application.cacheDir, "save-directory-${System.nanoTime()}").apply { mkdirs() }
-        val owner = object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() }
-        val model = withContext(Dispatchers.Main) {
-            ViewModelProvider(owner, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[JournalViewModel::class.java]
-        }
+        val directory =
+            File(application.cacheDir, "save-directory-${System.nanoTime()}").apply { mkdirs() }
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
+        val model =
+            withContext(Dispatchers.Main) {
+                ViewModelProvider(
+                    owner,
+                    ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+                )[JournalViewModel::class.java]
+            }
         try {
             awaitCondition { !model.isLoading }
             withContext(Dispatchers.Main) {
-                val requester = async(start = CoroutineStart.UNDISPATCHED) { model.save(entry, listOf(Uri.fromFile(directory))) }
+                val requester =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        model.save(entry, listOf(Uri.fromFile(directory)))
+                    }
                 assertTrue(model.isDraftSaving)
                 requester.cancel()
             }
@@ -93,7 +128,9 @@ class JournalSaveConcurrencyTest {
             withContext(Dispatchers.Main) { model.acknowledgeFeedback(feedback) }
             assertTrue(model.operationFeedback.isEmpty())
         } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { owner.viewModelStore.clear() }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                owner.viewModelStore.clear()
+            }
             directory.delete()
             if (store.entries().any { it.id == entry.id }) {
                 store.delete(entry.id, refreshEntries = false)

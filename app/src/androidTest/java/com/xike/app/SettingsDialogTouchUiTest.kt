@@ -56,23 +56,34 @@ class SettingsDialogTouchUiTest {
         try {
             for (language in listOf(AppLanguage.CHINESE, AppLanguage.ENGLISH)) {
                 languages.language = language
-                InstrumentationRegistry.getInstrumentation().runOnMainSync { AppLocale.initialize(context) }
+                InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                    AppLocale.initialize(context)
+                }
                 verifyOptions(
-                    "language", AppLanguage.entries, { it.displayName },
-                    { languages.language }, { languages.language = it },
+                    "language",
+                    AppLanguage.entries,
+                    { it.displayName },
+                    { languages.language },
+                    { languages.language = it },
                 ) { selected, onSelected, onDismiss ->
                     AppLanguageDialog(selected, onSelected, onDismiss)
                 }
                 languages.language = language
                 verifyOptions(
-                    "timeout", AppLockTimeout.entries, { it.label },
-                    { locks.timeout }, { locks.timeout = it },
+                    "timeout",
+                    AppLockTimeout.entries,
+                    { it.label },
+                    { locks.timeout },
+                    { locks.timeout = it },
                 ) { selected, onSelected, onDismiss ->
                     AppLockTimeoutDialog(selected, onSelected, onDismiss)
                 }
                 verifyOptions(
-                    "prompt", DailyPromptStyle.entries, { it.label },
-                    { habits.dailyPrompt.style }, { habits.dailyPrompt = habits.dailyPrompt.copy(style = it) },
+                    "prompt",
+                    DailyPromptStyle.entries,
+                    { it.label },
+                    { habits.dailyPrompt.style },
+                    { habits.dailyPrompt = habits.dailyPrompt.copy(style = it) },
                 ) { selected, onSelected, onDismiss ->
                     DailyPromptStyleDialog(selected, onSelected, onDismiss)
                 }
@@ -81,7 +92,9 @@ class SettingsDialogTouchUiTest {
             locks.timeout = originalTimeout
             habits.dailyPrompt = originalPrompt
             languages.language = originalLanguage
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { AppLocale.initialize(context) }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                AppLocale.initialize(context)
+            }
         }
     }
 
@@ -102,11 +115,15 @@ class SettingsDialogTouchUiTest {
                 activity.setContent {
                     XikeTheme(appearance.theme, style.value) {
                         if (showing.value) {
-                            dialog(selected.value, {
-                                writeSelected(it)
-                                selected.value = readSelected()
-                                showing.value = false
-                            }, { showing.value = false })
+                            dialog(
+                                selected.value,
+                                {
+                                    writeSelected(it)
+                                    selected.value = readSelected()
+                                    showing.value = false
+                                },
+                                { showing.value = false },
+                            )
                         }
                     }
                 }
@@ -115,35 +132,51 @@ class SettingsDialogTouchUiTest {
                 rule.runOnIdle { style.value = appStyle }
                 for (option in options) {
                     for (bottomEdge in listOf(false, true)) {
-                        // Select a different stored option first so an ignored or wrong tap cannot pass.
+                        // Select a different stored option first so an ignored or wrong tap cannot
+                        // pass.
                         rule.runOnIdle {
                             writeSelected(options.first { it != option })
                             selected.value = readSelected()
                             showing.value = true
                         }
                         val optionLabel = label(option)
-                        val row = rule.onNode(hasText(optionLabel) and radioRole)
-                            .performScrollTo().assertIsDisplayed()
+                        val row =
+                            rule
+                                .onNode(hasText(optionLabel) and radioRole)
+                                .performScrollTo()
+                                .assertIsDisplayed()
                         val full = row.getUnclippedBoundsInRoot()
                         val visible = row.getBoundsInRoot()
                         val fullHeight = (full.bottom - full.top).value
                         val fullWidth = (full.right - full.left).value
                         val pixelBounds = row.fetchSemanticsNode().boundsInRoot
-                        // Compare physical pixels to avoid cancellation when subtracting converted Dp coordinates.
-                        val minimumPixels = (48f * context.resources.displayMetrics.density).roundToInt()
-                        assertTrue("$name/$appStyle/$optionLabel: touch height $fullHeight", pixelBounds.height.roundToInt() >= minimumPixels)
-                        assertTrue("$name/$appStyle/$optionLabel: touch width $fullWidth", pixelBounds.width.roundToInt() >= minimumPixels)
+                        // Compare physical pixels to avoid cancellation when subtracting converted
+                        // Dp coordinates.
+                        val minimumPixels =
+                            (48f * context.resources.displayMetrics.density).roundToInt()
+                        assertTrue(
+                            "$name/$appStyle/$optionLabel: touch height $fullHeight",
+                            pixelBounds.height.roundToInt() >= minimumPixels,
+                        )
+                        assertTrue(
+                            "$name/$appStyle/$optionLabel: touch width $fullWidth",
+                            pixelBounds.width.roundToInt() >= minimumPixels,
+                        )
                         assertEquals(fullHeight, (visible.bottom - visible.top).value, 1f)
                         assertEquals(fullWidth, (visible.right - visible.left).value, 1f)
                         assertVisibleRowsDoNotOverlap()
-                        if (!bottomEdge) saveScreenshot("$name-${AppLocale.language}-$appStyle-$option")
+                        if (!bottomEdge)
+                            saveScreenshot("$name-${AppLocale.language}-$appStyle-$option")
                         row.performTouchInput {
                             click(Offset(width - 2f, if (bottomEdge) height - 2f else 2f))
                         }
                         rule.runOnIdle { assertEquals(option, readSelected()) }
                         rule.onNode(hasText(optionLabel) and radioRole).assertDoesNotExist()
                         rule.runOnIdle { showing.value = true }
-                        rule.onNode(hasText(optionLabel) and radioRole).performScrollTo().assertIsSelected()
+                        rule
+                            .onNode(hasText(optionLabel) and radioRole)
+                            .performScrollTo()
+                            .assertIsSelected()
                     }
                 }
                 rule.onNodeWithText(localizedText("取消")).performClick()
@@ -156,8 +189,13 @@ class SettingsDialogTouchUiTest {
     }
 
     private fun assertVisibleRowsDoNotOverlap() {
-        val bounds = rule.onAllNodes(radioRole).fetchSemanticsNodes()
-            .map { it.boundsInRoot }.filter { it.width > 0 && it.height > 0 }.sortedBy { it.top }
+        val bounds =
+            rule
+                .onAllNodes(radioRole)
+                .fetchSemanticsNodes()
+                .map { it.boundsInRoot }
+                .filter { it.width > 0 && it.height > 0 }
+                .sortedBy { it.top }
         bounds.zipWithNext().forEach { (above, below) ->
             assertTrue("Adjacent option touch areas overlap", above.bottom <= below.top + 1f)
         }
@@ -167,11 +205,19 @@ class SettingsDialogTouchUiTest {
         rule.waitForIdle()
         InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(500, 5_000)
         val config = context.resources.configuration
-        val directory = File(context.getExternalFilesDir(null), "settings-dialog-touch").apply { mkdirs() }
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        val directory =
+            File(context.getExternalFilesDir(null), "settings-dialog-touch").apply { mkdirs() }
+        val screenshot =
+            requireNotNull(
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            )
         try {
-            File(directory, "$name-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}.png")
-                .outputStream().use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            File(
+                    directory,
+                    "$name-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}.png",
+                )
+                .outputStream()
+                .use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         } finally {
             screenshot.recycle()
         }

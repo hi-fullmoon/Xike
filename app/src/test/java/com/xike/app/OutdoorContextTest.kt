@@ -3,7 +3,6 @@ package com.xike.app
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.outdoor.firstNonNullResult
-
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.awaitCancellation
@@ -18,17 +17,20 @@ import org.junit.Test
 class OutdoorContextTest {
     @Test
     fun `snapshot json round trip preserves normalized values`() {
-        val snapshot = OutdoorSnapshot(
-            placeName = "上海 · 浦东新区 · 世纪大道",
-            temperatureCelsius = 27.2,
-            weatherCode = 2,
-            capturedAt = 1_700_000_000_000L,
-        )
+        val snapshot =
+            OutdoorSnapshot(
+                placeName = "上海 · 浦东新区 · 世纪大道",
+                temperatureCelsius = 27.2,
+                weatherCode = 2,
+                capturedAt = 1_700_000_000_000L,
+            )
 
         val json = snapshot.toJson()
         assertEquals(snapshot, OutdoorSnapshot.fromJson(json))
-        assertEquals(setOf("placeName", "temperatureCelsius", "weatherCode", "capturedAt", "source"),
-            json.keys().asSequence().toSet())
+        assertEquals(
+            setOf("placeName", "temperatureCelsius", "weatherCode", "capturedAt", "source"),
+            json.keys().asSequence().toSet(),
+        )
     }
 
     @Test
@@ -49,61 +51,74 @@ class OutdoorContextTest {
 
     @Test
     fun `slow first provider does not block a later location result`() = runBlocking {
-        val result = withTimeout(1_000L) {
-            firstNonNullResult(listOf("network", "gps")) { provider ->
-                if (provider == "network") awaitCancellation() else "gps-location"
+        val result =
+            withTimeout(1_000L) {
+                firstNonNullResult(listOf("network", "gps")) { provider ->
+                    if (provider == "network") awaitCancellation() else "gps-location"
+                }
             }
-        }
 
         assertEquals("gps-location", result)
     }
 
     @Test
-    fun `selection waits for a preferred result instead of taking the first result`() = runBlocking {
-        val result = firstNonNullResult(
-            listOf(500, 20),
-            timeoutMillis = 1_000L,
-            isPreferred = { it <= 100 },
-            isBetter = { candidate, previous -> candidate < previous },
-        ) { value ->
-            if (value == 20) delay(20)
-            value
+    fun `selection waits for a preferred result instead of taking the first result`() =
+        runBlocking {
+            val result =
+                firstNonNullResult(
+                    listOf(500, 20),
+                    timeoutMillis = 1_000L,
+                    isPreferred = { it <= 100 },
+                    isBetter = { candidate, previous -> candidate < previous },
+                ) { value ->
+                    if (value == 20) delay(20)
+                    value
+                }
+            assertEquals(20, result)
         }
-        assertEquals(20, result)
-    }
 
     @Test
-    fun `timeout retains the best available result and cancels unfinished requests`() = runBlocking {
-        var unfinishedCancelled = false
-        val result = firstNonNullResult(
-            listOf(500, 200, null),
-            timeoutMillis = 100L,
-            isPreferred = { it <= 100 },
-            isBetter = { candidate, previous -> candidate < previous },
-        ) { value ->
-            if (value == null) {
-                try { awaitCancellation() } finally { unfinishedCancelled = true }
-            } else value
+    fun `timeout retains the best available result and cancels unfinished requests`() =
+        runBlocking {
+            var unfinishedCancelled = false
+            val result =
+                firstNonNullResult(
+                    listOf(500, 200, null),
+                    timeoutMillis = 100L,
+                    isPreferred = { it <= 100 },
+                    isBetter = { candidate, previous -> candidate < previous },
+                ) { value ->
+                    if (value == null) {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            unfinishedCancelled = true
+                        }
+                    } else value
+                }
+            assertEquals(200, result)
+            assertTrue(unfinishedCancelled)
         }
-        assertEquals(200, result)
-        assertTrue(unfinishedCancelled)
-    }
 
     @Test
     fun `failed provider does not discard the other provider result`() = runBlocking {
-        val result = firstNonNullResult(listOf(false, true)) { available ->
-            check(available)
-            available
-        }
+        val result =
+            firstNonNullResult(listOf(false, true)) { available ->
+                check(available)
+                available
+            }
         assertEquals(true, result)
     }
 
     @Test
     fun `editing within a date retains outdoor snapshot while crossing dates removes it`() {
         val zone = ZoneId.of("Asia/Shanghai")
-        val original = LocalDate.of(2026, 8, 26).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
-        val sameDate = LocalDate.of(2026, 8, 26).atTime(22, 0).atZone(zone).toInstant().toEpochMilli()
-        val nextDate = LocalDate.of(2026, 8, 27).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val original =
+            LocalDate.of(2026, 8, 26).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val sameDate =
+            LocalDate.of(2026, 8, 26).atTime(22, 0).atZone(zone).toInstant().toEpochMilli()
+        val nextDate =
+            LocalDate.of(2026, 8, 27).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
         val snapshot = OutdoorSnapshot("上海", 28.0, 1, original)
 
         assertEquals(snapshot, retainOutdoorForEditedTime(snapshot, original, sameDate, zone))

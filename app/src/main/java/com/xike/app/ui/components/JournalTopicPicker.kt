@@ -1,20 +1,12 @@
 package com.xike.app.ui.components
 
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeInlineActionGap
-
-import com.xike.app.containsTopic
-import com.xike.app.localizedText
-import com.xike.app.tr
-
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,43 +40,52 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.xike.app.containsTopic
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.theme.XikeInlineActionGap
+import com.xike.app.ui.theme.XikeShapes
 
 internal data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
 
-internal val journalTopics = listOf(
-    JournalTopic("工作", Color(0xFF56758B), Icons.Outlined.BusinessCenter),
-    JournalTopic("学习", Color(0xFF766B98), Icons.AutoMirrored.Outlined.MenuBook),
-    JournalTopic("关系", Color(0xFF9A6173), Icons.Outlined.FavoriteBorder),
-    JournalTopic("家庭", Color(0xFF976A50), Icons.Outlined.Home),
-    JournalTopic("身体", Color(0xFF568063), Icons.Outlined.SelfImprovement),
-    JournalTopic("睡眠", Color(0xFF637197), Icons.Outlined.Bedtime),
-    JournalTopic("饮食", Color(0xFFA87548), Icons.Outlined.Restaurant),
-    JournalTopic("金钱", Color(0xFF987838), Icons.Outlined.AccountBalanceWallet),
-    JournalTopic("自我", Color(0xFF447E78), Icons.Outlined.PersonOutline),
-    JournalTopic("兴趣", Color(0xFF8A6190), Icons.Outlined.Interests),
-    JournalTopic("出行", Color(0xFF4C7F8C), Icons.Outlined.Commute),
-    JournalTopic("居住", Color(0xFF8B7057), Icons.Outlined.HomeWork),
-    JournalTopic("其他", Color(0xFF6F766F), Icons.Outlined.MoreHoriz),
-)
-
+internal val journalTopics =
+    listOf(
+        JournalTopic("工作", Color(0xFF56758B), Icons.Outlined.BusinessCenter),
+        JournalTopic("学习", Color(0xFF766B98), Icons.AutoMirrored.Outlined.MenuBook),
+        JournalTopic("关系", Color(0xFF9A6173), Icons.Outlined.FavoriteBorder),
+        JournalTopic("家庭", Color(0xFF976A50), Icons.Outlined.Home),
+        JournalTopic("身体", Color(0xFF568063), Icons.Outlined.SelfImprovement),
+        JournalTopic("睡眠", Color(0xFF637197), Icons.Outlined.Bedtime),
+        JournalTopic("饮食", Color(0xFFA87548), Icons.Outlined.Restaurant),
+        JournalTopic("金钱", Color(0xFF987838), Icons.Outlined.AccountBalanceWallet),
+        JournalTopic("自我", Color(0xFF447E78), Icons.Outlined.PersonOutline),
+        JournalTopic("兴趣", Color(0xFF8A6190), Icons.Outlined.Interests),
+        JournalTopic("出行", Color(0xFF4C7F8C), Icons.Outlined.Commute),
+        JournalTopic("居住", Color(0xFF8B7057), Icons.Outlined.HomeWork),
+        JournalTopic("其他", Color(0xFF6F766F), Icons.Outlined.MoreHoriz),
+    )
 
 @Composable
 internal fun MomentTopicsHeader(selectedCount: Int, highlightSelection: Boolean = true) {
     val title = localizedText("主题")
-    val count = if (selectedCount == 0) localizedText("可多选") else tr("已选 $selectedCount", "$selectedCount selected")
+    val count =
+        if (selectedCount == 0) localizedText("可多选")
+        else tr("已选 $selectedCount", "$selectedCount selected")
     val titleStyle = MaterialTheme.typography.titleSmall
     val countStyle = MaterialTheme.typography.labelSmall
     val measurer = rememberTextMeasurer()
-    val requiredWidth = with(LocalDensity.current) {
-        (measurer.measure(title, titleStyle, softWrap = false).size.width +
-            measurer.measure(count, countStyle, softWrap = false).size.width).toDp() + 8.dp
-    }
+    val requiredWidth =
+        with(LocalDensity.current) {
+            (measurer.measure(title, titleStyle, softWrap = false).size.width +
+                    measurer.measure(count, countStyle, softWrap = false).size.width)
+                .toDp() + 8.dp
+        }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val stackCount = requiredWidth > maxWidth
         FlowRow(
@@ -101,11 +102,17 @@ internal fun MomentTopicsHeader(selectedCount: Int, highlightSelection: Boolean 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Box(if (stackCount) Modifier.fillMaxWidth() else Modifier, contentAlignment = Alignment.CenterEnd) {
+            Box(
+                if (stackCount) Modifier.fillMaxWidth() else Modifier,
+                contentAlignment = Alignment.CenterEnd,
+            ) {
                 Text(
                     count,
                     style = countStyle,
-                    color = if (selectedCount == 0 || !highlightSelection) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                    color =
+                        if (selectedCount == 0 || !highlightSelection)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -116,9 +123,17 @@ internal fun MomentTopicsHeader(selectedCount: Int, highlightSelection: Boolean 
 internal fun TopicChoices(selectedTags: Collection<String>, onToggle: (JournalTopic) -> Unit) {
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelLarge
-    val minWidth = with(LocalDensity.current) {
-        journalTopics.maxOf { textMeasurer.measure(localizedText(it.label), labelStyle, softWrap = false).size.width }.toDp() + 42.dp
-    }
+    val minWidth =
+        with(LocalDensity.current) {
+            journalTopics
+                .maxOf {
+                    textMeasurer
+                        .measure(localizedText(it.label), labelStyle, softWrap = false)
+                        .size
+                        .width
+                }
+                .toDp() + 42.dp
+        }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = ((maxWidth + 7.dp) / (minWidth + 7.dp)).toInt().coerceIn(1, 3)
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -151,28 +166,37 @@ internal fun TopicChip(
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
-        modifier = modifier.clip(XikeShapes.inner).selectable(
-            selected = selected, role = Role.Checkbox, onClick = onClick,
-        ),
+        modifier =
+            modifier
+                .clip(XikeShapes.inner)
+                .selectable(
+                    selected = selected,
+                    role = Role.Checkbox,
+                    onClick = onClick,
+                ),
         shape = XikeShapes.inner,
-        color = if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
-        border = BorderStroke(
-            1.dp,
-            if (selected) topic.accent.copy(alpha = 0.58f) else Color.Transparent,
-        ),
+        color =
+            if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+        border =
+            BorderStroke(
+                1.dp,
+                if (selected) topic.accent.copy(alpha = 0.58f) else Color.Transparent,
+            ),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = minHeight).padding(horizontal = 9.dp, vertical = 4.dp),
+            modifier =
+                Modifier.heightIn(min = minHeight).padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
+                tint =
+                    if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
                     else topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
             Spacer(Modifier.width(XikeInlineActionGap))
@@ -180,11 +204,12 @@ internal fun TopicChip(
                 localizedText(topic.label),
                 maxLines = labelMaxLines,
                 style = MaterialTheme.typography.labelLarge,
-                color = when {
-                    selected && isDark -> MaterialTheme.colorScheme.onSurface
-                    selected -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                color =
+                    when {
+                        selected && isDark -> MaterialTheme.colorScheme.onSurface
+                        selected -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
             )
         }
     }

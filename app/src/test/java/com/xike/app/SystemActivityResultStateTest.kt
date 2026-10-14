@@ -42,7 +42,10 @@ class SystemActivityResultStateTest {
         val state = SystemActivityResultState<Boolean>(SavedStateHandle())
         state.receive(true)
         var deliveries = 0
-        val accept: (Boolean) -> Boolean = { deliveries++; it }
+        val accept: (Boolean) -> Boolean = {
+            deliveries++
+            it
+        }
         assertEquals(false, state.acceptWhenReady(false, accept))
         assertEquals(0, deliveries)
         assertNotNull(state.pending)
@@ -88,7 +91,6 @@ class SystemActivityResultStateTest {
         }
     }
 
-    private fun restore(state: SavedStateHandle) = SavedStateHandle(
-        state.keys().associateWith { state.get<Any?>(it) },
-    )
+    private fun restore(state: SavedStateHandle) =
+        SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
 }

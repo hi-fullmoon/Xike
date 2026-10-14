@@ -1,28 +1,24 @@
 package com.xike.app
 
-import com.xike.app.feature.insights.InsightsPeriod
-import com.xike.app.feature.insights.journalPeriodSummary
-import com.xike.app.feature.insights.localJournalReview
-
-import com.xike.app.feature.insights.JournalInsightsScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
 import android.content.Context
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.JournalInsightsScreen
+import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.feature.insights.localJournalReview
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -30,8 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class LocalReviewNavigationTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun originalEntriesReturnToTheSameReviewPosition() {
@@ -50,7 +45,9 @@ class LocalReviewNavigationTest {
                 JournalInsightsScreen(PaddingValues(), entries, store::openImage, store::openAudio)
             }
         }
-        composeRule.onNodeWithTag("insights-list").performScrollToNode(hasText(localizedText("查看本地回顾")))
+        composeRule
+            .onNodeWithTag("insights-list")
+            .performScrollToNode(hasText(localizedText("查看本地回顾")))
         composeRule.onNodeWithText(localizedText("查看本地回顾")).performClick()
         composeRule.onNodeWithText(source.label).performScrollTo()
         val before = reviewScrollPosition()
@@ -63,6 +60,10 @@ class LocalReviewNavigationTest {
         assertEquals(before, reviewScrollPosition(), 1f)
     }
 
-    private fun reviewScrollPosition(): Float = composeRule.onNodeWithTag("local-review-scroll")
-        .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+    private fun reviewScrollPosition(): Float =
+        composeRule
+            .onNodeWithTag("local-review-scroll")
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+            .value()
 }

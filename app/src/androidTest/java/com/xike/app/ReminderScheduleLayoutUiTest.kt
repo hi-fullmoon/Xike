@@ -27,8 +27,8 @@ import com.xike.app.ui.theme.XikeTheme
 import java.io.File
 import java.time.DayOfWeek
 import java.time.format.TextStyle
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,9 +40,10 @@ class ReminderScheduleLayoutUiTest {
     @Test
     fun weekdayLabelsAndActionsRemainReadableAndReachable() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val language = AppLanguage.valueOf(
-            InstrumentationRegistry.getArguments().getString("reminderUiLanguage") ?: "ENGLISH",
-        )
+        val language =
+            AppLanguage.valueOf(
+                InstrumentationRegistry.getArguments().getString("reminderUiLanguage") ?: "ENGLISH"
+            )
         val originalLanguage = LanguagePreferences(context).language
         val theme = mutableStateOf(AppTheme.PINE)
         val style = mutableStateOf(AppStyle.BREATHE)
@@ -50,7 +51,11 @@ class ReminderScheduleLayoutUiTest {
             rule.runOnIdle { AppLocale.select(context, language) }
             rule.setContent {
                 XikeTheme(theme.value, style.value) {
-                    ReminderScheduleDialog(HabitPreferences(context).reminder, onConfirm = {}, onDismiss = {})
+                    ReminderScheduleDialog(
+                        HabitPreferences(context).reminder,
+                        onConfirm = {},
+                        onDismiss = {},
+                    )
                 }
             }
             for (palette in AppTheme.entries) {
@@ -60,37 +65,63 @@ class ReminderScheduleLayoutUiTest {
                         style.value = appearance
                     }
                     val timeLayouts = mutableListOf<TextLayoutResult>()
-                    rule.onNodeWithText(HabitPreferences(context).reminder.timeLabel)
-                        .performScrollTo().assertIsDisplayed()
-                        .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(timeLayouts) }
+                    rule
+                        .onNodeWithText(HabitPreferences(context).reminder.timeLabel)
+                        .performScrollTo()
+                        .assertIsDisplayed()
+                        .performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
+                            it(timeLayouts)
+                        }
                     assertTrue(timeLayouts.isNotEmpty())
                     timeLayouts.forEach { layout ->
-                        assertEquals("$palette $appearance time row: ${layout.layoutInput.text}", 1, layout.lineCount)
+                        assertEquals(
+                            "$palette $appearance time row: ${layout.layoutInput.text}",
+                            1,
+                            layout.lineCount,
+                        )
                         assertFalse(layout.didOverflowHeight)
                     }
                     rule.onNodeWithText(localizedText("修改")).assertIsDisplayed()
-                    if (palette == AppTheme.VIOLET) saveScreenshot(context, "$language-$appearance-top")
+                    if (palette == AppTheme.VIOLET)
+                        saveScreenshot(context, "$language-$appearance-top")
                     for (day in DayOfWeek.entries) {
-                        val node = rule.onNodeWithContentDescription(day.getDisplayName(TextStyle.FULL, AppLocale.locale))
+                        val node =
+                            rule.onNodeWithContentDescription(
+                                day.getDisplayName(TextStyle.FULL, AppLocale.locale)
+                            )
                         node.performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
                         val layouts = mutableListOf<TextLayoutResult>()
-                        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
+                            it(layouts)
+                        }
                         assertTrue(layouts.isNotEmpty())
                         layouts.forEach { layout ->
-                            val clipped = (0 until layout.lineCount).any { line ->
-                                layout.getLineLeft(line) < -1f || layout.getLineRight(line) > layout.size.width + 1f ||
-                                    layout.getLineBottom(line) > layout.size.height + 1f || layout.isLineEllipsized(line)
-                            }
+                            val clipped =
+                                (0 until layout.lineCount).any { line ->
+                                    layout.getLineLeft(line) < -1f ||
+                                        layout.getLineRight(line) > layout.size.width + 1f ||
+                                        layout.getLineBottom(line) > layout.size.height + 1f ||
+                                        layout.isLineEllipsized(line)
+                                }
                             if (clipped) {
-                                val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+                                val bitmap =
+                                    requireNotNull(
+                                        InstrumentationRegistry.getInstrumentation()
+                                            .uiAutomation
+                                            .takeScreenshot()
+                                    )
                                 try {
                                     File(context.getExternalFilesDir(null), "reminder-overflow.png")
-                                        .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                        .outputStream()
+                                        .use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                                 } finally {
                                     bitmap.recycle()
                                 }
                             }
-                            assertFalse("$palette $appearance $day: ${layout.size}, lines=${layout.lineCount}, left=${layout.getLineLeft(0)}, right=${layout.getLineRight(0)}, bottom=${layout.getLineBottom(0)}", clipped)
+                            assertFalse(
+                                "$palette $appearance $day: ${layout.size}, lines=${layout.lineCount}, left=${layout.getLineLeft(0)}, right=${layout.getLineRight(0)}, bottom=${layout.getLineBottom(0)}",
+                                clipped,
+                            )
                         }
                     }
                     rule.onNodeWithText(localizedText("夜间勿扰")).performScrollTo().assertIsDisplayed()
@@ -103,13 +134,24 @@ class ReminderScheduleLayoutUiTest {
             }
             val initial = HabitPreferences(context).reminder.weekdays
             for (day in initial) {
-                rule.onNodeWithContentDescription(day.getDisplayName(TextStyle.FULL, AppLocale.locale))
-                    .performScrollTo().assertIsOn().performClick().assertIsOff()
+                rule
+                    .onNodeWithContentDescription(
+                        day.getDisplayName(TextStyle.FULL, AppLocale.locale)
+                    )
+                    .performScrollTo()
+                    .assertIsOn()
+                    .performClick()
+                    .assertIsOff()
             }
             rule.onNodeWithText(localizedText("至少选择一天")).performScrollTo().assertIsDisplayed()
             rule.onNodeWithText(localizedText("保存")).assertIsNotEnabled()
-            rule.onNodeWithContentDescription(DayOfWeek.MONDAY.getDisplayName(TextStyle.FULL, AppLocale.locale))
-                .performScrollTo().performClick().assertIsOn()
+            rule
+                .onNodeWithContentDescription(
+                    DayOfWeek.MONDAY.getDisplayName(TextStyle.FULL, AppLocale.locale)
+                )
+                .performScrollTo()
+                .performClick()
+                .assertIsOn()
             rule.onNodeWithText(localizedText("保存")).assertIsEnabled()
         } finally {
             rule.runOnIdle { AppLocale.select(context, originalLanguage) }
@@ -125,7 +167,8 @@ class ReminderScheduleLayoutUiTest {
         val bitmap = requireNotNull(automation.takeScreenshot())
         try {
             File(folder, "$name-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}.png")
-                .outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                .outputStream()
+                .use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         } finally {
             bitmap.recycle()
         }

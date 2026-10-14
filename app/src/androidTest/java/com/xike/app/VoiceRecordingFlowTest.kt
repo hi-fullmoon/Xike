@@ -1,8 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.data.draft.JournalDraftStore
-
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.ViewModelProvider
@@ -11,6 +8,8 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.draft.JournalDraftStore
+import com.xike.app.data.model.JournalDraft
 import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -37,7 +36,10 @@ class VoiceRecordingFlowTest {
             assertTrue(encryptedFile.isFile)
             assertFalse(encryptedFile.readBytes().toString(Charsets.UTF_8).contains("只属于这次录音"))
             assertEquals(staged, PendingDraftAudioStore(application).recover())
-            assertArrayEquals(bytes, PendingDraftAudioStore(application).open(staged).use { it.readBytes() })
+            assertArrayEquals(
+                bytes,
+                PendingDraftAudioStore(application).open(staged).use { it.readBytes() },
+            )
         } finally {
             source.delete()
             staged?.let(store::delete)
@@ -54,22 +56,28 @@ class VoiceRecordingFlowTest {
         source.writeBytes(bytes)
         val staged = pendingStore.stage(source, 3_000L)
         source.delete()
-        val owner = object : ViewModelStoreOwner {
-            override val viewModelStore = ViewModelStore()
-        }
-        val viewModel = ViewModelProvider(
-            owner,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application),
-        )[JournalViewModel::class.java]
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
+        val viewModel =
+            ViewModelProvider(
+                owner,
+                ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+            )[JournalViewModel::class.java]
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         try {
             awaitCondition {
-                !viewModel.isLoading && !viewModel.isDraftAudioSaving &&
-                    viewModel.pendingDraftAudio == null && viewModel.draft.audio != null
+                !viewModel.isLoading &&
+                    !viewModel.isDraftAudioSaving &&
+                    viewModel.pendingDraftAudio == null &&
+                    viewModel.draft.audio != null
             }
             val audio = requireNotNull(viewModel.draft.audio)
             assertArrayEquals(bytes, viewModel.openAudio(audio.fileName)?.use { it.readBytes() })
-            assertFalse(File(application.filesDir, "pending-draft-audio/${staged.fileName}").exists())
+            assertFalse(
+                File(application.filesDir, "pending-draft-audio/${staged.fileName}").exists()
+            )
         } finally {
             instrumentation.runOnMainSync { viewModel.discardDraft() }
             instrumentation.runOnMainSync { owner.viewModelStore.clear() }
@@ -82,13 +90,15 @@ class VoiceRecordingFlowTest {
     @Test
     fun recordingThatCannotBeEncryptedDoesNotLeavePlaintextBehind() {
         val application = ApplicationProvider.getApplicationContext<Application>()
-        val owner = object : ViewModelStoreOwner {
-            override val viewModelStore = ViewModelStore()
-        }
-        val viewModel = ViewModelProvider(
-            owner,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application),
-        )[JournalViewModel::class.java]
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
+        val viewModel =
+            ViewModelProvider(
+                owner,
+                ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+            )[JournalViewModel::class.java]
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         awaitCondition { !viewModel.isLoading }
         val source = File.createTempFile("xike-recording-test-", ".m4a", application.cacheDir)

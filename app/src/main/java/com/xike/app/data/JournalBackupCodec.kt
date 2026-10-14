@@ -1,11 +1,7 @@
 package com.xike.app.data
 
-import com.xike.app.tr
-
 import com.xike.app.localizedText
-
-import org.json.JSONArray
-import org.json.JSONObject
+import com.xike.app.tr
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -18,6 +14,8 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import org.json.JSONArray
+import org.json.JSONObject
 
 internal class BackupValidationException(message: String) : IllegalArgumentException(message)
 
@@ -54,9 +52,19 @@ internal object BackupCipher {
     private const val KEY_BITS = 256
     private const val SALT_BYTES = 16
     private const val NONCE_BYTES = 12
-    private val streamingMagic = byteArrayOf('L'.code.toByte(), 'I'.code.toByte(), 'U'.code.toByte(), 'B'.code.toByte(), 'A'.code.toByte(), 'I'.code.toByte(), 4)
+    private val streamingMagic =
+        byteArrayOf(
+            'L'.code.toByte(),
+            'I'.code.toByte(),
+            'U'.code.toByte(),
+            'B'.code.toByte(),
+            'A'.code.toByte(),
+            'I'.code.toByte(),
+            4,
+        )
 
-    val magicSize: Int get() = streamingMagic.size
+    val magicSize: Int
+        get() = streamingMagic.size
 
     fun hasStreamingMagic(value: ByteArray): Boolean = value.contentEquals(streamingMagic)
 
@@ -100,7 +108,9 @@ internal object BackupCipher {
 
     fun decryptLegacy(payload: String, password: String): String {
         val backup = JSONObject(payload)
-        validateBackup(backup.optString("format") == "xike-encrypted") { localizedText("备份未加密或文件格式不正确。") }
+        validateBackup(backup.optString("format") == "xike-encrypted") {
+            localizedText("备份未加密或文件格式不正确。")
+        }
         val salt = Base64.getDecoder().decode(backup.getString("salt"))
         val nonce = Base64.getDecoder().decode(backup.getString("nonce"))
         val ciphertext = Base64.getDecoder().decode(backup.getString("ciphertext"))
@@ -111,11 +121,13 @@ internal object BackupCipher {
 
     private fun key(password: String, salt: ByteArray): SecretKeySpec {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val derived = factory.generateSecret(PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_BITS)).encoded
+        val derived =
+            factory
+                .generateSecret(PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_BITS))
+                .encoded
         return SecretKeySpec(derived, "AES")
     }
 }
-
 
 internal fun parseBackupEntries(
     values: JSONArray,
@@ -126,15 +138,20 @@ internal fun parseBackupEntries(
     validateBackup(values.length() <= maximumEntryCount) { localizedText("备份包含过多日记。") }
     return List(values.length()) { index ->
         val entry = JournalEntry.fromJson(values.getJSONObject(index))
-        entry.video?.let { validateBackup(it.isValid()) { tr("备份视频信息无效。", "Invalid backup video metadata.") } }
+        entry.video?.let {
+            validateBackup(it.isValid()) { tr("备份视频信息无效。", "Invalid backup video metadata.") }
+        }
         entry.copy(
-            imageFileNames = entry.imageFileNames
-                .filter(isSafeImageFileName)
-                .distinct()
-                .take(MAX_IMAGES_PER_ENTRY),
-            audio = entry.audio?.takeIf {
-                isSafeAudioFileName(it.fileName) && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
-            },
+            imageFileNames =
+                entry.imageFileNames
+                    .filter(isSafeImageFileName)
+                    .distinct()
+                    .take(MAX_IMAGES_PER_ENTRY),
+            audio =
+                entry.audio?.takeIf {
+                    isSafeAudioFileName(it.fileName) &&
+                        it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
+                },
         )
     }
 }

@@ -1,16 +1,5 @@
 package com.xike.app.feature.archive
 
-import com.xike.app.ui.components.MoodEmoji
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.data.Mood
-import com.xike.app.JournalImageFilter
-import com.xike.app.containsTopic
-import com.xike.app.AppLocale
-import com.xike.app.localizedText
-import com.xike.app.tr
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,14 +20,24 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
+import com.xike.app.AppLocale
+import com.xike.app.JournalImageFilter
+import com.xike.app.containsTopic
+import com.xike.app.data.Mood
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.components.MoodEmoji
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeShapes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
 
 internal enum class ArchiveDatePreset(private val sourceLabel: String) {
     ALL("全部日期"),
@@ -46,14 +45,16 @@ internal enum class ArchiveDatePreset(private val sourceLabel: String) {
     LAST_30_DAYS("近 30 天"),
     THIS_YEAR("今年");
 
-    val label: String get() = localizedText(sourceLabel)
+    val label: String
+        get() = localizedText(sourceLabel)
 
-    fun range(today: LocalDate): Pair<LocalDate?, LocalDate?> = when (this) {
-        ALL -> null to null
-        LAST_7_DAYS -> today.minusDays(6) to today
-        LAST_30_DAYS -> today.minusDays(29) to today
-        THIS_YEAR -> today.withDayOfYear(1) to today
-    }
+    fun range(today: LocalDate): Pair<LocalDate?, LocalDate?> =
+        when (this) {
+            ALL -> null to null
+            LAST_7_DAYS -> today.minusDays(6) to today
+            LAST_30_DAYS -> today.minusDays(29) to today
+            THIS_YEAR -> today.withDayOfYear(1) to today
+        }
 }
 
 @Composable
@@ -71,18 +72,21 @@ internal fun ArchiveFilters(
     onClearDate: () -> Unit,
     onClearAll: () -> Unit,
 ) {
-    val selectedContentColor = if (isSystemInDarkTheme()) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
-            .compositeOver(MaterialTheme.colorScheme.onPrimaryContainer)
-    }
-    val filterColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-        selectedLabelColor = selectedContentColor,
-        selectedLeadingIconColor = selectedContentColor,
-        selectedTrailingIconColor = selectedContentColor,
-    )
+    val selectedContentColor =
+        if (isSystemInDarkTheme()) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.primary
+                .copy(alpha = 0.92f)
+                .compositeOver(MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    val filterColors =
+        FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = selectedContentColor,
+            selectedLeadingIconColor = selectedContentColor,
+            selectedTrailingIconColor = selectedContentColor,
+        )
     Surface(
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.surface,
@@ -103,7 +107,9 @@ internal fun ArchiveFilters(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onClearAll, shape = XikeShapes.button) { Text(localizedText("全部清除")) }
+                TextButton(onClick = onClearAll, shape = XikeShapes.button) {
+                    Text(localizedText("全部清除"))
+                }
             }
             FilterTitle(localizedText("心情"))
             LazyRow(
@@ -155,7 +161,13 @@ internal fun ArchiveFilters(
                             colors = filterColors,
                             onClick = onClearDate,
                             label = { Text(selectedDate.asShortChineseDate()) },
-                            trailingIcon = { Icon(Icons.Outlined.Close, localizedText("清除指定日期"), Modifier.size(18.dp)) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    localizedText("清除指定日期"),
+                                    Modifier.size(18.dp),
+                                )
+                            },
                         )
                     }
                 }
@@ -198,7 +210,6 @@ private fun FilterTitle(title: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
 
 internal fun LocalDate.asShortChineseDate(): String =
     format(DateTimeFormatter.ofPattern(tr("M月d日", "MMM d"), AppLocale.locale))

@@ -1,14 +1,9 @@
 package com.xike.app.feature.moment
 
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeDialogContentGap
-import com.xike.app.localizedText
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -19,11 +14,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.DialogProperties
-
+import com.xike.app.localizedText
+import com.xike.app.ui.theme.XikeDialogContentGap
+import com.xike.app.ui.theme.XikeShapes
 
 @Composable
 internal fun OutdoorCityDialog(
@@ -57,13 +56,17 @@ internal fun OutdoorCityDialog(
                 )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
+        },
         confirmButton = {
             TextButton(
                 shape = XikeShapes.button,
                 onClick = { onConfirm(city.trim()) },
                 enabled = city.isNotBlank(),
-            ) { Text(localizedText("获取天气")) }
+            ) {
+                Text(localizedText("获取天气"))
+            }
         },
     )
 }

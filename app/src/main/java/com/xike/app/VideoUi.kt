@@ -1,52 +1,32 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalVideo
-import com.xike.app.data.model.MAX_VIDEO_BYTES
-import com.xike.app.data.model.VideoEditDraft
-
-import com.xike.app.ui.components.PlaybackProgressSlider
-
-import com.xike.app.data.JournalEntry
-
-import com.xike.app.ui.components.XikeNotice
-
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeCurrentStyle
-
-
-
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
-
 import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.media.AudioAttributes
 import android.media.MediaDataSource
 import android.media.MediaPlayer
-import android.media.AudioAttributes
 import android.net.Uri
 import android.provider.MediaStore
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,28 +34,42 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.MAX_VIDEO_BYTES
+import com.xike.app.data.model.VideoEditDraft
+import com.xike.app.ui.components.PlaybackProgressSlider
+import com.xike.app.ui.components.XikeNotice
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.XikeCurrentStyle
+import com.xike.app.ui.theme.XikeShapes
+import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
 
 internal data class VideoServices(
-    val import: suspend (Uri, (Float) -> Unit) -> Result<JournalVideo> = { _, _ -> Result.failure(IllegalStateException("Video service unavailable")) },
+    val import: suspend (Uri, (Float) -> Unit) -> Result<JournalVideo> = { _, _ ->
+        Result.failure(IllegalStateException("Video service unavailable"))
+    },
     val release: (JournalVideo) -> Unit = {},
     val source: (JournalVideo) -> MediaDataSource = { error("Video service unavailable") },
     val cover: (String) -> InputStream? = { null },
@@ -85,20 +79,28 @@ internal data class VideoServices(
     val draftSaving: Boolean = false,
     val draftProgress: Float? = null,
     val editDraft: (JournalEntry) -> VideoEditDraft? = { null },
-    val saveEdit: suspend (JournalEntry, JournalVideo?) -> Result<Unit> = { _, _ -> Result.failure(IllegalStateException("Video service unavailable")) },
-    val clearEdit: suspend (String) -> Result<Unit> = { Result.failure(IllegalStateException("Video service unavailable")) },
+    val saveEdit: suspend (JournalEntry, JournalVideo?) -> Result<Unit> = { _, _ ->
+        Result.failure(IllegalStateException("Video service unavailable"))
+    },
+    val clearEdit: suspend (String) -> Result<Unit> = {
+        Result.failure(IllegalStateException("Video service unavailable"))
+    },
 )
+
 internal val LocalVideoServices = compositionLocalOf { VideoServices() }
 
 internal class JournalVideoCaptureContract : ActivityResultContracts.CaptureVideo() {
-    override fun createIntent(context: Context, input: Uri): Intent = super.createIntent(context, input)
-        .putExtra(MediaStore.EXTRA_DURATION_LIMIT, 300)
-        .putExtra(MediaStore.EXTRA_SIZE_LIMIT, MAX_VIDEO_BYTES)
-        .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
-        .apply {
-            clipData = android.content.ClipData.newRawUri("video", input)
-            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+    override fun createIntent(context: Context, input: Uri): Intent =
+        super.createIntent(context, input)
+            .putExtra(MediaStore.EXTRA_DURATION_LIMIT, 300)
+            .putExtra(MediaStore.EXTRA_SIZE_LIMIT, MAX_VIDEO_BYTES)
+            .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
+            .apply {
+                clipData = android.content.ClipData.newRawUri("video", input)
+                addFlags(
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
 }
 
 @Composable
@@ -112,40 +114,85 @@ internal fun rememberVideoChooser(
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     var choosing by rememberSaveable { mutableStateOf(false) }
-    val cameraAvailable = if (choosing) remember(context) {
-        canCaptureMedia(context, MediaStore.ACTION_VIDEO_CAPTURE)
-    } else false
+    val cameraAvailable =
+        if (choosing)
+            remember(context) {
+                canCaptureMedia(context, MediaStore.ACTION_VIDEO_CAPTURE)
+            }
+        else false
     var captureUri by rememberSaveable { mutableStateOf<String?>(null) }
-    fun failure(error: Throwable) { XikeNotice.makeText(context, error.message ?: tr("无法添加视频。", "Unable to add video."), XikeNotice.LENGTH_LONG).show() }
-    val picker = rememberMediaActivityResultLauncher(ActivityResultContracts.PickVisualMedia(), "video/$ownerKey/picker", resultsReady = enabled) { uri, access ->
-        uri == null || onPicked(uri, access)
+    fun failure(error: Throwable) {
+        XikeNotice.makeText(
+                context,
+                error.message ?: tr("无法添加视频。", "Unable to add video."),
+                XikeNotice.LENGTH_LONG,
+            )
+            .show()
     }
-    val capture = rememberSystemActivityResultLauncher(JournalVideoCaptureContract(), "video/$ownerKey/capture") { captured ->
-        val uri = captureUri?.let(Uri::parse)
-        captureUri = null
-        if (uri != null) scope.launch {
-            runCatching { withContext(Dispatchers.IO) { finishVideoCapture(context, uri, captured) } }
-                .onSuccess { if (it) onPicked(uri, SystemActivityReadAccess(context, emptyList())) }.onFailure(::failure)
+    val picker =
+        rememberMediaActivityResultLauncher(
+            ActivityResultContracts.PickVisualMedia(),
+            "video/$ownerKey/picker",
+            resultsReady = enabled,
+        ) { uri, access ->
+            uri == null || onPicked(uri, access)
         }
-    }
+    val capture =
+        rememberSystemActivityResultLauncher(
+            JournalVideoCaptureContract(),
+            "video/$ownerKey/capture",
+        ) { captured ->
+            val uri = captureUri?.let(Uri::parse)
+            captureUri = null
+            if (uri != null)
+                scope.launch {
+                    runCatching {
+                            withContext(Dispatchers.IO) {
+                                finishVideoCapture(context, uri, captured)
+                            }
+                        }
+                        .onSuccess {
+                            if (it) onPicked(uri, SystemActivityReadAccess(context, emptyList()))
+                        }
+                        .onFailure(::failure)
+                }
+        }
     val shoot: () -> Unit = {
         scope.launch {
             runCatching {
-                val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
-                check(intent.resolveActivity(context.packageManager) != null) { tr("没有可用的摄像应用。", "No camera app is available.") }
-                val uri = withContext(Dispatchers.IO) { createVideoCaptureUri(context) }
-                captureUri = uri.toString()
-                try { capture.launch(uri) } catch (error: Throwable) {
-                    captureUri = null
-                    withContext(Dispatchers.IO) { finishVideoCapture(context, uri, false) }
-                    throw error
+                    val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+                    check(intent.resolveActivity(context.packageManager) != null) {
+                        tr("没有可用的摄像应用。", "No camera app is available.")
+                    }
+                    val uri = withContext(Dispatchers.IO) { createVideoCaptureUri(context) }
+                    captureUri = uri.toString()
+                    try {
+                        capture.launch(uri)
+                    } catch (error: Throwable) {
+                        captureUri = null
+                        withContext(Dispatchers.IO) { finishVideoCapture(context, uri, false) }
+                        throw error
+                    }
                 }
-            }.onFailure(::failure)
+                .onFailure(::failure)
         }
     }
-    val permission = rememberSystemActivityResultLauncher(ActivityResultContracts.RequestPermission(), "video/$ownerKey/storage-permission") { granted ->
-        if (granted) shoot() else failure(IllegalStateException(tr("需要存储权限才能保存拍摄的视频。", "Storage permission is required to save captured videos.")))
-    }
+    val permission =
+        rememberSystemActivityResultLauncher(
+            ActivityResultContracts.RequestPermission(),
+            "video/$ownerKey/storage-permission",
+        ) { granted ->
+            if (granted) shoot()
+            else
+                failure(
+                    IllegalStateException(
+                        tr(
+                            "需要存储权限才能保存拍摄的视频。",
+                            "Storage permission is required to save captured videos.",
+                        )
+                    )
+                )
+        }
     val choose: () -> Unit = {
         if (enabled) {
             focus.clearFocus()
@@ -153,25 +200,34 @@ internal fun rememberVideoChooser(
             choosing = true
         }
     }
-    if (choosing) MediaSourceDialog(
-        title = tr("添加视频", "Add video"),
-        description = tr("每条日记 1 段 · 最长 5 分钟 · 最大 500 MB", "1 video per entry · Up to 5 minutes · Up to 500 MB"),
-        captureIcon = Icons.Outlined.Videocam,
-        captureTitle = tr("拍摄视频", "Record video"),
-        cameraAvailable = cameraAvailable,
-        captureSupporting = if (cameraAvailable) null
-            else localizedText("当前设备没有可用的相机"),
-        onCapture = {
-            choosing = false
-            if (hasGalleryWriteAccess(context)) shoot() else permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        },
-        onChooseMedia = {
-            choosing = false
-            runCatching { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
-                .onFailure { failure(it) }
-        },
-        onDismiss = { choosing = false },
-    )
+    if (choosing)
+        MediaSourceDialog(
+            title = tr("添加视频", "Add video"),
+            description =
+                tr(
+                    "每条日记 1 段 · 最长 5 分钟 · 最大 500 MB",
+                    "1 video per entry · Up to 5 minutes · Up to 500 MB",
+                ),
+            captureIcon = Icons.Outlined.Videocam,
+            captureTitle = tr("拍摄视频", "Record video"),
+            cameraAvailable = cameraAvailable,
+            captureSupporting = if (cameraAvailable) null else localizedText("当前设备没有可用的相机"),
+            onCapture = {
+                choosing = false
+                if (hasGalleryWriteAccess(context)) shoot()
+                else permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            },
+            onChooseMedia = {
+                choosing = false
+                runCatching {
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                    )
+                }
+                    .onFailure { failure(it) }
+            },
+            onDismiss = { choosing = false },
+        )
     return choose
 }
 
@@ -182,73 +238,176 @@ internal fun VideoAddButton(
     modifier: Modifier = Modifier,
 ) {
     val chooseVideo = rememberVideoChooser(enabled, onPicked)
-    MomentQuickAction(label = tr("视频", "Video"), enabled = enabled, modifier = modifier, onClick = chooseVideo)
+    MomentQuickAction(
+        label = tr("视频", "Video"),
+        enabled = enabled,
+        modifier = modifier,
+        onClick = chooseVideo,
+    )
 }
 
 @Composable
-internal fun VideoCard(video: JournalVideo, onRemove: (() -> Unit)? = null, previewOnly: Boolean = false, onOpen: (() -> Unit)? = null, aspectRatio: Float = 16f / 9f, onReplace: (() -> Unit)? = null, useActionMenu: Boolean = false) {
+internal fun VideoCard(
+    video: JournalVideo,
+    onRemove: (() -> Unit)? = null,
+    previewOnly: Boolean = false,
+    onOpen: (() -> Unit)? = null,
+    aspectRatio: Float = 16f / 9f,
+    onReplace: (() -> Unit)? = null,
+    useActionMenu: Boolean = false,
+) {
     key(video.fileName) {
-        VideoCardContent(video, onRemove, previewOnly, onOpen, aspectRatio, onReplace, useActionMenu)
+        VideoCardContent(
+            video,
+            onRemove,
+            previewOnly,
+            onOpen,
+            aspectRatio,
+            onReplace,
+            useActionMenu,
+        )
     }
 }
 
 @Composable
-private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previewOnly: Boolean, onOpen: (() -> Unit)?, aspectRatio: Float, onReplace: (() -> Unit)?, useActionMenu: Boolean) {
+private fun VideoCardContent(
+    video: JournalVideo,
+    onRemove: (() -> Unit)?,
+    previewOnly: Boolean,
+    onOpen: (() -> Unit)?,
+    aspectRatio: Float,
+    onReplace: (() -> Unit)?,
+    useActionMenu: Boolean,
+) {
     val services = LocalVideoServices.current
     var playing by remember { mutableStateOf(false) }
     var showActions by remember(onRemove == null, onReplace == null) { mutableStateOf(false) }
-    val cover by produceState<android.graphics.Bitmap?>(null, video.coverFileName) {
-        value = withContext(Dispatchers.IO) { runCatching { services.cover(video.coverFileName)?.use(BitmapFactory::decodeStream) }.getOrNull() }
-    }
+    val cover by
+        produceState<android.graphics.Bitmap?>(null, video.coverFileName) {
+            value =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        services.cover(video.coverFileName)?.use(BitmapFactory::decodeStream)
+                    }
+                        .getOrNull()
+                }
+        }
     Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
             Box(
                 Modifier.fillMaxWidth().aspectRatio(aspectRatio).clipToBounds().clickable(
-                    onClickLabel = if (onOpen != null) tr("查看这一刻", "View this moment") else tr("播放视频", "Play video"),
-                ) { if (onOpen != null) onOpen() else playing = true },
+                    onClickLabel =
+                        if (onOpen != null) tr("查看这一刻", "View this moment")
+                        else tr("播放视频", "Play video")
+                ) {
+                    if (onOpen != null) onOpen() else playing = true
+                },
                 contentAlignment = Alignment.Center,
             ) {
-                cover?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                Surface(Modifier.size(48.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.5f), contentColor = Color.White) {
+                cover?.let {
+                    Image(
+                        it.asImageBitmap(),
+                        null,
+                        Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Surface(
+                    Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.5f),
+                    contentColor = Color.White,
+                ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.PlayArrow, tr("播放视频", "Play video"), Modifier.size(28.dp))
+                        Icon(
+                            Icons.Outlined.PlayArrow,
+                            tr("播放视频", "Play video"),
+                            Modifier.size(28.dp),
+                        )
                     }
                 }
-                Surface(Modifier.align(Alignment.BottomEnd).padding(8.dp), shape = XikeShapes.inner,
-                    color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White) {
+                Surface(
+                    Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                    shape = XikeShapes.inner,
+                    color = Color.Black.copy(alpha = 0.65f),
+                    contentColor = Color.White,
+                ) {
                     Text(
                         videoTime(video.durationMillis),
                         Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        style =
+                            MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace
+                            ),
                     )
                 }
                 Row(Modifier.align(Alignment.TopEnd)) {
                     if (useActionMenu && (onReplace != null || onRemove != null)) {
                         Box {
-                            IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
-                                Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                            IconButton(
+                                onClick = { showActions = true },
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Surface(
+                                    Modifier.size(32.dp),
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.66f),
+                                ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.MoreVert, tr("视频的更多操作", "More video actions"), Modifier.size(16.dp), tint = Color.White)
+                                        Icon(
+                                            Icons.Outlined.MoreVert,
+                                            tr("视频的更多操作", "More video actions"),
+                                            Modifier.size(16.dp),
+                                            tint = Color.White,
+                                        )
                                     }
                                 }
                             }
-                            DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
-                                if (onReplace != null) DropdownMenuItem(
-                                    text = { Text(tr("重新录制视频", "Record video again")) },
-                                    onClick = { showActions = false; playing = false; onReplace() },
-                                )
-                                if (onRemove != null) DropdownMenuItem(
-                                    text = { Text(tr("移除视频", "Remove video")) },
-                                    onClick = { showActions = false; playing = false; onRemove() },
-                                )
+                            DropdownMenu(
+                                expanded = showActions,
+                                onDismissRequest = { showActions = false },
+                            ) {
+                                if (onReplace != null)
+                                    DropdownMenuItem(
+                                        text = { Text(tr("重新录制视频", "Record video again")) },
+                                        onClick = {
+                                            showActions = false
+                                            playing = false
+                                            onReplace()
+                                        },
+                                    )
+                                if (onRemove != null)
+                                    DropdownMenuItem(
+                                        text = { Text(tr("移除视频", "Remove video")) },
+                                        onClick = {
+                                            showActions = false
+                                            playing = false
+                                            onRemove()
+                                        },
+                                    )
                             }
                         }
                     }
                     if (!useActionMenu && onReplace != null) {
-                        IconButton(onClick = { playing = false; onReplace() }, modifier = Modifier.size(48.dp)) {
-                            Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                        IconButton(
+                            onClick = {
+                                playing = false
+                                onReplace()
+                            },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Surface(
+                                Modifier.size(32.dp),
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.66f),
+                            ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Outlined.Refresh, tr("重新录制视频", "Record video again"), Modifier.size(16.dp), tint = Color.White)
+                                    Icon(
+                                        Icons.Outlined.Refresh,
+                                        tr("重新录制视频", "Record video again"),
+                                        Modifier.size(16.dp),
+                                        tint = Color.White,
+                                    )
                                 }
                             }
                         }
@@ -256,9 +415,18 @@ private fun VideoCardContent(video: JournalVideo, onRemove: (() -> Unit)?, previ
                     if (!useActionMenu && onRemove != null) {
                         IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Surface(Modifier.size(32.dp), shape = CircleShape, color = Color.Black.copy(alpha = 0.66f)) {
+                                Surface(
+                                    Modifier.size(32.dp),
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.66f),
+                                ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.Close, tr("移除视频", "Remove video"), Modifier.size(16.dp), tint = Color.White)
+                                        Icon(
+                                            Icons.Outlined.Close,
+                                            tr("移除视频", "Remove video"),
+                                            Modifier.size(16.dp),
+                                            tint = Color.White,
+                                        )
                                     }
                                 }
                             }
@@ -306,29 +474,38 @@ private fun VideoPlayerDialog(video: JournalVideo, onDismiss: () -> Unit) {
     var interaction by remember { mutableIntStateOf(0) }
     val playbackOwner = remember(player) { Any() }
     val accessibility = LocalAccessibilityManager.current
-    val nativeAccessibility = LocalContext.current.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
+    val nativeAccessibility =
+        LocalContext.current.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE)
+            as android.view.accessibility.AccessibilityManager
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    val playbackAttributes = remember(player) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_MOVIE) }
+    val playbackAttributes =
+        remember(player) { playbackAudioAttributes(AudioAttributes.CONTENT_TYPE_MOVIE) }
     var focusUnavailable by remember { mutableStateOf(false) }
 
     fun pausePlayback() {
-        if (ready && playing) runCatching {
-            player.pause()
-            if (!dragging) position = player.currentPosition.toFloat()
-        }
+        if (ready && playing)
+            runCatching {
+                player.pause()
+                if (!dragging) position = player.currentPosition.toFloat()
+            }
         playing = false
         controlsVisible = true
         journalPlayback.release(playbackOwner)
     }
 
     fun claimPlayback(): Boolean {
-        val granted = claimPlaybackFocus(context, playbackOwner, playbackAttributes, ::pausePlayback)
+        val granted =
+            claimPlaybackFocus(context, playbackOwner, playbackAttributes, ::pausePlayback)
         focusUnavailable = !granted
         return granted
     }
 
     fun startPlayback() {
-        if (!surfaceAvailable || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
+        if (
+            !surfaceAvailable ||
+                !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        )
+            return
         runCatching {
             if (!claimPlayback()) return@runCatching
             if (position >= video.durationMillis) {
@@ -339,19 +516,22 @@ private fun VideoPlayerDialog(video: JournalVideo, onDismiss: () -> Unit) {
             playing = true
             controlsVisible = true
             interaction++
-        }.onFailure {
-            pausePlayback()
-            error = tr("视频暂时无法播放，请关闭后重试。", "Unable to play the video. Close and retry.")
-            ready = false
         }
+            .onFailure {
+                pausePlayback()
+                error = tr("视频暂时无法播放，请关闭后重试。", "Unable to play the video. Close and retry.")
+                ready = false
+            }
     }
 
     val currentPause by rememberUpdatedState(::pausePlayback)
     DisposableEffect(player, lifecycle) {
-        focusUnavailable = !claimPlaybackFocus(context, playbackOwner, playbackAttributes) { currentPause() }
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) currentPause()
-        }
+        focusUnavailable =
+            !claimPlaybackFocus(context, playbackOwner, playbackAttributes) { currentPause() }
+        val observer =
+            androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) currentPause()
+            }
         lifecycle.addObserver(observer)
         onDispose {
             disposed.set(true)
@@ -362,118 +542,251 @@ private fun VideoPlayerDialog(video: JournalVideo, onDismiss: () -> Unit) {
         }
     }
     LaunchedEffect(ready, playing) {
-        while (ready && playing) { if (!dragging) position = player.currentPosition.toFloat(); delay(250) }
+        while (ready && playing) {
+            if (!dragging) position = player.currentPosition.toFloat()
+            delay(250)
+        }
     }
     LaunchedEffect(playing, dragging, controlsVisible, interaction, accessibility) {
-        if (playing && !dragging && controlsVisible && !nativeAccessibility.isTouchExplorationEnabled) {
-            delay(accessibility?.calculateRecommendedTimeoutMillis(3_000, containsIcons = true, containsText = true, containsControls = true) ?: 3_000)
+        if (
+            playing &&
+                !dragging &&
+                controlsVisible &&
+                !nativeAccessibility.isTouchExplorationEnabled
+        ) {
+            delay(
+                accessibility?.calculateRecommendedTimeoutMillis(
+                    3_000,
+                    containsIcons = true,
+                    containsText = true,
+                    containsControls = true,
+                ) ?: 3_000
+            )
             controlsVisible = false
         }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Surface(Modifier.fillMaxSize(), color = Color.Black, contentColor = Color.White) {
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                BoxWithConstraints(Modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints(
+                    Modifier.fillMaxSize().clipToBounds(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     val videoWidth = minOf(maxWidth, maxHeight * aspect)
-                    AndroidView(modifier = Modifier.size(videoWidth, videoWidth / aspect), factory = { context ->
-                        SurfaceView(context).apply { holder.addCallback(object : SurfaceHolder.Callback {
-                            override fun surfaceCreated(holder: SurfaceHolder) {
-                                if (disposed.get()) return
-                                surfaceAvailable = true
-                                player.setDisplay(holder)
-                                if (!ready && !preparing && error == null) {
-                                    preparing = true
-                                    scope.launch {
-                                        var opened: MediaDataSource? = null
-                                        try {
-                                            runCatching {
-                                                withContext(Dispatchers.IO) { opened = services.source(video) }
-                                                if (disposed.get()) return@runCatching
-                                                source = opened
-                                                player.setAudioAttributes(playbackAttributes)
-                                                player.setDataSource(requireNotNull(opened))
-                                                player.setOnPreparedListener {
-                                                    if (!disposed.get()) {
-                                                        preparing = false
-                                                        ready = true
-                                                        aspect = if (it.videoHeight > 0) it.videoWidth.toFloat() / it.videoHeight else aspect
-                                                        if (journalPlayback.owns(playbackOwner)) startPlayback()
+                    AndroidView(
+                        modifier = Modifier.size(videoWidth, videoWidth / aspect),
+                        factory = { context ->
+                            SurfaceView(context).apply {
+                                holder.addCallback(
+                                    object : SurfaceHolder.Callback {
+                                        override fun surfaceCreated(holder: SurfaceHolder) {
+                                            if (disposed.get()) return
+                                            surfaceAvailable = true
+                                            player.setDisplay(holder)
+                                            if (!ready && !preparing && error == null) {
+                                                preparing = true
+                                                scope.launch {
+                                                    var opened: MediaDataSource? = null
+                                                    try {
+                                                        runCatching {
+                                                            withContext(Dispatchers.IO) {
+                                                                opened = services.source(video)
+                                                            }
+                                                            if (disposed.get()) return@runCatching
+                                                            source = opened
+                                                            player.setAudioAttributes(
+                                                                playbackAttributes
+                                                            )
+                                                            player.setDataSource(
+                                                                requireNotNull(opened)
+                                                            )
+                                                            player.setOnPreparedListener {
+                                                                if (!disposed.get()) {
+                                                                    preparing = false
+                                                                    ready = true
+                                                                    aspect =
+                                                                        if (it.videoHeight > 0)
+                                                                            it.videoWidth
+                                                                                .toFloat() /
+                                                                                it.videoHeight
+                                                                        else aspect
+                                                                    if (
+                                                                        journalPlayback.owns(
+                                                                            playbackOwner
+                                                                        )
+                                                                    )
+                                                                        startPlayback()
+                                                                }
+                                                            }
+                                                            player.setOnCompletionListener {
+                                                                playing = false
+                                                                position =
+                                                                    video.durationMillis.toFloat()
+                                                                controlsVisible = true
+                                                                journalPlayback.release(
+                                                                    playbackOwner
+                                                                )
+                                                            }
+                                                            player.setOnErrorListener { _, _, _ ->
+                                                                journalPlayback.release(
+                                                                    playbackOwner
+                                                                )
+                                                                error =
+                                                                    tr(
+                                                                        "视频无法播放，文件或编码可能不受支持。",
+                                                                        "Unable to play this video. Its file or encoding may be unsupported.",
+                                                                    )
+                                                                ready = false
+                                                                preparing = false
+                                                                playing = false
+                                                                controlsVisible = true
+                                                                true
+                                                            }
+                                                            player.prepareAsync()
+                                                        }
+                                                            .onFailure {
+                                                                journalPlayback.release(
+                                                                    playbackOwner
+                                                                )
+                                                                preparing = false
+                                                                if (!disposed.get())
+                                                                    error =
+                                                                        tr(
+                                                                            "视频暂时无法读取，原文件已保留。",
+                                                                            "Unable to read the video. The original file is preserved.",
+                                                                        )
+                                                            }
+                                                    } finally {
+                                                        if (source !== opened) opened?.close()
                                                     }
                                                 }
-                                                player.setOnCompletionListener {
-                                                    playing = false
-                                                    position = video.durationMillis.toFloat()
-                                                    controlsVisible = true
-                                                    journalPlayback.release(playbackOwner)
-                                                }
-                                                player.setOnErrorListener { _, _, _ ->
-                                                    journalPlayback.release(playbackOwner)
-                                                    error = tr("视频无法播放，文件或编码可能不受支持。", "Unable to play this video. Its file or encoding may be unsupported.")
-                                                    ready = false
-                                                    preparing = false
-                                                    playing = false
-                                                    controlsVisible = true
-                                                    true
-                                                }
-                                                player.prepareAsync()
-                                            }.onFailure {
-                                                journalPlayback.release(playbackOwner)
-                                                preparing = false
-                                                if (!disposed.get()) error = tr("视频暂时无法读取，原文件已保留。", "Unable to read the video. The original file is preserved.")
                                             }
-                                        } finally {
-                                            if (source !== opened) opened?.close()
+                                        }
+
+                                        override fun surfaceChanged(
+                                            holder: SurfaceHolder,
+                                            format: Int,
+                                            width: Int,
+                                            height: Int,
+                                        ) {}
+
+                                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                            surfaceAvailable = false
+                                            if (!disposed.get()) {
+                                                pausePlayback()
+                                                runCatching { player.setDisplay(null) }
+                                            }
                                         }
                                     }
-                                }
+                                )
                             }
-                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
-                            override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                surfaceAvailable = false
-                                if (!disposed.get()) {
-                                    pausePlayback()
-                                    runCatching { player.setDisplay(null) }
-                                }
-                            }
-                        }) }
-                    }, update = { it.keepScreenOn = playing })
+                        },
+                        update = { it.keepScreenOn = playing },
+                    )
                 }
-                Box(Modifier.matchParentSize().clickable {
-                    controlsVisible = if (playing) !controlsVisible else true
-                    interaction++
-                }.semantics { contentDescription = tr("视频播放控制", "Video playback controls") })
-                if (!ready && error == null) CircularProgressIndicator(Modifier.align(Alignment.Center))
-                AnimatedVisibility(visible = controlsVisible || !playing, modifier = Modifier.align(Alignment.TopEnd)) {
-                    Surface(color = Color.Black.copy(alpha = 0.65f), shape = XikeShapes.button, modifier = Modifier.padding(16.dp)) {
-                        IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, localizedText("关闭"), tint = Color.White) }
+                Box(
+                    Modifier.matchParentSize()
+                        .clickable {
+                            controlsVisible = if (playing) !controlsVisible else true
+                            interaction++
+                        }
+                        .semantics { contentDescription = tr("视频播放控制", "Video playback controls") }
+                )
+                if (!ready && error == null)
+                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                AnimatedVisibility(
+                    visible = controlsVisible || !playing,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.65f),
+                        shape = XikeShapes.button,
+                        modifier = Modifier.padding(16.dp),
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Outlined.Close, localizedText("关闭"), tint = Color.White)
+                        }
                     }
                 }
-                AnimatedVisibility(visible = controlsVisible || !playing, modifier = Modifier.align(Alignment.BottomCenter)) {
+                AnimatedVisibility(
+                    visible = controlsVisible || !playing,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
                     Surface(color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp)) }
-                            if (focusUnavailable) Text(tr("暂时无法播放，请稍后再试。", "Unable to play right now. Please try again shortly."), Modifier.padding(bottom = 8.dp))
-                            PlaybackProgressSlider(value = position.coerceIn(0f, video.durationMillis.toFloat()), onValueChange = {
-                                dragging = true; position = it; interaction++
-                            }, onValueChangeFinished = {
-                                runCatching { player.seekTo(position.toInt()) }.onFailure {
-                                    pausePlayback()
-                                    error = tr("视频暂时无法播放，请关闭后重试。", "Unable to play the video. Close and retry.")
-                                    ready = false
-                                }
-                                dragging = false; interaction++
-                            }, valueRange = 0f..video.durationMillis.coerceAtLeast(1).toFloat(), enabled = ready && error == null,
-                                activeColor = Color.White, inactiveColor = Color.White.copy(alpha = 0.35f),
-                                modifier = Modifier.fillMaxWidth().semantics { contentDescription = tr("视频播放进度", "Video playback progress") })
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(enabled = ready && error == null, onClick = {
-                                    if (playing) pausePlayback() else startPlayback()
+                        Column(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            error?.let {
+                                Text(
+                                    it,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                            if (focusUnavailable)
+                                Text(
+                                    tr(
+                                        "暂时无法播放，请稍后再试。",
+                                        "Unable to play right now. Please try again shortly.",
+                                    ),
+                                    Modifier.padding(bottom = 8.dp),
+                                )
+                            PlaybackProgressSlider(
+                                value = position.coerceIn(0f, video.durationMillis.toFloat()),
+                                onValueChange = {
+                                    dragging = true
+                                    position = it
                                     interaction++
-                                }) {
-                                    Icon(if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                                        if (playing) tr("暂停视频", "Pause video") else tr("播放视频", "Play video"), tint = Color.White)
+                                },
+                                onValueChangeFinished = {
+                                    runCatching { player.seekTo(position.toInt()) }
+                                        .onFailure {
+                                            pausePlayback()
+                                            error =
+                                                tr(
+                                                    "视频暂时无法播放，请关闭后重试。",
+                                                    "Unable to play the video. Close and retry.",
+                                                )
+                                            ready = false
+                                        }
+                                    dragging = false
+                                    interaction++
+                                },
+                                valueRange = 0f..video.durationMillis.coerceAtLeast(1).toFloat(),
+                                enabled = ready && error == null,
+                                activeColor = Color.White,
+                                inactiveColor = Color.White.copy(alpha = 0.35f),
+                                modifier =
+                                    Modifier.fillMaxWidth().semantics {
+                                        contentDescription = tr("视频播放进度", "Video playback progress")
+                                    },
+                            )
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                IconButton(
+                                    enabled = ready && error == null,
+                                    onClick = {
+                                        if (playing) pausePlayback() else startPlayback()
+                                        interaction++
+                                    },
+                                ) {
+                                    Icon(
+                                        if (playing) Icons.Outlined.Pause
+                                        else Icons.Outlined.PlayArrow,
+                                        if (playing) tr("暂停视频", "Pause video")
+                                        else tr("播放视频", "Play video"),
+                                        tint = Color.White,
+                                    )
                                 }
-                                Text("${videoTime(position.toLong())} / ${videoTime(video.durationMillis)}", Modifier.padding(start = 8.dp))
+                                Text(
+                                    "${videoTime(position.toLong())} / ${videoTime(video.durationMillis)}",
+                                    Modifier.padding(start = 8.dp),
+                                )
                             }
                         }
                     }
@@ -494,21 +807,25 @@ private fun MomentQuickAction(
     val style = XikeCurrentStyle
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val restingContainerColor = when {
-        isDark -> MaterialTheme.colorScheme.surfaceVariant
-        style == AppStyle.BREATHE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val containerColor = if (isPressed) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.72f else 0.82f)
-    } else {
-        restingContainerColor
-    }
-    val actionColor = if (isPressed) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
+    val restingContainerColor =
+        when {
+            isDark -> MaterialTheme.colorScheme.surfaceVariant
+            style == AppStyle.BREATHE ->
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        }
+    val containerColor =
+        if (isPressed) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.72f else 0.82f)
+        } else {
+            restingContainerColor
+        }
+    val actionColor =
+        if (isPressed) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
     Surface(
         onClick = onClick,
         enabled = enabled,

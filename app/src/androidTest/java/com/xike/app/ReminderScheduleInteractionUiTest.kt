@@ -20,8 +20,8 @@ import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
@@ -50,21 +50,32 @@ class ReminderScheduleInteractionUiTest {
         if (phase == "read") {
             assertEquals(21, preferences.reminder.hour)
             assertEquals(37, preferences.reminder.minute)
-            assertEquals(DayOfWeek.entries.toSet() - DayOfWeek.MONDAY, preferences.reminder.weekdays)
+            assertEquals(
+                DayOfWeek.entries.toSet() - DayOfWeek.MONDAY,
+                preferences.reminder.weekdays,
+            )
             assertEquals(false, preferences.reminder.quietHoursEnabled)
             openSchedule()
             rule.onNodeWithText("21:37").performScrollTo().assertIsDisplayed()
             rule.onNodeWithText(localizedText("修改")).performScrollTo().performClick()
             onView(withId(android.R.id.button1)).check(matches(isCompletelyDisplayed()))
-            onView(withId(android.R.id.button2)).check(matches(isCompletelyDisplayed())).perform(click())
+            onView(withId(android.R.id.button2))
+                .check(matches(isCompletelyDisplayed()))
+                .perform(click())
             rule.onNodeWithText("21:37").performScrollTo().assertIsDisplayed()
             return
         }
         check(preferences.reminder == ReminderSettings()) { "Use a clean dedicated device." }
-        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
-            context.packageName, Manifest.permission.POST_NOTIFICATIONS,
-        )
-        rule.onNode(hasText(localizedText("记录提醒")) and isToggleable()).performScrollTo().performClick()
+        InstrumentationRegistry.getInstrumentation()
+            .uiAutomation
+            .grantRuntimePermission(
+                context.packageName,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+        rule
+            .onNode(hasText(localizedText("记录提醒")) and isToggleable())
+            .performScrollTo()
+            .performClick()
         rule.waitUntil(5_000) { preferences.reminder.enabled }
         val original = preferences.reminder
         openSchedule()
@@ -79,11 +90,13 @@ class ReminderScheduleInteractionUiTest {
         rule.onNodeWithText(original.timeLabel).performScrollTo().assertIsDisplayed()
         editSchedule()
         rule.onNodeWithText(localizedText("保存")).performClick()
-        val expected = original.copy(
-            hour = 21, minute = 37,
-            weekdays = original.weekdays - DayOfWeek.MONDAY,
-            quietHoursEnabled = !original.quietHoursEnabled,
-        )
+        val expected =
+            original.copy(
+                hour = 21,
+                minute = 37,
+                weekdays = original.weekdays - DayOfWeek.MONDAY,
+                quietHoursEnabled = !original.quietHoursEnabled,
+            )
         assertEquals(expected, preferences.reminder)
         rule.activityRule.scenario.recreate()
         openSchedule()
@@ -101,20 +114,33 @@ class ReminderScheduleInteractionUiTest {
         setPickerTime(21, 37)
         onView(withId(android.R.id.button1)).perform(click())
         rule.onNodeWithText("21:37").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithContentDescription(DayOfWeek.MONDAY.getDisplayName(TextStyle.FULL, AppLocale.locale))
-            .performScrollTo().performClick()
-        rule.onNode(hasText(localizedText("夜间勿扰")) and isToggleable()).performScrollTo().performClick()
+        rule
+            .onNodeWithContentDescription(
+                DayOfWeek.MONDAY.getDisplayName(TextStyle.FULL, AppLocale.locale)
+            )
+            .performScrollTo()
+            .performClick()
+        rule
+            .onNode(hasText(localizedText("夜间勿扰")) and isToggleable())
+            .performScrollTo()
+            .performClick()
     }
 
     private fun setPickerTime(hour: Int, minute: Int) {
-        onView(isAssignableFrom(TimePicker::class.java)).perform(object : ViewAction {
-            override fun getConstraints(): Matcher<View> = isAssignableFrom(TimePicker::class.java)
-            override fun getDescription() = "Set the real Android time picker"
-            override fun perform(controller: UiController, view: View) {
-                (view as TimePicker).hour = hour
-                view.minute = minute
-                controller.loopMainThreadUntilIdle()
-            }
-        })
+        onView(isAssignableFrom(TimePicker::class.java))
+            .perform(
+                object : ViewAction {
+                    override fun getConstraints(): Matcher<View> =
+                        isAssignableFrom(TimePicker::class.java)
+
+                    override fun getDescription() = "Set the real Android time picker"
+
+                    override fun perform(controller: UiController, view: View) {
+                        (view as TimePicker).hour = hour
+                        view.minute = minute
+                        controller.loopMainThreadUntilIdle()
+                    }
+                }
+            )
     }
 }

@@ -2,7 +2,6 @@ package com.xike.app
 
 import com.xike.app.feature.lock.AppLockTimeout
 import com.xike.app.feature.lock.shouldLockApp
-
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,7 +15,7 @@ class AppLockPreferencesTest {
                 backgroundedAtMillis = null,
                 nowMillis = 10_000L,
                 timeout = AppLockTimeout.THIRTY_MINUTES,
-            ),
+            )
         )
     }
 
@@ -27,7 +26,7 @@ class AppLockPreferencesTest {
                 backgroundedAtMillis = 10_000L,
                 nowMillis = 10_000L,
                 timeout = AppLockTimeout.IMMEDIATELY,
-            ),
+            )
         )
     }
 

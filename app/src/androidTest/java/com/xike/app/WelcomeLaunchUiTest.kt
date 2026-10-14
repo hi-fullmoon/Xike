@@ -7,9 +7,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
 
 /** Run on an isolated device: launches the real app and its local encrypted store. */
 class WelcomeLaunchUiTest {
@@ -24,7 +24,9 @@ class WelcomeLaunchUiTest {
             composeRule.onNodeWithTag("navigation-home").assertDoesNotExist()
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             File(context.getExternalFilesDir(null), "welcome-launch.png").outputStream().use {
-                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                InstrumentationRegistry.getInstrumentation()
+                    .uiAutomation
+                    .takeScreenshot()
                     .compress(Bitmap.CompressFormat.PNG, 100, it)
             }
             composeRule.mainClock.advanceTimeBy(1500)

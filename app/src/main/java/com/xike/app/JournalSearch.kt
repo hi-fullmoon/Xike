@@ -1,8 +1,7 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
-
+import com.xike.app.data.Mood
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -13,7 +12,8 @@ enum class JournalImageFilter(private val sourceLabel: String) {
     WITH_IMAGES("有照片"),
     WITHOUT_IMAGES("无照片");
 
-    val label: String get() = localizedText(sourceLabel)
+    val label: String
+        get() = localizedText(sourceLabel)
 }
 
 data class JournalSearchQuery(
@@ -24,18 +24,22 @@ data class JournalSearchQuery(
     val endDate: LocalDate? = null,
     val imageFilter: JournalImageFilter = JournalImageFilter.ANY,
 ) {
-    val normalizedText: String get() = text.trim()
+    val normalizedText: String
+        get() = text.trim()
 
     val activeFilterCount: Int
-        get() = listOf(
-            normalizedText.isNotEmpty(),
-            moods.isNotEmpty(),
-            tags.isNotEmpty(),
-            startDate != null || endDate != null,
-            imageFilter != JournalImageFilter.ANY,
-        ).count { it }
+        get() =
+            listOf(
+                    normalizedText.isNotEmpty(),
+                    moods.isNotEmpty(),
+                    tags.isNotEmpty(),
+                    startDate != null || endDate != null,
+                    imageFilter != JournalImageFilter.ANY,
+                )
+                .count { it }
 
-    val isEmpty: Boolean get() = activeFilterCount == 0
+    val isEmpty: Boolean
+        get() = activeFilterCount == 0
 }
 
 data class JournalSearchPage(
@@ -43,7 +47,8 @@ data class JournalSearchPage(
     val totalCount: Int,
     val offset: Int,
 ) {
-    val hasMore: Boolean get() = offset + entries.size < totalCount
+    val hasMore: Boolean
+        get() = offset + entries.size < totalCount
 }
 
 internal data class JournalEpochRange(
@@ -51,9 +56,12 @@ internal data class JournalEpochRange(
     val endExclusive: Long,
 )
 
-internal fun JournalSearchQuery.epochRange(zoneId: ZoneId = ZoneId.systemDefault()): JournalEpochRange {
+internal fun JournalSearchQuery.epochRange(
+    zoneId: ZoneId = ZoneId.systemDefault()
+): JournalEpochRange {
     val start = startDate?.atStartOfDay(zoneId)?.toInstant()?.toEpochMilli() ?: Long.MIN_VALUE
-    val end = endDate?.plusDays(1)?.atStartOfDay(zoneId)?.toInstant()?.toEpochMilli() ?: Long.MAX_VALUE
+    val end =
+        endDate?.plusDays(1)?.atStartOfDay(zoneId)?.toInstant()?.toEpochMilli() ?: Long.MAX_VALUE
     return JournalEpochRange(start, end)
 }
 
@@ -63,66 +71,78 @@ fun filterJournalEntries(
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): List<JournalEntry> {
     val text = query.normalizedText
-    val textTerms = SEARCH_TERM.findAll(text)
-        .map { it.value }
-        .map { term -> term to searchTopicLabels(term) }
-        .toList()
+    val textTerms =
+        SEARCH_TERM.findAll(text)
+            .map { it.value }
+            .map { term -> term to searchTopicLabels(term) }
+            .toList()
     val selectedTopics = query.tags.canonicalTopics().toSet()
     return entries.filter { entry ->
         val date = Instant.ofEpochMilli(entry.createdAt).atZone(zoneId).toLocalDate()
-        val textMatches = text.isEmpty() || textTerms.isNotEmpty() && textTerms.all { (term, topicTerms) ->
-            entry.note.contains(term, ignoreCase = true) ||
-                entry.tags.any { tag -> topicTerms.any { tag.contains(it, ignoreCase = true) } }
-        }
+        val textMatches =
+            text.isEmpty() ||
+                textTerms.isNotEmpty() &&
+                    textTerms.all { (term, topicTerms) ->
+                        entry.note.contains(term, ignoreCase = true) ||
+                            entry.tags.any { tag ->
+                                topicTerms.any { tag.contains(it, ignoreCase = true) }
+                            }
+                    }
         val moodMatches = query.moods.isEmpty() || entry.mood in query.moods
-        val tagMatches = selectedTopics.isEmpty() || entry.tags.any { canonicalTopic(it) in selectedTopics }
+        val tagMatches =
+            selectedTopics.isEmpty() || entry.tags.any { canonicalTopic(it) in selectedTopics }
         val startMatches = query.startDate?.let { !date.isBefore(it) } ?: true
         val endMatches = query.endDate?.let { !date.isAfter(it) } ?: true
-        val imageMatches = when (query.imageFilter) {
-            JournalImageFilter.ANY -> true
-            JournalImageFilter.WITH_IMAGES -> entry.imageFileNames.isNotEmpty()
-            JournalImageFilter.WITHOUT_IMAGES -> entry.imageFileNames.isEmpty()
-        }
+        val imageMatches =
+            when (query.imageFilter) {
+                JournalImageFilter.ANY -> true
+                JournalImageFilter.WITH_IMAGES -> entry.imageFileNames.isNotEmpty()
+                JournalImageFilter.WITHOUT_IMAGES -> entry.imageFileNames.isEmpty()
+            }
         textMatches && moodMatches && tagMatches && startMatches && endMatches && imageMatches
     }
 }
 
 /**
- * FTS4's unicode tokenizer treats adjacent Han characters as a single token on
- * some SQLite builds. Adding single-character and bigram tokens makes short
- * Chinese searches useful without sending journal text to a remote service.
+ * FTS4's unicode tokenizer treats adjacent Han characters as a single token on some SQLite builds.
+ * Adding single-character and bigram tokens makes short Chinese searches useful without sending
+ * journal text to a remote service.
  */
 internal fun journalSearchDocument(note: String, tags: List<String>): String {
     val source = buildString {
         append(note)
         append(' ')
         append(tags.joinToString(" "))
-    }.trim()
-    val cjkTokens = CJK_SEQUENCE.findAll(source)
-        .flatMap { match ->
-            val value = match.value
-            sequence {
-                value.forEach { yield(it.toString()) }
-                value.windowed(size = 2, step = 1, partialWindows = false).forEach { yield(it) }
+    }
+        .trim()
+    val cjkTokens =
+        CJK_SEQUENCE.findAll(source)
+            .flatMap { match ->
+                val value = match.value
+                sequence {
+                    value.forEach { yield(it.toString()) }
+                    value.windowed(size = 2, step = 1, partialWindows = false).forEach { yield(it) }
+                }
             }
-        }
-        .toList()
+            .toList()
     return (listOf(source) + cjkTokens).filter { it.isNotBlank() }.joinToString(" ")
 }
 
 internal fun journalFtsQuery(text: String): String {
-    val terms = SEARCH_TERM.findAll(text.trim())
-        .map { match ->
-            val term = match.value
-            val topicTerms = searchTopicLabels(term)
-            when {
-                topicTerms.size > 1 -> topicTerms.joinToString(" OR ", "(", ")") { quoteFtsTerm(it) }
-                term.all(::isCjkCharacter) && term.length > 2 ->
-                    term.asSequence().joinToString(" AND ") { quoteFtsTerm(it.toString()) }
-                else -> quoteFtsTerm(term)
+    val terms =
+        SEARCH_TERM.findAll(text.trim())
+            .map { match ->
+                val term = match.value
+                val topicTerms = searchTopicLabels(term)
+                when {
+                    topicTerms.size > 1 ->
+                        topicTerms.joinToString(" OR ", "(", ")") { quoteFtsTerm(it) }
+                    term.all(::isCjkCharacter) && term.length > 2 ->
+                        term.asSequence().joinToString(" AND ") { quoteFtsTerm(it.toString()) }
+                    else -> quoteFtsTerm(term)
+                }
             }
-        }
-        .toList()
+            .toList()
     return terms.joinToString(" AND ").ifEmpty { quoteFtsTerm("__xike_no_match__") }
 }
 

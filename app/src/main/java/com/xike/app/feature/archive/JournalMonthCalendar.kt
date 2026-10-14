@@ -1,18 +1,8 @@
 package com.xike.app.feature.archive
 
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeSectionTitleStyle
-import com.xike.app.data.JournalEntry
-import com.xike.app.monthCalendarCells
-import com.xike.app.AppLocale
-import com.xike.app.localizedText
-import com.xike.app.tr
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -39,21 +28,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.xike.app.AppLocale
+import com.xike.app.data.JournalEntry
+import com.xike.app.localizedText
+import com.xike.app.monthCalendarCells
+import com.xike.app.tr
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeSectionTitleStyle
+import com.xike.app.ui.theme.XikeShapes
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-
 
 @Composable
 internal fun JournalMonthCalendar(
@@ -65,7 +64,8 @@ internal fun JournalMonthCalendar(
     onNextMonth: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
 ) {
-    val monthTitle = month.format(DateTimeFormatter.ofPattern(tr("yyyy年 M月", "MMMM yyyy"), AppLocale.locale))
+    val monthTitle =
+        month.format(DateTimeFormatter.ofPattern(tr("yyyy年 M月", "MMMM yyyy"), AppLocale.locale))
     val cells = remember(month) { monthCalendarCells(month) }
     val monthEntries = countsByDate.filterKeys { YearMonth.from(it) == month }
     val monthEntryCount = monthEntries.values.sum()
@@ -86,7 +86,12 @@ internal fun JournalMonthCalendar(
                 Column {
                     Text(monthTitle, style = XikeSectionTitleStyle)
                     Text(
-                        if (monthEntryCount == 0) localizedText("这个月还没有留下记录") else tr("${monthEntries.size} 天 · $monthEntryCount 条记录", "${monthEntries.size} days · $monthEntryCount entries"),
+                        if (monthEntryCount == 0) localizedText("这个月还没有留下记录")
+                        else
+                            tr(
+                                "${monthEntries.size} 天 · $monthEntryCount 条记录",
+                                "${monthEntries.size} days · $monthEntryCount entries",
+                            ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -97,10 +102,16 @@ internal fun JournalMonthCalendar(
                 ) {
                     Row {
                         IconButton(onClick = onPreviousMonth) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = localizedText("上个月"))
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                contentDescription = localizedText("上个月"),
+                            )
                         }
                         IconButton(onClick = onNextMonth) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = localizedText("下个月"))
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = localizedText("下个月"),
+                            )
                         }
                     }
                 }
@@ -111,18 +122,27 @@ internal fun JournalMonthCalendar(
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 Column(
                     Modifier.horizontalScroll(rememberScrollState())
-                        .width(maxOf(maxWidth, (dayDiameter + 4.dp) * 7)),
+                        .width(maxOf(maxWidth, (dayDiameter + 4.dp) * 7))
                 ) {
                     Row(Modifier.fillMaxWidth()) {
-                        listOf(localizedText("一"), localizedText("二"), localizedText("三"), localizedText("四"), localizedText("五"), localizedText("六"), localizedText("日")).forEach { weekday ->
-                            Text(
-                                weekday,
-                                modifier = Modifier.weight(1f).padding(vertical = 5.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        listOf(
+                                localizedText("一"),
+                                localizedText("二"),
+                                localizedText("三"),
+                                localizedText("四"),
+                                localizedText("五"),
+                                localizedText("六"),
+                                localizedText("日"),
                             )
-                        }
+                            .forEach { weekday ->
+                                Text(
+                                    weekday,
+                                    modifier = Modifier.weight(1f).padding(vertical = 5.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                )
+                            }
                     }
 
                     cells.chunked(7).forEach { week ->
@@ -163,16 +183,21 @@ private fun CalendarDay(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val spokenDate = date.format(DateTimeFormatter.ofPattern(tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"), AppLocale.locale))
+    val spokenDate =
+        date.format(
+            DateTimeFormatter.ofPattern(tr("yyyy年M月d日 EEEE", "EEEE, MMM d, yyyy"), AppLocale.locale)
+        )
     Surface(
-        modifier = modifier
-            .height(diameter + 16.dp)
-            .padding(horizontal = 2.dp)
-            .semantics {
-                contentDescription = "$spokenDate，${if (count == 0) localizedText("没有记录") else tr("$count 条记录", "$count entries")}"
-                selected = isSelected
-            }
-            .clickable(enabled = enabled, onClick = onClick),
+        modifier =
+            modifier
+                .height(diameter + 16.dp)
+                .padding(horizontal = 2.dp)
+                .semantics {
+                    contentDescription =
+                        "$spokenDate，${if (count == 0) localizedText("没有记录") else tr("$count 条记录", "$count entries")}"
+                    selected = isSelected
+                }
+                .clickable(enabled = enabled, onClick = onClick),
         color = Color.Transparent,
     ) {
         Column(
@@ -183,25 +208,29 @@ private fun CalendarDay(
             Surface(
                 modifier = Modifier.size(diameter),
                 shape = CircleShape,
-                color = when {
-                    isSelected -> MaterialTheme.colorScheme.primary
-                    isToday -> MaterialTheme.colorScheme.primaryContainer
-                    enabled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                    else -> Color.Transparent
-                },
+                color =
+                    when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        isToday -> MaterialTheme.colorScheme.primaryContainer
+                        enabled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+                        else -> Color.Transparent
+                    },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         date.dayOfMonth.toString(),
                         maxLines = 1,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = when {
-                            isSelected -> MaterialTheme.colorScheme.onPrimary
-                            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.56f)
-                            isToday -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
+                        fontWeight =
+                            if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color =
+                            when {
+                                isSelected -> MaterialTheme.colorScheme.onPrimary
+                                !enabled ->
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.56f)
+                                isToday -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
                     )
                 }
             }
@@ -211,13 +240,12 @@ private fun CalendarDay(
             ) {
                 if (count > 0) {
                     Box(
-                        Modifier
-                            .size(width = if (count > 1) 10.dp else 4.dp, height = 4.dp)
+                        Modifier.size(width = if (count > 1) 10.dp else 4.dp, height = 4.dp)
                             .clip(RoundedCornerShape(2.dp))
                             .background(
                                 if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.tertiary,
-                            ),
+                                else MaterialTheme.colorScheme.tertiary
+                            )
                     )
                 }
             }

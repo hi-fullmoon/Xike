@@ -1,11 +1,10 @@
 package com.xike.app
 
-import com.xike.app.data.JournalDataException
-
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.xike.app.data.JournalDataException
 import java.nio.ByteBuffer
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -41,10 +40,11 @@ internal class DatabaseKeyManager(private val context: Context) {
                 localizedText("无法保存数据库密钥。")
             }
             passphrase
-        }.getOrElse { error ->
-            passphrase.fill(0)
-            throw JournalDataException(localizedText("数据库密钥初始化失败，未创建数据库。"), error)
         }
+            .getOrElse { error ->
+                passphrase.fill(0)
+                throw JournalDataException(localizedText("数据库密钥初始化失败，未创建数据库。"), error)
+            }
     }
 
     private fun wrap(passphrase: ByteArray): ByteArray {
@@ -65,7 +65,9 @@ internal class DatabaseKeyManager(private val context: Context) {
         require(buffer.remaining() >= 2) { "Invalid wrapped database key" }
         require(buffer.get() == FORMAT_VERSION) { "Unsupported wrapped database key version" }
         val nonceSize = buffer.get().toInt() and 0xff
-        require(nonceSize in 12..32 && buffer.remaining() > nonceSize) { "Invalid database key nonce" }
+        require(nonceSize in 12..32 && buffer.remaining() > nonceSize) {
+            "Invalid database key nonce"
+        }
         val nonce = ByteArray(nonceSize).also(buffer::get)
         val encrypted = ByteArray(buffer.remaining()).also(buffer::get)
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -78,19 +80,21 @@ internal class DatabaseKeyManager(private val context: Context) {
 
     private fun wrappingKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let {
+            return it
+        }
 
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE).run {
             init(
                 KeyGenParameterSpec.Builder(
-                    KEY_ALIAS,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                )
+                        KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                    )
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                     .setKeySize(256)
                     .setRandomizedEncryptionRequired(true)
-                    .build(),
+                    .build()
             )
             generateKey()
         }

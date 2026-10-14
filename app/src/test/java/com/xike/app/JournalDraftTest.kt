@@ -1,15 +1,13 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.data.model.OutdoorSnapshot
-import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
-import com.xike.app.data.model.parseJournalDraft
-
-import com.xike.app.data.Mood
-import com.xike.app.data.MAX_IMAGES_PER_ENTRY
-import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.JournalAudio
-
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.Mood
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
+import com.xike.app.data.model.OutdoorSnapshot
+import com.xike.app.data.model.parseJournalDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,26 +15,30 @@ import org.junit.Test
 class JournalDraftTest {
     @Test
     fun `draft round trip preserves mood note tags images audio and update time`() {
-        val draft = JournalDraft(
-            mood = Mood.GOOD,
-            note = "今天完成了重要的事",
-            tags = linkedSetOf("工作", "学习"),
-            imageUriStrings = listOf("content://photo/1", "content://photo/2"),
-            audio = JournalAudio("draft.xike-audio", 9_500L),
-            recordedAt = 120_000L,
-            updatedAt = 123_456L,
-        )
+        val draft =
+            JournalDraft(
+                mood = Mood.GOOD,
+                note = "今天完成了重要的事",
+                tags = linkedSetOf("工作", "学习"),
+                imageUriStrings = listOf("content://photo/1", "content://photo/2"),
+                audio = JournalAudio("draft.xike-audio", 9_500L),
+                recordedAt = 120_000L,
+                updatedAt = 123_456L,
+            )
 
         assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
     }
 
     @Test
     fun `draft normalization limits note and removes duplicate images`() {
-        val normalized = JournalDraft(
-            note = "心".repeat(MAX_DRAFT_NOTE_LENGTH + 20),
-            imageUriStrings = List(MAX_IMAGES_PER_ENTRY + 3) { "content://photo/${it % 9}" },
-            updatedAt = 10L,
-        ).normalized()
+        val normalized =
+            JournalDraft(
+                    note = "心".repeat(MAX_DRAFT_NOTE_LENGTH + 20),
+                    imageUriStrings =
+                        List(MAX_IMAGES_PER_ENTRY + 3) { "content://photo/${it % 9}" },
+                    updatedAt = 10L,
+                )
+                .normalized()
 
         assertEquals(MAX_DRAFT_NOTE_LENGTH, normalized.note.length)
         assertEquals(MAX_IMAGES_PER_ENTRY, normalized.imageUriStrings.size)
@@ -44,9 +46,7 @@ class JournalDraftTest {
 
     @Test
     fun `restored draft uses current topics without duplicating merged choices`() {
-        val restored = JournalDraft(
-            tags = linkedSetOf("社交", "关系", "运动", "创作"),
-        ).toJson().toString()
+        val restored = JournalDraft(tags = linkedSetOf("社交", "关系", "运动", "创作")).toJson().toString()
 
         assertEquals(
             linkedSetOf("关系", "身体", "兴趣"),
@@ -82,10 +82,12 @@ class JournalDraftTest {
 
     @Test
     fun `invalid audio duration is removed during normalization`() {
-        val draft = JournalDraft(
-            audio = JournalAudio("draft.xike-audio", MAX_AUDIO_DURATION_MILLIS + 1L),
-            updatedAt = 99L,
-        ).normalized()
+        val draft =
+            JournalDraft(
+                    audio = JournalAudio("draft.xike-audio", MAX_AUDIO_DURATION_MILLIS + 1L),
+                    updatedAt = 99L,
+                )
+                .normalized()
 
         assertTrue(draft.isEmpty)
         assertEquals(null, draft.audio)
@@ -94,11 +96,13 @@ class JournalDraftTest {
 
     @Test
     fun `backdated draft removes current outdoor snapshot`() {
-        val draft = JournalDraft(
-            recordedAt = 86_523_456L,
-            outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
-            updatedAt = 99L,
-        ).normalized()
+        val draft =
+            JournalDraft(
+                    recordedAt = 86_523_456L,
+                    outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
+                    updatedAt = 99L,
+                )
+                .normalized()
 
         assertEquals(null, draft.outdoor)
         assertEquals(86_523_456L, draft.recordedAt)
@@ -106,22 +110,24 @@ class JournalDraftTest {
 
     @Test
     fun `draft round trip preserves outdoor snapshot`() {
-        val draft = JournalDraft(
-            mood = Mood.CALM,
-            outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 119_000L),
-            updatedAt = 123_456L,
-        )
+        val draft =
+            JournalDraft(
+                mood = Mood.CALM,
+                outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 119_000L),
+                updatedAt = 123_456L,
+            )
 
         assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
     }
 
     @Test
     fun `changing time within the captured date preserves weather through persistence`() {
-        val draft = JournalDraft(
-            recordedAt = 123_456L,
-            outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
-            updatedAt = 99L,
-        )
+        val draft =
+            JournalDraft(
+                recordedAt = 123_456L,
+                outdoor = OutdoorSnapshot("杭州", 26.0, 1, 120_000L),
+                updatedAt = 99L,
+            )
         assertEquals(draft, draft.normalized())
         assertEquals(draft, parseJournalDraft(draft.toJson().toString()))
         assertEquals(draft.outdoor, draft.copy(recordedAt = null).normalized().outdoor)

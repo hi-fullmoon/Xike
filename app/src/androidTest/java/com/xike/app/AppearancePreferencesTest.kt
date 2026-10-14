@@ -1,12 +1,10 @@
 package com.xike.app
 
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-
-
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -56,7 +54,8 @@ class AppearancePreferencesTest {
     }
 
     private fun clearPreferences() {
-        context.getSharedPreferences(AppearancePreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
+        context
+            .getSharedPreferences(AppearancePreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()

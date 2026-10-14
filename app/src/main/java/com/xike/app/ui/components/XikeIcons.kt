@@ -1,8 +1,5 @@
 package com.xike.app.ui.components
 
-import com.xike.app.tr
-import com.xike.app.data.Mood
-
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -10,10 +7,10 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
+import com.xike.app.data.Mood
+import com.xike.app.tr
 
-/**
- * A small, purpose-built icon family for the app navigation and controls.
- */
+/** A small, purpose-built icon family for the app navigation and controls. */
 object XikeIcons {
     val Add: ImageVector by lazy {
         outlineIcon("XikeAdd", strokeWidth = 1.5f) {
@@ -117,28 +114,32 @@ object XikeIcons {
         name: String,
         strokeWidth: Float = 1.7f,
         block: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
-    ): ImageVector = ImageVector.Builder(
-        name = name,
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-    ).apply {
-        path(
-            fill = null,
-            stroke = SolidColor(Color.Black),
-            strokeLineWidth = strokeWidth,
-            strokeLineCap = StrokeCap.Round,
-            strokeLineJoin = StrokeJoin.Round,
-            pathBuilder = block,
-        )
-    }.build()
+    ): ImageVector =
+        ImageVector.Builder(
+                name = name,
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            )
+            .apply {
+                path(
+                    fill = null,
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = strokeWidth,
+                    strokeLineCap = StrokeCap.Round,
+                    strokeLineJoin = StrokeJoin.Round,
+                    pathBuilder = block,
+                )
+            }
+            .build()
 }
 
-internal fun Mood.moodDescription(): String = when (this) {
-    Mood.LOW -> tr("难过、无助，或有些不知所措", "Sad, helpless or a little overwhelmed")
-    Mood.TIRED -> tr("疲倦、压抑，或有些提不起劲", "Tired, weighed down or low on energy")
-    Mood.CALM -> tr("安稳、放松，或没有明显起伏", "Settled, relaxed or without strong changes")
-    Mood.GOOD -> tr("舒展、不错，或有一点期待", "At ease, feeling good or a little hopeful")
-    Mood.JOYFUL -> tr("开心、兴奋，或充满能量", "Happy, excited or full of energy")
-}
+internal fun Mood.moodDescription(): String =
+    when (this) {
+        Mood.LOW -> tr("难过、无助，或有些不知所措", "Sad, helpless or a little overwhelmed")
+        Mood.TIRED -> tr("疲倦、压抑，或有些提不起劲", "Tired, weighed down or low on energy")
+        Mood.CALM -> tr("安稳、放松，或没有明显起伏", "Settled, relaxed or without strong changes")
+        Mood.GOOD -> tr("舒展、不错，或有一点期待", "At ease, feeling good or a little hopeful")
+        Mood.JOYFUL -> tr("开心、兴奋，或充满能量", "Happy, excited or full of energy")
+    }

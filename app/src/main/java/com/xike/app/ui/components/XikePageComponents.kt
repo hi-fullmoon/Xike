@@ -1,11 +1,5 @@
 package com.xike.app.ui.components
 
-import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikePageTitleStyle
-import com.xike.app.ui.theme.XikeEyebrowStyle
-
-
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeEyebrowStyle
+import com.xike.app.ui.theme.XikePageTitleStyle
+import com.xike.app.ui.theme.XikeShapes
 
 @Composable
 internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: String? = null) {
@@ -30,7 +28,11 @@ internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: St
         Text(title, style = XikePageTitleStyle)
         if (supporting != null) {
             Spacer(Modifier.height(7.dp))
-            Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -41,7 +43,11 @@ internal fun PaperCard(
     contentPadding: PaddingValues = PaddingValues(XikeCardPadding),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier = modifier.fillMaxWidth(), shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
         Column(Modifier.padding(contentPadding), content = content)
     }
 }

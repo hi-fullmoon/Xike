@@ -1,12 +1,10 @@
 package com.xike.app.feature.insights
 
-import com.xike.app.localizedText
 import com.xike.app.canonicalTopics
 import com.xike.app.containsTopic
-
-import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
-
+import com.xike.app.data.Mood
+import com.xike.app.localizedText
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -39,10 +37,17 @@ enum class InsightsPeriod(
     DAYS_90("近90天", "90天记录", "最近三个月", "近90天"),
     YEAR("今年", "今年记录", "今年的变化", "今年");
 
-    val label: String get() = localizedText(sourceLabel)
-    val metricLabel: String get() = localizedText(sourceMetricLabel)
-    val trendTitle: String get() = localizedText(sourceTrendTitle)
-    val contextName: String get() = localizedText(sourceContextName)
+    val label: String
+        get() = localizedText(sourceLabel)
+
+    val metricLabel: String
+        get() = localizedText(sourceMetricLabel)
+
+    val trendTitle: String
+        get() = localizedText(sourceTrendTitle)
+
+    val contextName: String
+        get() = localizedText(sourceContextName)
 }
 
 data class MoodTrendPoint(
@@ -79,7 +84,8 @@ enum class DayType(private val sourceLabel: String) {
     WEEKDAY("工作日"),
     WEEKEND("周末");
 
-    val label: String get() = localizedText(sourceLabel)
+    val label: String
+        get() = localizedText(sourceLabel)
 }
 
 data class DayTypeInsight(
@@ -103,8 +109,11 @@ enum class InsightEvidenceLevel(
     DEVELOPING("初步线索", "可以观察分布，但仍不适合归因。"),
     ESTABLISHED("可供回顾", "样本足以描述这段记录，仍不代表原因或诊断。");
 
-    val label: String get() = localizedText(sourceLabel)
-    val description: String get() = localizedText(sourceDescription)
+    val label: String
+        get() = localizedText(sourceLabel)
+
+    val description: String
+        get() = localizedText(sourceDescription)
 }
 
 data class InsightEvidence(
@@ -201,9 +210,12 @@ fun journalPeriodSummary(
     val previousJournals = previousEntries.map(DatedJournalEntry::entry)
     val ranges = period.trendRanges(bounds)
     val trendPoints = ranges.map { (pointStart, pointEnd, label) ->
-        val pointEntries = periodEntries
-            .filter { dated -> !dated.date.isBefore(pointStart) && dated.date.isBefore(pointEnd) }
-            .map(DatedJournalEntry::entry)
+        val pointEntries =
+            periodEntries
+                .filter { dated ->
+                    !dated.date.isBefore(pointStart) && dated.date.isBefore(pointEnd)
+                }
+                .map(DatedJournalEntry::entry)
         MoodTrendPoint(
             startDate = pointStart,
             endDateExclusive = pointEnd,
@@ -215,40 +227,50 @@ fun journalPeriodSummary(
     }
     val recordedDayCount = periodEntries.map(DatedJournalEntry::date).distinct().size
     val elapsedDayCount = ChronoUnit.DAYS.between(bounds.startDate, bounds.endDateExclusive).toInt()
-    val evidence = InsightEvidence(
-        level = evidenceLevel(journals.size, recordedDayCount),
-        entryCount = journals.size,
-        recordedDayCount = recordedDayCount,
-        elapsedDayCount = elapsedDayCount,
-    )
+    val evidence =
+        InsightEvidence(
+            level = evidenceLevel(journals.size, recordedDayCount),
+            entryCount = journals.size,
+            recordedDayCount = recordedDayCount,
+            elapsedDayCount = elapsedDayCount,
+        )
     val previousTagCounts = previousJournals.tagCounts()
-    val topTags = journals.tagCounts().entries
-        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-        .take(MAX_TAG_INSIGHTS)
-        .map { (tag, count) ->
-            val taggedEntries = journals.filter { it.tags.containsTopic(tag) }
-            TagTrendItem(
-                tag = tag,
-                entryCount = count,
-                previousEntryCount = previousTagCounts[tag] ?: 0,
-                ratio = count.toDouble() / journals.size.coerceAtLeast(1),
-                averageScore = taggedEntries.moodAverage(),
-                entryIds = taggedEntries.map(JournalEntry::id),
-                recordedDayCount = periodEntries.filter { it.entry.tags.containsTopic(tag) }
-                    .map(DatedJournalEntry::date).distinct().size,
-                moodCounts = taggedEntries.groupingBy(JournalEntry::mood).eachCount(),
-            )
-        }
-    val weekdayInsight = periodEntries.dayTypeInsight(
-        type = DayType.WEEKDAY,
-        startDate = bounds.startDate,
-        endDateExclusive = bounds.endDateExclusive,
-    )
-    val weekendInsight = periodEntries.dayTypeInsight(
-        type = DayType.WEEKEND,
-        startDate = bounds.startDate,
-        endDateExclusive = bounds.endDateExclusive,
-    )
+    val topTags =
+        journals
+            .tagCounts()
+            .entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(MAX_TAG_INSIGHTS)
+            .map { (tag, count) ->
+                val taggedEntries = journals.filter { it.tags.containsTopic(tag) }
+                TagTrendItem(
+                    tag = tag,
+                    entryCount = count,
+                    previousEntryCount = previousTagCounts[tag] ?: 0,
+                    ratio = count.toDouble() / journals.size.coerceAtLeast(1),
+                    averageScore = taggedEntries.moodAverage(),
+                    entryIds = taggedEntries.map(JournalEntry::id),
+                    recordedDayCount =
+                        periodEntries
+                            .filter { it.entry.tags.containsTopic(tag) }
+                            .map(DatedJournalEntry::date)
+                            .distinct()
+                            .size,
+                    moodCounts = taggedEntries.groupingBy(JournalEntry::mood).eachCount(),
+                )
+            }
+    val weekdayInsight =
+        periodEntries.dayTypeInsight(
+            type = DayType.WEEKDAY,
+            startDate = bounds.startDate,
+            endDateExclusive = bounds.endDateExclusive,
+        )
+    val weekendInsight =
+        periodEntries.dayTypeInsight(
+            type = DayType.WEEKEND,
+            startDate = bounds.startDate,
+            endDateExclusive = bounds.endDateExclusive,
+        )
     val previousRecordedDays = previousEntries.map(DatedJournalEntry::date).distinct().size
 
     return JournalPeriodSummary(
@@ -260,36 +282,47 @@ fun journalPeriodSummary(
         recordedDayCount = recordedDayCount,
         averageScore = journals.moodAverage(),
         mostUsedTag = topTags.firstOrNull()?.tag,
-        moodDistribution = Mood.entries.map { mood ->
-            val moodEntries = journals.filter { it.mood == mood }
-            MoodDistributionItem(
-                mood = mood,
-                entryCount = moodEntries.size,
-                ratio = moodEntries.size.toDouble() / journals.size.coerceAtLeast(1),
-                entryIds = moodEntries.map(JournalEntry::id),
-            )
-        },
+        moodDistribution =
+            Mood.entries.map { mood ->
+                val moodEntries = journals.filter { it.mood == mood }
+                MoodDistributionItem(
+                    mood = mood,
+                    entryCount = moodEntries.size,
+                    ratio = moodEntries.size.toDouble() / journals.size.coerceAtLeast(1),
+                    entryIds = moodEntries.map(JournalEntry::id),
+                )
+            },
         topTags = topTags,
         weekdayInsight = weekdayInsight,
         weekendInsight = weekendInsight,
         evidence = evidence,
-        comparison = PeriodComparison(
-            startDate = previousBounds.first,
-            endDate = previousBounds.second.minusDays(1),
-            entryCount = previousJournals.size,
-            recordedDayCount = previousRecordedDays,
-            averageScore = previousJournals.moodAverage(),
-            entryIds = previousJournals.map(JournalEntry::id),
-            currentEntryCount = journals.size,
-            currentRecordedDayCount = recordedDayCount,
-            currentAverageScore = journals.moodAverage(),
-        ),
+        comparison =
+            PeriodComparison(
+                startDate = previousBounds.first,
+                endDate = previousBounds.second.minusDays(1),
+                entryCount = previousJournals.size,
+                recordedDayCount = previousRecordedDays,
+                averageScore = previousJournals.moodAverage(),
+                entryIds = previousJournals.map(JournalEntry::id),
+                currentEntryCount = journals.size,
+                currentRecordedDayCount = recordedDayCount,
+                currentAverageScore = journals.moodAverage(),
+            ),
         entryIds = journals.map(JournalEntry::id),
-        reviewDays = periodEntries.groupBy(DatedJournalEntry::date).toSortedMap().map { (date, dated) ->
-            val dayEntries = dated.map(DatedJournalEntry::entry)
-            MoodTrendPoint(date, date.plusDays(1), date.toString(), dayEntries.size,
-                dayEntries.moodAverage(), dayEntries.sortedWith(compareBy<JournalEntry> { it.createdAt }.thenBy { it.id }).map(JournalEntry::id))
-        },
+        reviewDays =
+            periodEntries.groupBy(DatedJournalEntry::date).toSortedMap().map { (date, dated) ->
+                val dayEntries = dated.map(DatedJournalEntry::entry)
+                MoodTrendPoint(
+                    date,
+                    date.plusDays(1),
+                    date.toString(),
+                    dayEntries.size,
+                    dayEntries.moodAverage(),
+                    dayEntries
+                        .sortedWith(compareBy<JournalEntry> { it.createdAt }.thenBy { it.id })
+                        .map(JournalEntry::id),
+                )
+            },
         previousMoodCounts = previousJournals.groupingBy(JournalEntry::mood).eachCount(),
     )
 }
@@ -303,20 +336,24 @@ fun weeklyJournalSummary(
 
     return WeeklyJournalSummary(
         weekStart = period.startDate,
-        days = period.trendPoints.map { point ->
-            DailyMoodSummary(
-                date = point.startDate,
-                entryCount = point.entryCount,
-                averageScore = point.averageScore,
-            )
-        },
+        days =
+            period.trendPoints.map { point ->
+                DailyMoodSummary(
+                    date = point.startDate,
+                    entryCount = point.entryCount,
+                    averageScore = point.averageScore,
+                )
+            },
         entryCount = period.entryCount,
         averageScore = period.averageScore,
         mostUsedTag = period.mostUsedTag,
     )
 }
 
-internal fun entriesWithIds(entries: List<JournalEntry>, entryIds: Collection<String>): List<JournalEntry> {
+internal fun entriesWithIds(
+    entries: List<JournalEntry>,
+    entryIds: Collection<String>,
+): List<JournalEntry> {
     val ids = entryIds.toSet()
     return entries.filter { it.id in ids }.sortedByDescending(JournalEntry::createdAt)
 }
@@ -328,51 +365,61 @@ internal fun InsightsPeriod.readDateRanges(today: LocalDate): List<Pair<LocalDat
 
 private fun InsightsPeriod.bounds(today: LocalDate): PeriodBounds {
     val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val start = when (this) {
-        InsightsPeriod.WEEK -> weekStart
-        InsightsPeriod.DAYS_30 -> today.minusDays(29)
-        InsightsPeriod.DAYS_90 -> today.minusDays(89)
-        InsightsPeriod.YEAR -> today.withDayOfYear(1)
-    }
+    val start =
+        when (this) {
+            InsightsPeriod.WEEK -> weekStart
+            InsightsPeriod.DAYS_30 -> today.minusDays(29)
+            InsightsPeriod.DAYS_90 -> today.minusDays(89)
+            InsightsPeriod.YEAR -> today.withDayOfYear(1)
+        }
     return PeriodBounds(
         startDate = start,
         endDateExclusive = today.plusDays(1),
-        trendEndDateExclusive = if (this == InsightsPeriod.WEEK) weekStart.plusDays(7) else today.plusDays(1),
+        trendEndDateExclusive =
+            if (this == InsightsPeriod.WEEK) weekStart.plusDays(7) else today.plusDays(1),
     )
 }
 
 private fun InsightsPeriod.previousBounds(
     today: LocalDate,
     current: PeriodBounds,
-): Pair<LocalDate, LocalDate> = when (this) {
-    InsightsPeriod.WEEK -> {
-        val elapsedDays = ChronoUnit.DAYS.between(current.startDate, current.endDateExclusive)
-        current.startDate.minusWeeks(1) to current.startDate.minusWeeks(1).plusDays(elapsedDays)
+): Pair<LocalDate, LocalDate> =
+    when (this) {
+        InsightsPeriod.WEEK -> {
+            val elapsedDays = ChronoUnit.DAYS.between(current.startDate, current.endDateExclusive)
+            current.startDate.minusWeeks(1) to current.startDate.minusWeeks(1).plusDays(elapsedDays)
+        }
+        InsightsPeriod.DAYS_30 -> current.startDate.minusDays(30) to current.startDate
+        InsightsPeriod.DAYS_90 -> current.startDate.minusDays(90) to current.startDate
+        InsightsPeriod.YEAR -> {
+            val previousEquivalentDate = today.minusYears(1)
+            previousEquivalentDate.withDayOfYear(1) to previousEquivalentDate.plusDays(1)
+        }
     }
-    InsightsPeriod.DAYS_30 -> current.startDate.minusDays(30) to current.startDate
-    InsightsPeriod.DAYS_90 -> current.startDate.minusDays(90) to current.startDate
-    InsightsPeriod.YEAR -> {
-        val previousEquivalentDate = today.minusYears(1)
-        previousEquivalentDate.withDayOfYear(1) to previousEquivalentDate.plusDays(1)
-    }
-}
 
-private fun InsightsPeriod.trendRanges(bounds: PeriodBounds): List<Triple<LocalDate, LocalDate, String>> = when (this) {
-    InsightsPeriod.WEEK -> (0L..6L).map { offset ->
-        val day = bounds.startDate.plusDays(offset)
-        Triple(day, day.plusDays(1), day.weekdayLabel())
+private fun InsightsPeriod.trendRanges(
+    bounds: PeriodBounds
+): List<Triple<LocalDate, LocalDate, String>> =
+    when (this) {
+        InsightsPeriod.WEEK ->
+            (0L..6L).map { offset ->
+                val day = bounds.startDate.plusDays(offset)
+                Triple(day, day.plusDays(1), day.weekdayLabel())
+            }
+        InsightsPeriod.DAYS_30 ->
+            fixedDayRanges(bounds.startDate, bounds.trendEndDateExclusive, bucketDays = 5)
+        InsightsPeriod.DAYS_90 ->
+            fixedDayRanges(bounds.startDate, bounds.trendEndDateExclusive, bucketDays = 10)
+        InsightsPeriod.YEAR ->
+            (1..bounds.endDateExclusive.minusDays(1).monthValue).map { month ->
+                val monthStart = bounds.startDate.withMonth(month)
+                Triple(
+                    monthStart,
+                    minOf(monthStart.plusMonths(1), bounds.trendEndDateExclusive),
+                    month.toString(),
+                )
+            }
     }
-    InsightsPeriod.DAYS_30 -> fixedDayRanges(bounds.startDate, bounds.trendEndDateExclusive, bucketDays = 5)
-    InsightsPeriod.DAYS_90 -> fixedDayRanges(bounds.startDate, bounds.trendEndDateExclusive, bucketDays = 10)
-    InsightsPeriod.YEAR -> (1..bounds.endDateExclusive.minusDays(1).monthValue).map { month ->
-        val monthStart = bounds.startDate.withMonth(month)
-        Triple(
-            monthStart,
-            minOf(monthStart.plusMonths(1), bounds.trendEndDateExclusive),
-            month.toString(),
-        )
-    }
-}
 
 private fun fixedDayRanges(
     startDate: LocalDate,
@@ -406,12 +453,14 @@ private fun List<DatedJournalEntry>.dayTypeInsight(
         (type == DayType.WEEKEND) == isWeekend
     }
     val journals = selected.map(DatedJournalEntry::entry)
-    val elapsedDayCount = generateSequence(startDate) { date -> date.plusDays(1) }
-        .takeWhile { date -> date.isBefore(endDateExclusive) }
-        .count { date ->
-            val isWeekend = date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY
-            (type == DayType.WEEKEND) == isWeekend
-        }
+    val elapsedDayCount =
+        generateSequence(startDate) { date -> date.plusDays(1) }
+            .takeWhile { date -> date.isBefore(endDateExclusive) }
+            .count { date ->
+                val isWeekend =
+                    date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY
+                (type == DayType.WEEKEND) == isWeekend
+            }
     return DayTypeInsight(
         type = type,
         entryCount = journals.size,
@@ -422,29 +471,36 @@ private fun List<DatedJournalEntry>.dayTypeInsight(
     )
 }
 
-private fun evidenceLevel(entryCount: Int, recordedDayCount: Int): InsightEvidenceLevel = when {
-    entryCount == 0 -> InsightEvidenceLevel.NONE
-    entryCount < 3 || recordedDayCount < 2 -> InsightEvidenceLevel.LIMITED
-    entryCount < 10 || recordedDayCount < 5 -> InsightEvidenceLevel.DEVELOPING
-    else -> InsightEvidenceLevel.ESTABLISHED
+private fun evidenceLevel(entryCount: Int, recordedDayCount: Int): InsightEvidenceLevel =
+    when {
+        entryCount == 0 -> InsightEvidenceLevel.NONE
+        entryCount < 3 || recordedDayCount < 2 -> InsightEvidenceLevel.LIMITED
+        entryCount < 10 || recordedDayCount < 5 -> InsightEvidenceLevel.DEVELOPING
+        else -> InsightEvidenceLevel.ESTABLISHED
+    }
+
+private fun List<JournalEntry>.moodAverage(): Double? = map {
+    it.mood.score
 }
+    .average()
+    .takeUnless(Double::isNaN)
 
-private fun List<JournalEntry>.moodAverage(): Double? =
-    map { it.mood.score }.average().takeUnless(Double::isNaN)
-
-private fun List<JournalEntry>.tagCounts(): Map<String, Int> = flatMap { entry -> entry.tags.canonicalTopics() }
+private fun List<JournalEntry>.tagCounts(): Map<String, Int> = flatMap { entry ->
+    entry.tags.canonicalTopics()
+}
     .groupingBy { it }
     .eachCount()
 
-private fun LocalDate.weekdayLabel(): String = when (dayOfWeek) {
-    DayOfWeek.MONDAY -> localizedText("一")
-    DayOfWeek.TUESDAY -> localizedText("二")
-    DayOfWeek.WEDNESDAY -> localizedText("三")
-    DayOfWeek.THURSDAY -> localizedText("四")
-    DayOfWeek.FRIDAY -> localizedText("五")
-    DayOfWeek.SATURDAY -> localizedText("六")
-    DayOfWeek.SUNDAY -> localizedText("日")
-}
+private fun LocalDate.weekdayLabel(): String =
+    when (dayOfWeek) {
+        DayOfWeek.MONDAY -> localizedText("一")
+        DayOfWeek.TUESDAY -> localizedText("二")
+        DayOfWeek.WEDNESDAY -> localizedText("三")
+        DayOfWeek.THURSDAY -> localizedText("四")
+        DayOfWeek.FRIDAY -> localizedText("五")
+        DayOfWeek.SATURDAY -> localizedText("六")
+        DayOfWeek.SUNDAY -> localizedText("日")
+    }
 
 fun entriesOnDate(
     entries: List<JournalEntry>,

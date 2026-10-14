@@ -1,10 +1,9 @@
 package com.xike.app
 
-import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
-
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import java.io.File
 
 internal class XikeAudioRecorder(
@@ -19,14 +18,16 @@ internal class XikeAudioRecorder(
 
     fun start(onLimitReached: () -> Unit): File {
         check(recorder == null) { localizedText("录音已经开始。") }
-        check(recordingDirectory.isDirectory || recordingDirectory.mkdirs()) { localizedText("无法创建录音暂存目录。") }
-        val target = File.createTempFile("xike-recording-", ".m4a", recordingDirectory)
-        val mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(context)
-        } else {
-            @Suppress("DEPRECATION")
-            MediaRecorder()
+        check(recordingDirectory.isDirectory || recordingDirectory.mkdirs()) {
+            localizedText("无法创建录音暂存目录。")
         }
+        val target = File.createTempFile("xike-recording-", ".m4a", recordingDirectory)
+        val mediaRecorder =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION") MediaRecorder()
+            }
         runCatching {
             mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC)
             mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -43,11 +44,12 @@ internal class XikeAudioRecorder(
             }
             mediaRecorder.prepare()
             mediaRecorder.start()
-        }.onFailure {
-            mediaRecorder.release()
-            target.delete()
-            throw it
         }
+            .onFailure {
+                mediaRecorder.release()
+                target.delete()
+                throw it
+            }
         recorder = mediaRecorder
         output = target
         isPaused = false

@@ -1,22 +1,20 @@
 package com.xike.app
 
-import com.xike.app.data.model.OutdoorSnapshot
-
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalAudio
-import com.xike.app.data.JournalEntry
-
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.data.model.OutdoorSnapshot
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 
 @RunWith(AndroidJUnit4::class)
 class JournalDaoTest {
@@ -26,9 +24,10 @@ class JournalDaoTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        database = Room.inMemoryDatabaseBuilder(context, JournalDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        database =
+            Room.inMemoryDatabaseBuilder(context, JournalDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
         dao = database.journalDao()
     }
 
@@ -40,12 +39,14 @@ class JournalDaoTest {
     @Test
     fun entryRelationsRoundTripInOriginalOrder() {
         val older = entry("older", 100L, listOf("生活"), listOf("old.xike-image"))
-        val newer = entry(
-            "newer",
-            200L,
-            listOf("工作", "运动", "阅读"),
-            listOf("first.xike-image", "second.xike-image"),
-        ).copy(audio = JournalAudio("newer.xike-audio", 18_000L))
+        val newer =
+            entry(
+                    "newer",
+                    200L,
+                    listOf("工作", "运动", "阅读"),
+                    listOf("first.xike-image", "second.xike-image"),
+                )
+                .copy(audio = JournalAudio("newer.xike-audio", 18_000L))
 
         dao.insertJournal(older.toBundle())
         dao.insertJournal(newer.toBundle())
@@ -92,29 +93,42 @@ class JournalDaoTest {
 
     @Test
     fun searchCombinesFtsMoodTagDateAndImageFilters() {
-        val matching = entry("matching", 300L, listOf("工作"), listOf("photo.xike-image"))
-            .copy(note = "今天工作顺利", mood = Mood.GOOD)
+        val matching =
+            entry("matching", 300L, listOf("工作"), listOf("photo.xike-image"))
+                .copy(note = "今天工作顺利", mood = Mood.GOOD)
         dao.insertJournal(matching.toBundle())
         dao.insertJournal(entry("other", 200L, listOf("睡眠")).copy(note = "早点休息").toBundle())
 
-        val results = dao.searchRecords(
-            hasText = 1,
-            ftsQuery = journalFtsQuery("工作"),
-            startInclusive = 250L,
-            endExclusive = 400L,
-            filterMoods = 1,
-            moods = listOf(Mood.GOOD.name),
-            filterTags = 1,
-            tags = listOf("工作"),
-            imageFilter = JournalImageFilter.WITH_IMAGES.name,
-            limit = 20,
-            offset = 0,
-        ).map(JournalEntryRecord::toJournalEntry)
+        val results =
+            dao.searchRecords(
+                    hasText = 1,
+                    ftsQuery = journalFtsQuery("工作"),
+                    startInclusive = 250L,
+                    endExclusive = 400L,
+                    filterMoods = 1,
+                    moods = listOf(Mood.GOOD.name),
+                    filterTags = 1,
+                    tags = listOf("工作"),
+                    imageFilter = JournalImageFilter.WITH_IMAGES.name,
+                    limit = 20,
+                    offset = 0,
+                )
+                .map(JournalEntryRecord::toJournalEntry)
 
         assertEquals(listOf("matching"), results.map { it.id })
         val repository = JournalReadRepository(database)
-        val query = JournalSearchQuery(text = "工作", moods = setOf(Mood.GOOD), tags = setOf("工作"), imageFilter = JournalImageFilter.WITH_IMAGES)
-        assertEquals(listOf("matching"), dao.entryIndex(repository.sql(query, "e.id, e.created_at", ordered = true, offset = 0)).map { it.id })
+        val query =
+            JournalSearchQuery(
+                text = "工作",
+                moods = setOf(Mood.GOOD),
+                tags = setOf("工作"),
+                imageFilter = JournalImageFilter.WITH_IMAGES,
+            )
+        assertEquals(
+            listOf("matching"),
+            dao.entryIndex(repository.sql(query, "e.id, e.created_at", ordered = true, offset = 0))
+                .map { it.id },
+        )
         assertEquals(1, dao.queryCount(repository.sql(query, "COUNT(*)")))
         assertEquals(
             1,
@@ -138,32 +152,36 @@ class JournalDaoTest {
         dao.insertJournal(entry("new", 200L, listOf("关系")).toBundle())
         dao.insertJournal(entry("other", 300L, listOf("身体")).toBundle())
 
-        val topicResults = dao.searchRecords(
-            hasText = 0,
-            ftsQuery = "\"\"",
-            startInclusive = 0L,
-            endExclusive = 400L,
-            filterMoods = 0,
-            moods = listOf(Mood.CALM.name),
-            filterTags = 1,
-            tags = expandedTopicLabels(listOf("关系")),
-            imageFilter = JournalImageFilter.ANY.name,
-            limit = 20,
-            offset = 0,
-        ).map(JournalEntryRecord::toJournalEntry)
-        val textResults = dao.searchRecords(
-            hasText = 1,
-            ftsQuery = journalFtsQuery("关系"),
-            startInclusive = 0L,
-            endExclusive = 400L,
-            filterMoods = 0,
-            moods = listOf(Mood.CALM.name),
-            filterTags = 0,
-            tags = listOf(""),
-            imageFilter = JournalImageFilter.ANY.name,
-            limit = 20,
-            offset = 0,
-        ).map(JournalEntryRecord::toJournalEntry)
+        val topicResults =
+            dao.searchRecords(
+                    hasText = 0,
+                    ftsQuery = "\"\"",
+                    startInclusive = 0L,
+                    endExclusive = 400L,
+                    filterMoods = 0,
+                    moods = listOf(Mood.CALM.name),
+                    filterTags = 1,
+                    tags = expandedTopicLabels(listOf("关系")),
+                    imageFilter = JournalImageFilter.ANY.name,
+                    limit = 20,
+                    offset = 0,
+                )
+                .map(JournalEntryRecord::toJournalEntry)
+        val textResults =
+            dao.searchRecords(
+                    hasText = 1,
+                    ftsQuery = journalFtsQuery("关系"),
+                    startInclusive = 0L,
+                    endExclusive = 400L,
+                    filterMoods = 0,
+                    moods = listOf(Mood.CALM.name),
+                    filterTags = 0,
+                    tags = listOf(""),
+                    imageFilter = JournalImageFilter.ANY.name,
+                    limit = 20,
+                    offset = 0,
+                )
+                .map(JournalEntryRecord::toJournalEntry)
 
         assertEquals(listOf("new", "old"), topicResults.map { it.id })
         assertEquals(listOf("new", "old"), textResults.map { it.id })
@@ -179,7 +197,10 @@ class JournalDaoTest {
 
         assertEquals(listOf("newer", "older"), observed.map { it.id })
         val repository = JournalReadRepository(database)
-        assertEquals(listOf("newer", "older"), repository.indexPage(JournalSearchQuery(), 0).entries.map { it.id })
+        assertEquals(
+            listOf("newer", "older"),
+            repository.indexPage(JournalSearchQuery(), 0).entries.map { it.id },
+        )
         assertEquals(2, repository.libraryState(1).totalCount)
         assertEquals("note-older", repository.entry("older")?.note)
     }
@@ -198,44 +219,60 @@ class JournalDaoTest {
         dao.rebuildSearchIndexFromRecords()
         assertEquals(original, dao.record(original.id)?.toJournalEntry())
         val repository = JournalReadRepository(database)
-        assertEquals(listOf(original.id), dao.entryIndex(repository.sql(JournalSearchQuery(text = "工作"), "e.id, e.created_at", ordered = true, offset = 0)).map { it.id })
+        assertEquals(
+            listOf(original.id),
+            dao.entryIndex(
+                    repository.sql(
+                        JournalSearchQuery(text = "工作"),
+                        "e.id, e.created_at",
+                        ordered = true,
+                        offset = 0,
+                    )
+                )
+                .map { it.id },
+        )
         assertEquals(SEARCH_INDEX_VERSION, dao.settingValue(SEARCH_INDEX_SETTING))
     }
 
     @Test
     fun updateReplacesRelationsAndRefreshesSearchIndexInOneTransaction() {
-        val original = entry(
-            id = "editable",
-            createdAt = 100L,
-            tags = listOf("旧关键词"),
-            images = listOf("old.xike-image"),
-        ).copy(note = "旧注脚", mood = Mood.TIRED)
+        val original =
+            entry(
+                    id = "editable",
+                    createdAt = 100L,
+                    tags = listOf("旧关键词"),
+                    images = listOf("old.xike-image"),
+                )
+                .copy(note = "旧注脚", mood = Mood.TIRED)
         dao.insertJournal(original.toBundle())
-        val updated = original.copy(
-            createdAt = 500L,
-            mood = Mood.JOYFUL,
-            tags = listOf("工作", "创作"),
-            note = "新的可搜索注脚",
-            imageFileNames = listOf("new.xike-image"),
-            outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 450L),
-            audio = JournalAudio("new.xike-audio", 12_000L),
-        )
+        val updated =
+            original.copy(
+                createdAt = 500L,
+                mood = Mood.JOYFUL,
+                tags = listOf("工作", "创作"),
+                note = "新的可搜索注脚",
+                imageFileNames = listOf("new.xike-image"),
+                outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 450L),
+                audio = JournalAudio("new.xike-audio", 12_000L),
+            )
 
         val previousImages = dao.updateJournal(updated.toBundle())
         val stored = dao.record(updated.id)?.toJournalEntry()
-        val searchResults = dao.searchRecords(
-            hasText = 1,
-            ftsQuery = journalFtsQuery("工作"),
-            startInclusive = 0L,
-            endExclusive = 1_000L,
-            filterMoods = 0,
-            moods = listOf(Mood.CALM.name),
-            filterTags = 0,
-            tags = listOf(""),
-            imageFilter = JournalImageFilter.ANY.name,
-            limit = 20,
-            offset = 0,
-        ).map(JournalEntryRecord::toJournalEntry)
+        val searchResults =
+            dao.searchRecords(
+                    hasText = 1,
+                    ftsQuery = journalFtsQuery("工作"),
+                    startInclusive = 0L,
+                    endExclusive = 1_000L,
+                    filterMoods = 0,
+                    moods = listOf(Mood.CALM.name),
+                    filterTags = 0,
+                    tags = listOf(""),
+                    imageFilter = JournalImageFilter.ANY.name,
+                    limit = 20,
+                    offset = 0,
+                )
+                .map(JournalEntryRecord::toJournalEntry)
 
         assertEquals(listOf("old.xike-image"), previousImages)
         assertEquals(updated, stored)
@@ -247,12 +284,13 @@ class JournalDaoTest {
         createdAt: Long,
         tags: List<String> = emptyList(),
         images: List<String> = emptyList(),
-    ) = JournalEntry(
-        id = id,
-        createdAt = createdAt,
-        mood = Mood.GOOD,
-        tags = tags,
-        note = "note-$id",
-        imageFileNames = images,
-    )
+    ) =
+        JournalEntry(
+            id = id,
+            createdAt = createdAt,
+            mood = Mood.GOOD,
+            tags = tags,
+            note = "note-$id",
+            imageFileNames = images,
+        )
 }

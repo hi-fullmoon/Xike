@@ -3,7 +3,6 @@ package com.xike.app
 import android.view.KeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isDisplayed
@@ -14,17 +13,17 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 
 class MomentContentUiTest {
-    @get:Rule
-    val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Test
     fun mediaSheetOpensExistingPhotoAndVideoFlowsWithoutChangingDraft() {
@@ -33,7 +32,10 @@ class MomentContentUiTest {
         }
         val viewModel = ViewModelProvider(rule.activity)[JournalViewModel::class.java]
         val originalDraft = viewModel.draft
-        rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).performScrollTo().assertIsDisplayed()
+        rule
+            .onNodeWithText(tr("今天 · 修改时间", "Today · Change time"))
+            .performScrollTo()
+            .assertIsDisplayed()
         assertCompleteLabel(tr("今天 · 修改时间", "Today · Change time"))
         rule.onNodeWithContentDescription(tr("添加内容", "Add content")).assertIsDisplayed()
         rule.onNodeWithText(tr("视频", "Video")).assertDoesNotExist()
@@ -57,15 +59,21 @@ class MomentContentUiTest {
         }
         rule.onNodeWithText(localizedText("完成")).assertIsDisplayed().performClick()
         rule.waitUntil(5_000) {
-            rule.onAllNodesWithText(tr("今天 · 修改时间", "Today · Change time"))
-                .fetchSemanticsNodes().isNotEmpty()
+            rule
+                .onAllNodesWithText(tr("今天 · 修改时间", "Today · Change time"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        rule.onNodeWithText(tr("今天 · 修改时间", "Today · Change time")).performScrollTo().assertIsDisplayed()
+        rule
+            .onNodeWithText(tr("今天 · 修改时间", "Today · Change time"))
+            .performScrollTo()
+            .assertIsDisplayed()
         assertEquals(originalDraft, viewModel.draft)
     }
 
     private fun openMedia() {
-        rule.onNodeWithContentDescription(tr("添加内容", "Add content"))
+        rule
+            .onNodeWithContentDescription(tr("添加内容", "Add content"))
             .performScrollTo()
             .performTouchInput { click(Offset(width - 2f, height / 2f)) }
         rule.onNodeWithText(tr("视频", "Video")).assertIsDisplayed()

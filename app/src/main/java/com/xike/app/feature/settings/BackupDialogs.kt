@@ -1,18 +1,5 @@
 package com.xike.app.feature.settings
 
-import com.xike.app.data.BackupSummary
-import com.xike.app.AppLocale
-import com.xike.app.localizedText
-import com.xike.app.tr
-
-import com.xike.app.ui.components.DestructiveConfirmationDialog
-
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeDialogContentGap
-import com.xike.app.ui.theme.xikeSwitchColors
-
-
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,8 +7,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -41,12 +28,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
+import com.xike.app.AppLocale
+import com.xike.app.data.BackupSummary
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.components.DestructiveConfirmationDialog
+import com.xike.app.ui.theme.XikeDialogContentGap
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.xikeSwitchColors
 import java.time.format.DateTimeFormatter
 
 internal data class PendingExport(val password: String?)
@@ -54,11 +49,12 @@ internal data class PendingExport(val password: String?)
 internal class BackupExportState : ViewModel() {
     private var pending: PendingExport? = null
 
-    fun begin(password: String?) { pending = PendingExport(password) }
+    fun begin(password: String?) {
+        pending = PendingExport(password)
+    }
 
     fun take(): PendingExport? = pending.also { pending = null }
 }
-
 
 @Composable
 internal fun RestoreConfirmationDialog(
@@ -67,23 +63,25 @@ internal fun RestoreConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val formatter = remember(AppLocale.language) {
-        DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
-    }
+    val formatter =
+        remember(AppLocale.language) {
+            DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
+        }
     val oldestCreatedAt = summary.oldestCreatedAt
     val newestCreatedAt = summary.newestCreatedAt
-    val dateRange = if (oldestCreatedAt == null || newestCreatedAt == null) {
-        localizedText("无记录日期")
-    } else {
-        val zone = java.time.ZoneId.systemDefault()
-        val oldest = java.time.Instant.ofEpochMilli(oldestCreatedAt).atZone(zone).toLocalDate()
-        val newest = java.time.Instant.ofEpochMilli(newestCreatedAt).atZone(zone).toLocalDate()
-        if (oldest == newest) {
-            formatter.format(oldest)
+    val dateRange =
+        if (oldestCreatedAt == null || newestCreatedAt == null) {
+            localizedText("无记录日期")
         } else {
-            "${formatter.format(oldest)} – ${formatter.format(newest)}"
+            val zone = java.time.ZoneId.systemDefault()
+            val oldest = java.time.Instant.ofEpochMilli(oldestCreatedAt).atZone(zone).toLocalDate()
+            val newest = java.time.Instant.ofEpochMilli(newestCreatedAt).atZone(zone).toLocalDate()
+            if (oldest == newest) {
+                formatter.format(oldest)
+            } else {
+                "${formatter.format(oldest)} – ${formatter.format(newest)}"
+            }
         }
-    }
 
     DestructiveConfirmationDialog(
         onDismiss = onDismiss,
@@ -92,20 +90,38 @@ internal fun RestoreConfirmationDialog(
         confirmText = localizedText("替换并恢复"),
         dismissText = localizedText("取消"),
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap)) {
                 Text(
-                    tr("备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片", "The backup contains ${summary.entryCount} entries and ${summary.imageCount} photos") +
-                        if (summary.audioCount > 0) tr("、${summary.audioCount} 段语音。", ", and ${summary.audioCount} voice notes.") else localizedText("。"),
+                    tr(
+                        "备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片",
+                        "The backup contains ${summary.entryCount} entries and ${summary.imageCount} photos",
+                    ) +
+                        if (summary.audioCount > 0)
+                            tr(
+                                "、${summary.audioCount} 段语音。",
+                                ", and ${summary.audioCount} voice notes.",
+                            )
+                        else localizedText("。")
                 )
                 Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (summary.videoCount > 0) {
-                    val videoSize = android.text.format.Formatter.formatShortFileSize(LocalContext.current, summary.videoBytes)
-                    Text(tr("${summary.videoCount} 段视频 · $videoSize", "${summary.videoCount} videos · $videoSize"))
+                    val videoSize =
+                        android.text.format.Formatter.formatShortFileSize(
+                            LocalContext.current,
+                            summary.videoBytes,
+                        )
+                    Text(
+                        tr(
+                            "${summary.videoCount} 段视频 · $videoSize",
+                            "${summary.videoCount} videos · $videoSize",
+                        )
+                    )
                 }
                 Text(
-                    tr("当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。", "The $localEntryCount entries on this device will be replaced. An encrypted safety snapshot is created first, allowing one undo."),
+                    tr(
+                        "当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。",
+                        "The $localEntryCount entries on this device will be replaced. An encrypted safety snapshot is created first, allowing one undo.",
+                    ),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -133,13 +149,26 @@ internal fun BackupExportDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
             ) {
-                Text(tr("备份包含全部日记、照片、录音和视频。", "The backup includes all entries, photos, recordings and videos."), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    tr(
+                        "备份包含全部日记、照片、录音和视频。",
+                        "The backup includes all entries, photos, recordings and videos.",
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(localizedText("使用密码加密"), style = MaterialTheme.typography.titleSmall)
-                        Text(localizedText("建议开启；密码不会保存在应用中"), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            localizedText("建议开启；密码不会保存在应用中"),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
-                    Switch(checked = encrypted, onCheckedChange = { encrypted = it }, colors = xikeSwitchColors())
+                    Switch(
+                        checked = encrypted,
+                        onCheckedChange = { encrypted = it },
+                        colors = xikeSwitchColors(),
+                    )
                 }
                 if (encrypted) {
                     OutlinedTextField(
@@ -147,13 +176,18 @@ internal fun BackupExportDialog(
                         onValueChange = { password = it },
                         shape = XikeShapes.inner,
                         label = { Text(localizedText("备份密码（至少 8 位）")) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation =
+                            if (passwordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
-                                    if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                    contentDescription = if (passwordVisible) localizedText("隐藏密码") else localizedText("显示密码"),
+                                    if (passwordVisible) Icons.Outlined.VisibilityOff
+                                    else Icons.Outlined.Visibility,
+                                    contentDescription =
+                                        if (passwordVisible) localizedText("隐藏密码")
+                                        else localizedText("显示密码"),
                                 )
                             }
                         },
@@ -164,15 +198,21 @@ internal fun BackupExportDialog(
                         onValueChange = { confirmation = it },
                         shape = XikeShapes.inner,
                         label = { Text(localizedText("再次输入备份密码")) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation =
+                            if (passwordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         isError = confirmation.isNotEmpty() && confirmation != password,
-                        supportingText = if (confirmation.isNotEmpty() && confirmation != password) {
-                            { Text(localizedText("两次密码不一致")) }
-                        } else null,
+                        supportingText =
+                            if (confirmation.isNotEmpty() && confirmation != password) {
+                                { Text(localizedText("两次密码不一致")) }
+                            } else null,
                         singleLine = true,
                     )
-                    Text(localizedText("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。"), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        localizedText("加密文件保存为 .xike；在应用内输入密码后可恢复，不能直接用浏览器打开 HTML。"),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 } else {
                     Text(
                         localizedText("未加密文件保存为 .zip。解压后打开 index.html 即可离线查看；拿到文件的人也能看到全部内容。"),
@@ -187,9 +227,13 @@ internal fun BackupExportDialog(
                 shape = XikeShapes.button,
                 enabled = !encrypted || (password.length >= 8 && confirmation == password),
                 onClick = { onConfirm(password.takeIf { encrypted }) },
-            ) { Text(localizedText("选择保存位置")) }
+            ) {
+                Text(localizedText("选择保存位置"))
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
+        },
     )
 }
 
@@ -226,13 +270,18 @@ internal fun BackupPasswordDialog(
                     onValueChange = { password = it },
                     shape = XikeShapes.inner,
                     label = { Text(localizedText("备份密码（至少 8 位）")) },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    visualTransformation =
+                        if (passwordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
-                                if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (passwordVisible) localizedText("隐藏密码") else localizedText("显示密码"),
+                                if (passwordVisible) Icons.Outlined.VisibilityOff
+                                else Icons.Outlined.Visibility,
+                                contentDescription =
+                                    if (passwordVisible) localizedText("隐藏密码")
+                                    else localizedText("显示密码"),
                             )
                         }
                     },
@@ -244,12 +293,15 @@ internal fun BackupPasswordDialog(
                         onValueChange = { confirmation = it },
                         shape = XikeShapes.inner,
                         label = { Text(localizedText("再次输入备份密码")) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation =
+                            if (passwordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         isError = confirmation.isNotEmpty() && confirmation != password,
-                        supportingText = if (confirmation.isNotEmpty() && confirmation != password) {
-                            { Text(localizedText("两次密码不一致")) }
-                        } else null,
+                        supportingText =
+                            if (confirmation.isNotEmpty() && confirmation != password) {
+                                { Text(localizedText("两次密码不一致")) }
+                            } else null,
                         singleLine = true,
                     )
                 }
@@ -258,10 +310,15 @@ internal fun BackupPasswordDialog(
         confirmButton = {
             TextButton(
                 shape = XikeShapes.button,
-                enabled = password.length >= 8 && (!requireConfirmation || confirmation == password),
+                enabled =
+                    password.length >= 8 && (!requireConfirmation || confirmation == password),
                 onClick = { onConfirm(password) },
-            ) { Text(confirm) }
+            ) {
+                Text(confirm)
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
+        },
     )
 }

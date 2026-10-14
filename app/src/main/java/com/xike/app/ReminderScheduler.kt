@@ -49,23 +49,26 @@ internal object ReminderScheduler {
         AppLocale.initialize(context)
         if (!canPostNotifications(context)) return
         createNotificationChannel(context)
-        val openApp = PendingIntent.getActivity(
-            context,
-            QUICK_RECORD_REQUEST_CODE,
-            Intent(context, MainActivity::class.java)
-                .setAction(ACTION_QUICK_RECORD)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = android.app.Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(localizedText("给今天留一刻"))
-            .setContentText(localizedText("如果愿意，看看此刻的心情。没有连续打卡，也不会催促你。"))
-            .setContentIntent(openApp)
-            .setAutoCancel(true)
-            .setCategory(android.app.Notification.CATEGORY_REMINDER)
-            .build()
-        context.getSystemService(NotificationManager::class.java)
+        val openApp =
+            PendingIntent.getActivity(
+                context,
+                QUICK_RECORD_REQUEST_CODE,
+                Intent(context, MainActivity::class.java)
+                    .setAction(ACTION_QUICK_RECORD)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        val notification =
+            android.app.Notification.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(localizedText("给今天留一刻"))
+                .setContentText(localizedText("如果愿意，看看此刻的心情。没有连续打卡，也不会催促你。"))
+                .setContentIntent(openApp)
+                .setAutoCancel(true)
+                .setCategory(android.app.Notification.CATEGORY_REMINDER)
+                .build()
+        context
+            .getSystemService(NotificationManager::class.java)
             ?.notify(REMINDER_NOTIFICATION_ID, notification)
     }
 
@@ -80,25 +83,26 @@ internal object ReminderScheduler {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_ID,
-                localizedText("记录提醒"),
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply {
-                description = localizedText("仅按你选择的本地时间，温和提醒你记录此刻。")
-            },
+                    CHANNEL_ID,
+                    localizedText("记录提醒"),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                )
+                .apply {
+                    description = localizedText("仅按你选择的本地时间，温和提醒你记录此刻。")
+                }
         )
     }
 
-    private fun reminderPendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
-        context,
-        REMINDER_REQUEST_CODE,
-        Intent(context, ReminderReceiver::class.java).setAction(ACTION_SHOW_REMINDER),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
+    private fun reminderPendingIntent(context: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            REMINDER_REQUEST_CODE,
+            Intent(context, ReminderReceiver::class.java).setAction(ACTION_SHOW_REMINDER),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
     private fun cancelPendingAlarm(context: Context) {
-        context.getSystemService(AlarmManager::class.java)
-            ?.cancel(reminderPendingIntent(context))
+        context.getSystemService(AlarmManager::class.java)?.cancel(reminderPendingIntent(context))
     }
 
     private fun setRescheduleReceiverEnabled(context: Context, enabled: Boolean) {
@@ -125,8 +129,8 @@ class ReminderReceiver : BroadcastReceiver() {
         val settings = HabitPreferences(context).reminder
         val now = ZonedDateTime.now()
         val pausedUntil = settings.pausedUntilEpochDay?.let(LocalDate::ofEpochDay)
-        val canShowToday = settings.enabled &&
-            (pausedUntil == null || !now.toLocalDate().isBefore(pausedUntil))
+        val canShowToday =
+            settings.enabled && (pausedUntil == null || !now.toLocalDate().isBefore(pausedUntil))
 
         if (canShowToday) ReminderScheduler.showReminder(context)
         ReminderScheduler.reconcile(context, settings, now.plusSeconds(1))
@@ -139,11 +143,12 @@ class ReminderRescheduleReceiver : BroadcastReceiver() {
     }
 
     private companion object {
-        val SUPPORTED_ACTIONS = setOf(
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED,
-            Intent.ACTION_MY_PACKAGE_REPLACED,
-        )
+        val SUPPORTED_ACTIONS =
+            setOf(
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+                Intent.ACTION_MY_PACKAGE_REPLACED,
+            )
     }
 }

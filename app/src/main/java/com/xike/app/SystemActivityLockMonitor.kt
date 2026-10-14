@@ -22,28 +22,38 @@ internal class SystemActivityLockMonitor(
     private var registered = false
     private var taskId = -1
     private var watchingTask = false
-    private val receiver = object : BroadcastReceiver() {
-        @Suppress("DEPRECATION")
-        override fun onReceive(context: Context, intent: Intent) {
-            val userLeft = intent.action == Intent.ACTION_CLOSE_SYSTEM_DIALOGS &&
-                intent.getStringExtra("reason") in setOf("homekey", "recentapps")
-            if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                stopWatching()
-                onDeviceLocked()
-            } else if (userLeft) interrupt()
+    private val receiver =
+        object : BroadcastReceiver() {
+            @Suppress("DEPRECATION")
+            override fun onReceive(context: Context, intent: Intent) {
+                val userLeft =
+                    intent.action == Intent.ACTION_CLOSE_SYSTEM_DIALOGS &&
+                        intent.getStringExtra("reason") in setOf("homekey", "recentapps")
+                if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                    stopWatching()
+                    onDeviceLocked()
+                } else if (userLeft) interrupt()
+            }
         }
-    }
-    private val checkVisibility = object : Runnable {
-        override fun run() {
-            if (!registered || !watchingTask || Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2) return
-            val visible = runCatching {
-                context.getSystemService(ActivityManager::class.java).appTasks
-                    .firstOrNull { it.taskInfo.taskId == taskId }?.taskInfo?.isVisible == true
-            }.getOrDefault(false)
-            if (!visible) interrupt()
-            else handler.postDelayed(this, 100L)
+    private val checkVisibility =
+        object : Runnable {
+            override fun run() {
+                if (
+                    !registered || !watchingTask || Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2
+                )
+                    return
+                val visible = runCatching {
+                    context
+                        .getSystemService(ActivityManager::class.java)
+                        .appTasks
+                        .firstOrNull { it.taskInfo.taskId == taskId }
+                        ?.taskInfo
+                        ?.isVisible == true
+                }
+                    .getOrDefault(false)
+                if (!visible) interrupt() else handler.postDelayed(this, 100L)
+            }
         }
-    }
 
     @Suppress("DEPRECATION")
     fun observe(taskId: Int) {
@@ -53,7 +63,9 @@ internal class SystemActivityLockMonitor(
         ContextCompat.registerReceiver(
             context,
             receiver,
-            IntentFilter(Intent.ACTION_SCREEN_OFF).apply { addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS) },
+            IntentFilter(Intent.ACTION_SCREEN_OFF).apply {
+                addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+            },
             "android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS",
             null,
             ContextCompat.RECEIVER_EXPORTED,

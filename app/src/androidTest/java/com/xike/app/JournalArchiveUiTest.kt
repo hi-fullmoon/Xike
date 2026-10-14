@@ -1,15 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-
-import com.xike.app.feature.archive.JournalArchiveScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,6 +19,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.feature.archive.JournalArchiveScreen
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -41,16 +36,16 @@ import org.junit.Rule
 import org.junit.Test
 
 class JournalArchiveUiTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun searchShowsOnlyMatchingJournalAndItsTotal() {
         val today = LocalDate.now()
-        val entries = listOf(
-            entry("work", today, listOf("工作"), "工作完成得很顺利"),
-            entry("rest", today.minusDays(1), listOf("睡眠"), "早点休息"),
-        )
+        val entries =
+            listOf(
+                entry("work", today, listOf("工作"), "工作完成得很顺利"),
+                entry("rest", today.minusDays(1), listOf("睡眠"), "早点休息"),
+            )
 
         composeRule.setContent {
             ArchiveTestTheme {
@@ -64,7 +59,7 @@ class JournalArchiveUiTest {
                                 entries = matches.drop(offset).take(limit),
                                 totalCount = matches.size,
                                 offset = offset,
-                            ),
+                            )
                         )
                     },
                     onUpdate = { updated, _, _ -> Result.success(updated) },
@@ -89,8 +84,9 @@ class JournalArchiveUiTest {
     @Test
     fun calendarDatesWithoutEntriesAreNotClickable() {
         val today = LocalDate.now()
-        val emptyDate = generateSequence(today.withDayOfMonth(1)) { date -> date.plusDays(1) }
-            .first { date -> date.month == today.month && date != today }
+        val emptyDate =
+            generateSequence(today.withDayOfMonth(1)) { date -> date.plusDays(1) }
+                .first { date -> date.month == today.month && date != today }
         val entries = listOf(entry("today", today, emptyList(), "今天的记录"))
 
         composeRule.setContent {
@@ -105,7 +101,7 @@ class JournalArchiveUiTest {
                                 entries = matches.drop(offset).take(limit),
                                 totalCount = matches.size,
                                 offset = offset,
-                            ),
+                            )
                         )
                     },
                     onUpdate = { updated, _, _ -> Result.success(updated) },
@@ -118,9 +114,8 @@ class JournalArchiveUiTest {
         }
 
         composeRule.onNodeWithText("月历").performClick()
-        val spokenDate = emptyDate.format(
-            DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA),
-        )
+        val spokenDate =
+            emptyDate.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
         composeRule.onNodeWithContentDescription("$spokenDate，没有记录").assertIsNotEnabled()
     }
 
@@ -128,8 +123,9 @@ class JournalArchiveUiTest {
     fun selectingRecordedSundayBringsItsRecordIntoView() {
         val today = LocalDate.now()
         val firstOfMonth = today.withDayOfMonth(1)
-        val sunday = generateSequence(firstOfMonth) { date -> date.plusDays(1) }
-            .first { date -> date.dayOfWeek == DayOfWeek.SUNDAY }
+        val sunday =
+            generateSequence(firstOfMonth) { date -> date.plusDays(1) }
+                .first { date -> date.dayOfWeek == DayOfWeek.SUNDAY }
         val entries = buildList {
             add(entry("sunday", sunday, emptyList(), "周日记录"))
             repeat(24) { index ->
@@ -139,10 +135,11 @@ class JournalArchiveUiTest {
                         firstOfMonth.minusDays(index.toLong() + 1),
                         emptyList(),
                         "历史记录 $index",
-                    ),
+                    )
                 )
             }
-        }.distinctBy(JournalEntry::id)
+        }
+            .distinctBy(JournalEntry::id)
 
         composeRule.setContent {
             ArchiveTestTheme {
@@ -156,7 +153,7 @@ class JournalArchiveUiTest {
                                 entries = matches.drop(offset).take(limit),
                                 totalCount = matches.size,
                                 offset = offset,
-                            ),
+                            )
                         )
                     },
                     onUpdate = { updated, _, _ -> Result.success(updated) },
@@ -169,16 +166,17 @@ class JournalArchiveUiTest {
         }
 
         composeRule.onNodeWithText("月历").performClick()
-        val spokenDate = sunday.format(
-            DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA),
-        )
+        val spokenDate = sunday.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA))
         val sundayNode = composeRule.onNodeWithContentDescription("$spokenDate，1 条记录")
         sundayNode.performScrollTo()
         sundayNode.performClick()
         composeRule.waitUntil(timeoutMillis = 3_000) {
-            composeRule.onAllNodesWithText(
-                sunday.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)) + "的记录",
-            ).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithText(
+                    sunday.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)) + "的记录"
+                )
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("周日记录").assertIsDisplayed()
@@ -198,7 +196,13 @@ class JournalArchiveUiTest {
                     entries = listOf(journal),
                     onSearch = { query, offset, limit ->
                         val matches = filterJournalEntries(listOf(journal), query)
-                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                        Result.success(
+                            JournalSearchPage(
+                                matches.drop(offset).take(limit),
+                                matches.size,
+                                offset,
+                            )
+                        )
                     },
                     onUpdate = { updated, _, _ -> Result.success(updated) },
                     onDelete = {
@@ -243,7 +247,13 @@ class JournalArchiveUiTest {
                     entries = listOf(journal),
                     onSearch = { query, offset, limit ->
                         val matches = filterJournalEntries(listOf(journal), query)
-                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                        Result.success(
+                            JournalSearchPage(
+                                matches.drop(offset).take(limit),
+                                matches.size,
+                                offset,
+                            )
+                        )
                     },
                     onUpdate = { updated, retainedImages, newImages ->
                         check(retainedImages.isEmpty())
@@ -262,9 +272,9 @@ class JournalArchiveUiTest {
         composeRule.onNodeWithText("准备编辑的记录").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription("编辑记录").performClick()
         composeRule.onNodeWithText("编辑这一刻").assertIsDisplayed()
-        composeRule.onNode(
-            hasSetTextAction() and hasText("准备编辑的记录"),
-        ).performTextReplacement("修改后的注脚")
+        composeRule
+            .onNode(hasSetTextAction() and hasText("准备编辑的记录"))
+            .performTextReplacement("修改后的注脚")
         composeRule.onNodeWithText("平静").performScrollTo().performClick().assertIsSelected()
         composeRule.onNodeWithText("关系").performScrollTo().assertIsSelected()
         composeRule.onNodeWithText("工作").performScrollTo().performClick()
@@ -293,7 +303,13 @@ class JournalArchiveUiTest {
                     entries = listOf(journal),
                     onSearch = { query, offset, limit ->
                         val matches = filterJournalEntries(listOf(journal), query)
-                        Result.success(JournalSearchPage(matches.drop(offset).take(limit), matches.size, offset))
+                        Result.success(
+                            JournalSearchPage(
+                                matches.drop(offset).take(limit),
+                                matches.size,
+                                offset,
+                            )
+                        )
                     },
                     onUpdate = { updated, _, _ ->
                         updateCount++
@@ -329,10 +345,17 @@ class JournalArchiveUiTest {
         XikeTheme(AppTheme.OCEAN) {
             CompositionLocalProvider(
                 LocalJournalEditOperations provides operations,
-                LocalAudioEditServices provides AudioEditServices(
-                    import = { file, duration -> withContext(Dispatchers.IO) { runCatching { store.importEditAudio(file, duration) } } },
-                    release = { audio -> scope.launch(Dispatchers.IO) { store.releaseEditAudio(audio) } },
-                ),
+                LocalAudioEditServices provides
+                    AudioEditServices(
+                        import = { file, duration ->
+                            withContext(Dispatchers.IO) {
+                                runCatching { store.importEditAudio(file, duration) }
+                            }
+                        },
+                        release = { audio ->
+                            scope.launch(Dispatchers.IO) { store.releaseEditAudio(audio) }
+                        },
+                    ),
                 content = content,
             )
         }
@@ -343,11 +366,13 @@ class JournalArchiveUiTest {
         date: LocalDate,
         tags: List<String>,
         note: String,
-    ) = JournalEntry(
-        id = id,
-        createdAt = date.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-        mood = Mood.GOOD,
-        tags = tags,
-        note = note,
-    )
+    ) =
+        JournalEntry(
+            id = id,
+            createdAt =
+                date.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            mood = Mood.GOOD,
+            tags = tags,
+            note = note,
+        )
 }

@@ -1,11 +1,5 @@
 package com.xike.app.ui.components
 
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikeContentMaxWidth
-
-import com.xike.app.localizedText
-
-
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -50,12 +44,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.xike.app.localizedText
+import com.xike.app.ui.theme.XikeContentMaxWidth
+import com.xike.app.ui.theme.XikeShapes
 import java.lang.ref.WeakReference
 import java.util.WeakHashMap
 import kotlinx.coroutines.delay
 
 /** Activity-scoped feedback: a new message replaces the previous one, without a stale queue. */
-internal class XikeNotice private constructor(
+internal class XikeNotice
+private constructor(
     activity: Activity?,
     private val message: String,
     private val duration: Int,
@@ -90,7 +88,11 @@ internal class NoticeState {
 }
 
 // Reference identity ensures that repeated identical messages restart their display time.
-internal class NoticeMessage(val text: String, val duration: Int, val onDismiss: (() -> Unit)? = null)
+internal class NoticeMessage(
+    val text: String,
+    val duration: Int,
+    val onDismiss: (() -> Unit)? = null,
+)
 
 internal val LocalRetainedNotice = staticCompositionLocalOf<NoticeMessage?> { null }
 
@@ -126,22 +128,34 @@ internal fun XikeNoticeHost() {
     val accessibility = LocalAccessibilityManager.current
     LaunchedEffect(message, accessibility) {
         val duration = if (message.duration == XikeNotice.LENGTH_LONG) 6000L else 3500L
-        delay(accessibility?.calculateRecommendedTimeoutMillis(
-            duration, containsIcons = true, containsText = true, containsControls = true,
-        ) ?: duration)
+        delay(
+            accessibility?.calculateRecommendedTimeoutMillis(
+                duration,
+                containsIcons = true,
+                containsText = true,
+                containsControls = true,
+            ) ?: duration
+        )
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         if (state.message === message) state.message = null
         else if (state.message == null && retainedNotice === message) message.onDismiss?.invoke()
     }
     Popup(
         alignment = Alignment.TopCenter,
-        properties = PopupProperties(focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false),
+        properties =
+            PopupProperties(
+                focusable = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
     ) {
         Surface(
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .widthIn(max = XikeContentMaxWidth).fillMaxWidth()
-                .semantics { liveRegion = LiveRegionMode.Polite },
+            modifier =
+                Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             shape = XikeShapes.card,
             color = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -152,13 +166,27 @@ internal fun XikeNoticeHost() {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(22.dp))
-                Text(message.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                IconButton(onClick = {
-                    if (state.message === message) state.message = null
-                    else if (state.message == null) message.onDismiss?.invoke()
-                }) {
-                    Icon(Icons.Outlined.Close, contentDescription = localizedText("关闭"), modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    message.text,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                IconButton(
+                    onClick = {
+                        if (state.message === message) state.message = null
+                        else if (state.message == null) message.onDismiss?.invoke()
+                    }
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = localizedText("关闭"),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }

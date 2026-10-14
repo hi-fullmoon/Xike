@@ -1,15 +1,5 @@
 package com.xike.app
 
-import com.xike.app.ui.components.showRecordedAtPicker
-import com.xike.app.ui.components.showRecordedAtTimePicker
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.LocalRecordedAtPickerContext
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -17,23 +7,28 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import java.time.YearMonth
+import com.xike.app.ui.components.showRecordedAtPicker
+import com.xike.app.ui.components.showRecordedAtTimePicker
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.LocalRecordedAtPickerContext
+import com.xike.app.ui.theme.XikeTheme
 import java.time.LocalDateTime
-import org.junit.Assert.assertFalse
-import org.junit.Assume.assumeTrue
+import java.time.YearMonth
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 
 class NativePickerUiTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun futureTimeKeepsDialogOpenAndCanBeCorrectedWithoutRestarting() {
@@ -49,9 +44,15 @@ class NativePickerUiTest {
         var selected: Long? = null
         lateinit var dialog: TimePickerDialog
         composeRule.runOnIdle {
-            dialog = showRecordedAtTimePicker(pickerContext, now.toLocalDate(), now.hour + 1, now.minute) {
-                selected = it
-            }
+            dialog =
+                showRecordedAtTimePicker(
+                    pickerContext,
+                    now.toLocalDate(),
+                    now.hour + 1,
+                    now.minute,
+                ) {
+                    selected = it
+                }
         }
         try {
             composeRule.runOnIdle {
@@ -93,16 +94,26 @@ class NativePickerUiTest {
                 assertViewInsideScreen(dialog.datePicker, screenWidth)
                 val picker = dialog.datePicker
                 val content = picker.getChildAt(0) as android.view.ViewGroup
-                assertEquals("Picker leaves a strip beside the header", (picker.parent as View).width, picker.width)
+                assertEquals(
+                    "Picker leaves a strip beside the header",
+                    (picker.parent as View).width,
+                    picker.width,
+                )
                 assertEquals("Picker content does not fill its width", picker.width, content.width)
-                assertEquals("Calendar header does not fill its width", content.width, content.getChildAt(0).width)
+                assertEquals(
+                    "Calendar header does not fill its width",
+                    content.width,
+                    content.getChildAt(0).width,
+                )
                 assertViewInsideScreen(dialog.getButton(AlertDialog.BUTTON_POSITIVE), screenWidth)
                 assertViewInsideScreen(dialog.getButton(AlertDialog.BUTTON_NEGATIVE), screenWidth)
             }
-            val dayCount = YearMonth.of(dialog.datePicker.year, dialog.datePicker.month + 1).lengthOfMonth()
+            val dayCount =
+                YearMonth.of(dialog.datePicker.year, dialog.datePicker.month + 1).lengthOfMonth()
             var nodes = emptyList<AccessibilityNodeInfo>()
             composeRule.waitUntil(10_000) {
-                val root = InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+                val root =
+                    InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
                 nodes = root?.let(::descendants).orEmpty()
                 nodes.any { it.className == "android.widget.DatePicker" }
             }
@@ -137,7 +148,10 @@ class NativePickerUiTest {
         val location = IntArray(2)
         view.getLocationOnScreen(location)
         assertTrue("Picker control extends past the left edge", location[0] >= 0)
-        assertTrue("Picker control extends past the right edge", location[0] + view.width <= screenWidth)
+        assertTrue(
+            "Picker control extends past the right edge",
+            location[0] + view.width <= screenWidth,
+        )
         val visible = Rect()
         assertTrue("Picker control is not visible", view.getGlobalVisibleRect(visible))
         assertEquals("Picker control is clipped", view.width, visible.width())

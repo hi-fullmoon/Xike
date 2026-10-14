@@ -1,10 +1,10 @@
 package com.xike.app.data.model
 
-import com.xike.app.data.Mood
-import com.xike.app.data.MAX_IMAGES_PER_ENTRY
-import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
-import com.xike.app.data.JournalAudio
 import com.xike.app.canonicalTopics
+import com.xike.app.data.JournalAudio
+import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
+import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.Mood
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -21,40 +21,42 @@ data class JournalDraft(
     val updatedAt: Long = 0L,
 ) {
     val isEmpty: Boolean
-        get() = mood == null &&
-            note.isBlank() &&
-            tags.isEmpty() &&
-            imageUriStrings.isEmpty() &&
-            audio == null &&
-            video == null &&
-            pendingVideoUri == null &&
-            recordedAt == null &&
-            outdoor == null
+        get() =
+            mood == null &&
+                note.isBlank() &&
+                tags.isEmpty() &&
+                imageUriStrings.isEmpty() &&
+                audio == null &&
+                video == null &&
+                pendingVideoUri == null &&
+                recordedAt == null &&
+                outdoor == null
 
     fun normalized(): JournalDraft {
         val normalizedNote = note.take(MAX_DRAFT_NOTE_LENGTH)
-        val normalizedTags = tags.filter(String::isNotBlank).canonicalTopics().toCollection(linkedSetOf())
-        val normalizedImages = imageUriStrings
-            .filter(String::isNotBlank)
-            .distinct()
-            .take(MAX_IMAGES_PER_ENTRY)
+        val normalizedTags =
+            tags.filter(String::isNotBlank).canonicalTopics().toCollection(linkedSetOf())
+        val normalizedImages =
+            imageUriStrings.filter(String::isNotBlank).distinct().take(MAX_IMAGES_PER_ENTRY)
         val normalizedAudio = audio?.takeIf {
             it.fileName.isNotBlank() && it.durationMillis in 1..MAX_AUDIO_DURATION_MILLIS
         }
         val normalizedRecordedAt = recordedAt?.takeIf { it > 0L }
-        val normalizedOutdoor = outdoor?.normalizedOrNull()?.let { snapshot ->
-            if (normalizedRecordedAt == null) snapshot
-            else retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, normalizedRecordedAt)
-        }
-        val normalizedIsEmpty = mood == null &&
-            normalizedNote.isBlank() &&
-            normalizedTags.isEmpty() &&
-            normalizedImages.isEmpty() &&
-            normalizedAudio == null &&
-            video == null &&
-            pendingVideoUri == null &&
-            normalizedRecordedAt == null &&
-            normalizedOutdoor == null
+        val normalizedOutdoor =
+            outdoor?.normalizedOrNull()?.let { snapshot ->
+                if (normalizedRecordedAt == null) snapshot
+                else retainOutdoorForEditedTime(snapshot, snapshot.capturedAt, normalizedRecordedAt)
+            }
+        val normalizedIsEmpty =
+            mood == null &&
+                normalizedNote.isBlank() &&
+                normalizedTags.isEmpty() &&
+                normalizedImages.isEmpty() &&
+                normalizedAudio == null &&
+                video == null &&
+                pendingVideoUri == null &&
+                normalizedRecordedAt == null &&
+                normalizedOutdoor == null
         return copy(
             note = normalizedNote,
             tags = normalizedTags,
@@ -66,45 +68,51 @@ data class JournalDraft(
         )
     }
 
-    fun toJson(): JSONObject = JSONObject()
-        .put("version", DRAFT_FORMAT_VERSION)
-        .put("mood", mood?.name ?: JSONObject.NULL)
-        .put("note", note)
-        .put("tags", JSONArray(tags.toList()))
-        .put("imageUriStrings", JSONArray(imageUriStrings))
-        .put("audio", audio?.toJson() ?: JSONObject.NULL)
-        .put("video", video?.toJson() ?: JSONObject.NULL)
-        .put("pendingVideoUri", pendingVideoUri ?: JSONObject.NULL)
-        .put("recordedAt", recordedAt ?: JSONObject.NULL)
-        .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
-        .put("updatedAt", updatedAt)
+    fun toJson(): JSONObject =
+        JSONObject()
+            .put("version", DRAFT_FORMAT_VERSION)
+            .put("mood", mood?.name ?: JSONObject.NULL)
+            .put("note", note)
+            .put("tags", JSONArray(tags.toList()))
+            .put("imageUriStrings", JSONArray(imageUriStrings))
+            .put("audio", audio?.toJson() ?: JSONObject.NULL)
+            .put("video", video?.toJson() ?: JSONObject.NULL)
+            .put("pendingVideoUri", pendingVideoUri ?: JSONObject.NULL)
+            .put("recordedAt", recordedAt ?: JSONObject.NULL)
+            .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
+            .put("updatedAt", updatedAt)
 
     companion object {
-        fun fromJson(json: JSONObject): JournalDraft = JournalDraft(
-            mood = json.optString("mood")
-                .takeIf(String::isNotBlank)
-                ?.let { stored -> Mood.entries.firstOrNull { it.name == stored } },
-            note = json.optString("note").take(MAX_DRAFT_NOTE_LENGTH),
-            tags = json.optJSONArray("tags")?.toStringSet().orEmpty(),
-            imageUriStrings = json.optJSONArray("imageUriStrings")?.toStringList().orEmpty(),
-            audio = JournalAudio.fromJson(json.optJSONObject("audio")),
-            video = JournalVideo.fromJson(json.optJSONObject("video")),
-            pendingVideoUri = json.optString("pendingVideoUri").takeIf { it.isNotBlank() && it != "null" },
-            recordedAt = json.optLong("recordedAt").takeIf { it > 0L },
-            outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
-            updatedAt = json.optLong("updatedAt"),
-        ).normalized()
+        fun fromJson(json: JSONObject): JournalDraft =
+            JournalDraft(
+                    mood =
+                        json.optString("mood").takeIf(String::isNotBlank)?.let { stored ->
+                            Mood.entries.firstOrNull { it.name == stored }
+                        },
+                    note = json.optString("note").take(MAX_DRAFT_NOTE_LENGTH),
+                    tags = json.optJSONArray("tags")?.toStringSet().orEmpty(),
+                    imageUriStrings =
+                        json.optJSONArray("imageUriStrings")?.toStringList().orEmpty(),
+                    audio = JournalAudio.fromJson(json.optJSONObject("audio")),
+                    video = JournalVideo.fromJson(json.optJSONObject("video")),
+                    pendingVideoUri =
+                        json.optString("pendingVideoUri").takeIf {
+                            it.isNotBlank() && it != "null"
+                        },
+                    recordedAt = json.optLong("recordedAt").takeIf { it > 0L },
+                    outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
+                    updatedAt = json.optLong("updatedAt"),
+                )
+                .normalized()
     }
 }
 
 internal const val MAX_DRAFT_NOTE_LENGTH = 280
 private const val DRAFT_FORMAT_VERSION = 5
 
-internal fun parseJournalDraft(serialized: String?): JournalDraft = serialized
-    ?.takeIf(String::isNotBlank)
-    ?.let { JSONObject(it) }
-    ?.let(JournalDraft::fromJson)
-    ?: JournalDraft()
+internal fun parseJournalDraft(serialized: String?): JournalDraft =
+    serialized?.takeIf(String::isNotBlank)?.let { JSONObject(it) }?.let(JournalDraft::fromJson)
+        ?: JournalDraft()
 
 private fun JSONArray.toStringList(): List<String> = buildList {
     repeat(length()) { index -> optString(index).takeIf(String::isNotBlank)?.let(::add) }

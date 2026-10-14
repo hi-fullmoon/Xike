@@ -1,12 +1,8 @@
 package com.xike.app
 
-import com.xike.app.ui.theme.XikePageTitleStyle
-
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,15 +10,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,25 +32,26 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.xike.app.ui.theme.XikePageTitleStyle
+import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /** A single launch animation; no journal data or authentication is opened here. */
 @Composable
@@ -82,42 +80,55 @@ internal fun WelcomeScreen(onFinished: () -> Unit) {
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val viewportHeight = with(LocalDensity.current) { maxHeight.roundToPx() }
             SubcomposeLayout(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).alpha(opacity.value),
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).alpha(opacity.value)
             ) { constraints ->
                 val inset = 24.dp.roundToPx()
                 val edge = 12.dp.roundToPx()
                 val gap = 16.dp.roundToPx()
-                val contentConstraints = Constraints(maxWidth = (constraints.maxWidth - 2 * inset).coerceAtLeast(0))
-                val footer = subcompose("footer") {
-                    Text(
-                        stringResource(R.string.welcome_footer),
-                        modifier = Modifier.alpha(textOpacity.value),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }.single().measure(contentConstraints)
-                val stackedBrand = subcompose("stacked-brand") {
-                    // This unplaced composition only measures the preferred layout; accessibility
-                    // must expose only the final, placed brand below.
-                    Box(Modifier.clearAndSetSemantics {}) {
-                        WelcomeBrand(false, textOpacity.value, breath.value)
-                    }
-                }.single().measure(contentConstraints)
+                val contentConstraints =
+                    Constraints(maxWidth = (constraints.maxWidth - 2 * inset).coerceAtLeast(0))
+                val footer =
+                    subcompose("footer") {
+                            Text(
+                                stringResource(R.string.welcome_footer),
+                                modifier = Modifier.alpha(textOpacity.value),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        .single()
+                        .measure(contentConstraints)
+                val stackedBrand =
+                    subcompose("stacked-brand") {
+                            // This unplaced composition only measures the preferred layout;
+                            // accessibility
+                            // must expose only the final, placed brand below.
+                            Box(Modifier.clearAndSetSemantics {}) {
+                                WelcomeBrand(false, textOpacity.value, breath.value)
+                            }
+                        }
+                        .single()
+                        .measure(contentConstraints)
                 val compact = stackedBrand.height + footer.height + gap + 2 * edge > viewportHeight
-                val brand = subcompose("brand") {
-                    WelcomeBrand(compact, textOpacity.value, breath.value)
-                }.single().measure(contentConstraints)
+                val brand =
+                    subcompose("brand") {
+                            WelcomeBrand(compact, textOpacity.value, breath.value)
+                        }
+                        .single()
+                        .measure(contentConstraints)
                 val bottomInset = if (compact) edge else 40.dp.roundToPx()
                 // Extremely short windows can scroll rather than clip or overlap text.
-                val height = maxOf(viewportHeight, edge + brand.height + gap + footer.height + bottomInset)
+                val height =
+                    maxOf(viewportHeight, edge + brand.height + gap + footer.height + bottomInset)
                 val footerTop = height - bottomInset - footer.height
                 val latestBrandTop = footerTop - gap - brand.height
-                val preferredBrandTop = if (compact) {
-                    (edge + latestBrandTop) / 2
-                } else {
-                    (height * 0.4f - 105.dp.toPx()).roundToInt()
-                }
+                val preferredBrandTop =
+                    if (compact) {
+                        (edge + latestBrandTop) / 2
+                    } else {
+                        (height * 0.4f - 105.dp.toPx()).roundToInt()
+                    }
                 val brandTop = preferredBrandTop.coerceIn(edge, latestBrandTop)
                 layout(constraints.maxWidth, height) {
                     brand.placeRelative((constraints.maxWidth - brand.width) / 2, brandTop)
@@ -132,11 +143,15 @@ internal fun WelcomeScreen(onFinished: () -> Unit) {
 private fun WelcomeBrand(compact: Boolean, textOpacity: Float, breath: Float) {
     Box(contentAlignment = Alignment.TopCenter) {
         Box(
-            Modifier.size(190.dp).background(
-                Brush.radialGradient(
-                    listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f), Color.Transparent),
-                ),
-            ),
+            Modifier.size(190.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                            Color.Transparent,
+                        )
+                    )
+                )
         )
         if (compact) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -157,10 +172,12 @@ private fun WelcomeBrand(compact: Boolean, textOpacity: Float, breath: Float) {
 @Composable
 private fun WelcomeLogo(breath: Float) {
     Box(
-        Modifier.size(82.dp).graphicsLayer {
-            scaleX = breath
-            scaleY = breath
-        }.background(colorResource(R.color.launcher_background), RoundedCornerShape(25.dp)),
+        Modifier.size(82.dp)
+            .graphicsLayer {
+                scaleX = breath
+                scaleY = breath
+            }
+            .background(colorResource(R.color.launcher_background), RoundedCornerShape(25.dp))
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_launcher_foreground),
@@ -176,11 +193,14 @@ private fun WelcomeBrandText(opacity: Float) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.alpha(opacity)) {
         Text(
             stringResource(R.string.app_name),
-            style = XikePageTitleStyle.copy(
-                fontSize = 30.sp, lineHeight = 38.sp,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Medium, letterSpacing = 4.sp,
-            ),
+            style =
+                XikePageTitleStyle.copy(
+                    fontSize = 30.sp,
+                    lineHeight = 38.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 4.sp,
+                ),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))

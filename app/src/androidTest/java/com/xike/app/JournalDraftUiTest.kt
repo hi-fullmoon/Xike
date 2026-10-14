@@ -1,44 +1,38 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.data.model.OutdoorSnapshot
-
-import com.xike.app.data.Mood
-
-import com.xike.app.feature.moment.MomentScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
-
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.CompositionLocalProvider
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.test.core.app.ApplicationProvider
-import android.content.Context
-import java.io.File
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeLeft
-import androidx.compose.ui.test.swipeRight
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.test.isDisplayed
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.Density
+import androidx.test.core.app.ApplicationProvider
+import com.xike.app.data.Mood
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.OutdoorSnapshot
+import com.xike.app.feature.moment.MomentScreen
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertTrue
@@ -81,9 +75,10 @@ class JournalDraftUiTest {
                 MomentScreen(
                     padding = PaddingValues(),
                     entries = emptyList(),
-                    draft = JournalDraft(
-                        outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 1_700_000_000_000L),
-                    ),
+                    draft =
+                        JournalDraft(
+                            outdoor = OutdoorSnapshot("上海 · 浦东", 27.2, 2, 1_700_000_000_000L)
+                        ),
                     dailyPromptSettings = DailyPromptSettings(enabled = false),
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
@@ -103,18 +98,21 @@ class JournalDraftUiTest {
     @Test
     fun newlyAddedPhotosOpenAtTappedImageAndSwipeBothDirections() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val files = (1..3).map { index ->
-            File.createTempFile("preview-$index-", ".png", context.cacheDir).also { file ->
-                val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
-                bitmap.eraseColor(android.graphics.Color.rgb(index * 70, 100, 150))
-                file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                bitmap.recycle()
+        val files =
+            (1..3).map { index ->
+                File.createTempFile("preview-$index-", ".png", context.cacheDir).also { file ->
+                    val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(android.graphics.Color.rgb(index * 70, 100, 150))
+                    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    bitmap.recycle()
+                }
             }
-        }
         try {
             showPhotoDraft(files.map { Uri.fromFile(it).toString() })
-            composeRule.onNodeWithContentDescription("待保存的第 2 张照片")
-                .performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+            composeRule
+                .onNodeWithContentDescription("待保存的第 2 张照片")
+                .performScrollTo()
+                .performSemanticsAction(SemanticsActions.OnClick)
             waitForPhotoPage("2 / 3")
             composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
             composeRule.onNodeWithTag("photo-gallery-pager").performTouchInput { swipeLeft() }
@@ -135,8 +133,10 @@ class JournalDraftUiTest {
         val uri = "content://com.xike.app.missing/preview"
         var removed: String? = null
         showPhotoDraft(listOf(uri), onRemove = { removed = it })
-        composeRule.onNodeWithContentDescription("待保存的第 1 张照片")
-            .performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        composeRule
+            .onNodeWithContentDescription("待保存的第 1 张照片")
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick)
         waitForPhotoPage("1 / 1")
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("关闭图片查看").performClick()
@@ -170,7 +170,8 @@ class JournalDraftUiTest {
             }
         }
         composeRule.runOnIdle {
-            draft.value = JournalDraft(imageUriStrings = listOf("content://com.xike.app.missing/added"))
+            draft.value =
+                JournalDraft(imageUriStrings = listOf("content://com.xike.app.missing/added"))
         }
         composeRule.waitUntil(5_000) {
             composeRule.onNodeWithContentDescription("待保存的第 1 张照片").isDisplayed()
@@ -179,7 +180,10 @@ class JournalDraftUiTest {
         composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
         composeRule.onNodeWithText("再留下一点").performClick()
         composeRule.onNodeWithText("主题").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("待保存的第 1 张照片").performScrollTo().assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription("待保存的第 1 张照片")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     private fun waitForPhotoPage(label: String) {
@@ -205,8 +209,7 @@ class JournalDraftUiTest {
         }
     }
 
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun restoredDraftIsShownWhileDailyPromptCanStayOff() {
@@ -215,12 +218,13 @@ class JournalDraftUiTest {
                 MomentScreen(
                     padding = PaddingValues(),
                     entries = emptyList(),
-                    draft = JournalDraft(
-                        mood = Mood.GOOD,
-                        note = "进程恢复后的草稿",
-                        tags = setOf("工作"),
-                        updatedAt = 123L,
-                    ),
+                    draft =
+                        JournalDraft(
+                            mood = Mood.GOOD,
+                            note = "进程恢复后的草稿",
+                            tags = setOf("工作"),
+                            updatedAt = 123L,
+                        ),
                     dailyPromptSettings = DailyPromptSettings(enabled = false),
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
@@ -245,10 +249,11 @@ class JournalDraftUiTest {
                     padding = PaddingValues(),
                     entries = emptyList(),
                     draft = JournalDraft(),
-                    dailyPromptSettings = DailyPromptSettings(
-                        enabled = true,
-                        style = DailyPromptStyle.AWARENESS,
-                    ),
+                    dailyPromptSettings =
+                        DailyPromptSettings(
+                            enabled = true,
+                            style = DailyPromptStyle.AWARENESS,
+                        ),
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
                     onDraftTagToggle = {},
@@ -293,7 +298,7 @@ class JournalDraftUiTest {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale = 2f),
+                LocalDensity provides Density(density.density, fontScale = 2f)
             ) {
                 XikeTheme(AppTheme.OCEAN) {
                     MomentScreen(
@@ -313,9 +318,7 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("选择参考").performClick()
-        composeRule.onNodeWithText("开心、兴奋，或充满能量")
-            .performScrollTo()
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("开心、兴奋，或充满能量").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -417,7 +420,10 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription(tr("添加内容", "Add content")).performScrollTo().performClick()
+        composeRule
+            .onNodeWithContentDescription(tr("添加内容", "Add content"))
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText("照片").performClick()
         composeRule.onNodeWithText("拍照").assertIsDisplayed()
         composeRule.onNodeWithText("从相册选择").assertIsDisplayed()
@@ -430,9 +436,10 @@ class JournalDraftUiTest {
                 MomentScreen(
                     padding = PaddingValues(),
                     entries = emptyList(),
-                    draft = JournalDraft(
-                        imageUriStrings = listOf("content://com.xike.app.missing/not-found"),
-                    ),
+                    draft =
+                        JournalDraft(
+                            imageUriStrings = listOf("content://com.xike.app.missing/not-found")
+                        ),
                     dailyPromptSettings = DailyPromptSettings(enabled = false),
                     onDraftMoodChange = {},
                     onDraftNoteChange = {},
@@ -450,12 +457,13 @@ class JournalDraftUiTest {
 
     @Test
     fun restoredBackdatedDraftShowsItsTimeAndCanReturnToNow() {
-        val recordedAt = LocalDate.now()
-            .minusDays(1)
-            .atTime(20, 15)
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
+        val recordedAt =
+            LocalDate.now()
+                .minusDays(1)
+                .atTime(20, 15)
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
         var resetValue: Long? = recordedAt
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {

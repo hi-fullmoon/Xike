@@ -16,10 +16,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class JournalDatabaseMigrationTest {
     @get:Rule
-    val helper = MigrationTestHelper(
-        InstrumentationRegistry.getInstrumentation(),
-        JournalDatabase::class.java,
-    )
+    val helper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            JournalDatabase::class.java,
+        )
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -39,19 +40,22 @@ class JournalDatabaseMigrationTest {
                 """
                 INSERT INTO journal_entries(id, created_at, mood, note)
                 VALUES('existing', 100, 'GOOD', '迁移前的记录')
-                """.trimIndent(),
+                """
+                    .trimIndent()
             )
         }
 
-        helper.runMigrationsAndValidate(
-            TEST_DATABASE,
-            2,
-            true,
-            JournalDatabase.MIGRATION_1_2,
-        ).use { database ->
-            assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
-            assertEquals(0, database.singleInt("SELECT COUNT(*) FROM journal_entries_fts"))
-        }
+        helper
+            .runMigrationsAndValidate(
+                TEST_DATABASE,
+                2,
+                true,
+                JournalDatabase.MIGRATION_1_2,
+            )
+            .use { database ->
+                assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
+                assertEquals(0, database.singleInt("SELECT COUNT(*) FROM journal_entries_fts"))
+            }
     }
 
     @Test
@@ -61,19 +65,27 @@ class JournalDatabaseMigrationTest {
                 """
                 INSERT INTO journal_entries(id, created_at, mood, note)
                 VALUES('existing-v2', 200, 'CALM', '升级前的记录')
-                """.trimIndent(),
+                """
+                    .trimIndent()
             )
         }
 
-        helper.runMigrationsAndValidate(
-            TEST_DATABASE_V2,
-            3,
-            true,
-            JournalDatabase.MIGRATION_2_3,
-        ).use { database ->
-            assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
-            assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries WHERE outdoor_place_name IS NULL"))
-        }
+        helper
+            .runMigrationsAndValidate(
+                TEST_DATABASE_V2,
+                3,
+                true,
+                JournalDatabase.MIGRATION_2_3,
+            )
+            .use { database ->
+                assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
+                assertEquals(
+                    1,
+                    database.singleInt(
+                        "SELECT COUNT(*) FROM journal_entries WHERE outdoor_place_name IS NULL"
+                    ),
+                )
+            }
     }
 
     @Test
@@ -86,19 +98,22 @@ class JournalDatabaseMigrationTest {
                     outdoor_temperature_celsius, outdoor_weather_code,
                     outdoor_captured_at, outdoor_source
                 ) VALUES('existing-v3', 300, 'CALM', '升级前的记录', NULL, NULL, NULL, NULL, NULL)
-                """.trimIndent(),
+                """
+                    .trimIndent()
             )
         }
 
-        helper.runMigrationsAndValidate(
-            TEST_DATABASE_V3,
-            4,
-            true,
-            JournalDatabase.MIGRATION_3_4,
-        ).use { database ->
-            assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
-            assertEquals(0, database.singleInt("SELECT COUNT(*) FROM journal_audios"))
-        }
+        helper
+            .runMigrationsAndValidate(
+                TEST_DATABASE_V3,
+                4,
+                true,
+                JournalDatabase.MIGRATION_3_4,
+            )
+            .use { database ->
+                assertEquals(1, database.singleInt("SELECT COUNT(*) FROM journal_entries"))
+                assertEquals(0, database.singleInt("SELECT COUNT(*) FROM journal_audios"))
+            }
     }
 
     private fun SupportSQLiteDatabase.singleInt(query: String): Int =
@@ -110,13 +125,22 @@ class JournalDatabaseMigrationTest {
     @Test
     fun migrationFrom4To5PreservesEntriesAndAudio() {
         helper.createDatabase(TEST_DATABASE_V4, 4).use { db ->
-            db.execSQL("INSERT INTO journal_entries(id, created_at, mood, note) VALUES('existing-v4', 400, 'CALM', '')")
-            db.execSQL("INSERT INTO journal_audios(entry_id, file_name, duration_millis, mime_type) VALUES('existing-v4', 'existing.m4a', 1000, 'audio/mp4')")
+            db.execSQL(
+                "INSERT INTO journal_entries(id, created_at, mood, note) VALUES('existing-v4', 400, 'CALM', '')"
+            )
+            db.execSQL(
+                "INSERT INTO journal_audios(entry_id, file_name, duration_millis, mime_type) VALUES('existing-v4', 'existing.m4a', 1000, 'audio/mp4')"
+            )
         }
-        helper.runMigrationsAndValidate(TEST_DATABASE_V4, 5, true, JournalDatabase.MIGRATION_4_5).use { db ->
-            assertEquals(1, db.singleInt("SELECT COUNT(*) FROM journal_entries WHERE video_json IS NULL"))
-            assertEquals(1, db.singleInt("SELECT COUNT(*) FROM journal_audios"))
-        }
+        helper
+            .runMigrationsAndValidate(TEST_DATABASE_V4, 5, true, JournalDatabase.MIGRATION_4_5)
+            .use { db ->
+                assertEquals(
+                    1,
+                    db.singleInt("SELECT COUNT(*) FROM journal_entries WHERE video_json IS NULL"),
+                )
+                assertEquals(1, db.singleInt("SELECT COUNT(*) FROM journal_audios"))
+            }
     }
 
     private companion object {

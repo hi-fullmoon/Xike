@@ -1,8 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.model.parseJournalDraft
-import com.xike.app.data.draft.JournalDraftStore
-
 import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.ViewModelProvider
@@ -13,6 +10,8 @@ import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.draft.JournalDraftStore
+import com.xike.app.data.model.parseJournalDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,28 +28,39 @@ class JournalDraftProcessTest {
         val phase = InstrumentationRegistry.getArguments().getString("draftProcessPhase")
         assumeNotNull(phase)
         val application = ApplicationProvider.getApplicationContext<Application>()
-        val backup = EncryptedSharedPreferences.create(
-            application,
-            "xike-draft-process-test",
-            MasterKey.Builder(application).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-        val owner = object : ViewModelStoreOwner {
-            override val viewModelStore = ViewModelStore()
-        }
+        val backup =
+            EncryptedSharedPreferences.create(
+                application,
+                "xike-draft-process-test",
+                MasterKey.Builder(application).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        val owner =
+            object : ViewModelStoreOwner {
+                override val viewModelStore = ViewModelStore()
+            }
         val store = JournalDraftStore(application)
-        fun openViewModel(): JournalViewModel = ViewModelProvider(
-            owner, ViewModelProvider.AndroidViewModelFactory.getInstance(application),
-        )[JournalViewModel::class.java]
+        fun openViewModel(): JournalViewModel =
+            ViewModelProvider(
+                owner,
+                ViewModelProvider.AndroidViewModelFactory.getInstance(application),
+            )[JournalViewModel::class.java]
 
         when (phase) {
             "write" -> {
-                check(!backup.contains("original")) { "A previous process test still requires restoration." }
+                check(!backup.contains("original")) {
+                    "A previous process test still requires restoration."
+                }
                 val original = store.load()
                 val expected = "今天走了一段路，回来后心情平静。"
-                check(backup.edit().putString("original", original.toJson().toString())
-                    .putString("expected", expected).commit())
+                check(
+                    backup
+                        .edit()
+                        .putString("original", original.toJson().toString())
+                        .putString("expected", expected)
+                        .commit()
+                )
                 try {
                     val viewModel = openViewModel()
                     awaitCondition { !viewModel.isLoading }

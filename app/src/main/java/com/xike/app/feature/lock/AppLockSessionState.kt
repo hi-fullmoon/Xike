@@ -1,14 +1,17 @@
 package com.xike.app.feature.lock
 
-import com.xike.app.SystemActivityLockMonitor
-
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.xike.app.SystemActivityLockMonitor
 
-internal enum class LockAuthentication { UNLOCK, ENABLE, DISABLE }
+internal enum class LockAuthentication {
+    UNLOCK,
+    ENABLE,
+    DISABLE,
+}
 
 /** Public because ViewModelProvider creates this type reflectively from another package. */
 class AppLockSessionState : ViewModel() {
@@ -36,8 +39,10 @@ class AppLockSessionState : ViewModel() {
         authenticationInProgress && authenticationDeviceLockRevision == deviceLockRevision
 
     internal fun shouldLockOnForeground(nowMillis: Long, timeout: AppLockTimeout): Boolean =
-        isAppLocked || systemActivitiesRequiringAuthentication.isNotEmpty() ||
-            (backgroundedAtMillis != null && shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
+        isAppLocked ||
+            systemActivitiesRequiringAuthentication.isNotEmpty() ||
+            (backgroundedAtMillis != null &&
+                shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
 
     internal fun beginSystemActivity(
         watchTaskVisibility: Boolean = true,
@@ -51,7 +56,10 @@ class AppLockSessionState : ViewModel() {
         systemActivityMonitor?.startWatching(watchTaskVisibility)
     }
 
-    internal fun finishSystemActivity(resultReceived: Boolean = true, operationId: String = "default") {
+    internal fun finishSystemActivity(
+        resultReceived: Boolean = true,
+        operationId: String = "default",
+    ) {
         val outstanding = activeSystemActivities[operationId] ?: return
         val requiresAuthentication = operationId in systemActivitiesRequiringAuthentication
         if (resultReceived && requiresAuthentication) isAppLocked = true
@@ -70,9 +78,14 @@ class AppLockSessionState : ViewModel() {
             systemActivityMonitor?.stop()
             return
         }
-        val monitor = systemActivityMonitor ?: SystemActivityLockMonitor(
-            context, ::interruptSystemActivity, ::recordDeviceLocked,
-        ).also { systemActivityMonitor = it }
+        val monitor =
+            systemActivityMonitor
+                ?: SystemActivityLockMonitor(
+                        context,
+                        ::interruptSystemActivity,
+                        ::recordDeviceLocked,
+                    )
+                    .also { systemActivityMonitor = it }
         monitor.observe(taskId)
     }
 
@@ -90,7 +103,8 @@ class AppLockSessionState : ViewModel() {
     }
 
     internal fun recordBackgrounded(nowMillis: Long) {
-        if (!systemActivityInProgress && backgroundedAtMillis == null) backgroundedAtMillis = nowMillis
+        if (!systemActivityInProgress && backgroundedAtMillis == null)
+            backgroundedAtMillis = nowMillis
     }
 
     override fun onCleared() {

@@ -1,28 +1,19 @@
 package com.xike.app.feature.lock
 
-import com.xike.app.localizedText
-import com.xike.app.tr
-
-import com.xike.app.ui.theme.XikeShapes
-import com.xike.app.ui.theme.XikePageTitleStyle
-import com.xike.app.ui.theme.XikeEyebrowStyle
-import com.xike.app.ui.theme.xikeButtonElevation
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.xike.app.localizedText
+import com.xike.app.tr
+import com.xike.app.ui.theme.XikeEyebrowStyle
+import com.xike.app.ui.theme.XikePageTitleStyle
+import com.xike.app.ui.theme.XikeShapes
+import com.xike.app.ui.theme.xikeButtonElevation
 
 @Composable
 fun AppLockDialog(
@@ -51,10 +48,11 @@ fun AppLockDialog(
 ) {
     Dialog(
         onDismissRequest = {},
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         AppLockScreen(
             authenticationAvailable = authenticationAvailable,
@@ -72,14 +70,15 @@ fun AppLockScreen(
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 32.dp, vertical = 28.dp),
+            modifier =
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 32.dp, vertical = 28.dp)
         ) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 Box(
-                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                    Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .heightIn(min = maxHeight),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -99,9 +98,16 @@ fun AppLockScreen(
                             }
                         }
                         Spacer(Modifier.height(24.dp))
-                        Text(tr("只属于你的空间", "A SPACE OF YOUR OWN"), style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            tr("只属于你的空间", "A SPACE OF YOUR OWN"),
+                            style = XikeEyebrowStyle,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                         Spacer(Modifier.height(9.dp))
-                        Text(localizedText("息刻已锁定"), style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp))
+                        Text(
+                            localizedText("息刻已锁定"),
+                            style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp),
+                        )
                         Spacer(Modifier.height(8.dp))
                         Text(
                             if (authenticationAvailable) {
@@ -114,12 +120,16 @@ fun AppLockScreen(
                         )
                         Spacer(Modifier.height(28.dp))
                         Button(
-                            onClick = if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
+                            onClick =
+                                if (authenticationAvailable) onUnlock else onOpenSecuritySettings,
                             shape = XikeShapes.button,
                             contentPadding = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
                             elevation = xikeButtonElevation(),
                         ) {
-                            Text(if (authenticationAvailable) localizedText("解锁息刻") else localizedText("设置设备锁屏"))
+                            Text(
+                                if (authenticationAvailable) localizedText("解锁息刻")
+                                else localizedText("设置设备锁屏")
+                            )
                         }
                     }
                 }

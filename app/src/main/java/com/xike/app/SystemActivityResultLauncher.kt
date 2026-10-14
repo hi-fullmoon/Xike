@@ -1,12 +1,9 @@
 package com.xike.app
 
-import com.xike.app.ui.components.XikeNotice
-
-
-import android.content.Intent
 import android.content.Context
-import android.net.Uri
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
@@ -20,10 +17,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityOptionsCompat
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xike.app.ui.components.XikeNotice
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -63,7 +61,8 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
         if (!durable || store != null) return
         storeKey = key
         val applicationContext = context.applicationContext
-        val loading = viewModelScope.async(Dispatchers.IO) { PendingMediaResultStore(applicationContext) }
+        val loading =
+            viewModelScope.async(Dispatchers.IO) { PendingMediaResultStore(applicationContext) }
         store = loading
         restoring = true
         notifyPending()
@@ -76,8 +75,17 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
                                 @Suppress("UNCHECKED_CAST")
                                 receive(restored.value as T, restored.ownedReadUris)
                             }
-                        }.onFailure {
-                            XikeNotice.makeText(applicationContext, tr("无法读取待处理的媒体选择，请稍后重试。", "Unable to read the pending media selection. Please try again later."), XikeNotice.LENGTH_LONG).show()
+                        }
+                        .onFailure {
+                            XikeNotice.makeText(
+                                    applicationContext,
+                                    tr(
+                                        "无法读取待处理的媒体选择，请稍后重试。",
+                                        "Unable to read the pending media selection. Please try again later.",
+                                    ),
+                                    XikeNotice.LENGTH_LONG,
+                                )
+                                .show()
                         }
                 }
             } finally {
@@ -98,13 +106,24 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
             try {
                 deliveryMutex.withLock {
                     runCatching {
-                        withContext(Dispatchers.IO) { store!!.await().save(storeKey!!, value, ownedReadUris) }
-                    }.onSuccess { receive(value, ownedReadUris) }
+                        withContext(Dispatchers.IO) {
+                            store!!.await().save(storeKey!!, value, ownedReadUris)
+                        }
+                    }
+                        .onSuccess { receive(value, ownedReadUris) }
                         .onFailure {
                             // Keep the selection and grants in memory on a transient write failure.
                             receive(value, ownedReadUris)
                             context?.let { applicationContext ->
-                                XikeNotice.makeText(applicationContext, tr("媒体选择暂时无法持久保存，请保持应用开启。", "The media selection could not be preserved yet. Keep the app open."), XikeNotice.LENGTH_LONG).show()
+                                XikeNotice.makeText(
+                                        applicationContext,
+                                        tr(
+                                            "媒体选择暂时无法持久保存，请保持应用开启。",
+                                            "The media selection could not be preserved yet. Keep the app open.",
+                                        ),
+                                        XikeNotice.LENGTH_LONG,
+                                    )
+                                    .show()
                             }
                         }
                 }
@@ -117,15 +136,19 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
 
     internal suspend fun acknowledgeDurableResult() {
         deliveryMutex.withLock {
-            store?.let { loading -> withContext(Dispatchers.IO) { loading.await().remove(storeKey!!) } }
+            store?.let { loading ->
+                withContext(Dispatchers.IO) { loading.await().remove(storeKey!!) }
+            }
         }
     }
+
     @Suppress("UNCHECKED_CAST")
-    internal var pending by mutableStateOf(
-        if (savedState.get<Boolean>("hasResult") == true) {
-            PendingSystemActivityResult(savedState.get<Any?>("result") as T)
-        } else null,
-    )
+    internal var pending by
+        mutableStateOf(
+            if (savedState.get<Boolean>("hasResult") == true) {
+                PendingSystemActivityResult(savedState.get<Any?>("result") as T)
+            } else null
+        )
         private set
 
     internal fun receive(value: T, ownedReadUris: List<Uri> = emptyList()) {
@@ -159,7 +182,10 @@ class SystemActivityResultState<T>(private val savedState: SavedStateHandle) : V
     }
 
     internal fun pendingReadAccess(context: Context): SystemActivityReadAccess =
-        SystemActivityReadAccess(context, savedState.get<ArrayList<String>>("ownedReadUris").orEmpty().map(Uri::parse))
+        SystemActivityReadAccess(
+            context,
+            savedState.get<ArrayList<String>>("ownedReadUris").orEmpty().map(Uri::parse),
+        )
 
     override fun onCleared() {
         // Durable pending results retain their grants until restored and handed to a consumer.
@@ -174,7 +200,11 @@ internal fun <I, O> rememberSystemActivityResultLauncher(
     contract: ActivityResultContract<I, O>,
     resultKey: String,
     onResult: (O) -> Unit,
-): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, false, true, {}) { result, _ -> onResult(result); true }
+): ActivityResultLauncher<I> =
+    rememberActivityResultWithAccess(contract, resultKey, false, true, {}) { result, _ ->
+        onResult(result)
+        true
+    }
 
 @Composable
 internal fun <I, O> rememberSystemActivityResultLauncherWhenReady(
@@ -183,7 +213,12 @@ internal fun <I, O> rememberSystemActivityResultLauncherWhenReady(
     resultsReady: Boolean,
     onPendingChange: (Boolean) -> Unit,
     onResult: (O) -> Boolean,
-): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, false, resultsReady, onPendingChange) { result, _ -> onResult(result) }
+): ActivityResultLauncher<I> =
+    rememberActivityResultWithAccess(contract, resultKey, false, resultsReady, onPendingChange) {
+        result,
+        _ ->
+        onResult(result)
+    }
 
 @Composable
 internal fun <I, O> rememberMediaActivityResultLauncher(
@@ -192,7 +227,15 @@ internal fun <I, O> rememberMediaActivityResultLauncher(
     resultsReady: Boolean = true,
     onPendingChange: (Boolean) -> Unit = {},
     onResult: (O, SystemActivityReadAccess) -> Boolean,
-): ActivityResultLauncher<I> = rememberActivityResultWithAccess(contract, resultKey, true, resultsReady, onPendingChange, onResult)
+): ActivityResultLauncher<I> =
+    rememberActivityResultWithAccess(
+        contract,
+        resultKey,
+        true,
+        resultsReady,
+        onPendingChange,
+        onResult,
+    )
 
 @Composable
 private fun <I, O> rememberActivityResultWithAccess(
@@ -214,28 +257,43 @@ private fun <I, O> rememberActivityResultWithAccess(
         val stopObserving = resultState.observePending { currentOnPendingChange(it) }
         onDispose { stopObserving() }
     }
-    val launcher = rememberLauncherForActivityResult(contract) { result ->
-        callbacks.onResult(key)
-        val ownedReadUris = if (retainReadAccess) retainSystemActivityReadAccess(context, result) else emptyList()
-        resultState.receiveFromSystem(result, ownedReadUris)
-    }
+    val launcher =
+        rememberLauncherForActivityResult(contract) { result ->
+            callbacks.onResult(key)
+            val ownedReadUris =
+                if (retainReadAccess) retainSystemActivityReadAccess(context, result)
+                else emptyList()
+            resultState.receiveFromSystem(result, ownedReadUris)
+        }
     LaunchedEffect(callbacks.isLocked, callbacks.resultsReady, resultsReady, resultState.pending) {
         val result = resultState.pending
         if (resultsReady && !callbacks.isLocked && callbacks.canHandleResult() && result != null) {
             val access = resultState.pendingReadAccess(context)
             var accepted = false
             try {
-                accepted = resultState.acceptWhenReady(resultsReady && callbacks.canHandleResult()) {
-                    currentOnResult(it, access)
-                }
+                accepted =
+                    resultState.acceptWhenReady(resultsReady && callbacks.canHandleResult()) {
+                        currentOnResult(it, access)
+                    }
                 if (!accepted) return@LaunchedEffect
                 resultState.takeReadAccess(context)
                 withContext(NonCancellable) {
-                    runCatching { resultState.acknowledgeDurableResult() }.onFailure {
-                        XikeNotice.makeText(context, tr("媒体选择确认暂时无法保存，请稍后重试。", "Unable to save the media selection acknowledgement. Please try again later."), XikeNotice.LENGTH_LONG).show()
-                    }
+                    runCatching { resultState.acknowledgeDurableResult() }
+                        .onFailure {
+                            XikeNotice.makeText(
+                                    context,
+                                    tr(
+                                        "媒体选择确认暂时无法保存，请稍后重试。",
+                                        "Unable to save the media selection acknowledgement. Please try again later.",
+                                    ),
+                                    XikeNotice.LENGTH_LONG,
+                                )
+                                .show()
+                        }
                 }
-            } finally { if (accepted) access.closeUnlessDeferred() }
+            } finally {
+                if (accepted) access.closeUnlessDeferred()
+            }
         }
     }
     return remember(launcher, context) {
@@ -248,9 +306,10 @@ private fun <I, O> rememberActivityResultWithAccess(
                     val info = intent.resolveActivityInfo(context.packageManager, 0)
                     // A camera may run in its own task. Its hidden caller task does not imply
                     // that the user left the capture flow; Home/recents/screen events still apply.
-                    val sameTask = intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
-                        (info?.launchMode == ActivityInfo.LAUNCH_MULTIPLE ||
-                            info?.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP)
+                    val sameTask =
+                        intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
+                            (info?.launchMode == ActivityInfo.LAUNCH_MULTIPLE ||
+                                info?.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP)
                     started = true
                     callbacks.onLaunch(key, sameTask)
                     launcher.launch(input, options)
@@ -260,7 +319,9 @@ private fun <I, O> rememberActivityResultWithAccess(
                 }
             }
 
-            override val contract: ActivityResultContract<I, *> get() = launcher.contract
+            override val contract: ActivityResultContract<I, *>
+                get() = launcher.contract
+
             override fun unregister() = launcher.unregister()
         }
     }

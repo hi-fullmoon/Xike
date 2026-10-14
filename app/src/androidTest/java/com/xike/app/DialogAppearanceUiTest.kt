@@ -52,7 +52,10 @@ class DialogAppearanceUiTest {
                         selectedTheme.value = theme
                         selectedStyle.value = style
                     }
-                    rule.onNodeWithText(localizedText("备份密码（至少 8 位）")).performScrollTo().assertIsDisplayed()
+                    rule
+                        .onNodeWithText(localizedText("备份密码（至少 8 位）"))
+                        .performScrollTo()
+                        .assertIsDisplayed()
                     rule.onNodeWithText(localizedText("取消")).assertIsDisplayed()
                     rule.onNodeWithText(localizedText("选择保存位置")).assertIsDisplayed()
                     saveScreenshot("export-$theme-$style")
@@ -92,7 +95,13 @@ class DialogAppearanceUiTest {
                     val now = LocalDateTime.now()
                     lateinit var timeDialog: android.app.TimePickerDialog
                     rule.runOnIdle {
-                        timeDialog = showRecordedAtTimePicker(pickerContext, now.toLocalDate(), now.hour, now.minute) {}
+                        timeDialog =
+                            showRecordedAtTimePicker(
+                                pickerContext,
+                                now.toLocalDate(),
+                                now.hour,
+                                now.minute,
+                            ) {}
                     }
                     try {
                         verifyNativeActions(timeDialog)
@@ -126,11 +135,19 @@ class DialogAppearanceUiTest {
         rule.waitForIdle()
         InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(500, 5_000)
         val config = context.resources.configuration
-        val directory = File(context.getExternalFilesDir(null), "dialog-appearance").apply { mkdirs() }
-        val screenshot = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+        val directory =
+            File(context.getExternalFilesDir(null), "dialog-appearance").apply { mkdirs() }
+        val screenshot =
+            requireNotNull(
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            )
         try {
-            File(directory, "$name-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}.png")
-                .outputStream().use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            File(
+                    directory,
+                    "$name-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}.png",
+                )
+                .outputStream()
+                .use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         } finally {
             screenshot.recycle()
         }

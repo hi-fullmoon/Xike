@@ -26,7 +26,11 @@ internal class PlaybackCoordinator(private val onReleased: () -> Unit = {}) {
         owner = null
         pause = null
         if (callback != null) {
-            try { callback() } finally { onReleased() }
+            try {
+                callback()
+            } finally {
+                onReleased()
+            }
         }
     }
 }

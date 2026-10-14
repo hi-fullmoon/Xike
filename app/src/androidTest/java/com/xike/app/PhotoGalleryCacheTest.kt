@@ -1,39 +1,35 @@
 package com.xike.app
 
-import com.xike.app.ui.components.PhotoGalleryDialog
-import com.xike.app.ui.components.GalleryPhoto
-import com.xike.app.ui.components.GalleryImageLoader
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.XikeTheme
-
-
-
 import android.content.Context
-import androidx.security.crypto.EncryptedFile
-import androidx.security.crypto.MasterKey
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.security.crypto.EncryptedFile
+import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import coil3.decode.DataSource
-import coil3.request.SuccessResult
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import coil3.size.Scale
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.delay
-import java.util.concurrent.atomic.AtomicInteger
+import com.xike.app.ui.components.GalleryImageLoader
+import com.xike.app.ui.components.GalleryPhoto
+import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -42,13 +38,14 @@ import org.junit.Test
 class PhotoGalleryCacheTest {
     @get:Rule val composeRule = createComposeRule()
     private val photos = listOf("moment.png", "archive.png", "insights.png")
-    private val assets get() = InstrumentationRegistry.getInstrumentation().context.assets
+    private val assets
+        get() = InstrumentationRegistry.getInstrumentation().context.assets
 
     @Test
-    fun unavailablePhotoShowsFailureAndRetryLoadsRestoredFile() = checkPhotoRetry(AppLanguage.CHINESE)
+    fun unavailablePhotoShowsFailureAndRetryLoadsRestoredFile() =
+        checkPhotoRetry(AppLanguage.CHINESE)
 
-    @Test
-    fun unavailablePhotoCanRetryInEnglish() = checkPhotoRetry(AppLanguage.ENGLISH)
+    @Test fun unavailablePhotoCanRetryInEnglish() = checkPhotoRetry(AppLanguage.ENGLISH)
 
     private fun checkPhotoRetry(language: AppLanguage) {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -68,20 +65,37 @@ class PhotoGalleryCacheTest {
                 }
             }
             composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("photo-gallery-error-0").fetchSemanticsNodes().isNotEmpty()
+                composeRule
+                    .onAllNodesWithTag("photo-gallery-error-0")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
             }
             composeRule.onNodeWithTag("photo-gallery-error-0").assertIsDisplayed()
-            composeRule.onNodeWithTag("photo-gallery-pager").captureToImage().asAndroidBitmap().let { bitmap ->
-                File(context.cacheDir, "gallery-retry-error-${language.tag}.png").outputStream().use {
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            composeRule
+                .onNodeWithTag("photo-gallery-pager")
+                .captureToImage()
+                .asAndroidBitmap()
+                .let { bitmap ->
+                    File(context.cacheDir, "gallery-retry-error-${language.tag}.png")
+                        .outputStream()
+                        .use {
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                        }
                 }
-            }
             assertTrue(heldFile.renameTo(file))
-            composeRule.onNodeWithText(if (language == AppLanguage.CHINESE) "重试" else "Retry").performClick()
+            composeRule
+                .onNodeWithText(if (language == AppLanguage.CHINESE) "重试" else "Retry")
+                .performClick()
             composeRule.waitUntil(10_000) {
                 loader.memoryCache?.keys?.any { it.key == "gallery:${file.name}" } == true &&
-                    composeRule.onAllNodesWithTag("photo-gallery-error-0").fetchSemanticsNodes().isEmpty() &&
-                    composeRule.onAllNodesWithTag("photo-gallery-placeholder-0").fetchSemanticsNodes().isEmpty()
+                    composeRule
+                        .onAllNodesWithTag("photo-gallery-error-0")
+                        .fetchSemanticsNodes()
+                        .isEmpty() &&
+                    composeRule
+                        .onAllNodesWithTag("photo-gallery-placeholder-0")
+                        .fetchSemanticsNodes()
+                        .isEmpty()
             }
         } finally {
             file.delete()
@@ -96,21 +110,31 @@ class PhotoGalleryCacheTest {
         val loader = GalleryImageLoader.create(context)
         val reads = AtomicInteger()
         val requests = photos.map { name ->
-            GalleryImageLoader.request(context, GalleryPhoto(name) {
-                reads.incrementAndGet()
-                assets.open(name)
-            }).newBuilder().size(GalleryImageLoader.decodeSize(1440, 3200)).build()
+            GalleryImageLoader.request(
+                    context,
+                    GalleryPhoto(name) {
+                        reads.incrementAndGet()
+                        assets.open(name)
+                    },
+                )
+                .newBuilder()
+                .size(GalleryImageLoader.decodeSize(1440, 3200))
+                .build()
         }
         suspend fun loadPhotos(expectCached: Boolean) {
             requests.forEach { request ->
                 val result = loader.execute(request)
                 assertTrue(result is SuccessResult)
-                if (expectCached) assertEquals(DataSource.MEMORY_CACHE, (result as SuccessResult).dataSource)
+                if (expectCached)
+                    assertEquals(DataSource.MEMORY_CACHE, (result as SuccessResult).dataSource)
             }
         }
         try {
             loadPhotos(false)
-            repeat(3) { System.gc(); delay(200) }
+            repeat(3) {
+                System.gc()
+                delay(200)
+            }
             loadPhotos(true)
             assertEquals(3, reads.get())
         } finally {
@@ -125,19 +149,29 @@ class PhotoGalleryCacheTest {
         loader.memoryCache?.clear()
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
-                PhotoGalleryDialog(listOf("platform-crop"), 0, {
-                    context.resources.openRawResource(android.R.drawable.ic_menu_crop)
-                }, {})
+                PhotoGalleryDialog(
+                    listOf("platform-crop"),
+                    0,
+                    {
+                        context.resources.openRawResource(android.R.drawable.ic_menu_crop)
+                    },
+                    {},
+                )
             }
         }
         composeRule.waitUntil(10_000) {
             loader.memoryCache?.keys?.isNotEmpty() == true &&
-                composeRule.onAllNodesWithTag("photo-gallery-placeholder-0").fetchSemanticsNodes().isEmpty()
+                composeRule
+                    .onAllNodesWithTag("photo-gallery-placeholder-0")
+                    .fetchSemanticsNodes()
+                    .isEmpty()
         }
         composeRule.onNodeWithTag("photo-gallery-placeholder-0").assertDoesNotExist()
         val screenshot = composeRule.onNodeWithTag("photo-gallery-pager").captureToImage()
         File(context.cacheDir, "gallery-transparent-fixed.png").outputStream().use {
-            screenshot.asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            screenshot
+                .asAndroidBitmap()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
     }
 
@@ -145,17 +179,33 @@ class PhotoGalleryCacheTest {
     fun encryptedPhotoDecodesDirectlyAndReturnsFromMemory() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val file = File(context.cacheDir, "gallery-encrypted-${System.nanoTime()}")
-        val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-        val encrypted = EncryptedFile.Builder(context, file, masterKey,
-            EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB).build()
+        val masterKey =
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+        val encrypted =
+            EncryptedFile.Builder(
+                    context,
+                    file,
+                    masterKey,
+                    EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB,
+                )
+                .build()
         val loader = GalleryImageLoader.create(context)
         val reads = AtomicInteger()
         try {
-            encrypted.openFileOutput().use { output -> assets.open("moment.png").use { it.copyTo(output) } }
-            val request = GalleryImageLoader.request(context, GalleryPhoto(file.name) {
-                reads.incrementAndGet()
-                encrypted.openFileInput()
-            }).newBuilder().size(1080, 1920).build()
+            encrypted.openFileOutput().use { output ->
+                assets.open("moment.png").use { it.copyTo(output) }
+            }
+            val request =
+                GalleryImageLoader.request(
+                        context,
+                        GalleryPhoto(file.name) {
+                            reads.incrementAndGet()
+                            encrypted.openFileInput()
+                        },
+                    )
+                    .newBuilder()
+                    .size(1080, 1920)
+                    .build()
             assertTrue(loader.execute(request) is SuccessResult)
             val cached = loader.execute(request) as SuccessResult
             assertEquals(DataSource.MEMORY_CACHE, cached.dataSource)
@@ -175,8 +225,15 @@ class PhotoGalleryCacheTest {
         try {
             val requests = photos.map { name ->
                 ImageRequest.Builder(context)
-                    .data(GalleryPhoto(name) { reads.incrementAndGet(); assets.open(name) })
-                    .size(1080, 1920).scale(Scale.FIT).build()
+                    .data(
+                        GalleryPhoto(name) {
+                            reads.incrementAndGet()
+                            assets.open(name)
+                        }
+                    )
+                    .size(1080, 1920)
+                    .scale(Scale.FIT)
+                    .build()
             }
             requests.forEach { assertTrue(loader.execute(it) is SuccessResult) }
             repeat(3) {
@@ -202,17 +259,25 @@ class PhotoGalleryCacheTest {
         val reads = AtomicInteger()
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
-                if (visible.value) PhotoGalleryDialog(photos, 1, { name ->
-                    reads.incrementAndGet()
-                    assets.open(name)
-                }, { visible.value = false })
+                if (visible.value)
+                    PhotoGalleryDialog(
+                        photos,
+                        1,
+                        { name ->
+                            reads.incrementAndGet()
+                            assets.open(name)
+                        },
+                        { visible.value = false },
+                    )
             }
         }
         composeRule.waitUntil(15_000) { loader.memoryCache?.keys?.size == 3 }
         composeRule.waitForIdle()
         val screenshot = composeRule.onNodeWithTag("photo-gallery-pager").captureToImage()
         File(context.cacheDir, "gallery-cache-check.png").outputStream().use {
-            screenshot.asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            screenshot
+                .asAndroidBitmap()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
         repeat(3) {
             composeRule.onNodeWithTag("photo-gallery-pager").performTouchInput { swipeLeft() }

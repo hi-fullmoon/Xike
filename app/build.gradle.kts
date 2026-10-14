@@ -8,12 +8,13 @@ plugins {
 }
 
 val ciVersionCodeValue = providers.environmentVariable("XIKE_VERSION_CODE").orNull
-val ciVersionCode = ciVersionCodeValue?.toIntOrNull()
-    ?: if (ciVersionCodeValue == null) {
-        1
-    } else {
-        throw GradleException("XIKE_VERSION_CODE must be a positive integer")
-    }
+val ciVersionCode =
+    ciVersionCodeValue?.toIntOrNull()
+        ?: if (ciVersionCodeValue == null) {
+            1
+        } else {
+            throw GradleException("XIKE_VERSION_CODE must be a positive integer")
+        }
 
 if (ciVersionCode < 1) {
     throw GradleException("XIKE_VERSION_CODE must be a positive integer")
@@ -25,19 +26,20 @@ val releaseStoreFile = providers.environmentVariable("XIKE_KEYSTORE_FILE").orNul
 val releaseStorePassword = providers.environmentVariable("XIKE_KEYSTORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("XIKE_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("XIKE_KEY_PASSWORD").orNull
-val releaseSigningValues = listOf(
-    releaseStoreFile,
-    releaseStorePassword,
-    releaseKeyAlias,
-    releaseKeyPassword,
-)
+val releaseSigningValues =
+    listOf(
+        releaseStoreFile,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword,
+    )
 val hasAnyReleaseSigningValue = releaseSigningValues.any { !it.isNullOrBlank() }
 val hasCompleteReleaseSigningConfig = releaseSigningValues.all { !it.isNullOrBlank() }
 
 if (hasAnyReleaseSigningValue && !hasCompleteReleaseSigningConfig) {
     throw GradleException(
         "Release signing requires XIKE_KEYSTORE_FILE, XIKE_KEYSTORE_PASSWORD, " +
-            "XIKE_KEY_ALIAS, and XIKE_KEY_PASSWORD",
+            "XIKE_KEY_ALIAS, and XIKE_KEY_PASSWORD"
     )
 }
 
@@ -93,7 +95,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
 }
 
 kotlin {

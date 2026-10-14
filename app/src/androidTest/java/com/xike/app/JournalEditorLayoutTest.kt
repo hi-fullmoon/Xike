@@ -1,32 +1,27 @@
 package com.xike.app
 
-import com.xike.app.media.JournalVideoStore
-
-import com.xike.app.feature.archive.JournalArchiveScreen
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeTheme
-
-
-
-import androidx.activity.ComponentActivity
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.xike.app.feature.archive.JournalArchiveScreen
+import com.xike.app.media.JournalVideoStore
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -46,9 +41,17 @@ class JournalEditorLayoutTest {
         val entry = entries.single()
         val videos = JournalVideoStore(context)
         val application = context.applicationContext as android.app.Application
-        val model = androidx.lifecycle.ViewModelProvider(context,
-            androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application))[JournalViewModel::class.java]
-        val language = if (arguments.getString("language") == "en") AppLanguage.ENGLISH else AppLanguage.CHINESE
+        val model =
+            androidx.lifecycle
+                .ViewModelProvider(
+                    context,
+                    androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
+                        application
+                    ),
+                )[JournalViewModel::class.java]
+        val language =
+            if (arguments.getString("language") == "en") AppLanguage.ENGLISH
+            else AppLanguage.CHINESE
         val style = AppStyle.valueOf(arguments.getString("style") ?: "BREATHE")
         val keyboardVisible = AtomicBoolean(false)
         rule.runOnUiThread { AppLocale.select(context, language) }
@@ -58,58 +61,128 @@ class JournalEditorLayoutTest {
                 SideEffect { keyboardVisible.set(keyboardHeight > 0) }
                 CompositionLocalProvider(
                     LocalJournalEditOperations provides model.editOperations,
-                    LocalAudioEditServices provides AudioEditServices(
-                        import = { file, duration -> withContext(Dispatchers.IO) { runCatching { store.importEditAudio(file, duration) } } },
-                        release = store::releaseEditAudio,
-                    ),
-                    LocalVideoServices provides VideoServices(
-                        import = { uri, progress -> withContext(Dispatchers.IO) { runCatching { store.importVideo(uri, progress) } } },
-                        release = store::deleteUnreferencedVideo,
-                        source = videos::dataSource,
-                        cover = videos::open,
-                        editDraft = videos::editDraft,
-                        saveEdit = { original, video -> withContext(Dispatchers.IO) { runCatching { videos.saveEdit(original, video) } } },
-                        clearEdit = { id -> withContext(Dispatchers.IO) { runCatching { videos.clearEdit(id) } } },
-                    ),
+                    LocalAudioEditServices provides
+                        AudioEditServices(
+                            import = { file, duration ->
+                                withContext(Dispatchers.IO) {
+                                    runCatching { store.importEditAudio(file, duration) }
+                                }
+                            },
+                            release = store::releaseEditAudio,
+                        ),
+                    LocalVideoServices provides
+                        VideoServices(
+                            import = { uri, progress ->
+                                withContext(Dispatchers.IO) {
+                                    runCatching { store.importVideo(uri, progress) }
+                                }
+                            },
+                            release = store::deleteUnreferencedVideo,
+                            source = videos::dataSource,
+                            cover = videos::open,
+                            editDraft = videos::editDraft,
+                            saveEdit = { original, video ->
+                                withContext(Dispatchers.IO) {
+                                    runCatching { videos.saveEdit(original, video) }
+                                }
+                            },
+                            clearEdit = { id ->
+                                withContext(Dispatchers.IO) { runCatching { videos.clearEdit(id) } }
+                            },
+                        ),
                 ) {
-                JournalArchiveScreen(
-                    padding = PaddingValues(), entries = entries,
-                    onSearch = { query, offset, limit -> withContext(Dispatchers.IO) { runCatching { store.search(query, offset, limit) } } },
-                    onUpdate = { updated, retained, added -> withContext(Dispatchers.IO) { runCatching { store.update(updated, retained, added).single { it.id == updated.id } } } },
-                    onDelete = { withContext(Dispatchers.IO) { runCatching { store.delete(it.id); Unit } } },
-                    onUndoDelete = { withContext(Dispatchers.IO) { runCatching { store.undoDelete(it); Unit } } },
-                    onFinalizeDelete = { withContext(Dispatchers.IO) { runCatching { store.finalizeDelete(it) } } },
-                    openImage = store::openImage, openAudio = store::openAudio,
-                )
+                    JournalArchiveScreen(
+                        padding = PaddingValues(),
+                        entries = entries,
+                        onSearch = { query, offset, limit ->
+                            withContext(Dispatchers.IO) {
+                                runCatching { store.search(query, offset, limit) }
+                            }
+                        },
+                        onUpdate = { updated, retained, added ->
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    store.update(updated, retained, added).single {
+                                        it.id == updated.id
+                                    }
+                                }
+                            }
+                        },
+                        onDelete = {
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    store.delete(it.id)
+                                    Unit
+                                }
+                            }
+                        },
+                        onUndoDelete = {
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    store.undoDelete(it)
+                                    Unit
+                                }
+                            }
+                        },
+                        onFinalizeDelete = {
+                            withContext(Dispatchers.IO) { runCatching { store.finalizeDelete(it) } }
+                        },
+                        openImage = store::openImage,
+                        openAudio = store::openAudio,
+                    )
                 }
             }
         }
-        rule.onNode(hasScrollToIndexAction() and hasAnyDescendant(hasContentDescription(localizedText("打开筛选"))))
+        rule
+            .onNode(
+                hasScrollToIndexAction() and
+                    hasAnyDescendant(hasContentDescription(localizedText("打开筛选")))
+            )
             .performScrollToNode(hasText(entry.mood.label))
         rule.onAllNodesWithText(entry.mood.label)[0].performClick()
-        rule.waitUntil(5_000) { rule.onNodeWithContentDescription(localizedText("关闭记录详情")).isDisplayed() }
-        rule.onNodeWithTag("journal-detail-body").performScrollToNode(hasText(localizedText("删除记录")))
+        rule.waitUntil(5_000) {
+            rule.onNodeWithContentDescription(localizedText("关闭记录详情")).isDisplayed()
+        }
+        rule
+            .onNodeWithTag("journal-detail-body")
+            .performScrollToNode(hasText(localizedText("删除记录")))
         rule.onNodeWithContentDescription(localizedText("关闭记录详情")).assertIsDisplayed()
         capture("preview")
         rule.onNodeWithContentDescription(localizedText("编辑记录")).assertIsDisplayed().performClick()
-        rule.waitUntil(5_000) { rule.onNodeWithContentDescription(localizedText("取消编辑")).isDisplayed() }
-        rule.onNodeWithTag("journal-edit-body").performScrollToNode(hasContentDescription(tr("添加内容", "Add content")))
+        rule.waitUntil(5_000) {
+            rule.onNodeWithContentDescription(localizedText("取消编辑")).isDisplayed()
+        }
+        rule
+            .onNodeWithTag("journal-edit-body")
+            .performScrollToNode(hasContentDescription(tr("添加内容", "Add content")))
         rule.onNodeWithContentDescription(tr("添加内容", "Add content")).performClick()
         rule.waitUntil(5_000) { rule.onNodeWithTag("journal-edit-add-content").isDisplayed() }
-        rule.onNodeWithTag("journal-edit-add-content").performScrollToNode(hasText(tr("视频", "Video")))
+        rule
+            .onNodeWithTag("journal-edit-add-content")
+            .performScrollToNode(hasText(tr("视频", "Video")))
         rule.onNodeWithText(tr("视频", "Video")).assertIsDisplayed()
         capture("add-content")
         ParcelFileDescriptor.AutoCloseInputStream(
-            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent 4"),
-        ).use { it.readBytes() }
-        rule.waitUntil(5_000) { rule.onAllNodesWithTag("journal-edit-add-content").fetchSemanticsNodes().isEmpty() }
+                InstrumentationRegistry.getInstrumentation()
+                    .uiAutomation
+                    .executeShellCommand("input keyevent 4")
+            )
+            .use { it.readBytes() }
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithTag("journal-edit-add-content").fetchSemanticsNodes().isEmpty()
+        }
         if (arguments.getString("keyboardCheck") == "true") {
-            rule.onNodeWithContentDescription(localizedText("此刻的注脚")).performScrollTo().performClick()
+            rule
+                .onNodeWithContentDescription(localizedText("此刻的注脚"))
+                .performScrollTo()
+                .performClick()
             rule.waitUntil(5_000) { keyboardVisible.get() }
             rule.onNodeWithText(localizedText("保存")).assertIsDisplayed()
             rule.onNodeWithContentDescription(localizedText("取消编辑")).assertIsDisplayed()
             capture("keyboard")
-            rule.onNodeWithTag("journal-edit-body").performScrollToNode(hasText(localizedText("完成")))
+            rule
+                .onNodeWithTag("journal-edit-body")
+                .performScrollToNode(hasText(localizedText("完成")))
             rule.onNodeWithText(localizedText("完成")).performClick()
             rule.waitUntil(5_000) { !keyboardVisible.get() }
             rule.onNodeWithText(localizedText("完成")).assertDoesNotExist()
@@ -132,8 +205,12 @@ class JournalEditorLayoutTest {
             rule.onNodeWithText(localizedText("保存")).assertIsDisplayed().assertIsEnabled()
             rule.onNodeWithTag("journal-edit-body").assertHeightIsAtLeast(48.dp)
             capture("error")
-            val noteField = rule.onNodeWithContentDescription(localizedText("此刻的注脚"))
-                .performScrollTo().assertIsDisplayed().performClick()
+            val noteField =
+                rule
+                    .onNodeWithContentDescription(localizedText("此刻的注脚"))
+                    .performScrollTo()
+                    .assertIsDisplayed()
+                    .performClick()
             noteField.performTextInput(" ")
             rule.waitUntil(5_000) { keyboardVisible.get() }
             noteField.assertIsDisplayed()
@@ -150,16 +227,30 @@ class JournalEditorLayoutTest {
         rule.onNodeWithText(localizedText("保存")).performClick()
         rule.waitUntil(5_000) {
             rule.onNodeWithContentDescription(localizedText("编辑记录")).isDisplayed() &&
-                rule.onAllNodesWithContentDescription(localizedText("取消编辑")).fetchSemanticsNodes().isEmpty()
+                rule
+                    .onAllNodesWithContentDescription(localizedText("取消编辑"))
+                    .fetchSemanticsNodes()
+                    .isEmpty()
         }
         org.junit.Assert.assertEquals(entry.note.trim(), store.entries().single().note)
         rule.onNodeWithContentDescription(localizedText("编辑记录")).performClick()
-        rule.waitUntil(5_000) { rule.onNodeWithContentDescription(localizedText("取消编辑")).isDisplayed() }
-        rule.onNodeWithContentDescription(localizedText("此刻的注脚")).performScrollTo().performClick().performTextInput(" ")
+        rule.waitUntil(5_000) {
+            rule.onNodeWithContentDescription(localizedText("取消编辑")).isDisplayed()
+        }
+        rule
+            .onNodeWithContentDescription(localizedText("此刻的注脚"))
+            .performScrollTo()
+            .performClick()
+            .performTextInput(" ")
         rule.onNodeWithContentDescription(localizedText("取消编辑")).performClick()
         rule.onNodeWithText(localizedText("放弃未保存的修改？")).assertIsDisplayed()
         rule.onNodeWithText(localizedText("放弃修改")).performClick()
-        rule.waitUntil(5_000) { rule.onAllNodesWithContentDescription(localizedText("取消编辑")).fetchSemanticsNodes().isEmpty() }
+        rule.waitUntil(5_000) {
+            rule
+                .onAllNodesWithContentDescription(localizedText("取消编辑"))
+                .fetchSemanticsNodes()
+                .isEmpty()
+        }
         org.junit.Assert.assertEquals(entry.note.trim(), store.entries().single().note)
     }
 

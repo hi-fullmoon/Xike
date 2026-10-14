@@ -1,33 +1,6 @@
 package com.xike.app
 
-import com.xike.app.feature.insights.InsightsPeriod
-import com.xike.app.feature.insights.journalPeriodSummary
-
-import com.xike.app.data.Mood
-
-import com.xike.app.feature.insights.MoodDistributionCard
-
-import com.xike.app.feature.archive.ArchiveViewMode
-import com.xike.app.feature.archive.ArchiveHeader
-import com.xike.app.feature.archive.ArchiveSearchBar
-import com.xike.app.feature.archive.ArchiveControls
-
-import com.xike.app.ui.components.MoodChoices
-import com.xike.app.ui.components.JournalTopic
-import com.xike.app.ui.components.journalTopics
-import com.xike.app.ui.components.MomentTopicsHeader
-import com.xike.app.ui.components.TopicChoices
-import com.xike.app.ui.components.AppScreen
-import com.xike.app.ui.components.XikeNavigationBar
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeScreenHorizontalPadding
-import com.xike.app.ui.theme.XikeTheme
-
-
-
-
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -38,33 +11,50 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import android.content.Context
+import com.xike.app.data.Mood
+import com.xike.app.feature.archive.ArchiveControls
+import com.xike.app.feature.archive.ArchiveHeader
+import com.xike.app.feature.archive.ArchiveSearchBar
+import com.xike.app.feature.archive.ArchiveViewMode
+import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.MoodDistributionCard
+import com.xike.app.feature.insights.journalPeriodSummary
+import com.xike.app.ui.components.AppScreen
+import com.xike.app.ui.components.JournalTopic
+import com.xike.app.ui.components.MomentTopicsHeader
+import com.xike.app.ui.components.MoodChoices
+import com.xike.app.ui.components.TopicChoices
+import com.xike.app.ui.components.XikeNavigationBar
+import com.xike.app.ui.components.journalTopics
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeScreenHorizontalPadding
+import com.xike.app.ui.theme.XikeTheme
 import org.junit.After
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class ResponsiveChoicesUiTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val originalLanguage = LanguagePreferences(context).language
 
@@ -98,8 +88,11 @@ class ResponsiveChoicesUiTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
-                    Column(Modifier.width(viewportWidth.value).verticalScroll(rememberScrollState())
-                        .padding(horizontal = XikeScreenHorizontalPadding)) {
+                    Column(
+                        Modifier.width(viewportWidth.value)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = XikeScreenHorizontalPadding)
+                    ) {
                         MoodDistributionCard(distribution) {}
                     }
                 }
@@ -114,12 +107,20 @@ class ResponsiveChoicesUiTest {
                 val statistics = tr("0 次 · 0%", "0 entries · 0%")
                 assertCompleteLabel(statistics, allowWrap = true)
                 Mood.entries.forEach { assertCompleteLabel(it.label) }
-                composeRule.onAllNodesWithText(statistics, useUnmergedTree = true)
-                    .fetchSemanticsNodes().forEach { node ->
+                composeRule
+                    .onAllNodesWithText(statistics, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .forEach { node ->
                         val results = mutableListOf<TextLayoutResult>()
-                        assertTrue(node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results))
-                        assertTrue("Statistics became a narrow text column for $style at $width",
-                            results.single().lineCount <= 2)
+                        assertTrue(
+                            node.config[SemanticsActions.GetTextLayoutResult]
+                                .action!!
+                                .invoke(results)
+                        )
+                        assertTrue(
+                            "Statistics became a narrow text column for $style at $width",
+                            results.single().lineCount <= 2,
+                        )
                     }
             }
         }
@@ -156,7 +157,9 @@ class ResponsiveChoicesUiTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
-                    Column(Modifier.width(240.dp)) { MomentTopicsHeader(selectedTopics.value.size, highlightSelection) }
+                    Column(Modifier.width(240.dp)) {
+                        MomentTopicsHeader(selectedTopics.value.size, highlightSelection)
+                    }
                 }
             }
         }
@@ -166,15 +169,22 @@ class ResponsiveChoicesUiTest {
                     selectedStyle.value = style
                     selectedTopics.value = selection
                 }
-                val countLabel = if (selection.isEmpty()) localizedText("可多选")
+                val countLabel =
+                    if (selection.isEmpty()) localizedText("可多选")
                     else tr("已选 ${selection.size}", "${selection.size} selected")
                 assertCompleteLabel(localizedText("主题"))
                 assertCompleteLabel(localizedText("这一刻与什么有关？"), allowWrap = true)
                 assertCompleteLabel(countLabel)
-                val explanation = composeRule.onNodeWithText(localizedText("这一刻与什么有关？")).getUnclippedBoundsInRoot()
+                val explanation =
+                    composeRule
+                        .onNodeWithText(localizedText("这一刻与什么有关？"))
+                        .getUnclippedBoundsInRoot()
                 val count = composeRule.onNodeWithText(countLabel).getUnclippedBoundsInRoot()
-                assertTrue("Explanation overlaps the count for $style",
-                    explanation.right + 8.dp <= count.left || explanation.bottom + 8.dp <= count.top)
+                assertTrue(
+                    "Explanation overlaps the count for $style",
+                    explanation.right + 8.dp <= count.left ||
+                        explanation.bottom + 8.dp <= count.top,
+                )
                 assertTrue("Count escapes the header for $style", count.right <= 240.dp)
             }
         }
@@ -214,7 +224,13 @@ class ResponsiveChoicesUiTest {
                     AppStyle.entries.forEach { style ->
                         XikeTheme(AppTheme.OCEAN, style) {
                             Column(Modifier.width(viewportWidth.value)) {
-                                ArchiveControls(selected.value, 1, false, { selected.value = it }, {})
+                                ArchiveControls(
+                                    selected.value,
+                                    1,
+                                    false,
+                                    { selected.value = it },
+                                    {},
+                                )
                             }
                         }
                     }
@@ -257,7 +273,9 @@ class ResponsiveChoicesUiTest {
         val query = mutableStateOf("")
         composeRule.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale.value)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale.value)
+            ) {
                 XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
                     Column(Modifier.width(272.dp)) {
                         ArchiveSearchBar(query.value, { query.value = it }, { query.value = "" })
@@ -276,14 +294,19 @@ class ResponsiveChoicesUiTest {
                 val emptyHeight = (emptyBounds.bottom - emptyBounds.top).value
                 search.performTextInput("UI")
                 val filledBounds = search.getUnclippedBoundsInRoot()
-                assertTrue("Search changed height for $style at $scale", kotlin.math.abs(
-                    (filledBounds.bottom - filledBounds.top).value - emptyHeight,
-                ) < 0.5f)
+                assertTrue(
+                    "Search changed height for $style at $scale",
+                    kotlin.math.abs((filledBounds.bottom - filledBounds.top).value - emptyHeight) <
+                        0.5f,
+                )
                 search.performTextClearance()
                 val clearedBounds = search.getUnclippedBoundsInRoot()
-                assertTrue("Clearing search changed height for $style at $scale", kotlin.math.abs(
-                    (clearedBounds.bottom - clearedBounds.top).value - emptyHeight,
-                ) < 0.5f)
+                assertTrue(
+                    "Clearing search changed height for $style at $scale",
+                    kotlin.math.abs(
+                        (clearedBounds.bottom - clearedBounds.top).value - emptyHeight
+                    ) < 0.5f,
+                )
             }
         }
     }
@@ -329,7 +352,9 @@ class ResponsiveChoicesUiTest {
         val selected = mutableStateOf(AppScreen.SETTINGS)
         composeRule.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale.value)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale.value)
+            ) {
                 Column(Modifier.width(viewportWidth.value)) {
                     AppStyle.entries.forEach { style ->
                         XikeTheme(AppTheme.OCEAN, style) {
@@ -357,8 +382,14 @@ class ResponsiveChoicesUiTest {
             val node = nodes[index].assertIsDisplayed().assertIsSelected()
             val full = node.getUnclippedBoundsInRoot()
             val visible = node.getBoundsInRoot()
-            assertTrue("Selected $mode is clipped on the left in style $index", full.left >= visible.left - 0.5.dp)
-            assertTrue("Selected $mode is clipped on the right in style $index", full.right <= visible.right + 0.5.dp)
+            assertTrue(
+                "Selected $mode is clipped on the left in style $index",
+                full.left >= visible.left - 0.5.dp,
+            )
+            assertTrue(
+                "Selected $mode is clipped on the right in style $index",
+                full.right <= visible.right + 0.5.dp,
+            )
         }
     }
 
@@ -369,26 +400,43 @@ class ResponsiveChoicesUiTest {
             val node = nodes[index].assertIsDisplayed().assertIsSelected()
             val full = node.getUnclippedBoundsInRoot()
             val visible = node.getBoundsInRoot()
-            assertTrue("Selected $screen is clipped on the left in style $index", full.left >= visible.left - 0.5.dp)
-            assertTrue("Selected $screen is clipped on the right in style $index", full.right <= visible.right + 0.5.dp)
+            assertTrue(
+                "Selected $screen is clipped on the left in style $index",
+                full.left >= visible.left - 0.5.dp,
+            )
+            assertTrue(
+                "Selected $screen is clipped on the right in style $index",
+                full.right <= visible.right + 0.5.dp,
+            )
         }
     }
 
     private fun assertCompleteLabel(label: String, allowWrap: Boolean = false) {
-        val nodes = composeRule.onAllNodesWithText(label, useUnmergedTree = true).fetchSemanticsNodes()
+        val nodes =
+            composeRule.onAllNodesWithText(label, useUnmergedTree = true).fetchSemanticsNodes()
         assertTrue("Missing label: $label", nodes.isNotEmpty())
         nodes.forEach { node ->
             val results = mutableListOf<TextLayoutResult>()
             assertTrue(node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results))
             val result = results.single()
             if (!allowWrap) assertEquals("Wrapped label: $label", 1, result.lineCount)
-            assertEquals("Truncated label: $label", label.length, result.getLineEnd(result.lineCount - 1))
+            assertEquals(
+                "Truncated label: $label",
+                label.length,
+                result.getLineEnd(result.lineCount - 1),
+            )
             repeat(result.lineCount) { line ->
                 assertFalse("Ellipsized label: $label", result.isLineEllipsized(line))
-                assertTrue("Clipped label: $label", result.getLineRight(line) <= result.size.width + 1f)
+                assertTrue(
+                    "Clipped label: $label",
+                    result.getLineRight(line) <= result.size.width + 1f,
+                )
             }
             // Paragraph metrics are fractional; layout bounds use integer pixels.
-            assertTrue("Clipped label: $label, size=${result.size}, left=${result.getLineLeft(0)}, right=${result.getLineRight(0)}, paragraphWidth=${result.multiParagraph.width}, constraints=${result.layoutInput.constraints}", result.getLineRight(0) <= result.size.width + 1f)
+            assertTrue(
+                "Clipped label: $label, size=${result.size}, left=${result.getLineLeft(0)}, right=${result.getLineRight(0)}, paragraphWidth=${result.multiParagraph.width}, constraints=${result.layoutInput.constraints}",
+                result.getLineRight(0) <= result.size.width + 1f,
+            )
             assertFalse("Vertically clipped label: $label", result.didOverflowHeight)
         }
     }

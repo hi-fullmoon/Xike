@@ -213,13 +213,15 @@ enum class DailyPromptStyle(
         ),
     );
 
-    val label: String get() = localizedText(sourceLabel)
-    val description: String get() = localizedText(sourceDescription)
+    val label: String
+        get() = localizedText(sourceLabel)
+
+    val description: String
+        get() = localizedText(sourceDescription)
 
     companion object {
-        fun fromStorage(value: String?): DailyPromptStyle = entries
-            .firstOrNull { it.name == value }
-            ?: GENTLE
+        fun fromStorage(value: String?): DailyPromptStyle =
+            entries.firstOrNull { it.name == value } ?: GENTLE
     }
 }
 
@@ -249,31 +251,39 @@ data class ReminderSettings(
         get() = "%02d:%02d".format(Locale.ROOT, hour, minute)
 
     fun summary(locale: Locale = AppLocale.locale): String {
-        val days = when {
-            weekdays.size == DayOfWeek.entries.size -> localizedText("每天")
-            weekdays == setOf(
-                DayOfWeek.MONDAY,
-                DayOfWeek.TUESDAY,
-                DayOfWeek.WEDNESDAY,
-                DayOfWeek.THURSDAY,
-                DayOfWeek.FRIDAY,
-            ) -> localizedText("工作日")
-            else -> weekdays.sortedBy(DayOfWeek::getValue).joinToString(tr("、", ", ")) {
-                it.getDisplayName(TextStyle.SHORT, locale)
+        val days =
+            when {
+                weekdays.size == DayOfWeek.entries.size -> localizedText("每天")
+                weekdays ==
+                    setOf(
+                        DayOfWeek.MONDAY,
+                        DayOfWeek.TUESDAY,
+                        DayOfWeek.WEDNESDAY,
+                        DayOfWeek.THURSDAY,
+                        DayOfWeek.FRIDAY,
+                    ) -> localizedText("工作日")
+                else ->
+                    weekdays.sortedBy(DayOfWeek::getValue).joinToString(tr("、", ", ")) {
+                        it.getDisplayName(TextStyle.SHORT, locale)
+                    }
             }
-        }
         return "$days $timeLabel"
     }
 
-    fun pauseLabel(today: LocalDate = LocalDate.now()): String? = pausedUntilEpochDay
-        ?.let(LocalDate::ofEpochDay)
-        ?.takeIf { it.isAfter(today) }
-        ?.format(DateTimeFormatter.ofPattern(tr("M 月 d 日恢复", "'Resumes' MMM d"), AppLocale.locale))
+    fun pauseLabel(today: LocalDate = LocalDate.now()): String? =
+        pausedUntilEpochDay
+            ?.let(LocalDate::ofEpochDay)
+            ?.takeIf { it.isAfter(today) }
+            ?.format(
+                DateTimeFormatter.ofPattern(tr("M 月 d 日恢复", "'Resumes' MMM d"), AppLocale.locale)
+            )
 }
 
 internal fun dailyQuestion(date: LocalDate, style: DailyPromptStyle): String {
     val questions = style.questions
-    return localizedText(questions[Math.floorMod(date.toEpochDay(), questions.size.toLong()).toInt()])
+    return localizedText(
+        questions[Math.floorMod(date.toEpochDay(), questions.size.toLong()).toInt()]
+    )
 }
 
 internal fun nextReminderAt(
@@ -282,16 +292,20 @@ internal fun nextReminderAt(
 ): ZonedDateTime? {
     if (!settings.enabled || settings.weekdays.isEmpty()) return null
     val pausedUntil = settings.pausedUntilEpochDay?.let(LocalDate::ofEpochDay)
-    val earliestDate = if (settings.quietHoursEnabled && settings.quietHoursStart > settings.quietHoursEnd) {
-        now.toLocalDate().minusDays(1)
-    } else {
-        now.toLocalDate()
-    }
+    val earliestDate =
+        if (settings.quietHoursEnabled && settings.quietHoursStart > settings.quietHoursEnd) {
+            now.toLocalDate().minusDays(1)
+        } else {
+            now.toLocalDate()
+        }
     val firstDate = pausedUntil?.takeIf { it.isAfter(earliestDate) } ?: earliestDate
 
     repeat(16) { offset ->
         val date = firstDate.plusDays(offset.toLong())
-        if (date.dayOfWeek in settings.weekdays && (pausedUntil == null || !date.isBefore(pausedUntil))) {
+        if (
+            date.dayOfWeek in settings.weekdays &&
+                (pausedUntil == null || !date.isBefore(pausedUntil))
+        ) {
             val candidate = date.atTime(settings.hour, settings.minute).atZone(now.zone)
             val deliveryTime = candidate.afterQuietHours(settings)
             if (deliveryTime.isAfter(now)) return deliveryTime
@@ -301,49 +315,62 @@ internal fun nextReminderAt(
 }
 
 internal class HabitPreferences(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences(
-        PREFERENCES_NAME,
-        Context.MODE_PRIVATE,
-    )
+    private val preferences =
+        context.applicationContext.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE,
+        )
 
     var dailyPrompt: DailyPromptSettings
-        get() = DailyPromptSettings(
-            enabled = preferences.getBoolean(PROMPT_ENABLED, false),
-            style = DailyPromptStyle.fromStorage(preferences.getString(PROMPT_STYLE, null)),
-        )
+        get() =
+            DailyPromptSettings(
+                enabled = preferences.getBoolean(PROMPT_ENABLED, false),
+                style = DailyPromptStyle.fromStorage(preferences.getString(PROMPT_STYLE, null)),
+            )
         set(value) {
             check(
-                preferences.edit()
+                preferences
+                    .edit()
                     .putBoolean(PROMPT_ENABLED, value.enabled)
                     .putString(PROMPT_STYLE, value.style.name)
-                    .commit(),
-            ) { localizedText("无法保存每日一问设置。") }
+                    .commit()
+            ) {
+                localizedText("无法保存每日一问设置。")
+            }
         }
 
     var reminder: ReminderSettings
-        get() = ReminderSettings(
-            enabled = preferences.getBoolean(REMINDER_ENABLED, false),
-            hour = preferences.getInt(REMINDER_HOUR, 20).coerceIn(0, 23),
-            minute = preferences.getInt(REMINDER_MINUTE, 30).coerceIn(0, 59),
-            weekdays = preferences.getStringSet(REMINDER_WEEKDAYS, null)
-                ?.mapNotNull { stored -> DayOfWeek.entries.firstOrNull { it.name == stored } }
-                ?.toSet()
-                ?: DayOfWeek.entries.toSet(),
-            pausedUntilEpochDay = preferences.getLong(REMINDER_PAUSED_UNTIL, NO_PAUSE)
-                .takeUnless { it == NO_PAUSE },
-            quietHoursEnabled = preferences.getBoolean(QUIET_HOURS_ENABLED, true),
-            quietHoursStart = preferences.getInt(QUIET_HOURS_START, 22).coerceIn(0, 23),
-            quietHoursEnd = preferences.getInt(QUIET_HOURS_END, 8).coerceIn(0, 23),
-        )
+        get() =
+            ReminderSettings(
+                enabled = preferences.getBoolean(REMINDER_ENABLED, false),
+                hour = preferences.getInt(REMINDER_HOUR, 20).coerceIn(0, 23),
+                minute = preferences.getInt(REMINDER_MINUTE, 30).coerceIn(0, 59),
+                weekdays =
+                    preferences
+                        .getStringSet(REMINDER_WEEKDAYS, null)
+                        ?.mapNotNull { stored ->
+                            DayOfWeek.entries.firstOrNull { it.name == stored }
+                        }
+                        ?.toSet() ?: DayOfWeek.entries.toSet(),
+                pausedUntilEpochDay =
+                    preferences.getLong(REMINDER_PAUSED_UNTIL, NO_PAUSE).takeUnless {
+                        it == NO_PAUSE
+                    },
+                quietHoursEnabled = preferences.getBoolean(QUIET_HOURS_ENABLED, true),
+                quietHoursStart = preferences.getInt(QUIET_HOURS_START, 22).coerceIn(0, 23),
+                quietHoursEnd = preferences.getInt(QUIET_HOURS_END, 8).coerceIn(0, 23),
+            )
         set(value) {
-            val editor = preferences.edit()
-                .putBoolean(REMINDER_ENABLED, value.enabled)
-                .putInt(REMINDER_HOUR, value.hour)
-                .putInt(REMINDER_MINUTE, value.minute)
-                .putStringSet(REMINDER_WEEKDAYS, value.weekdays.map(DayOfWeek::name).toSet())
-                .putBoolean(QUIET_HOURS_ENABLED, value.quietHoursEnabled)
-                .putInt(QUIET_HOURS_START, value.quietHoursStart)
-                .putInt(QUIET_HOURS_END, value.quietHoursEnd)
+            val editor =
+                preferences
+                    .edit()
+                    .putBoolean(REMINDER_ENABLED, value.enabled)
+                    .putInt(REMINDER_HOUR, value.hour)
+                    .putInt(REMINDER_MINUTE, value.minute)
+                    .putStringSet(REMINDER_WEEKDAYS, value.weekdays.map(DayOfWeek::name).toSet())
+                    .putBoolean(QUIET_HOURS_ENABLED, value.quietHoursEnabled)
+                    .putInt(QUIET_HOURS_START, value.quietHoursStart)
+                    .putInt(QUIET_HOURS_END, value.quietHoursEnd)
             if (value.pausedUntilEpochDay == null) {
                 editor.remove(REMINDER_PAUSED_UNTIL)
             } else {
@@ -369,21 +396,24 @@ internal class HabitPreferences(context: Context) {
 }
 
 private fun ZonedDateTime.afterQuietHours(settings: ReminderSettings): ZonedDateTime {
-    if (!settings.quietHoursEnabled || settings.quietHoursStart == settings.quietHoursEnd) return this
+    if (!settings.quietHoursEnabled || settings.quietHoursStart == settings.quietHoursEnd)
+        return this
     val start = LocalTime.of(settings.quietHoursStart, 0)
     val end = LocalTime.of(settings.quietHoursEnd, 0)
     val time = toLocalTime()
-    val isQuiet = if (start < end) {
-        !time.isBefore(start) && time.isBefore(end)
-    } else {
-        !time.isBefore(start) || time.isBefore(end)
-    }
+    val isQuiet =
+        if (start < end) {
+            !time.isBefore(start) && time.isBefore(end)
+        } else {
+            !time.isBefore(start) || time.isBefore(end)
+        }
     if (!isQuiet) return this
 
-    val endDate = if (start > end && !time.isBefore(start)) {
-        toLocalDate().plusDays(1)
-    } else {
-        toLocalDate()
-    }
+    val endDate =
+        if (start > end && !time.isBefore(start)) {
+            toLocalDate().plusDays(1)
+        } else {
+            toLocalDate()
+        }
     return endDate.atTime(end).atZone(zone)
 }

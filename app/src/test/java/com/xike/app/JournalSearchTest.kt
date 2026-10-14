@@ -1,60 +1,63 @@
 package com.xike.app
 
-import com.xike.app.data.Mood
 import com.xike.app.data.JournalEntry
-
+import com.xike.app.data.Mood
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
+import kotlin.system.measureTimeMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.system.measureTimeMillis
 
 class JournalSearchTest {
     private val zone = ZoneId.of("Asia/Shanghai")
 
     @Test
     fun `combined filters match text mood tag date and image state`() {
-        val matching = entry(
-            id = "matching",
-            date = LocalDate.of(2026, 8, 24),
-            mood = Mood.GOOD,
-            tags = listOf("工作", "学习"),
-            note = "完成了重要方案",
-            images = listOf("photo.xike-image"),
-        )
-        val entries = listOf(
-            matching,
-            matching.copy(id = "wrong-mood", mood = Mood.LOW),
-            matching.copy(id = "wrong-text", note = "散步", tags = listOf("身体")),
-            matching.copy(id = "wrong-date", createdAt = epoch(LocalDate.of(2026, 7, 1))),
-            matching.copy(id = "no-photo", imageFileNames = emptyList()),
-        )
+        val matching =
+            entry(
+                id = "matching",
+                date = LocalDate.of(2026, 8, 24),
+                mood = Mood.GOOD,
+                tags = listOf("工作", "学习"),
+                note = "完成了重要方案",
+                images = listOf("photo.xike-image"),
+            )
+        val entries =
+            listOf(
+                matching,
+                matching.copy(id = "wrong-mood", mood = Mood.LOW),
+                matching.copy(id = "wrong-text", note = "散步", tags = listOf("身体")),
+                matching.copy(id = "wrong-date", createdAt = epoch(LocalDate.of(2026, 7, 1))),
+                matching.copy(id = "no-photo", imageFileNames = emptyList()),
+            )
 
-        val results = filterJournalEntries(
-            entries,
-            JournalSearchQuery(
-                text = "方案",
-                moods = setOf(Mood.GOOD),
-                tags = setOf("工作"),
-                startDate = LocalDate.of(2026, 8, 1),
-                endDate = LocalDate.of(2026, 8, 31),
-                imageFilter = JournalImageFilter.WITH_IMAGES,
-            ),
-            zone,
-        )
+        val results =
+            filterJournalEntries(
+                entries,
+                JournalSearchQuery(
+                    text = "方案",
+                    moods = setOf(Mood.GOOD),
+                    tags = setOf("工作"),
+                    startDate = LocalDate.of(2026, 8, 1),
+                    endDate = LocalDate.of(2026, 8, 31),
+                    imageFilter = JournalImageFilter.WITH_IMAGES,
+                ),
+                zone,
+            )
 
         assertEquals(listOf("matching"), results.map { it.id })
     }
 
     @Test
     fun `date range is inclusive in the selected timezone`() {
-        val query = JournalSearchQuery(
-            startDate = LocalDate.of(2026, 8, 1),
-            endDate = LocalDate.of(2026, 8, 31),
-        )
+        val query =
+            JournalSearchQuery(
+                startDate = LocalDate.of(2026, 8, 1),
+                endDate = LocalDate.of(2026, 8, 31),
+            )
 
         val range = query.epochRange(zone)
 
@@ -79,15 +82,39 @@ class JournalSearchTest {
 
     @Test
     fun `current topic filters and text find historical labels`() {
-        val entries = listOf(
-            entry("old", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("社交"), "见了朋友", emptyList()),
-            entry("new", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("关系"), "打了电话", emptyList()),
-            entry("other", LocalDate.of(2026, 8, 24), Mood.GOOD, listOf("身体"), "散步", emptyList()),
-        )
+        val entries =
+            listOf(
+                entry(
+                    "old",
+                    LocalDate.of(2026, 8, 24),
+                    Mood.GOOD,
+                    listOf("社交"),
+                    "见了朋友",
+                    emptyList(),
+                ),
+                entry(
+                    "new",
+                    LocalDate.of(2026, 8, 24),
+                    Mood.GOOD,
+                    listOf("关系"),
+                    "打了电话",
+                    emptyList(),
+                ),
+                entry(
+                    "other",
+                    LocalDate.of(2026, 8, 24),
+                    Mood.GOOD,
+                    listOf("身体"),
+                    "散步",
+                    emptyList(),
+                ),
+            )
 
         assertEquals(
             listOf("old", "new"),
-            filterJournalEntries(entries, JournalSearchQuery(tags = setOf("关系")), zone).map { it.id },
+            filterJournalEntries(entries, JournalSearchQuery(tags = setOf("关系")), zone).map {
+                it.id
+            },
         )
         assertEquals(
             listOf("old", "new"),
@@ -111,12 +138,13 @@ class JournalSearchTest {
 
     @Test
     fun `active filter count treats a date range as one condition`() {
-        val query = JournalSearchQuery(
-            text = "工作",
-            moods = setOf(Mood.CALM),
-            startDate = LocalDate.of(2026, 8, 1),
-            endDate = LocalDate.of(2026, 8, 31),
-        )
+        val query =
+            JournalSearchQuery(
+                text = "工作",
+                moods = setOf(Mood.CALM),
+                startDate = LocalDate.of(2026, 8, 1),
+                endDate = LocalDate.of(2026, 8, 31),
+            )
 
         assertEquals(3, query.activeFilterCount)
         assertFalse(query.isEmpty)
@@ -125,14 +153,16 @@ class JournalSearchTest {
 
     @Test
     fun `search page reports whether more records are available`() {
-        val page = JournalSearchPage(
-            entries = listOf(
-                JournalEntry(mood = Mood.CALM, tags = emptyList(), note = ""),
-                JournalEntry(mood = Mood.GOOD, tags = emptyList(), note = ""),
-            ),
-            totalCount = 3,
-            offset = 0,
-        )
+        val page =
+            JournalSearchPage(
+                entries =
+                    listOf(
+                        JournalEntry(mood = Mood.CALM, tags = emptyList(), note = ""),
+                        JournalEntry(mood = Mood.GOOD, tags = emptyList(), note = ""),
+                    ),
+                totalCount = 3,
+                offset = 0,
+            )
 
         assertTrue(page.hasMore)
         assertFalse(page.copy(totalCount = 2).hasMore)
@@ -140,23 +170,25 @@ class JournalSearchTest {
 
     @Test
     fun `ten thousand entry filter stays within an interactive baseline`() {
-        val entries = List(10_000) { index ->
-            JournalEntry(
-                id = "entry-$index",
-                createdAt = epoch(LocalDate.of(2026, 8, 1).plusDays((index % 24).toLong())),
-                mood = Mood.entries[index % Mood.entries.size],
-                tags = if (index % 100 == 0) listOf("目标主题") else listOf("日常"),
-                note = if (index % 100 == 0) "需要找到的内容" else "普通记录 $index",
-            )
-        }
+        val entries =
+            List(10_000) { index ->
+                JournalEntry(
+                    id = "entry-$index",
+                    createdAt = epoch(LocalDate.of(2026, 8, 1).plusDays((index % 24).toLong())),
+                    mood = Mood.entries[index % Mood.entries.size],
+                    tags = if (index % 100 == 0) listOf("目标主题") else listOf("日常"),
+                    note = if (index % 100 == 0) "需要找到的内容" else "普通记录 $index",
+                )
+            }
         var results = emptyList<JournalEntry>()
 
         val elapsed = measureTimeMillis {
-            results = filterJournalEntries(
-                entries,
-                JournalSearchQuery(text = "找到", tags = setOf("目标主题")),
-                zone,
-            )
+            results =
+                filterJournalEntries(
+                    entries,
+                    JournalSearchQuery(text = "找到", tags = setOf("目标主题")),
+                    zone,
+                )
         }
 
         assertEquals(100, results.size)
@@ -170,14 +202,15 @@ class JournalSearchTest {
         tags: List<String>,
         note: String,
         images: List<String>,
-    ) = JournalEntry(
-        id = id,
-        createdAt = epoch(date),
-        mood = mood,
-        tags = tags,
-        note = note,
-        imageFileNames = images,
-    )
+    ) =
+        JournalEntry(
+            id = id,
+            createdAt = epoch(date),
+            mood = mood,
+            tags = tags,
+            note = note,
+            imageFileNames = images,
+        )
 
     private fun epoch(date: LocalDate): Long = date.atStartOfDay(zone).toInstant().toEpochMilli()
 }

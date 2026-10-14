@@ -1,19 +1,5 @@
 package com.xike.app
 
-import com.xike.app.data.model.JournalDraft
-import com.xike.app.data.Mood
-import com.xike.app.data.JournalEntry
-import com.xike.app.data.BackupSummary
-import com.xike.app.feature.lock.AppLockTimeout
-import com.xike.app.feature.settings.ProfileSettingsScreen
-import com.xike.app.feature.insights.JournalInsightsScreen
-import com.xike.app.feature.archive.JournalArchiveScreen
-import com.xike.app.feature.moment.MomentScreen
-import com.xike.app.ui.components.AppScreen
-import com.xike.app.ui.components.XikeNavigationBar
-import com.xike.app.ui.components.XikeNotice
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
 import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,8 +15,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import java.io.InputStream
+import com.xike.app.data.BackupSummary
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.feature.archive.JournalArchiveScreen
+import com.xike.app.feature.insights.JournalInsightsScreen
+import com.xike.app.feature.lock.AppLockTimeout
+import com.xike.app.feature.moment.MomentScreen
+import com.xike.app.feature.settings.ProfileSettingsScreen
+import com.xike.app.ui.components.AppScreen
+import com.xike.app.ui.components.XikeNavigationBar
+import com.xike.app.ui.components.XikeNotice
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
 import java.io.File
+import java.io.InputStream
 
 @Composable
 internal fun XikeApp(
@@ -130,7 +130,12 @@ internal fun XikeApp(
                     selected = screen,
                     onSelected = { selected ->
                         if (isVoiceCaptureActive && selected != AppScreen.HOME) {
-                            XikeNotice.makeText(context, localizedText("请先完成或取消录音"), XikeNotice.LENGTH_SHORT).show()
+                            XikeNotice.makeText(
+                                    context,
+                                    localizedText("请先完成或取消录音"),
+                                    XikeNotice.LENGTH_SHORT,
+                                )
+                                .show()
                         } else {
                             screen = selected
                         }
@@ -140,82 +145,93 @@ internal fun XikeApp(
         ) { innerPadding ->
             screenStateHolder.SaveableStateProvider(screen.name) {
                 when (screen) {
-                    AppScreen.HOME -> MomentScreen(
-                        padding = innerPadding,
-                        entries = emptyList(),
-                        recordedTodayCount = libraryState.todayCount,
-                        draft = draft,
-                        dailyPromptSettings = dailyPromptSettings,
-                        onDraftMoodChange = onDraftMoodChange,
-                        onDraftNoteChange = onDraftNoteChange,
-                        onDraftTagToggle = onDraftTagToggle,
-                        onDraftRecordedAtChange = onDraftRecordedAtChange,
-                        onAttachCurrentOutdoor = onAttachCurrentOutdoor,
-                        isDraftOutdoorLoading = isDraftOutdoorLoading,
-                        onAttachOutdoorForCity = onAttachOutdoorForCity,
-                        onClearDraftOutdoor = onClearDraftOutdoor,
-                        onDraftImagesAdded = onDraftImagesAdded,
-                        onDraftImageResultPending = onDraftImageResultPending,
-                        isDraftImageResultPending = isDraftImageResultPending,
-                        draftImageResultsReady = draftImageResultsReady,
-                        onDraftImageRemoved = onDraftImageRemoved,
-                        pendingDraftAudio = pendingDraftAudio,
-                        isDraftAudioSaving = isDraftAudioSaving,
-                        draftAudioSaveError = draftAudioSaveError,
-                        onDraftAudioRecorded = onDraftAudioRecorded,
-                        onDraftAudioRetry = onDraftAudioRetry,
-                        onDraftAudioDiscard = onDraftAudioDiscard,
-                        onDraftAudioRemoved = onDraftAudioRemoved,
-                        openAudio = openAudio,
-                        onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
-                        onDraftDiscard = onDraftDiscard,
-                        hasResumedDraft = hasResumedDraft,
-                        onSave = onSave,
-                        isDraftSaving = isDraftSaving,
-                        saveFeedbackHandledExternally = true,
-                    )
-                    AppScreen.INSIGHTS -> JournalInsightsScreen(innerPadding, emptyList(), openImage, openAudio, readRepository, libraryState.revision, onReadError)
-                    AppScreen.ARCHIVE -> JournalArchiveScreen(
-                        padding = innerPadding,
-                        entries = emptyList(),
-                        entriesLoading = entriesLoading,
-                        readRepository = readRepository,
-                        libraryState = libraryState,
-                        onReadError = onReadError,
-                        onSearch = onSearch,
-                        onUpdate = onUpdate,
-                        onDelete = onDelete,
-                        onUndoDelete = onUndoDelete,
-                        onFinalizeDelete = onFinalizeDelete,
-                        openImage = openImage,
-                        openAudio = openAudio,
-                    )
-                    AppScreen.SETTINGS -> ProfileSettingsScreen(
-                        padding = innerPadding,
-                        selectedTheme = selectedTheme,
-                        selectedStyle = selectedStyle,
-                        appLockEnabled = appLockEnabled,
-                        appLockTimeout = appLockTimeout,
-                        authenticationAvailable = authenticationAvailable,
-                        reminderSettings = reminderSettings,
-                        dailyPromptSettings = dailyPromptSettings,
-                        notificationPermissionGranted = notificationPermissionGranted,
-                        onThemeChange = onThemeChange,
-                        onStyleChange = onStyleChange,
-                        onAppLockChange = onAppLockChange,
-                        onAppLockTimeoutChange = onAppLockTimeoutChange,
-                        onLockNow = onLockNow,
-                        onReminderEnabledChange = onReminderEnabledChange,
-                        onReminderSettingsChange = onReminderSettingsChange,
-                        onDailyPromptSettingsChange = onDailyPromptSettingsChange,
-                        onExport = onExport,
-                        onImport = onImport,
-                        canUndoRestore = canUndoRestore,
-                        onUndoRestore = onUndoRestore,
-                    )
+                    AppScreen.HOME ->
+                        MomentScreen(
+                            padding = innerPadding,
+                            entries = emptyList(),
+                            recordedTodayCount = libraryState.todayCount,
+                            draft = draft,
+                            dailyPromptSettings = dailyPromptSettings,
+                            onDraftMoodChange = onDraftMoodChange,
+                            onDraftNoteChange = onDraftNoteChange,
+                            onDraftTagToggle = onDraftTagToggle,
+                            onDraftRecordedAtChange = onDraftRecordedAtChange,
+                            onAttachCurrentOutdoor = onAttachCurrentOutdoor,
+                            isDraftOutdoorLoading = isDraftOutdoorLoading,
+                            onAttachOutdoorForCity = onAttachOutdoorForCity,
+                            onClearDraftOutdoor = onClearDraftOutdoor,
+                            onDraftImagesAdded = onDraftImagesAdded,
+                            onDraftImageResultPending = onDraftImageResultPending,
+                            isDraftImageResultPending = isDraftImageResultPending,
+                            draftImageResultsReady = draftImageResultsReady,
+                            onDraftImageRemoved = onDraftImageRemoved,
+                            pendingDraftAudio = pendingDraftAudio,
+                            isDraftAudioSaving = isDraftAudioSaving,
+                            draftAudioSaveError = draftAudioSaveError,
+                            onDraftAudioRecorded = onDraftAudioRecorded,
+                            onDraftAudioRetry = onDraftAudioRetry,
+                            onDraftAudioDiscard = onDraftAudioDiscard,
+                            onDraftAudioRemoved = onDraftAudioRemoved,
+                            openAudio = openAudio,
+                            onVoiceCaptureStateChange = { isVoiceCaptureActive = it },
+                            onDraftDiscard = onDraftDiscard,
+                            hasResumedDraft = hasResumedDraft,
+                            onSave = onSave,
+                            isDraftSaving = isDraftSaving,
+                            saveFeedbackHandledExternally = true,
+                        )
+                    AppScreen.INSIGHTS ->
+                        JournalInsightsScreen(
+                            innerPadding,
+                            emptyList(),
+                            openImage,
+                            openAudio,
+                            readRepository,
+                            libraryState.revision,
+                            onReadError,
+                        )
+                    AppScreen.ARCHIVE ->
+                        JournalArchiveScreen(
+                            padding = innerPadding,
+                            entries = emptyList(),
+                            entriesLoading = entriesLoading,
+                            readRepository = readRepository,
+                            libraryState = libraryState,
+                            onReadError = onReadError,
+                            onSearch = onSearch,
+                            onUpdate = onUpdate,
+                            onDelete = onDelete,
+                            onUndoDelete = onUndoDelete,
+                            onFinalizeDelete = onFinalizeDelete,
+                            openImage = openImage,
+                            openAudio = openAudio,
+                        )
+                    AppScreen.SETTINGS ->
+                        ProfileSettingsScreen(
+                            padding = innerPadding,
+                            selectedTheme = selectedTheme,
+                            selectedStyle = selectedStyle,
+                            appLockEnabled = appLockEnabled,
+                            appLockTimeout = appLockTimeout,
+                            authenticationAvailable = authenticationAvailable,
+                            reminderSettings = reminderSettings,
+                            dailyPromptSettings = dailyPromptSettings,
+                            notificationPermissionGranted = notificationPermissionGranted,
+                            onThemeChange = onThemeChange,
+                            onStyleChange = onStyleChange,
+                            onAppLockChange = onAppLockChange,
+                            onAppLockTimeoutChange = onAppLockTimeoutChange,
+                            onLockNow = onLockNow,
+                            onReminderEnabledChange = onReminderEnabledChange,
+                            onReminderSettingsChange = onReminderSettingsChange,
+                            onDailyPromptSettingsChange = onDailyPromptSettingsChange,
+                            onExport = onExport,
+                            onImport = onImport,
+                            canUndoRestore = canUndoRestore,
+                            onUndoRestore = onUndoRestore,
+                        )
                 }
             }
         }
-
     }
 }

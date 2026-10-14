@@ -1,13 +1,12 @@
 package com.xike.app.ui.components
 
-import com.xike.app.data.Mood
-
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
+import com.xike.app.data.Mood
 
 /** The nearby mood label provides the spoken description; the emoji is decorative. */
 @Composable

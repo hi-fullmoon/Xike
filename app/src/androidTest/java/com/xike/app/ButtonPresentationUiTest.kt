@@ -1,18 +1,10 @@
 package com.xike.app
 
-import com.xike.app.ui.components.AddPhotoTile
-
-import com.xike.app.ui.theme.AppTheme
-import com.xike.app.ui.theme.AppStyle
-import com.xike.app.ui.theme.XikeTheme
-
-
-
-import android.graphics.Bitmap
 import android.app.LocaleManager
 import android.content.Context
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.LocaleList
 import androidx.activity.ComponentActivity
@@ -31,14 +23,18 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.ui.components.AddPhotoTile
+import com.xike.app.ui.theme.AppStyle
+import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.XikeTheme
+import java.io.File
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
 
 class ButtonPresentationUiTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -47,17 +43,19 @@ class ButtonPresentationUiTest {
     private var originalQuickRecord: ShortcutInfo? = null
     private var languageStateCaptured = false
 
-    @get:Rule
-    val rule = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     @Before
     fun rememberLanguageState() {
         originalLanguage = AppLocale.language
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            originalSystemLocales = context.getSystemService(LocaleManager::class.java).applicationLocales
+            originalSystemLocales =
+                context.getSystemService(LocaleManager::class.java).applicationLocales
         }
-        originalQuickRecord = context.getSystemService(ShortcutManager::class.java)
-            .dynamicShortcuts.firstOrNull { it.id == "quick_record" }
+        originalQuickRecord =
+            context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.firstOrNull {
+                it.id == "quick_record"
+            }
         languageStateCaptured = true
     }
 
@@ -70,7 +68,8 @@ class ButtonPresentationUiTest {
             } finally {
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        context.getSystemService(LocaleManager::class.java).applicationLocales = requireNotNull(originalSystemLocales)
+                        context.getSystemService(LocaleManager::class.java).applicationLocales =
+                            requireNotNull(originalSystemLocales)
                     }
                 } finally {
                     val shortcuts = context.getSystemService(ShortcutManager::class.java)
@@ -78,28 +77,47 @@ class ButtonPresentationUiTest {
                     if (original == null) {
                         shortcuts.removeDynamicShortcuts(listOf("quick_record"))
                     } else {
-                        // Queried ShortcutInfo omits its icon; update existing fields without replacing it.
+                        // Queried ShortcutInfo omits its icon; update existing fields without
+                        // replacing it.
                         check(shortcuts.updateShortcuts(listOf(original)))
                     }
                 }
             }
             assertEquals(originalLanguage, AppLocale.language)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                assertEquals(originalSystemLocales, context.getSystemService(LocaleManager::class.java).applicationLocales)
+                assertEquals(
+                    originalSystemLocales,
+                    context.getSystemService(LocaleManager::class.java).applicationLocales,
+                )
             }
-            val restoredShortcut = context.getSystemService(ShortcutManager::class.java)
-                .dynamicShortcuts.firstOrNull { it.id == "quick_record" }
-            assertEquals(originalQuickRecord?.shortLabel?.toString(), restoredShortcut?.shortLabel?.toString())
-            assertEquals(originalQuickRecord?.longLabel?.toString(), restoredShortcut?.longLabel?.toString())
-            assertEquals(originalQuickRecord?.disabledMessage?.toString(), restoredShortcut?.disabledMessage?.toString())
+            val restoredShortcut =
+                context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.firstOrNull {
+                    it.id == "quick_record"
+                }
+            assertEquals(
+                originalQuickRecord?.shortLabel?.toString(),
+                restoredShortcut?.shortLabel?.toString(),
+            )
+            assertEquals(
+                originalQuickRecord?.longLabel?.toString(),
+                restoredShortcut?.longLabel?.toString(),
+            )
+            assertEquals(
+                originalQuickRecord?.disabledMessage?.toString(),
+                restoredShortcut?.disabledMessage?.toString(),
+            )
         }
     }
 
     @Test
     fun mediaActionsSeparateTextAndIconAndPreservePhotoAction() {
         val arguments = InstrumentationRegistry.getArguments()
-        val language = if (arguments.getString("language") == "en") AppLanguage.ENGLISH else AppLanguage.CHINESE
-        val style = AppStyle.entries.firstOrNull { it.name == arguments.getString("style") } ?: AppStyle.BREATHE
+        val language =
+            if (arguments.getString("language") == "en") AppLanguage.ENGLISH
+            else AppLanguage.CHINESE
+        val style =
+            AppStyle.entries.firstOrNull { it.name == arguments.getString("style") }
+                ?: AppStyle.BREATHE
         rule.runOnUiThread { AppLocale.select(rule.activity, language) }
         var photoClicks = 0
         val photoLabel = localizedText("添加照片")
@@ -114,17 +132,25 @@ class ButtonPresentationUiTest {
         }
 
         rule.onNodeWithText(photoLabel).assertDoesNotExist()
-        rule.onNodeWithContentDescription(photoLabel)
-            .assertIsDisplayed().assertHasClickAction()
-            .assertWidthIsEqualTo(92.dp).assertHeightIsEqualTo(92.dp)
+        rule
+            .onNodeWithContentDescription(photoLabel)
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .assertWidthIsEqualTo(92.dp)
+            .assertHeightIsEqualTo(92.dp)
             .performClick()
         rule.runOnIdle { assertEquals(1, photoClicks) }
         rule.waitForIdle()
         val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         try {
-            File(rule.activity.getExternalFilesDir(null), "buttons-${language.name}-${style.name}.png").outputStream().use {
-                check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
+            File(
+                    rule.activity.getExternalFilesDir(null),
+                    "buttons-${language.name}-${style.name}.png",
+                )
+                .outputStream()
+                .use {
+                    check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
+                }
         } finally {
             screenshot.recycle()
         }
