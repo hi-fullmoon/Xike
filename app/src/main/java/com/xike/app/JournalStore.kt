@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalDataException
@@ -12,11 +13,14 @@ import com.xike.app.data.JournalSnapshot
 import com.xike.app.data.MAX_AUDIO_BYTES
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.Mood
+import com.xike.app.data.attachmentDigest
 import com.xike.app.data.backup.JournalBackupStorage
 import com.xike.app.data.backup.RESTORE_STAGING_PREFIX
 import com.xike.app.data.draft.JournalDraftStore
 import com.xike.app.data.model.JournalVideo
 import com.xike.app.data.model.files
+import com.xike.app.data.planMergedEntries
+import com.xike.app.data.restoreContentKey
 import com.xike.app.media.JournalAttachmentStore
 import com.xike.app.media.JournalVideoStore
 import com.xike.app.media.MAX_BACKUP_AUDIO_BYTES
@@ -180,6 +184,7 @@ class JournalStore(context: Context) {
             attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
             dao.insertJournal(storedEntry.toBundle())
+            discardInvalidUndoSnapshot()
             storedEntry
         }
             .onFailure {
@@ -219,7 +224,7 @@ class JournalStore(context: Context) {
         val previousImages = runCatching {
             attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
-            dao.updateJournal(storedEntry.toBundle())
+            dao.updateJournal(storedEntry.toBundle()).also { discardInvalidUndoSnapshot() }
         }
             .onFailure { imported.forEach(attachments::deleteImage) }
             .getOrElse { error ->
@@ -245,6 +250,7 @@ class JournalStore(context: Context) {
         val deletedEntry =
             dao.record(entryId)?.toJournalEntry() ?: error(localizedText("记录不存在或已经删除。"))
         dao.deleteJournal(entryId)
+        discardInvalidUndoSnapshot()
         pendingDeletedEntry = deletedEntry
         if (refreshEntries) readEntries() else emptyList()
     }
@@ -271,6 +277,7 @@ class JournalStore(context: Context) {
             check(missingAudio == null) { localizedText("记录语音已经清理，无法撤销删除。") }
             videos.requireReadable(deletedEntry.video)
             dao.insertJournal(deletedEntry.toBundle())
+            discardInvalidUndoSnapshot()
             pendingDeletedEntry = null
             if (refreshEntries) readEntries() else listOf(deletedEntry)
         }
@@ -403,7 +410,8 @@ class JournalStore(context: Context) {
         input: InputStream,
         password: String,
         retainedAudioFileNames: Set<String> = emptySet(),
-    ): List<JournalEntry> = restoreBackup(input, password, retainedAudioFileNames)
+        mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+    ): List<JournalEntry> = restoreBackup(input, password, retainedAudioFileNames, mode = mode)
 
     @Synchronized
     fun restoreBackup(
@@ -411,16 +419,26 @@ class JournalStore(context: Context) {
         password: String?,
         retainedAudioFileNames: Set<String> = emptySet(),
         retainedVideo: JournalVideo? = null,
+        mode: BackupRestoreMode = BackupRestoreMode.MERGE,
     ): List<JournalEntry> {
         val prepared = backups.readBackup(input, password)
         return try {
+            val localEntries = if (mode == BackupRestoreMode.MERGE) readEntries() else emptyList()
+            val entriesToInstall =
+                if (mode == BackupRestoreMode.MERGE) {
+                    planRestoreMerge(prepared.stagingDirectory, localEntries, prepared.entries)
+                } else prepared.entries.distinctBy { it.id }
+            // A duplicate import is not a mutation and must retain the previous undo snapshot.
+            if (mode == BackupRestoreMode.MERGE && entriesToInstall.isEmpty()) return localEntries
             val snapshotSwap = createUndoSnapshot()
             try {
                 installRestoredData(
                         prepared.stagingDirectory,
-                        prepared.entries,
+                        entriesToInstall,
                         retainedAudioFileNames,
                         retainedVideo,
+                        localEntries,
+                        undoToken = snapshotSwap.current.file.name,
                     )
                     .also {
                         commitUndoSnapshot(snapshotSwap)
@@ -434,7 +452,11 @@ class JournalStore(context: Context) {
         }
     }
 
-    @Synchronized fun canUndoLastRestore(): Boolean = currentUndoSnapshot() != null
+    @Synchronized
+    fun canUndoLastRestore(): Boolean {
+        discardInvalidUndoSnapshot()
+        return currentUndoSnapshot() != null
+    }
 
     @Synchronized
     fun undoLastRestore(
@@ -452,6 +474,7 @@ class JournalStore(context: Context) {
                     prepared.entries,
                     retainedAudioFileNames,
                     retainedVideo,
+                    expectedUndoToken = snapshot.file.name,
                 )
                 .also {
                     clearUndoSnapshot(snapshot)
@@ -519,6 +542,7 @@ class JournalStore(context: Context) {
             restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null)?.takeIf {
                 it.startsWith(RESTORE_UNDO_PREFIX) && File(it).name == it
             } ?: return null
+        if (dao.settingValue(RESTORE_UNDO_TOKEN_SETTING) != fileName) return null
         val password =
             restorePreferences.getString(RESTORE_UNDO_PASSWORD_KEY, null)?.takeIf { it.length >= 8 }
                 ?: return null
@@ -526,17 +550,87 @@ class JournalStore(context: Context) {
         return UndoSnapshot(file, password)
     }
 
+    private fun discardInvalidUndoSnapshot() {
+        // The database marker is authoritative and changes in the same transaction as journals.
+        // Cleanup is best effort: a crash or preference-write failure cannot re-enable undo.
+        runCatching {
+            val name = restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null) ?: return
+            if (dao.settingValue(RESTORE_UNDO_TOKEN_SETTING) == name) return
+            if (name.startsWith(RESTORE_UNDO_PREFIX) && File(name).name == name) {
+                File(appContext.filesDir, name).delete()
+            }
+            restorePreferences
+                .edit()
+                .remove(RESTORE_UNDO_FILE_KEY)
+                .remove(RESTORE_UNDO_PASSWORD_KEY)
+                .commit()
+        }
+    }
+
+    private fun planRestoreMerge(
+        stagingDirectory: File,
+        localEntries: List<JournalEntry>,
+        restoredEntries: List<JournalEntry>,
+    ): List<JournalEntry> {
+        return try {
+            val localDigests = mutableMapOf<String, String>()
+            val stagedDigests = mutableMapOf<String, String>()
+            fun contentKey(entry: JournalEntry, staged: Boolean): String {
+                fun digest(kind: String, name: String): String {
+                    val cache = if (staged) stagedDigests else localDigests
+                    return cache.getOrPut("$kind:$name") {
+                        val input =
+                            if (staged) {
+                                if (kind == "video") videos.openStaged(stagingDirectory, name)
+                                else attachments.openEncrypted(File(stagingDirectory, name))
+                            } else
+                                when (kind) {
+                                    "image" -> attachments.openImage(name)
+                                    "audio" -> attachments.openAudio(name)
+                                    else -> videos.open(name)
+                                }
+                        checkNotNull(input) { localizedText("附件无法读取，恢复已停止，原数据未被修改。") }
+                            .use(::attachmentDigest)
+                    }
+                }
+                return restoreContentKey(
+                    entry,
+                    { digest("image", it) },
+                    { digest("audio", it) },
+                    { digest("video", it) },
+                )
+            }
+            planMergedEntries(
+                localEntries,
+                restoredEntries,
+                { contentKey(it, false) },
+                { contentKey(it, true) },
+            )
+        } catch (error: Throwable) {
+            throw JournalDataException(
+                tr(
+                    "无法核对日记及附件，恢复已停止，原数据未被修改。",
+                    "Unable to compare entries and attachments. Restore stopped without changing existing data.",
+                ),
+                error,
+            )
+        }
+    }
+
     private fun installRestoredData(
         stagingDirectory: File,
-        restoredEntries: List<JournalEntry>,
+        entriesToInstall: List<JournalEntry>,
         retainedAudioFileNames: Set<String>,
         retainedVideo: JournalVideo? = null,
+        localEntries: List<JournalEntry> = emptyList(),
+        undoToken: String = "",
+        expectedUndoToken: String? = null,
     ): List<JournalEntry> {
         val installedFiles = mutableListOf<File>()
         return try {
             val stagedFiles = stagingDirectory.listFiles().orEmpty()
-            val imageNames = restoredEntries.flatMap { it.imageFileNames }.toSet()
-            val audioNames = restoredEntries.mapNotNull { it.audio?.fileName }.toSet()
+            val imageNames = entriesToInstall.flatMap { it.imageFileNames }.toSet()
+            val audioNames = entriesToInstall.mapNotNull { it.audio?.fileName }.toSet()
             val renamedImages =
                 stagedFiles
                     .filter { it.name in imageNames }
@@ -575,23 +669,30 @@ class JournalStore(context: Context) {
                         stagedFile.name to newName
                     }
             val renamedVideos =
-                restoredEntries
+                entriesToInstall
                     .mapNotNull { it.video }
+                    .distinct()
                     .associateWith { video ->
                         videos.install(stagingDirectory, video).also {
                             installedFiles.addAll(videos.filesOnDisk(it))
                         }
                     }
-            val installedEntries = restoredEntries.map { entry ->
-                entry.copy(
-                    video = entry.video?.let(renamedVideos::getValue),
-                    imageFileNames = entry.imageFileNames.mapNotNull(renamedImages::get),
-                    audio =
-                        entry.audio?.let { audio ->
-                            renamedAudios[audio.fileName]?.let { audio.copy(fileName = it) }
-                        },
-                )
-            }
+            val installedEntries =
+                (localEntries +
+                        entriesToInstall.map { entry ->
+                            entry.copy(
+                                video = entry.video?.let(renamedVideos::getValue),
+                                imageFileNames =
+                                    entry.imageFileNames.mapNotNull(renamedImages::get),
+                                audio =
+                                    entry.audio?.let { audio ->
+                                        renamedAudios[audio.fileName]?.let {
+                                            audio.copy(fileName = it)
+                                        }
+                                    },
+                            )
+                        })
+                    .sortedByDescending { it.createdAt }
 
             val preservedDraft = videoDraftStore.load()
             val protectedVideos =
@@ -600,21 +701,26 @@ class JournalStore(context: Context) {
                 retainedAudioFileNames +
                     listOfNotNull(preservedDraft.audio?.fileName) +
                     editAudioPreferences.all.keys
-            writeEntries(installedEntries)
-            runCatching { cleanupStaleVideoEdits() }
-            videos.prune(installedEntries.flatMap { it.video.files() }.toSet() + protectedVideos)
-            val referencedFiles = installedEntries.flatMap { it.imageFileNames }.toSet()
-            attachments.imagesDirectory
-                .listFiles()
-                ?.filter { it.name !in referencedFiles }
-                ?.forEach(File::delete)
-            val referencedAudios =
-                installedEntries.mapNotNull { it.audio?.fileName }.toSet() + protectedAudios
-            attachments.audiosDirectory
-                .listFiles()
-                ?.filter { it.name !in referencedAudios }
-                ?.forEach(File::delete)
-            stagingDirectory.deleteRecursively()
+            writeEntries(installedEntries, undoToken, expectedUndoToken)
+            // The database has committed. A cleanup failure must not remove installed media
+            // or roll back the safety snapshot while records already reference the new files.
+            runCatching {
+                cleanupStaleVideoEdits()
+                videos.prune(
+                    installedEntries.flatMap { it.video.files() }.toSet() + protectedVideos
+                )
+                val referencedFiles = installedEntries.flatMap { it.imageFileNames }.toSet()
+                attachments.imagesDirectory
+                    .listFiles()
+                    ?.filter { it.name !in referencedFiles }
+                    ?.forEach(File::delete)
+                val referencedAudios =
+                    installedEntries.mapNotNull { it.audio?.fileName }.toSet() + protectedAudios
+                attachments.audiosDirectory
+                    .listFiles()
+                    ?.filter { it.name !in referencedAudios }
+                    ?.forEach(File::delete)
+            }
             installedEntries
         } catch (error: Throwable) {
             installedFiles.forEach(File::delete)
@@ -702,8 +808,18 @@ class JournalStore(context: Context) {
         }
     }
 
-    private fun writeEntries(entries: List<JournalEntry>) {
-        runCatching { dao.replaceJournals(entries.map(JournalEntry::toBundle)) }
+    private fun writeEntries(
+        entries: List<JournalEntry>,
+        undoToken: String = "",
+        expectedUndoToken: String? = null,
+    ) {
+        runCatching {
+            dao.replaceJournals(
+                entries.map(JournalEntry::toBundle),
+                undoToken,
+                expectedUndoToken,
+            )
+        }
             .getOrElse { error ->
                 throw JournalDataException(localizedText("恢复内容写入失败，原数据未被覆盖。"), error)
             }

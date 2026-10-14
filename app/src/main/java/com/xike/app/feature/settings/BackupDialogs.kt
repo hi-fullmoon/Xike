@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,12 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import com.xike.app.AppLocale
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.localizedText
 import com.xike.app.tr
@@ -61,8 +68,28 @@ internal fun RestoreConfirmationDialog(
     summary: BackupSummary,
     localEntryCount: Int,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (BackupRestoreMode) -> Unit,
 ) {
+    var mode by rememberSaveable { mutableStateOf(BackupRestoreMode.MERGE) }
+    var confirmReplacement by rememberSaveable { mutableStateOf(false) }
+    if (confirmReplacement) {
+        DestructiveConfirmationDialog(
+            title = localizedText("确认替换设备内容？"),
+            confirmText = localizedText("替换并恢复"),
+            dismissText = localizedText("取消"),
+            onDismiss = { confirmReplacement = false },
+            onConfirm = { onConfirm(BackupRestoreMode.REPLACE) },
+            text = {
+                Text(
+                    tr(
+                        "当前设备的 $localEntryCount 条日记将被备份内容替换。恢复前会创建加密安全快照，可撤销一次。",
+                        "The $localEntryCount entries on this device will be replaced by the backup. An encrypted safety snapshot is created first, allowing one undo.",
+                    )
+                )
+            },
+        )
+        return
+    }
     val formatter =
         remember(AppLocale.language) {
             DateTimeFormatter.ofPattern(tr("yyyy年M月d日", "MMM d, yyyy"), AppLocale.locale)
@@ -83,14 +110,32 @@ internal fun RestoreConfirmationDialog(
             }
         }
 
-    DestructiveConfirmationDialog(
-        onDismiss = onDismiss,
-        onConfirm = onConfirm,
-        title = localizedText("确认替换设备内容？"),
-        confirmText = localizedText("替换并恢复"),
-        dismissText = localizedText("取消"),
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = XikeShapes.dialog,
+        title = { Text(tr("从备份恢复", "Restore from backup")) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (mode == BackupRestoreMode.REPLACE) confirmReplacement = true
+                    else onConfirm(mode)
+                },
+                shape = XikeShapes.button,
+            ) {
+                Text(
+                    if (mode == BackupRestoreMode.MERGE) tr("合并恢复", "Merge and restore")
+                    else tr("继续", "Continue")
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = XikeShapes.button) { Text(localizedText("取消")) }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
+            ) {
                 Text(
                     tr(
                         "备份包含 ${summary.entryCount} 条日记、${summary.imageCount} 张图片",
@@ -117,12 +162,46 @@ internal fun RestoreConfirmationDialog(
                         )
                     )
                 }
+                BackupRestoreMode.entries.forEach { option ->
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = mode == option,
+                                    role = Role.RadioButton,
+                                    onClick = { mode = option },
+                                ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = mode == option, onClick = null)
+                        Text(
+                            if (option == BackupRestoreMode.MERGE)
+                                tr("合并恢复（推荐）", "Merge (recommended)")
+                            else tr("替换全部内容", "Replace all entries")
+                        )
+                    }
+                }
+                Text(
+                    if (mode == BackupRestoreMode.MERGE)
+                        tr(
+                            "保留本机日记，补入备份记录。同一记录内容一致时跳过；内容冲突时保留双方版本，重复导入不会再次添加相同版本。",
+                            "Keep local entries and add backup entries. Identical versions of the same entry are skipped; conflicting versions are both kept. Importing again does not add the same version twice.",
+                        )
+                    else
+                        tr(
+                            "当前设备的 $localEntryCount 条日记将被替换为备份内容。",
+                            "The $localEntryCount entries on this device will be replaced by the backup.",
+                        ),
+                    color =
+                        if (mode == BackupRestoreMode.REPLACE) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     tr(
-                        "当前设备的 $localEntryCount 条日记将被替换。恢复前会创建加密安全快照，可撤销一次。",
-                        "The $localEntryCount entries on this device will be replaced. An encrypted safety snapshot is created first, allowing one undo.",
-                    ),
-                    color = MaterialTheme.colorScheme.error,
+                        "恢复前会创建加密安全快照，可撤销一次。",
+                        "An encrypted safety snapshot is created first, allowing one undo.",
+                    )
                 )
             }
         },

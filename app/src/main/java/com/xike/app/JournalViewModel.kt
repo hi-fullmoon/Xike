@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
@@ -143,6 +144,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             mediaMutationMutex = mediaMutationMutex,
             onRestored = { _, undoAvailable ->
                 canUndoRestore = undoAvailable
+                // Re-read after publishing: a journal write may have raced the restore result.
+                readRefreshRequests.tryEmit(Unit)
                 dataError = null
             },
             reportOperation = ::reportOperation,
@@ -206,7 +209,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     libraryState = initialState.copy(revision = libraryState.revision + 1)
                     selectedTheme = appearance.theme
                     selectedStyle = appearance.style
-                    canUndoRestore = runCatching(store::canUndoLastRestore).getOrDefault(false)
+                    canUndoRestore =
+                        withContext(Dispatchers.IO) {
+                            runCatching(store::canUndoLastRestore).getOrDefault(false)
+                        }
                     draftResult.onSuccess {
                         draft = it
                         hasResumedDraft = !it.isEmpty
@@ -284,6 +290,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                                 true
                             }
                             .collect { latestState ->
+                                canUndoRestore =
+                                    withContext(Dispatchers.IO) {
+                                        runCatching(store::canUndoLastRestore).getOrDefault(false)
+                                    }
                                 observationFailureReported = false
                                 // Foreground refreshes must also retry failed page and summary
                                 // reads.
@@ -648,8 +658,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> =
         backupOperations.inspectBackup(uri, password)
 
-    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> =
-        backupOperations.restoreBackup(uri, password)
+    suspend fun restoreBackup(
+        uri: Uri,
+        password: String?,
+        mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+    ): Result<Int> = backupOperations.restoreBackup(uri, password, mode)
 
     suspend fun undoRestore(): Result<Int> = backupOperations.undoRestore()
 

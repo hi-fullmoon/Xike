@@ -141,6 +141,11 @@ internal class JournalVideoStore(context: Context) {
         return open(File(directory, name))
     }
 
+    fun openStaged(staging: File, name: String): InputStream {
+        require(safeVideoName(name))
+        return open(File(staging, name))
+    }
+
     fun dataSource(video: JournalVideo): MediaDataSource {
         require(video.isValid())
         return source(File(directory, video.fileName), video.sizeBytes)

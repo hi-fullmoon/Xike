@@ -15,6 +15,10 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.BackupRestoreMode
+import com.xike.app.data.attachmentDigest
+import com.xike.app.data.restoreContentKey
+import com.xike.app.media.JournalVideoStore
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,11 +44,12 @@ class BackupRestoreLifecycleTest {
         val store = JournalStore(context)
         val originalIds = store.entries().map { it.id }.toSet()
         saveMoment(model, "恢复前记录 ${java.util.UUID.randomUUID()}")
-        val backedUpEntries = store.entries()
+        val backedUpContents = contents(store)
         val backup = File.createTempFile("restore-real-", ".zip", context.cacheDir)
         backup.outputStream().use { store.writeBackup(it, null) }
         saveMoment(model, "撤销恢复核对 ${java.util.UUID.randomUUID()}")
         val beforeRestore = store.entries()
+        val beforeRestoreContents = contents(store)
         val recorder = XikeAudioRecorder(context)
         InstrumentationRegistry.getInstrumentation()
             .uiAutomation
@@ -65,7 +70,9 @@ class BackupRestoreLifecycleTest {
             rule.waitUntil(15_000) {
                 model.pendingDraftAudio?.stagedFileName != null && model.isDraftAudioSaving
             }
-            val restore = requester.async { model.restoreBackup(Uri.fromFile(backup), null) }
+            val restore = requester.async {
+                model.restoreBackup(Uri.fromFile(backup), null, BackupRestoreMode.REPLACE)
+            }
             rule.waitUntil(10_000) {
                 model.backupRestoreState.operation == RestoreOperation.RESTORE
             }
@@ -83,7 +90,7 @@ class BackupRestoreLifecycleTest {
                     model.backupRestoreState.outcome != null
             }
             assertTrue(requireNotNull(model.backupRestoreState.outcome).result.isSuccess)
-            assertEquals(backedUpEntries, store.entries())
+            assertEquals(backedUpContents, contents(store))
             rule.waitUntil(15_000) { !model.isDraftAudioSaving && model.pendingDraftAudio == null }
             val savedAudio = requireNotNull(model.draft.audio)
             publishedAudioName = savedAudio.fileName
@@ -125,7 +132,7 @@ class BackupRestoreLifecycleTest {
                 replacementBytes,
                 store.openAudio(replacementAudio.fileName)!!.use { it.readBytes() },
             )
-            assertEquals(beforeRestore, store.entries())
+            assertEquals(beforeRestoreContents, contents(store))
             assertArrayEquals(
                 bytes,
                 store.openAudio(editingAudio.fileName)!!.use { it.readBytes() },
@@ -219,4 +226,19 @@ class BackupRestoreLifecycleTest {
             it.isAccessible = true
             it.get(model) as Mutex
         }
+
+    // Replacement and undo legitimately rename private attachment copies. Compare every
+    // record field and the decrypted media, so real existing photos/audio remain covered.
+    private fun contents(store: JournalStore): Map<String, String> {
+        val videos = JournalVideoStore(rule.activity)
+        return store.entries().associate { entry ->
+            entry.id to
+                restoreContentKey(
+                    entry,
+                    { requireNotNull(store.openImage(it)).use(::attachmentDigest) },
+                    { requireNotNull(store.openAudio(it)).use(::attachmentDigest) },
+                    { videos.open(it).use(::attachmentDigest) },
+                )
+        }
+    }
 }

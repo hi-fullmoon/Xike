@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
 import com.xike.app.data.draft.JournalDraftStore
@@ -147,18 +148,61 @@ class JournalVideoWorkflowTest {
                 val summary = store.inspectBackup(encrypted.inputStream(), password)
                 assertEquals(1, summary.videoCount)
                 assertEquals(video.sizeBytes, summary.videoBytes)
+                val beforeMerge = store.entries()
+                plain.inputStream().use { store.restoreBackup(it, null) }
+                assertEquals(beforeMerge.sortedBy { it.id }, store.entries().sortedBy { it.id })
+                val originalEntry = beforeMerge.single { it.id == ENTRY_ID }
+                val editedEntry = originalEntry.copy(mood = Mood.JOYFUL)
+                store.update(editedEntry, editedEntry.imageFileNames)
+                plain.inputStream().use { store.restoreBackup(it, null) }
+                assertEquals(beforeMerge.size + 1, store.entries().size)
+                assertEquals(editedEntry, store.entries().single { it.id == ENTRY_ID })
+                val conflict =
+                    store.entries().single { it.id !in beforeMerge.map(JournalEntry::id) }
+                assertEquals(originalEntry.mood, conflict.mood)
+                assertArrayEquals(
+                    digest,
+                    videos.open(requireNotNull(conflict.video).fileName).use(::digest),
+                )
+                assertArrayEquals(
+                    videos.open(video.coverFileName).use(::digest),
+                    videos.open(conflict.video.coverFileName).use(::digest),
+                )
+                val mergedEntries = store.entries()
+                encrypted.inputStream().use { store.restoreBackup(it, password) }
+                assertEquals(mergedEntries.sortedBy { it.id }, store.entries().sortedBy { it.id })
+                store.undoLastRestore(retainedVideo = video)
+                assertEquals(beforeMerge.size, store.entries().size)
+                assertEquals(
+                    editedEntry.copy(video = store.entries().single { it.id == ENTRY_ID }.video),
+                    store.entries().single { it.id == ENTRY_ID },
+                )
+                val current = store.entries().single { it.id == ENTRY_ID }
+                store.update(current.copy(mood = originalEntry.mood), current.imageFileNames)
                 val restored =
                     store
-                        .restoreBackup(encrypted.inputStream(), password, retainedVideo = video)
+                        .restoreBackup(
+                            encrypted.inputStream(),
+                            password,
+                            retainedVideo = video,
+                            mode = BackupRestoreMode.REPLACE,
+                        )
                         .single { it.id == ENTRY_ID }
                 assertTrue(videos.editReferences().isEmpty())
                 assertNotEquals(video.fileName, restored.video!!.fileName)
                 assertArrayEquals(digest, videos.open(restored.video.fileName).use(::digest))
                 store.undoLastRestore(retainedVideo = video)
                 val restoredAgain =
-                    store.restoreBackup(plain.inputStream(), null, retainedVideo = video).single {
-                        it.id == ENTRY_ID
-                    }
+                    store
+                        .restoreBackup(
+                            plain.inputStream(),
+                            null,
+                            retainedVideo = video,
+                            mode = BackupRestoreMode.REPLACE,
+                        )
+                        .single {
+                            it.id == ENTRY_ID
+                        }
                 val restoredVideo = requireNotNull(restoredAgain.video)
                 assertArrayEquals(digest, videos.open(restoredVideo.fileName).use(::digest))
                 store.delete(ENTRY_ID)

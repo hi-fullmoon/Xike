@@ -1,0 +1,8 @@
+
+com.xike.app.JournalVideoWorkflowTest:.
+
+Time: 8.289
+
+OK (1 test)
+
+

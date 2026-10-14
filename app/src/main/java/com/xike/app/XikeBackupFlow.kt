@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.feature.settings.BackupExportDialog
 import com.xike.app.feature.settings.BackupExportState
@@ -43,10 +44,11 @@ internal fun XikeBackupFlow(
     localEntryCount: Int,
     isBackupExporting: Boolean,
     restoreState: BackupRestoreState,
+    canUndoRestore: Boolean,
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
     onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
-    onRestoreBackup: suspend (Uri, String?) -> Result<Int>,
+    onRestoreBackup: suspend (Uri, String?, BackupRestoreMode) -> Result<Int>,
     onUndoRestore: suspend () -> Result<Int>,
     content:
         @Composable
@@ -68,6 +70,14 @@ internal fun XikeBackupFlow(
     var busyMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(canUndoRestore) {
+        if (
+            !canUndoRestore && snackbarHostState.currentSnackbarData?.visuals?.actionLabel != null
+        ) {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
     suspend fun runUndoRestore() {
         snackbarHostState.currentSnackbarData?.dismiss()
         onUndoRestore()
@@ -80,8 +90,12 @@ internal fun XikeBackupFlow(
             val count = result.getOrThrow()
             val action =
                 snackbarHostState.showSnackbar(
-                    message = tr("已恢复 $count 条日记", "Restored $count entries"),
-                    actionLabel = localizedText("撤销"),
+                    message =
+                        if (outcome.mode == BackupRestoreMode.MERGE)
+                            tr("合并完成，现有 $count 条日记", "Merge complete. $count entries in total")
+                        else tr("已恢复 $count 条日记", "Restored $count entries"),
+                    actionLabel =
+                        if (outcome.undoAvailable && canUndoRestore) localizedText("撤销") else null,
                     withDismissAction = true,
                     duration = SnackbarDuration.Long,
                 )
@@ -236,10 +250,10 @@ internal fun XikeBackupFlow(
             summary = request.summary,
             localEntryCount = localEntryCount,
             onDismiss = { pendingRestore = null },
-            onConfirm = {
+            onConfirm = { mode ->
                 pendingRestore = null
                 scope.launch {
-                    onRestoreBackup(request.uri, request.password)
+                    onRestoreBackup(request.uri, request.password, mode)
                 }
             },
         )

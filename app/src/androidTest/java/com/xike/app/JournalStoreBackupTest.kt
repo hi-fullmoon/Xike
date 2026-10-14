@@ -7,6 +7,7 @@ import androidx.security.crypto.MasterKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xike.app.data.BackupCipher
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
 import com.xike.app.data.model.OutdoorSnapshot
@@ -81,7 +82,12 @@ class JournalStoreBackupTest {
         assertEquals(source.createdAt, summary.newestCreatedAt)
         assertEquals(listOf("local"), store.entries().map { it.id })
 
-        val restored = store.restoreEncryptedBackup(backup.inputStream(), PASSWORD)
+        val restored =
+            store.restoreEncryptedBackup(
+                backup.inputStream(),
+                PASSWORD,
+                mode = BackupRestoreMode.REPLACE,
+            )
         assertEquals(listOf(storedSource.id), restored.map { it.id })
         assertEquals(imageContents.size, restored.single().imageFileNames.size)
         assertEquals(source.outdoor, restored.single().outdoor)
@@ -129,7 +135,14 @@ class JournalStoreBackupTest {
 
         val summary = store.inspectEncryptedBackup(backup.inputStream(), PASSWORD)
         assertEquals(1, summary.audioCount)
-        val restored = store.restoreEncryptedBackup(backup.inputStream(), PASSWORD).single()
+        val restored =
+            store
+                .restoreEncryptedBackup(
+                    backup.inputStream(),
+                    PASSWORD,
+                    mode = BackupRestoreMode.REPLACE,
+                )
+                .single()
 
         assertEquals(12_500L, restored.audio?.durationMillis)
         val restoredBytes =
@@ -181,7 +194,10 @@ class JournalStoreBackupTest {
         assertEquals(1, summary.entryCount)
         assertEquals(1, summary.imageCount)
         assertEquals(1, summary.audioCount)
-        val restored = store.restoreBackup(backup.inputStream(), null).single()
+        val restored =
+            store
+                .restoreBackup(backup.inputStream(), null, mode = BackupRestoreMode.REPLACE)
+                .single()
         assertEquals(source.note, restored.note)
         assertImageContents(restored, listOf(imageContents))
         assertArrayEquals(

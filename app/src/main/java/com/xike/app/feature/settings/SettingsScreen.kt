@@ -412,7 +412,11 @@ fun ProfileSettingsScreen(
                         SettingsAction(
                             icon = Icons.AutoMirrored.Outlined.Undo,
                             title = localizedText("撤销上次恢复"),
-                            subtitle = localizedText("找回恢复前的设备内容，仅可撤销一次"),
+                            subtitle =
+                                tr(
+                                    "仅在恢复后未改动日记时可撤销一次",
+                                    "Undo once, before making any changes to entries",
+                                ),
                             onClick = onUndoRestore,
                         )
                     }

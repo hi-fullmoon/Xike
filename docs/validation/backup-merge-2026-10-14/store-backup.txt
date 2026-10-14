@@ -1,0 +1,8 @@
+
+com.xike.app.JournalStoreBackupTest:.........
+
+Time: 15.582
+
+OK (9 tests)
+
+

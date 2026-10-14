@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
@@ -96,7 +97,7 @@ internal fun XikeApp(
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
     onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
-    onRestoreBackup: suspend (Uri, String?) -> Result<Int>,
+    onRestoreBackup: suspend (Uri, String?, BackupRestoreMode) -> Result<Int>,
     canUndoRestore: Boolean,
     onUndoRestore: suspend () -> Result<Int>,
     // Navigation requests.
@@ -116,6 +117,7 @@ internal fun XikeApp(
         localEntryCount = libraryState.totalCount,
         isBackupExporting = isBackupExporting,
         restoreState = backupRestoreState,
+        canUndoRestore = canUndoRestore,
         onExportBackup = onExportBackup,
         onBackupRequiresPassword = onBackupRequiresPassword,
         onInspectBackup = onInspectBackup,

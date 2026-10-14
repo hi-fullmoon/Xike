@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.Flow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 internal const val THEME_SETTING = "theme"
+internal const val RESTORE_UNDO_TOKEN_SETTING = "restore-undo-token"
 internal const val THEME_STYLE_SETTING = "theme-style"
 internal const val LEGACY_MIGRATION_SETTING = "legacy-shared-preferences-migrated-v1"
 internal const val SEARCH_INDEX_SETTING = "journal-search-index-version"
@@ -408,6 +409,11 @@ internal abstract class JournalDao {
 
     @Transaction
     open fun insertJournal(bundle: JournalBundle) {
+        insertJournalContents(bundle)
+        putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
+    }
+
+    private fun insertJournalContents(bundle: JournalBundle) {
         insertEntry(bundle.entry)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
@@ -420,6 +426,7 @@ internal abstract class JournalDao {
         val images = imageFileNames(entryId)
         deleteSearchEntry(entryId)
         check(deleteEntry(entryId) == 1) { localizedText("记录不存在或已经删除。") }
+        putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
         return images
     }
 
@@ -435,17 +442,30 @@ internal abstract class JournalDao {
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
         bundle.audio?.let(::insertAudio)
         insertSearchEntry(bundle.toSearchEntity())
+        putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
         return previousImages
     }
 
     @Transaction
-    open fun replaceJournals(bundles: List<JournalBundle>) {
+    open fun replaceJournals(
+        bundles: List<JournalBundle>,
+        undoToken: String = "",
+        expectedUndoToken: String? = null,
+    ) {
+        if (expectedUndoToken != null)
+            check(settingValue(RESTORE_UNDO_TOKEN_SETTING) == expectedUndoToken) {
+                tr(
+                    "日记已发生变化，无法撤销上次恢复。",
+                    "Entries have changed. The last restore can no longer be undone.",
+                )
+            }
         deleteSearchEntries()
         deleteTags()
         deleteImages()
         deleteAudios()
         deleteEntries()
-        bundles.forEach(::insertJournal)
+        bundles.forEach(::insertJournalContents)
+        putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, undoToken))
     }
 
     @Transaction

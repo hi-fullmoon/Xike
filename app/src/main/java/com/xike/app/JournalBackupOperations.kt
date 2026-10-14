@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.model.JournalDraft
@@ -21,7 +22,12 @@ internal enum class RestoreOperation {
     UNDO,
 }
 
-internal class RestoreOutcome(val operation: RestoreOperation, val result: Result<Int>)
+internal class RestoreOutcome(
+    val operation: RestoreOperation,
+    val result: Result<Int>,
+    val mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+    val undoAvailable: Boolean = true,
+)
 
 internal class BackupRestoreState {
     var operation by mutableStateOf<RestoreOperation?>(null)
@@ -98,14 +104,19 @@ internal class JournalBackupOperations(
             }
             .await()
 
-    suspend fun restoreBackup(uri: Uri, password: String?): Result<Int> =
-        runRestore(RestoreOperation.RESTORE) { snapshot ->
+    suspend fun restoreBackup(
+        uri: Uri,
+        password: String?,
+        mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+    ): Result<Int> =
+        runRestore(RestoreOperation.RESTORE, mode) { snapshot ->
             context.contentResolver.openInputStream(uri)?.use { input ->
                 store.restoreBackup(
                     input,
                     password,
                     setOfNotNull(snapshot.audio?.fileName),
                     snapshot.video,
+                    mode,
                 )
             } ?: error(localizedText("无法读取备份文件"))
         }
@@ -117,6 +128,7 @@ internal class JournalBackupOperations(
 
     private suspend fun runRestore(
         operation: RestoreOperation,
+        mode: BackupRestoreMode = BackupRestoreMode.MERGE,
         work: (JournalDraft) -> List<JournalEntry>,
     ): Result<Int> =
         scope
@@ -134,12 +146,19 @@ internal class JournalBackupOperations(
                         val snapshot = draft
                         withContext(Dispatchers.IO) { runCatching { work(snapshot) } }
                     }
-                    result.onSuccess { onRestored(it, operation == RestoreOperation.RESTORE) }
+                    val undoAvailable =
+                        if (result.isSuccess)
+                            withContext(Dispatchers.IO) {
+                                runCatching(store::canUndoLastRestore).getOrDefault(false)
+                            }
+                        else false
+                    result.onSuccess { onRestored(it, undoAvailable) }
                     result
                         .map { it.size }
                         .also { outcome ->
                             if (operation == RestoreOperation.RESTORE && outcome.isSuccess) {
-                                restoreState.outcome = RestoreOutcome(operation, outcome)
+                                restoreState.outcome =
+                                    RestoreOutcome(operation, outcome, mode, undoAvailable)
                             } else {
                                 val message =
                                     outcome.fold(

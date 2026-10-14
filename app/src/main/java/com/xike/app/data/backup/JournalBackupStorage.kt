@@ -8,6 +8,7 @@ import com.xike.app.data.BackupValidationException
 import com.xike.app.data.JournalDataException
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.MAX_AUDIO_BYTES
+import com.xike.app.data.MAX_BACKUP_MANIFEST_BYTES
 import com.xike.app.data.model.files
 import com.xike.app.data.normalizeRestoredEntries
 import com.xike.app.data.parseBackupEntries
@@ -376,6 +377,7 @@ internal class JournalBackupStorage(
                     restoredImages,
                     restoredAudios,
                     restoredVideos,
+                    preserveConflicts = true,
                 )
             validateBackup(restoredVideos == referencedVideos) {
                 tr("备份缺少视频或封面。", "Backup video or cover is missing.")
@@ -426,7 +428,13 @@ internal class JournalBackupStorage(
                 }
             }
 
-            val restored = normalizeRestoredEntries(parsedEntries, restoredImages, emptySet())
+            val restored =
+                normalizeRestoredEntries(
+                    parsedEntries,
+                    restoredImages,
+                    emptySet(),
+                    preserveConflicts = true,
+                )
             PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
@@ -470,7 +478,7 @@ internal class JournalBackupStorage(
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
         const val MAX_BACKUP_AUDIOS = 100_000
-        const val MAX_MANIFEST_BYTES = 16L * 1024L * 1024L
+        const val MAX_MANIFEST_BYTES = MAX_BACKUP_MANIFEST_BYTES
         const val MAX_HTML_BYTES = 64L * 1024L * 1024L
         const val MAX_LEGACY_BACKUP_BYTES = 320L * 1024L * 1024L
     }

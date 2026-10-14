@@ -2,14 +2,17 @@ package com.xike.app.data
 
 import kotlinx.coroutines.flow.map
 
+internal const val MAX_BACKUP_MANIFEST_BYTES = 16L * 1024L * 1024L
+
 internal fun normalizeRestoredEntries(
     entries: List<JournalEntry>,
     availableImages: Set<String>,
     availableAudios: Set<String> = emptySet(),
     availableVideos: Set<String> = emptySet(),
+    preserveConflicts: Boolean = false,
 ): List<JournalEntry> =
     entries
-        .distinctBy { it.id }
+        .let { if (preserveConflicts) it else it.distinctBy { entry -> entry.id } }
         .map { entry ->
             entry.copy(
                 video =
