@@ -93,6 +93,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private val noteSaveScope = CoroutineScope(noteSaveScopeJob + Dispatchers.IO)
     private var observationFailureReported = false
     private val readRefreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private var draftReady = false
+    private var libraryReady = false
+    private var initializationJob: Job? = null
+    private var observationJob: Job? = null
 
     val readRepository
         get() = store.readRepository
@@ -119,6 +123,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     internal fun onAppForegrounded() {
+        if (!isLoading && (!draftReady || !libraryReady)) initialize()
         if (draftSessionBackgrounded) {
             hasResumedDraft = !draft.isEmpty || pendingDraftAudio != null
             draftSessionBackgrounded = false
@@ -185,10 +190,22 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     init {
         draftStore.nextRevision()
         pruneVoiceTemporaryFiles(application)
-        viewModelScope.launch {
+        initialize()
+    }
+
+    private fun initialize() {
+        if (initializationJob?.isActive == true) return
+        isLoading = true
+        initializationJob = viewModelScope.launch {
             val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
             val draftFlushResult =
                 withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
+            // Draft recovery does not depend on the journal database opening successfully.
+            draftResult.onSuccess {
+                draft = it
+                hasResumedDraft = !it.isEmpty
+            }
+            draftReady = draftResult.isSuccess && draftFlushResult.isSuccess
             val result =
                 withContext(Dispatchers.IO) {
                     runCatching {
@@ -201,6 +218,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 }
             result
                 .onSuccess { (snapshot, initialState) ->
+                    libraryReady = true
                     val appearance =
                         appearancePreferences.migrateFromDatabase(
                             themeName = snapshot.themeName,
@@ -213,10 +231,6 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                         withContext(Dispatchers.IO) {
                             runCatching(store::canUndoLastRestore).getOrDefault(false)
                         }
-                    draftResult.onSuccess {
-                        draft = it
-                        hasResumedDraft = !it.isEmpty
-                    }
                     dataError =
                         draftResult.exceptionOrNull()?.message
                             ?: draftFlushResult.exceptionOrNull()?.message
@@ -277,7 +291,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                             }
                         }
                     }
-                    viewModelScope.launch {
+                    observationJob?.cancel()
+                    observationJob = viewModelScope.launch {
                         merge(readRepository.changes().map { Unit }, readRefreshRequests)
                             .map { readRepository.libraryState(0) }
                             .retryWhen { error, attempt ->
@@ -305,15 +320,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 .onFailure { error ->
                     dataError = error.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
                 }
-            systemActivityResultsReady = draftResult.isSuccess && result.isSuccess
+            systemActivityResultsReady = draftReady && result.isSuccess
             isLoading = false
-            if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
-            draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
+            if (systemActivityResultsReady) {
+                if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
+                draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
+            }
         }
     }
 
     fun dismissDataError() {
         dataError = null
+        if (!draftReady || !libraryReady) initialize()
     }
 
     fun reportReadError(message: String) {
@@ -353,6 +371,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateDraftNote(note: String) {
+        if (!requireDraftReady()) return
         draft =
             draft
                 .copy(
@@ -443,6 +462,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         request: suspend () -> OutdoorSnapshot,
     ): Result<Unit> =
         withContext(Dispatchers.Main.immediate) {
+            if (!requireDraftReady()) {
+                return@withContext Result.failure(IllegalStateException(dataError))
+            }
             if (isDraftSaving || isDraftOutdoorLoading) {
                 return@withContext Result.failure(
                     IllegalStateException(
@@ -482,16 +504,22 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-    fun addDraftImages(uris: List<Uri>): Boolean = draftMediaOperations.addDraftImages(uris)
+    fun addDraftImages(uris: List<Uri>): Boolean =
+        requireDraftReady() && draftMediaOperations.addDraftImages(uris)
 
     fun removeDraftImage(uriString: String) = draftMediaOperations.removeDraftImage(uriString)
 
-    fun queueDraftAudio(source: File, durationMillis: Long) =
-        draftMediaOperations.queueDraftAudio(source, durationMillis)
+    fun queueDraftAudio(source: File, durationMillis: Long) {
+        if (requireDraftReady()) draftMediaOperations.queueDraftAudio(source, durationMillis)
+    }
 
-    fun retryPendingDraftAudio() = draftMediaOperations.retryPendingDraftAudio()
+    fun retryPendingDraftAudio() {
+        if (requireDraftReady()) draftMediaOperations.retryPendingDraftAudio()
+    }
 
-    fun discardPendingDraftAudio() = draftMediaOperations.discardPendingDraftAudio()
+    fun discardPendingDraftAudio() {
+        if (requireDraftReady()) draftMediaOperations.discardPendingDraftAudio()
+    }
 
     fun removeDraftAudio() = draftMediaOperations.removeDraftAudio()
 
@@ -531,6 +559,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> =
         withContext(Dispatchers.Main.immediate) {
+            if (!requireDraftReady() || !libraryReady)
+                return@withContext Result.failure(
+                    IllegalStateException(localizedText("日记数据库暂时无法读取，原数据未被覆盖。"))
+                )
             if (isDraftSaving)
                 return@withContext Result.failure(
                     IllegalStateException(tr("正在保存，请稍候。", "Saving. Please wait."))
@@ -729,13 +761,15 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun releaseVideo(video: JournalVideo) = draftMediaOperations.releaseVideo(video)
 
-    fun queueDraftVideo(uri: Uri): Boolean = draftMediaOperations.queueDraftVideo(uri)
+    fun queueDraftVideo(uri: Uri): Boolean =
+        requireDraftReady() && draftMediaOperations.queueDraftVideo(uri)
 
     fun removeDraftVideo() = draftMediaOperations.removeDraftVideo()
 
     fun cancelPendingDraftVideo() = draftMediaOperations.cancelPendingDraftVideo()
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
+        if (!requireDraftReady(reportError)) return false
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
         return runCatching { draftStore.save(normalized) }
             .onSuccess {
@@ -748,6 +782,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 if (reportError) dataError = error.message ?: localizedText("草稿保存失败，请重试。")
             }
             .isSuccess
+    }
+
+    private fun requireDraftReady(reportError: Boolean = true): Boolean {
+        if (draftReady && !isLoading) return true
+        if (reportError) {
+            dataError =
+                tr(
+                    "草稿尚未恢复，原内容已保留。请关闭提示重试，或稍后重新打开应用。",
+                    "The draft has not been recovered. Its original contents are preserved. Dismiss this message to retry, or reopen the app later.",
+                )
+        }
+        return false
     }
 
     private suspend fun <T> runOutdoorRequest(request: suspend () -> T): Result<T> =
