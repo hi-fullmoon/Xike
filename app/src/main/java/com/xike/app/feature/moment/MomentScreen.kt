@@ -542,7 +542,7 @@ fun MomentScreen(
             }
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(localizedText("此刻窗外"), style = MaterialTheme.typography.titleSmall)
+                Text(localizedText("此刻窗外"), style = MaterialTheme.typography.titleMedium)
                 OutdoorContextCard(
                     snapshot = draft.outdoor,
                     contentPadding = XikeContentCardPadding,
@@ -616,7 +616,7 @@ fun MomentScreen(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 showDeleteAtTopEnd = true,
                                 useActionMenu = true,
-                                shape = XikeShapes.inner,
+                                shape = XikeShapes.card,
                             )
                         }
                     }
@@ -671,6 +671,7 @@ fun MomentScreen(
                                 else videoServices.removeDraft,
                             onReplace = if (canChangeVideo) chooseVideo else null,
                             useActionMenu = true,
+                            shape = XikeShapes.card,
                         )
                     }
                     if (draft.pendingVideoUri != null && !videoServices.draftSaving) {

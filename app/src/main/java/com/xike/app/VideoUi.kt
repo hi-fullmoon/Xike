@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalAccessibilityManager
@@ -255,6 +256,7 @@ internal fun VideoCard(
     aspectRatio: Float = 16f / 9f,
     onReplace: (() -> Unit)? = null,
     useActionMenu: Boolean = false,
+    shape: Shape = XikeShapes.inner,
 ) {
     key(video.fileName) {
         VideoCardContent(
@@ -265,6 +267,7 @@ internal fun VideoCard(
             aspectRatio,
             onReplace,
             useActionMenu,
+            shape,
         )
     }
 }
@@ -278,6 +281,7 @@ private fun VideoCardContent(
     aspectRatio: Float,
     onReplace: (() -> Unit)?,
     useActionMenu: Boolean,
+    shape: Shape,
 ) {
     val services = LocalVideoServices.current
     var playing by remember { mutableStateOf(false) }
@@ -292,7 +296,7 @@ private fun VideoCardContent(
                         .getOrNull()
                 }
         }
-    Surface(shape = XikeShapes.inner, color = MaterialTheme.colorScheme.surfaceVariant) {
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceVariant) {
         Column {
             Box(
                 Modifier.fillMaxWidth().aspectRatio(aspectRatio).clipToBounds().clickable(

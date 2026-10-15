@@ -21,11 +21,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.Dehaze
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Thunderstorm
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -112,7 +120,7 @@ internal fun OutdoorContextCard(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Outlined.Cloud,
+                                    weatherConditionIcon(snapshot.weatherCode),
                                     contentDescription = null,
                                     modifier = Modifier.size(26.dp),
                                     tint = MaterialTheme.colorScheme.primary,
@@ -351,6 +359,39 @@ internal fun OutdoorContextCard(
         )
     }
 }
+
+internal fun weatherConditionIcon(code: Int): ImageVector =
+    when (code) {
+        0 -> Icons.Outlined.WbSunny
+        1,
+        2 -> Icons.Outlined.CloudQueue
+        3 -> Icons.Outlined.Cloud
+        45,
+        48 -> Icons.Outlined.Dehaze
+        51,
+        53,
+        55,
+        56,
+        57,
+        61,
+        63,
+        65,
+        66,
+        67,
+        80,
+        81,
+        82 -> Icons.Outlined.WaterDrop
+        71,
+        73,
+        75,
+        77,
+        85,
+        86 -> Icons.Outlined.AcUnit
+        95,
+        96,
+        99 -> Icons.Outlined.Thunderstorm
+        else -> Icons.Outlined.HelpOutline
+    }
 
 @Composable
 internal fun OutdoorAddressDialog(address: String, onDismiss: () -> Unit) {
