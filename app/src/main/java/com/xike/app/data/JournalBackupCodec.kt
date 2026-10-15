@@ -23,6 +23,34 @@ internal inline fun validateBackup(condition: Boolean, lazyMessage: () -> String
     if (!condition) throw BackupValidationException(lazyMessage())
 }
 
+/** Apply the same plaintext byte limits when importing and exporting attachments. */
+internal fun InputStream.copyAttachmentTo(
+    output: OutputStream,
+    byteLimit: Long,
+    totalBytes: LongArray?,
+    totalLimit: Long,
+    itemName: String,
+    totalName: String,
+) {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var itemBytes = 0L
+    while (true) {
+        val count = read(buffer)
+        if (count < 0) break
+        itemBytes += count
+        validateBackup(itemBytes <= byteLimit) {
+            tr("$itemName 超过大小限制。", "$itemName exceeds the size limit.")
+        }
+        if (totalBytes != null) {
+            totalBytes[0] += count
+            validateBackup(totalBytes[0] <= totalLimit) {
+                tr("$totalName 总大小超过限制。", "$totalName exceed the total size limit.")
+            }
+        }
+        output.write(buffer, 0, count)
+    }
+}
+
 internal fun InputStream.readAvailable(target: ByteArray): Int {
     var offset = 0
     while (offset < target.size) {

@@ -8,10 +8,9 @@ import com.xike.app.data.JournalAudio
 import com.xike.app.data.MAX_AUDIO_BYTES
 import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
+import com.xike.app.data.copyAttachmentTo
 import com.xike.app.data.readAvailable
-import com.xike.app.data.validateBackup
 import com.xike.app.localizedText
-import com.xike.app.tr
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
@@ -160,23 +159,14 @@ internal class JournalAttachmentStore(
     ) {
         runCatching {
             encryptedFile(target).openFileOutput().buffered().use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var itemBytes = 0L
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    itemBytes += count
-                    validateBackup(itemBytes <= byteLimit) {
-                        tr("$itemName 超过大小限制。", "$itemName exceeds the size limit.")
-                    }
-                    if (totalBytes != null) {
-                        totalBytes[0] += count
-                        validateBackup(totalBytes[0] <= totalLimit) {
-                            tr("$totalName 总大小超过限制。", "$totalName exceed the total size limit.")
-                        }
-                    }
-                    output.write(buffer, 0, count)
-                }
+                input.copyAttachmentTo(
+                    output,
+                    byteLimit,
+                    totalBytes,
+                    totalLimit,
+                    itemName,
+                    totalName,
+                )
             }
         }
             .onFailure {

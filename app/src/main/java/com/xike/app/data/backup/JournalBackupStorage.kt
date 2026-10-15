@@ -9,6 +9,7 @@ import com.xike.app.data.JournalDataException
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.MAX_AUDIO_BYTES
 import com.xike.app.data.MAX_BACKUP_MANIFEST_BYTES
+import com.xike.app.data.copyAttachmentTo
 import com.xike.app.data.model.files
 import com.xike.app.data.normalizeRestoredEntries
 import com.xike.app.data.parseBackupEntries
@@ -19,6 +20,7 @@ import com.xike.app.localizedText
 import com.xike.app.media.JournalAttachmentStore
 import com.xike.app.media.JournalVideoStore
 import com.xike.app.media.MAX_BACKUP_AUDIO_BYTES
+import com.xike.app.media.MAX_BACKUP_IMAGE_BYTES
 import com.xike.app.media.MAX_BACKUP_VIDEO_BYTES
 import com.xike.app.media.MAX_IMAGE_BYTES
 import com.xike.app.media.isSafeAudioFileName
@@ -56,6 +58,9 @@ internal class JournalBackupStorage(
         val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
         val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
         val videoNames = currentEntries.flatMap { it.video.files() }.distinct()
+        validateEntryCount(currentEntries.size)
+        validateImageCount(imageNames.size)
+        validateAudioCount(audioNames.size)
         require(
             currentEntries
                 .mapNotNull { it.video }
@@ -105,6 +110,8 @@ internal class JournalBackupStorage(
             archive.write(htmlBytes)
             archive.closeEntry()
 
+            val imageBytes = longArrayOf(0L)
+            val audioBytes = longArrayOf(0L)
             imageNames.forEach { fileName ->
                 (attachments.openImage(fileName)
                         ?: error(
@@ -114,7 +121,14 @@ internal class JournalBackupStorage(
                         archive.putNextEntry(
                             ZipEntry("$IMAGES_PREFIX${imageExportNames.getValue(fileName)}")
                         )
-                        image.copyTo(archive)
+                        image.copyAttachmentTo(
+                            archive,
+                            MAX_IMAGE_BYTES,
+                            imageBytes,
+                            MAX_BACKUP_IMAGE_BYTES,
+                            localizedText("图片"),
+                            localizedText("备份图片"),
+                        )
                         archive.closeEntry()
                     }
             }
@@ -127,7 +141,14 @@ internal class JournalBackupStorage(
                         archive.putNextEntry(
                             ZipEntry("$AUDIOS_PREFIX${audioExportNames.getValue(fileName)}")
                         )
-                        audio.copyTo(archive)
+                        audio.copyAttachmentTo(
+                            archive,
+                            MAX_AUDIO_BYTES,
+                            audioBytes,
+                            MAX_BACKUP_AUDIO_BYTES,
+                            localizedText("录音"),
+                            localizedText("备份录音"),
+                        )
                         archive.closeEntry()
                     }
             }
@@ -262,18 +283,14 @@ internal class JournalBackupStorage(
                         .flatMap { it.imageFileNames }
                         .filter(::isSafeImageFileName)
                         .toSet()
-                validateBackup(referencedImages.size <= MAX_BACKUP_IMAGES) {
-                    localizedText("备份包含过多图片。")
-                }
+                validateImageCount(referencedImages.size)
                 referencedAudios =
                     parsedEntries
                         .orEmpty()
                         .mapNotNull { it.audio?.fileName }
                         .filter(::isSafeAudioFileName)
                         .toSet()
-                validateBackup(referencedAudios.size <= MAX_BACKUP_AUDIOS) {
-                    localizedText("备份包含过多录音。")
-                }
+                validateAudioCount(referencedAudios.size)
                 validateBackup(referencedImages.intersect(referencedAudios).isEmpty()) {
                     localizedText("备份中的图片和录音文件名重复。")
                 }
@@ -401,9 +418,7 @@ internal class JournalBackupStorage(
             val parsedEntries = parseEntries(backup.getJSONArray("entries"))
             val referencedImages =
                 parsedEntries.flatMap { it.imageFileNames }.filter(::isSafeImageFileName).toSet()
-            validateBackup(referencedImages.size <= MAX_BACKUP_IMAGES) {
-                localizedText("备份包含过多图片。")
-            }
+            validateImageCount(referencedImages.size)
 
             val restoredImages = linkedSetOf<String>()
             val totalBytes = longArrayOf(0L)
@@ -465,6 +480,18 @@ internal class JournalBackupStorage(
             .also { directory ->
                 check(directory.mkdir()) { localizedText("无法创建恢复临时目录。") }
             }
+
+    private fun validateEntryCount(count: Int) {
+        validateBackup(count <= MAX_BACKUP_ENTRIES) { localizedText("备份包含过多日记。") }
+    }
+
+    private fun validateImageCount(count: Int) {
+        validateBackup(count <= MAX_BACKUP_IMAGES) { localizedText("备份包含过多图片。") }
+    }
+
+    private fun validateAudioCount(count: Int) {
+        validateBackup(count <= MAX_BACKUP_AUDIOS) { localizedText("备份包含过多录音。") }
+    }
 
     private companion object {
         const val MANIFEST_ENTRY = "manifest.json"
