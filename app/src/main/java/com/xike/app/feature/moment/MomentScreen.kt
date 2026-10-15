@@ -548,6 +548,7 @@ fun MomentScreen(
                     contentPadding = XikeContentCardPadding,
                     minContentHeight = 42.dp,
                     showLocationIconBackground = true,
+                    placeTextStyle = MaterialTheme.typography.titleSmall,
                     isBackdated = draft.recordedAt != null,
                     isLoading = outdoorLoading,
                     errorMessage =

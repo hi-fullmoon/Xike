@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,6 +80,7 @@ internal fun OutdoorContextCard(
     contentPadding: Dp = XikeCardPadding,
     minContentHeight: Dp = 0.dp,
     showLocationIconBackground: Boolean = false,
+    placeTextStyle: TextStyle = MaterialTheme.typography.titleMedium,
 ) {
     val isEmpty = snapshot == null && !isBackdated && !isLoading && errorMessage == null
     var showActions by remember(snapshot, enabled) { mutableStateOf(false) }
@@ -128,7 +130,7 @@ internal fun OutdoorContextCard(
                                         ) {
                                             showFullAddress = true
                                         },
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = placeTextStyle,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
