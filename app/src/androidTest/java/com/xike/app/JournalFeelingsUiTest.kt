@@ -34,10 +34,11 @@ class JournalFeelingsUiTest {
             check(store.entries().isEmpty()) { "Use an isolated device with no existing entries" }
             LanguagePreferences(context).language = AppLanguage.CHINESE
         }
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             rule.waitUntil(15_000) {
                 rule.onAllNodesWithText("此刻的心情").fetchSemanticsNodes().isNotEmpty()
             }
+            awaitJournalReady(scenario)
             if (phase == "write") {
                 rule.onNodeWithText("还不错").performClick()
                 rule.onNodeWithText("添加具体感受").performClick()
@@ -109,11 +110,12 @@ class JournalFeelingsUiTest {
         val originalDraft = JournalDraftStore(context).load()
         check(originalDraft.isEmpty) { "Use an isolated preview device with an empty draft" }
         try {
-            ActivityScenario.launch(MainActivity::class.java).use {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 val mood = if (english) "Positive" else "还不错"
                 rule.waitUntil(15_000) {
                     rule.onAllNodesWithText(mood).fetchSemanticsNodes().isNotEmpty()
                 }
+                awaitJournalReady(scenario)
                 rule.onNodeWithText(mood).performScrollTo().performClick()
                 rule
                     .onNodeWithText(if (english) "Add feelings" else "添加具体感受")
@@ -137,6 +139,14 @@ class JournalFeelingsUiTest {
         } finally {
             JournalDraftStore(context).save(originalDraft)
         }
+    }
+
+    private fun awaitJournalReady(scenario: ActivityScenario<MainActivity>) {
+        var model: JournalViewModel? = null
+        scenario.onActivity {
+            model = androidx.lifecycle.ViewModelProvider(it)[JournalViewModel::class.java]
+        }
+        rule.waitUntil(15_000) { model?.systemActivityResultsReady == true }
     }
 
     private fun capture(name: String) {

@@ -1,5 +1,6 @@
 package com.xike.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -144,19 +146,36 @@ private fun FeelingSheet(
             Spacer(Modifier.height(16.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 Feeling.entries.forEach { feeling ->
+                    val selected = feeling.name in draft
+                    val ink = feeling.labelColor(isSystemInDarkTheme())
                     FilterChip(
-                        selected = feeling.name in draft,
+                        selected = selected,
                         onClick = {
                             draft =
                                 if (feeling.name in draft) draft - feeling.name
                                 else draft + feeling.name
                         },
                         label = { Text(feeling.label) },
-                        modifier = Modifier.heightIn(min = 48.dp),
                         shape = XikeShapes.button,
+                        colors =
+                            FilterChipDefaults.filterChipColors(
+                                labelColor = ink,
+                                selectedLabelColor =
+                                    feeling.selectedLabelColor(isSystemInDarkTheme()),
+                                selectedContainerColor =
+                                    ink.copy(alpha = .14f)
+                                        .compositeOver(
+                                            MaterialTheme.colorScheme.surfaceContainerLow
+                                        ),
+                            ),
+                        border =
+                            BorderStroke(
+                                if (selected) 1.5.dp else 1.dp,
+                                ink.copy(alpha = if (selected) .65f else .28f),
+                            ),
                     )
                 }
                 draft
@@ -166,7 +185,6 @@ private fun FeelingSheet(
                             selected = true,
                             onClick = { draft = draft - key },
                             label = { Text(feelingLabel(key)) },
-                            modifier = Modifier.heightIn(min = 48.dp),
                         )
                     }
             }
@@ -181,6 +199,44 @@ private fun FeelingSheet(
         }
     }
 }
+
+private fun Feeling.labelColor(dark: Boolean): Color =
+    when (this) {
+        Feeling.HAPPY,
+        Feeling.EXCITED,
+        Feeling.HOPEFUL,
+        Feeling.ENERGETIC -> if (dark) Color(0xFFE4B77D) else Color(0xFF805A2B)
+        Feeling.PEACEFUL,
+        Feeling.RELAXED,
+        Feeling.SAFE,
+        Feeling.CONTENT,
+        Feeling.GRATEFUL -> if (dark) Color(0xFFA5C7AF) else Color(0xFF466650)
+        Feeling.SAD,
+        Feeling.DISAPPOINTED,
+        Feeling.HURT,
+        Feeling.LONELY -> if (dark) Color(0xFFAEC4DD) else Color(0xFF506881)
+        Feeling.ANXIOUS,
+        Feeling.IRRITATED,
+        Feeling.ANGRY -> if (dark) Color(0xFFE0ADA2) else Color(0xFF8C574C)
+        Feeling.TIRED,
+        Feeling.BORED -> if (dark) Color(0xFFCAB5D7) else Color(0xFF766084)
+    }
+
+private fun Feeling.selectedLabelColor(dark: Boolean): Color =
+    if (dark) labelColor(dark = true)
+    else
+        when (this) {
+            Feeling.SAD,
+            Feeling.DISAPPOINTED,
+            Feeling.HURT,
+            Feeling.LONELY -> Color(0xFF40566D)
+            Feeling.ANXIOUS,
+            Feeling.IRRITATED,
+            Feeling.ANGRY -> Color(0xFF77463D)
+            Feeling.TIRED,
+            Feeling.BORED -> Color(0xFF624D70)
+            else -> labelColor(dark = false)
+        }
 
 @Composable
 internal fun MoodChoice(
