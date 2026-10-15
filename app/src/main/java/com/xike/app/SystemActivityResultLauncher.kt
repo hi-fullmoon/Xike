@@ -305,7 +305,8 @@ private fun <I, O> rememberActivityResultWithAccess(
                     val intent = launcher.contract.createIntent(context, input)
                     val info = intent.resolveActivityInfo(context.packageManager, 0)
                     // Media pickers may hide the caller even when their launch mode suggests
-                    // the same task. Only explicit Home/recents/screen events interrupt selection.
+                    // the same task. Explicit system events detect interruptions; otherwise the
+                    // session applies its conservative elapsed-time gate when returning.
                     // A camera may also run in its own task.
                     val sameTask =
                         !retainReadAccess &&

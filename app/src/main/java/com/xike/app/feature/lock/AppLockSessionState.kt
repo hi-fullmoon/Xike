@@ -27,7 +27,9 @@ class AppLockSessionState : ViewModel() {
     private var deviceLockRevision = 0L
     private var authenticationDeviceLockRevision = 0L
     private val activeSystemActivities = mutableMapOf<String, Int>()
+    private val exemptSystemActivities = mutableMapOf<String, Int>()
     private val systemActivitiesRequiringAuthentication = mutableSetOf<String>()
+    private val unobservableOperationStarts = mutableMapOf<String, Long>()
 
     internal fun beginAuthentication(action: LockAuthentication) {
         authenticationAction = action
@@ -41,6 +43,7 @@ class AppLockSessionState : ViewModel() {
     internal fun shouldLockOnForeground(nowMillis: Long, timeout: AppLockTimeout): Boolean =
         isAppLocked ||
             systemActivitiesRequiringAuthentication.isNotEmpty() ||
+            unobservableOperationStarts.values.any { shouldLockApp(it, nowMillis, timeout) } ||
             (backgroundedAtMillis != null &&
                 shouldLockApp(backgroundedAtMillis, nowMillis, timeout))
 
@@ -48,10 +51,15 @@ class AppLockSessionState : ViewModel() {
         watchTaskVisibility: Boolean = true,
         requireAuthenticationOnReturn: Boolean = false,
         operationId: String = "default",
+        startedAtMillis: Long = 0L,
     ) {
         systemActivityInProgress = true
         activeSystemActivities[operationId] = (activeSystemActivities[operationId] ?: 0) + 1
+        exemptSystemActivities[operationId] = (exemptSystemActivities[operationId] ?: 0) + 1
         if (requireAuthenticationOnReturn) systemActivitiesRequiringAuthentication.add(operationId)
+        if (!watchTaskVisibility) {
+            unobservableOperationStarts.putIfAbsent(operationId, startedAtMillis)
+        }
         backgroundedAtMillis = null
         systemActivityMonitor?.startWatching(watchTaskVisibility)
     }
@@ -59,17 +67,30 @@ class AppLockSessionState : ViewModel() {
     internal fun finishSystemActivity(
         resultReceived: Boolean = true,
         operationId: String = "default",
+        nowMillis: Long? = null,
+        timeout: AppLockTimeout? = null,
     ) {
         val outstanding = activeSystemActivities[operationId] ?: return
+        val expiredOnReturn =
+            resultReceived &&
+                nowMillis != null &&
+                timeout != null &&
+                shouldLockOnForeground(nowMillis, timeout)
+        exemptSystemActivities[operationId]?.let { count ->
+            if (count == 1) exemptSystemActivities.remove(operationId)
+            else exemptSystemActivities[operationId] = count - 1
+        }
         val requiresAuthentication = operationId in systemActivitiesRequiringAuthentication
+        if (expiredOnReturn) isAppLocked = true
         if (resultReceived && requiresAuthentication) isAppLocked = true
         if (outstanding == 1) {
             activeSystemActivities.remove(operationId)
             systemActivitiesRequiringAuthentication.remove(operationId)
+            unobservableOperationStarts.remove(operationId)
         } else activeSystemActivities[operationId] = outstanding - 1
-        if (activeSystemActivities.isEmpty()) {
+        systemActivityInProgress = exemptSystemActivities.isNotEmpty()
+        if (!systemActivityInProgress) {
             systemActivityMonitor?.stopWatching()
-            systemActivityInProgress = false
         }
     }
 
@@ -89,6 +110,19 @@ class AppLockSessionState : ViewModel() {
         monitor.observe(taskId)
     }
 
+    internal fun unlockAfterAuthentication() {
+        isAppLocked = false
+        journalSessionOpened = true
+        backgroundedAtMillis = null
+        // Authentication happens in our foreground. Older pending results remain queued,
+        // but no longer exempt subsequent backgrounding or require the same authentication twice.
+        unobservableOperationStarts.clear()
+        exemptSystemActivities.clear()
+        systemActivitiesRequiringAuthentication.clear()
+        systemActivityInProgress = false
+        systemActivityMonitor?.stopWatching()
+    }
+
     internal fun recordDeviceLocked() {
         deviceLockRevision += 1
         systemActivityMonitor?.stopWatching()
@@ -100,6 +134,10 @@ class AppLockSessionState : ViewModel() {
         if (!systemActivityInProgress) return
         systemActivityInProgress = false
         backgroundedAtMillis = backgroundedAtMillis ?: nowMillis
+        // A trusted interruption gives us the actual background time. Old pending results
+        // must not reactivate an exemption when one of several operations returns.
+        unobservableOperationStarts.clear()
+        exemptSystemActivities.clear()
     }
 
     internal fun recordBackgrounded(nowMillis: Long) {

@@ -165,29 +165,141 @@ class AppLockSessionStateTest {
     }
 
     @Test
-    fun crossTaskPickerReturnStaysUnlockedForEveryTimeout() {
+    fun crossTaskPickerHasBoundedExemptionForEveryTimeout() {
         AppLockTimeout.entries.forEach { timeout ->
             val state = AppLockSessionState().apply { isAppLocked = false }
-            state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+            state.beginSystemActivity(
+                watchTaskVisibility = false,
+                operationId = "media-picker",
+                startedAtMillis = 1_000L,
+            )
             state.recordBackgrounded(1_000L)
-            assertFalse(state.shouldLockOnForeground(1_800_001L, timeout))
-            state.finishSystemActivity(operationId = "media-picker")
-
-            assertFalse(state.shouldLockOnForeground(1_800_001L, timeout))
+            if (timeout != AppLockTimeout.IMMEDIATELY) {
+                assertFalse(
+                    state.shouldLockOnForeground(1_000L + timeout.durationMillis - 1, timeout)
+                )
+            }
+            val expiredAt = 1_000L + timeout.durationMillis
+            assertTrue(state.shouldLockOnForeground(expiredAt, timeout))
+            state.finishSystemActivity(
+                operationId = "media-picker",
+                nowMillis = expiredAt,
+                timeout = timeout,
+            )
+            assertTrue(state.isAppLocked)
         }
+    }
+
+    @Test
+    fun resultChecksTimeoutEvenWhenCallerNeverStopped() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, operationId = "picker", startedAtMillis = 1_000L)
+        state.finishSystemActivity(
+            operationId = "picker",
+            nowMillis = 61_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertTrue(state.isAppLocked)
+    }
+
+    @Test
+    fun quickResultAndFailedLaunchDoNotRetainConservativeTimers() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, operationId = "picker", startedAtMillis = 1_000L)
+        state.finishSystemActivity(
+            operationId = "picker",
+            nowMillis = 60_999L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertFalse(state.isAppLocked)
+        assertFalse(state.shouldLockOnForeground(100_000L, AppLockTimeout.ONE_MINUTE))
+        state.beginSystemActivity(false, operationId = "failed", startedAtMillis = 100_000L)
+        state.finishSystemActivity(
+            resultReceived = false,
+            operationId = "failed",
+            nowMillis = 100_000L,
+            timeout = AppLockTimeout.IMMEDIATELY,
+        )
+        assertFalse(state.isAppLocked)
+    }
+
+    @Test
+    fun repeatedOperationCannotResetItsEarliestUnobservableStart() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, operationId = "picker", startedAtMillis = 1_000L)
+        state.beginSystemActivity(false, operationId = "picker", startedAtMillis = 50_000L)
+        state.finishSystemActivity(
+            operationId = "picker",
+            nowMillis = 51_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertTrue(state.shouldLockOnForeground(61_000L, AppLockTimeout.ONE_MINUTE))
+    }
+
+    @Test
+    fun freshAuthenticationSupersedesOldResultWithoutRevivingBackgroundExemption() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, operationId = "old", startedAtMillis = 1_000L)
+        assertTrue(state.shouldLockOnForeground(61_000L, AppLockTimeout.ONE_MINUTE))
+        state.unlockAfterAuthentication()
+        state.beginSystemActivity(false, operationId = "new", startedAtMillis = 62_000L)
+        state.finishSystemActivity(
+            operationId = "new",
+            nowMillis = 63_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertFalse(state.systemActivityInProgress)
+        state.recordBackgrounded(64_000L)
+        state.finishSystemActivity(
+            operationId = "old",
+            nowMillis = 124_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertEquals(64_000L, state.backgroundedAtMillis)
+        assertTrue(state.shouldLockOnForeground(124_000L, AppLockTimeout.ONE_MINUTE))
     }
 
     @Test
     fun cancelledMediaPickerDoesNotLeaveBackgroundExemptionBehind() {
         val state = AppLockSessionState().apply { isAppLocked = false }
-        state.beginSystemActivity(watchTaskVisibility = false, operationId = "media-picker")
+        state.beginSystemActivity(
+            watchTaskVisibility = false,
+            operationId = "media-picker",
+            startedAtMillis = 1_000L,
+        )
         state.recordBackgrounded(1_000L)
         // Cancellation still delivers an Activity result and completes the operation.
-        state.finishSystemActivity(operationId = "media-picker")
+        state.finishSystemActivity(
+            operationId = "media-picker",
+            nowMillis = 2_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
 
         assertFalse(state.shouldLockOnForeground(60_000L, AppLockTimeout.IMMEDIATELY))
         state.recordBackgrounded(61_000L)
         assertTrue(state.shouldLockOnForeground(61_000L, AppLockTimeout.IMMEDIATELY))
+    }
+
+    @Test
+    fun knownInterruptionUsesActualBackgroundTimeAndCannotReviveExemption() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.beginSystemActivity(false, operationId = "first", startedAtMillis = 1_000L)
+        state.beginSystemActivity(false, operationId = "second", startedAtMillis = 2_000L)
+        state.interruptSystemActivity(61_000L)
+        assertFalse(state.shouldLockOnForeground(62_000L, AppLockTimeout.ONE_MINUTE))
+        state.finishSystemActivity(
+            operationId = "first",
+            nowMillis = 62_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertFalse(state.systemActivityInProgress)
+        assertFalse(state.isAppLocked)
+        state.finishSystemActivity(
+            operationId = "second",
+            nowMillis = 121_000L,
+            timeout = AppLockTimeout.ONE_MINUTE,
+        )
+        assertTrue(state.isAppLocked)
     }
 
     @Test

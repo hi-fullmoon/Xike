@@ -159,15 +159,19 @@ class MainActivity : FragmentActivity() {
                                 sameTask && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2
                             lockSession.beginSystemActivity(
                                 watchTaskVisibility = observable,
-                                // A picker running in another task is still part of the user's
-                                // operation. Screen-off and Home/recents events interrupt it;
-                                // task visibility alone must not force authentication on return.
+                                // Hidden caller tasks cannot prove that selection was interrupted.
+                                // Unobservable flows instead have a bounded elapsed-time exemption.
                                 operationId = operationId,
+                                startedAtMillis = SystemClock.elapsedRealtime(),
                             )
                         },
                         onResult = { operationId ->
                             refreshLockMonitor()
-                            lockSession.finishSystemActivity(operationId = operationId)
+                            lockSession.finishSystemActivity(
+                                operationId = operationId,
+                                nowMillis = SystemClock.elapsedRealtime(),
+                                timeout = appLockTimeout.takeIf { appLockEnabled },
+                            )
                         },
                         onLaunchFailed = { operationId ->
                             refreshLockMonitor()
@@ -333,6 +337,11 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         refreshLockMonitor()
+        if (appLockEnabled) {
+            if (lockSession.shouldLockOnForeground(SystemClock.elapsedRealtime(), appLockTimeout)) {
+                lockSession.isAppLocked = true
+            } else lockSession.backgroundedAtMillis = null
+        }
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         refreshAuthenticationAvailability()
         notificationPermissionGranted = hasNotificationPermission()
@@ -398,9 +407,7 @@ class MainActivity : FragmentActivity() {
                         }
                         when (lockSession.authenticationAction) {
                             LockAuthentication.UNLOCK -> {
-                                lockSession.isAppLocked = false
-                                lockSession.journalSessionOpened = true
-                                lockSession.backgroundedAtMillis = null
+                                lockSession.unlockAfterAuthentication()
                             }
 
                             LockAuthentication.ENABLE -> updateAppLockEnabled(true)
@@ -437,6 +444,7 @@ class MainActivity : FragmentActivity() {
         action: LockAuthentication,
         openSettingsWhenUnavailable: Boolean = true,
     ) {
+        if (action == LockAuthentication.UNLOCK && !lockSession.isAppLocked) return
         if (lockSession.authenticationInProgress || !isDeviceInteractiveAndUnlocked()) return
         val availability = BiometricManager.from(this).canAuthenticate(allowedAuthenticators)
         authenticationAvailable = availability == BiometricManager.BIOMETRIC_SUCCESS
