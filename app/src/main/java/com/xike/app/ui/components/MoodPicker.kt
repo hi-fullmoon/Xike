@@ -1,6 +1,7 @@
 package com.xike.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -279,6 +280,8 @@ internal fun MoodChoice(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             color = if (selected) ink else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
         )
         Spacer(Modifier.height(5.dp))
         Surface(
@@ -318,25 +321,23 @@ internal fun MoodChoices(
             )
         }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = ((maxWidth + 3.dp) / (minWidth + 3.dp)).toInt().coerceIn(1, choices.size)
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            choices.chunked(columns).forEach { moods ->
-                Row(
-                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    moods.forEach { mood ->
-                        MoodChoice(
-                            mood,
-                            selectedMood == mood,
-                            enabled,
-                            { onSelected(mood) },
-                            Modifier.weight(1f).fillMaxHeight(),
-                            quietStyle,
-                        )
-                    }
-                    repeat(columns - moods.size) { Spacer(Modifier.weight(1f)) }
-                }
+        val choiceWidth = maxOf(minWidth, (maxWidth - 3.dp * (choices.size - 1)) / choices.size)
+        Row(
+            Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .selectableGroup()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            choices.forEach { mood ->
+                MoodChoice(
+                    mood,
+                    selectedMood == mood,
+                    enabled,
+                    { onSelected(mood) },
+                    Modifier.width(choiceWidth).fillMaxHeight(),
+                    quietStyle,
+                )
             }
         }
     }

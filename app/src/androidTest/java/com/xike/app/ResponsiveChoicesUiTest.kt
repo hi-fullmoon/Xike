@@ -20,6 +20,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.xike.app.data.Mood
+import com.xike.app.data.overallLabel
 import com.xike.app.feature.archive.ArchiveControls
 import com.xike.app.feature.archive.ArchiveHeader
 import com.xike.app.feature.archive.ArchiveSearchBar
@@ -202,15 +205,80 @@ class ResponsiveChoicesUiTest {
 
     @Test
     fun largeFontMoodChoicesKeepEveryEnglishLabelComplete() {
+        assertMoodChoicesLayout()
+    }
+
+    @Test
+    fun largeFontMoodChoicesKeepEveryChineseLabelComplete() {
+        composeRule.runOnIdle { AppLocale.select(context, AppLanguage.CHINESE) }
+        assertMoodChoicesLayout()
+    }
+
+    private fun assertMoodChoicesLayout() {
+        val overallScale = mutableStateOf(true)
+        val selected = mutableStateOf<Mood?>(null)
+        val selectedStyle = mutableStateOf(AppStyle.BREATHE)
+        val fontScale = mutableStateOf(1f)
+        val viewportWidth = mutableStateOf(320.dp)
         composeRule.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
-                XikeTheme(AppTheme.OCEAN) {
-                    Column(Modifier.width(320.dp)) { MoodChoices(null, true, {}) }
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale.value)
+            ) {
+                XikeTheme(AppTheme.OCEAN, selectedStyle.value) {
+                    Column(Modifier.width(viewportWidth.value)) {
+                        MoodChoices(
+                            selected.value,
+                            true,
+                            { selected.value = it },
+                            quietStyle = overallScale.value,
+                        )
+                    }
                 }
             }
         }
-        Mood.legacyChoices.forEach { assertCompleteLabel(it.label) }
+        AppStyle.entries.forEach { style ->
+            listOf(1f, 2f).forEach { scale ->
+                composeRule.runOnIdle {
+                    selectedStyle.value = style
+                    fontScale.value = scale
+                    viewportWidth.value = if (scale == 1f) 320.dp else 240.dp
+                }
+                listOf(true, false).forEach { overall ->
+                    composeRule.runOnIdle { overallScale.value = overall }
+                    val choices = if (overall) Mood.overallChoices else Mood.legacyChoices
+                    val rowTops = choices.map { mood ->
+                        val label = if (overall) mood.overallLabel else mood.label
+                        composeRule
+                            .onNodeWithText(label, useUnmergedTree = true)
+                            .getUnclippedBoundsInRoot()
+                            .top
+                    }
+                    assertEquals("Mood choices must stay in one row", 1, rowTops.distinct().size)
+                    choices.forEach { mood ->
+                        val label = if (overall) mood.overallLabel else mood.label
+                        composeRule
+                            .onNodeWithText(label)
+                            .performScrollTo()
+                            .assertIsDisplayed()
+                            .performClick()
+                        assertCompleteLabel(label)
+                        val text = composeRule.onNodeWithText(label, useUnmergedTree = true)
+                        val full = text.getUnclippedBoundsInRoot()
+                        val visible = text.getBoundsInRoot()
+                        assertTrue(
+                            "Label clipped on the left: $label",
+                            full.left >= visible.left - 0.5.dp,
+                        )
+                        assertTrue(
+                            "Label clipped on the right: $label",
+                            full.right <= visible.right + 0.5.dp,
+                        )
+                        composeRule.runOnIdle { assertEquals(mood, selected.value) }
+                    }
+                }
+            }
+        }
     }
 
     @Test
