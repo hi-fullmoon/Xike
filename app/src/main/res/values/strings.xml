@@ -4,6 +4,6 @@
     <string name="welcome_message">留一刻，给自己。</string>
     <string name="welcome_footer">感受此刻 · 留下日常</string>
     <string name="shortcut_quick_record_short">记录此刻</string>
-    <string name="shortcut_quick_record_long">快速记录此刻的心情</string>
+    <string name="shortcut_quick_record_long">记录此刻</string>
     <string name="shortcut_quick_record_disabled">快速记录暂时不可用</string>
 </resources>

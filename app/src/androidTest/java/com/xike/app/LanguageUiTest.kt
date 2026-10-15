@@ -58,7 +58,7 @@ class LanguageUiTest {
         composeRule.onNodeWithText("English").performClick()
         composeRule.onNodeWithText("App language").performScrollTo().assertIsDisplayed()
         assertEquals(AppLanguage.ENGLISH, LanguagePreferences(context).language)
-        assertSystemLanguage(AppLanguage.ENGLISH, "Keep this moment")
+        assertSystemLanguage(AppLanguage.ENGLISH, "Quick record")
         assertEquals("Calm", Mood.CALM.label)
         assertEquals("Pine", AppTheme.PINE.title)
         assertEquals("Work", localizedText("工作"))
