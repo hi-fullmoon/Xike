@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
 import com.xike.app.data.JournalEntry
+import com.xike.app.data.displayMoodLabel
+import com.xike.app.data.feelingLabel
 import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.ui.components.formatAudioDuration
@@ -77,10 +79,19 @@ internal fun JournalEntryCard(
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.mood.label, style = MaterialTheme.typography.titleSmall)
+                        Text(entry.displayMoodLabel, style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.weight(1f))
                         Text(
                             entry.createdAt.asChineseTime(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (entry.feelings.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            entry.feelings.take(3).joinToString(" · ", transform = ::feelingLabel) +
+                                if (entry.feelings.size > 3) " +${entry.feelings.size - 3}" else "",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

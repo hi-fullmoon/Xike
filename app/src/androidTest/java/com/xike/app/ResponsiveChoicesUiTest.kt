@@ -106,7 +106,7 @@ class ResponsiveChoicesUiTest {
                 }
                 val statistics = tr("0 次 · 0%", "0 entries · 0%")
                 assertCompleteLabel(statistics, allowWrap = true)
-                Mood.entries.forEach { assertCompleteLabel(it.label) }
+                distribution.forEach { assertCompleteLabel(it.mood.label) }
                 composeRule
                     .onAllNodesWithText(statistics, useUnmergedTree = true)
                     .fetchSemanticsNodes()
@@ -210,7 +210,7 @@ class ResponsiveChoicesUiTest {
                 }
             }
         }
-        Mood.entries.forEach { assertCompleteLabel(it.label) }
+        Mood.legacyChoices.forEach { assertCompleteLabel(it.label) }
     }
 
     @Test

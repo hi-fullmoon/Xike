@@ -26,6 +26,31 @@ class JournalRestoreMergeTest {
         planMergedEntries(local, incoming, ::key, ::key)
 
     @Test
+    fun previewAndIndependentScaleIdentifiersHaveTheSameRestoreIdentity() {
+        val preview = original.copy(mood = Mood.TIRED, moodScaleVersion = 1)
+        val upgraded = preview.copy(mood = Mood.BELOW_AVERAGE)
+        assertEquals(key(preview), key(upgraded))
+        assertTrue(merge(listOf(upgraded), listOf(preview)).isEmpty())
+        assertNotEquals(key(original.copy(mood = Mood.TIRED)), key(upgraded))
+    }
+
+    @Test
+    fun changedFeelingsAndMoodScaleArePreservedAsSeparateVersions() {
+        val withFeelings =
+            original.copy(feelings = listOf("HOPEFUL", "ANXIOUS"), moodScaleVersion = 1)
+        val withOtherFeelings = withFeelings.copy(feelings = listOf("PEACEFUL"))
+        val copies = merge(listOf(original), listOf(withFeelings, withOtherFeelings))
+        assertEquals(2, copies.size)
+        assertEquals(
+            listOf(withFeelings.feelings, withOtherFeelings.feelings),
+            copies.map { it.feelings },
+        )
+        assertTrue(
+            merge(listOf(original) + copies, listOf(withFeelings, withOtherFeelings)).isEmpty()
+        )
+    }
+
+    @Test
     fun identicalVersionsAreSkippedButIndependentIdentitiesRemain() {
         assertTrue(merge(listOf(original), listOf(original)).isEmpty())
         val independent = original.copy(id = "independent")

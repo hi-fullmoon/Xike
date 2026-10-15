@@ -27,6 +27,7 @@ import androidx.sqlite.db.SupportSQLiteQuery
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
+import com.xike.app.data.feelingKeys
 import com.xike.app.data.model.JournalVideo
 import com.xike.app.data.model.OPEN_METEO_SOURCE
 import com.xike.app.data.model.OutdoorSnapshot
@@ -56,6 +57,8 @@ internal data class JournalEntryEntity(
     @ColumnInfo(name = "outdoor_source") val outdoorSource: String? = null,
     @ColumnInfo(name = "outdoor_full_place_name") val outdoorFullPlaceName: String? = null,
     @ColumnInfo(name = "video_json") val videoJson: String? = null,
+    @ColumnInfo(name = "feelings_json") val feelingsJson: String? = null,
+    @ColumnInfo(name = "mood_scale_version", defaultValue = "0") val moodScaleVersion: Int = 0,
 )
 
 @Entity(
@@ -165,7 +168,7 @@ internal fun JournalEntry.toBundle(): JournalBundle =
             JournalEntryEntity(
                 id = id,
                 createdAt = createdAt,
-                mood = mood.name,
+                mood = Mood.fromName(mood.name, moodScaleVersion).name,
                 note = note,
                 outdoorPlaceName = outdoor?.placeName,
                 outdoorTemperatureCelsius = outdoor?.temperatureCelsius,
@@ -174,6 +177,8 @@ internal fun JournalEntry.toBundle(): JournalBundle =
                 outdoorSource = outdoor?.source,
                 outdoorFullPlaceName = outdoor?.fullPlaceName,
                 videoJson = video?.toJson()?.toString(),
+                feelingsJson = org.json.JSONArray(feelings).toString(),
+                moodScaleVersion = moodScaleVersion,
             ),
         tags = tags.mapIndexed { position, tag -> JournalTagEntity(id, position, tag) },
         images =
@@ -195,9 +200,11 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
     JournalEntry(
         id = entry.id,
         createdAt = entry.createdAt,
-        mood = Mood.fromName(entry.mood),
+        mood = Mood.fromName(entry.mood, entry.moodScaleVersion),
         tags = tags.sortedBy { it.position }.map { it.tag },
         note = entry.note,
+        feelings = entry.feelingsJson?.let { org.json.JSONArray(it).feelingKeys() }.orEmpty(),
+        moodScaleVersion = entry.moodScaleVersion,
         imageFileNames = images.sortedBy { it.position }.map { it.fileName },
         video = entry.videoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) },
         audio =
@@ -255,7 +262,7 @@ internal abstract class JournalDao {
 
     @Transaction
     @Query(
-        "SELECT id, created_at, mood FROM journal_entries WHERE created_at >= :start AND created_at < :end ORDER BY created_at DESC, id DESC"
+        "SELECT id, created_at, mood, mood_scale_version FROM journal_entries WHERE created_at >= :start AND created_at < :end ORDER BY created_at DESC, id DESC"
     )
     abstract fun analyticsRecords(start: Long, end: Long): List<JournalAnalyticsRecord>
 
@@ -508,7 +515,7 @@ internal abstract class JournalDao {
             AppSettingEntity::class,
             JournalSearchEntity::class,
         ],
-    version = 6,
+    version = 8,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -537,9 +544,33 @@ internal abstract class JournalDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 .build()
         }
+
+        internal val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    Mood.legacyChoices.forEach { old ->
+                        db.execSQL(
+                            "UPDATE journal_entries SET mood = ? WHERE mood = ? AND mood_scale_version > 0",
+                            arrayOf(Mood.fromName(old.name, 1).name, old.name),
+                        )
+                    }
+                }
+            }
+
+        internal val MIGRATION_6_7 =
+            object : Migration(6, 7) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE journal_entries ADD COLUMN feelings_json TEXT")
+                    db.execSQL(
+                        "ALTER TABLE journal_entries ADD COLUMN mood_scale_version INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
 
         internal val MIGRATION_5_6 =
             object : Migration(5, 6) {

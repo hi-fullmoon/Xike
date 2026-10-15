@@ -5,6 +5,7 @@ import com.xike.app.data.JournalAudio
 import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.Mood
+import com.xike.app.data.feelingKeys
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -19,12 +20,15 @@ data class JournalDraft(
     val recordedAt: Long? = null,
     val outdoor: OutdoorSnapshot? = null,
     val updatedAt: Long = 0L,
+    val feelings: List<String> = emptyList(),
+    val moodScaleVersion: Int = if (mood?.isOverallScale == false) 0 else 1,
 ) {
     val isEmpty: Boolean
         get() =
             mood == null &&
                 note.isBlank() &&
                 tags.isEmpty() &&
+                feelings.isEmpty() &&
                 imageUriStrings.isEmpty() &&
                 audio == null &&
                 video == null &&
@@ -34,6 +38,7 @@ data class JournalDraft(
 
     fun normalized(): JournalDraft {
         val normalizedNote = note.take(MAX_DRAFT_NOTE_LENGTH)
+        val normalizedFeelings = feelings.filter(String::isNotBlank).distinct()
         val normalizedTags =
             tags.filter(String::isNotBlank).canonicalTopics().toCollection(linkedSetOf())
         val normalizedImages =
@@ -51,6 +56,7 @@ data class JournalDraft(
             mood == null &&
                 normalizedNote.isBlank() &&
                 normalizedTags.isEmpty() &&
+                normalizedFeelings.isEmpty() &&
                 normalizedImages.isEmpty() &&
                 normalizedAudio == null &&
                 video == null &&
@@ -60,6 +66,7 @@ data class JournalDraft(
         return copy(
             note = normalizedNote,
             tags = normalizedTags,
+            feelings = normalizedFeelings,
             imageUriStrings = normalizedImages,
             audio = normalizedAudio,
             recordedAt = normalizedRecordedAt,
@@ -81,13 +88,17 @@ data class JournalDraft(
             .put("recordedAt", recordedAt ?: JSONObject.NULL)
             .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
             .put("updatedAt", updatedAt)
+            .put("feelings", JSONArray(feelings))
+            .put("moodScaleVersion", moodScaleVersion)
 
     companion object {
         fun fromJson(json: JSONObject): JournalDraft =
             JournalDraft(
                     mood =
                         json.optString("mood").takeIf(String::isNotBlank)?.let { stored ->
-                            Mood.entries.firstOrNull { it.name == stored }
+                            Mood.entries
+                                .firstOrNull { it.name == stored }
+                                ?.let { Mood.fromName(it.name, json.optInt("moodScaleVersion", 0)) }
                         },
                     note = json.optString("note").take(MAX_DRAFT_NOTE_LENGTH),
                     tags = json.optJSONArray("tags")?.toStringSet().orEmpty(),
@@ -102,13 +113,15 @@ data class JournalDraft(
                     recordedAt = json.optLong("recordedAt").takeIf { it > 0L },
                     outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
                     updatedAt = json.optLong("updatedAt"),
+                    feelings = json.optJSONArray("feelings")?.feelingKeys().orEmpty(),
+                    moodScaleVersion = json.optInt("moodScaleVersion", 0),
                 )
                 .normalized()
     }
 }
 
 internal const val MAX_DRAFT_NOTE_LENGTH = 280
-private const val DRAFT_FORMAT_VERSION = 5
+private const val DRAFT_FORMAT_VERSION = 6
 
 internal fun parseJournalDraft(serialized: String?): JournalDraft =
     serialized?.takeIf(String::isNotBlank)?.let { JSONObject(it) }?.let(JournalDraft::fromJson)

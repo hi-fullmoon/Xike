@@ -38,13 +38,15 @@ internal data class JournalAnalyticsRecord(
     val id: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     val mood: String,
+    @ColumnInfo(name = "mood_scale_version") val moodScaleVersion: Int = 0,
     @Relation(parentColumn = "id", entityColumn = "entry_id") val tags: List<JournalTagEntity>,
 ) {
     fun toEntry() =
         JournalEntry(
             id = id,
             createdAt = createdAt,
-            mood = Mood.fromName(mood),
+            mood = Mood.fromName(mood, moodScaleVersion),
+            moodScaleVersion = moodScaleVersion,
             tags = tags.sortedBy { it.position }.map { it.tag },
             note = "",
         )

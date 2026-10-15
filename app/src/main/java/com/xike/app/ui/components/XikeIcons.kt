@@ -142,4 +142,5 @@ internal fun Mood.moodDescription(): String =
         Mood.CALM -> tr("安稳、放松，或没有明显起伏", "Settled, relaxed or without strong changes")
         Mood.GOOD -> tr("舒展、不错，或有一点期待", "At ease, feeling good or a little hopeful")
         Mood.JOYFUL -> tr("开心、兴奋，或充满能量", "Happy, excited or full of energy")
+        else -> label
     }

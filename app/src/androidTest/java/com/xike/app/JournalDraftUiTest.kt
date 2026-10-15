@@ -269,7 +269,7 @@ class JournalDraftUiTest {
     }
 
     @Test
-    fun moodGuideOffersPlainEmotionReferences() {
+    fun feelingsSheetOffersSpecificEmotions() {
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
                 MomentScreen(
@@ -287,14 +287,14 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("选择参考").performClick()
-        composeRule.onNodeWithText("五种心情，怎么选？").assertIsDisplayed()
-        composeRule.onNodeWithText("难过、无助，或有些不知所措").assertIsDisplayed()
-        composeRule.onNodeWithText("舒展、不错，或有一点期待").assertIsDisplayed()
+        composeRule.onNodeWithText("添加具体感受").performScrollTo().performClick()
+        composeRule.onNodeWithText("此刻还有哪些感受？").assertIsDisplayed()
+        composeRule.onNodeWithText("焦虑").assertIsDisplayed()
+        composeRule.onNodeWithText("期待").assertIsDisplayed()
     }
 
     @Test
-    fun moodGuideRemainsScrollableAtLargeFontScale() {
+    fun feelingsSheetRemainsScrollableAtLargeFontScale() {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -317,8 +317,9 @@ class JournalDraftUiTest {
             }
         }
 
-        composeRule.onNodeWithText("选择参考").performClick()
-        composeRule.onNodeWithText("开心、兴奋，或充满能量").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("添加具体感受").performScrollTo().performClick()
+        composeRule.onNodeWithText("充沛").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("完成").performScrollTo().assertIsDisplayed()
     }
 
     @Test

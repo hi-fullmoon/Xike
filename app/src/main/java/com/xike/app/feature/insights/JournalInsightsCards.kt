@@ -589,30 +589,27 @@ private fun LocalDate.asDateRange(end: LocalDate): String =
 
 private fun moodBandLabel(average: Double): String =
     when {
-        average >= 4.5 -> localizedText("愉悦时刻更多")
-        average >= 3.5 -> localizedText("整体更轻松")
-        average >= 2.5 -> localizedText("大多比较平静")
-        average >= 1.5 -> localizedText("疲惫感停留较多")
-        else -> localizedText("低落时刻较多")
+        average >= 4.5 -> tr("心情均值很高", "Very high mood average")
+        average >= 3.5 -> tr("心情均值较高", "Higher mood average")
+        average >= 2.5 -> tr("心情均值居中", "Mid-range mood average")
+        average >= 1.5 -> tr("心情均值较低", "Lower mood average")
+        else -> tr("心情均值很低", "Very low mood average")
     }
 
 private fun Double.averageMood(): Mood =
     when {
-        this >= 4.5 -> Mood.JOYFUL
-        this >= 3.5 -> Mood.GOOD
-        this >= 2.5 -> Mood.CALM
-        this >= 1.5 -> Mood.TIRED
-        else -> Mood.LOW
+        this >= 4.5 -> Mood.VERY_GOOD
+        this >= 3.5 -> Mood.ABOVE_AVERAGE
+        this >= 2.5 -> Mood.NEUTRAL
+        this >= 1.5 -> Mood.BELOW_AVERAGE
+        else -> Mood.VERY_LOW
     }
 
 private fun moodSummary(average: Double): String =
-    when {
-        average >= 4.5 -> localizedText("记录里较多是开心而舒展的时刻。")
-        average >= 3.5 -> localizedText("记录里轻松的时刻更多。")
-        average >= 2.5 -> localizedText("记录里平静与起伏都曾出现。")
-        average >= 1.5 -> localizedText("记录里疲惫和低落停留得更多。")
-        else -> localizedText("记录里低落时刻较多，记得照顾自己。")
-    }
+    tr(
+        "五档记录的平均分为 ${average.oneDecimal()}。均值不代表某一种具体感受。",
+        "The five-level average is ${average.oneDecimal()}. An average does not identify a specific feeling.",
+    )
 
 private fun comparisonDescription(comparison: PeriodComparison): String = buildString {
     append(

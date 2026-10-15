@@ -7,18 +7,39 @@ import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class Mood(private val sourceLabel: String, val score: Int, val emoji: String) {
+enum class Mood(
+    private val sourceLabel: String,
+    val score: Int,
+    val emoji: String,
+    private val englishLabel: String? = null,
+) {
     LOW("低落", 1, "😔"),
     TIRED("疲惫", 2, "😫"),
     CALM("平静", 3, "😌"),
     GOOD("轻松", 4, "🙂"),
-    JOYFUL("愉悦", 5, "😄");
+    JOYFUL("愉悦", 5, "😄"),
+    VERY_LOW("很不好", 1, "😔", "Very low"),
+    BELOW_AVERAGE("不太好", 2, "🙁", "Not great"),
+    NEUTRAL("一般", 3, "😐", "Okay"),
+    ABOVE_AVERAGE("还不错", 4, "🙂", "Positive"),
+    VERY_GOOD("很好", 5, "😄", "Very good");
 
     val label: String
-        get() = localizedText(sourceLabel)
+        get() = englishLabel?.let { com.xike.app.tr(sourceLabel, it) } ?: localizedText(sourceLabel)
+
+    val isOverallScale: Boolean
+        get() = englishLabel != null
 
     companion object {
-        fun fromName(value: String): Mood = entries.firstOrNull { it.name == value } ?: CALM
+        val legacyChoices: List<Mood> = entries.filterNot { it.isOverallScale }
+        val overallChoices: List<Mood> = entries.filter { it.isOverallScale }
+
+        fun fromName(value: String, scaleVersion: Int = 0): Mood {
+            val mood = entries.firstOrNull { it.name == value } ?: CALM
+            return if (scaleVersion > 0 && !mood.isOverallScale)
+                overallChoices.first { it.score == mood.score }
+            else mood
+        }
     }
 }
 
@@ -59,6 +80,8 @@ data class JournalEntry(
     val audio: JournalAudio? = null,
     val video: JournalVideo? = null,
     val outdoor: OutdoorSnapshot? = null,
+    val feelings: List<String> = emptyList(),
+    val moodScaleVersion: Int = if (mood.isOverallScale) 1 else 0,
 ) {
     fun toJson(): JSONObject =
         JSONObject()
@@ -71,13 +94,15 @@ data class JournalEntry(
             .put("audio", audio?.toJson() ?: JSONObject.NULL)
             .put("video", video?.toJson() ?: JSONObject.NULL)
             .put("outdoor", outdoor?.toJson() ?: JSONObject.NULL)
+            .put("feelings", JSONArray(feelings))
+            .put("moodScaleVersion", moodScaleVersion)
 
     companion object {
         fun fromJson(json: JSONObject): JournalEntry =
             JournalEntry(
                 id = json.getString("id"),
                 createdAt = json.getLong("createdAt"),
-                mood = Mood.fromName(json.getString("mood")),
+                mood = Mood.fromName(json.getString("mood"), json.optInt("moodScaleVersion", 0)),
                 tags =
                     json.optJSONArray("tags")?.let { values ->
                         List(values.length()) { index -> values.getString(index) }
@@ -90,6 +115,8 @@ data class JournalEntry(
                 audio = JournalAudio.fromJson(json.optJSONObject("audio")),
                 video = JournalVideo.fromJson(json.optJSONObject("video")),
                 outdoor = OutdoorSnapshot.fromJson(json.optJSONObject("outdoor")),
+                feelings = json.optJSONArray("feelings")?.feelingKeys().orEmpty(),
+                moodScaleVersion = json.optInt("moodScaleVersion", 0),
             )
     }
 }

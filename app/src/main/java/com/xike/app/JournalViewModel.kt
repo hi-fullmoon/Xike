@@ -343,7 +343,13 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun selectDraftMood(mood: Mood?) {
-        persistDraft(draft.copy(mood = mood))
+        persistDraft(
+            draft.copy(mood = mood, moodScaleVersion = if (mood?.isOverallScale != false) 1 else 0)
+        )
+    }
+
+    fun updateDraftFeelings(feelings: List<String>) {
+        if (!isDraftSaving) persistDraft(draft.copy(feelings = feelings))
     }
 
     fun updateDraftNote(note: String) {
@@ -516,6 +522,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     audio = snapshot.audio,
                     video = snapshot.video,
                     outdoor = snapshot.outdoor,
+                    feelings = snapshot.feelings,
+                    moodScaleVersion = snapshot.moodScaleVersion,
                 ),
                 snapshot.imageUriStrings.map(Uri::parse),
             )

@@ -1,232 +1,185 @@
 package com.xike.app.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.xike.app.data.Feeling
 import com.xike.app.data.Mood
+import com.xike.app.data.feelingLabel
+import com.xike.app.data.overallLabel
 import com.xike.app.localizedText
+import com.xike.app.tr
 import com.xike.app.ui.theme.XikeContentCardPadding
-import com.xike.app.ui.theme.XikeDialogCompactGap
-import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeShapes
 
 @Composable
 internal fun MoodPicker(
     selectedMood: Mood?,
     enabled: Boolean,
+    feelings: List<String> = emptyList(),
+    onFeelingsChange: (List<String>) -> Unit = {},
+    overallScale: Boolean = true,
     onSelected: (Mood?) -> Unit,
 ) {
-    var showGuide by rememberSaveable { mutableStateOf(false) }
+    var showFeelings by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                localizedText("此刻的心情"),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
+        Text(localizedText("此刻的心情"), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = XikeShapes.card,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-        ) {
-            Column(Modifier.padding(XikeContentCardPadding)) {
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val textMeasurer = rememberTextMeasurer()
-                    val supportingStyle = MaterialTheme.typography.bodySmall
-                    val guideStyle = MaterialTheme.typography.labelSmall
-                    val requiredWidth =
-                        with(LocalDensity.current) {
-                            (textMeasurer
-                                    .measure(
-                                        localizedText("选最接近的感受，没有标准答案"),
-                                        supportingStyle,
-                                        softWrap = false,
-                                    )
-                                    .size
-                                    .width +
-                                    textMeasurer
-                                        .measure(
-                                            localizedText("选择参考"),
-                                            guideStyle,
-                                            softWrap = false,
-                                        )
-                                        .size
-                                        .width)
-                                .toDp()
-                        } + 16.dp
-                    val stackGuide =
-                        LocalDensity.current.fontScale >= 1.5f && requiredWidth > maxWidth
-                    if (stackGuide) {
-                        Column {
+        Surface(shape = XikeShapes.card, color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxWidth().padding(XikeContentCardPadding)) {
+                MoodChoices(
+                    selectedMood,
+                    enabled,
+                    { onSelected(if (it == selectedMood) null else it) },
+                    quietStyle = overallScale,
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { showFeelings = true },
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = XikeShapes.button,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    val summary =
+                        when {
+                            feelings.isEmpty() -> tr("添加具体感受", "Add feelings")
+                            feelings.size <= 3 ->
+                                feelings.joinToString(tr("、", ", "), transform = ::feelingLabel)
+                            else ->
+                                tr(
+                                    "${feelings.take(2).joinToString("、", transform = ::feelingLabel)}等 ${feelings.size} 种感受",
+                                    "${feelings.take(2).joinToString(", ", transform = ::feelingLabel)} +${feelings.size - 2}",
+                                )
+                        }
+                    Text(
+                        summary,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Start,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (feelings.isNotEmpty()) {
                             Text(
-                                localizedText("选最接近的感受，没有标准答案"),
-                                style = supportingStyle,
+                                tr("编辑", "Edit"),
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            TextButton(
-                                onClick = { showGuide = true },
-                                modifier = Modifier.align(Alignment.End),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                shape = XikeShapes.button,
-                            ) {
-                                Text(localizedText("选择参考"), style = guideStyle)
-                            }
+                            Spacer(Modifier.width(4.dp))
                         }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                localizedText("选最接近的感受，没有标准答案"),
-                                modifier = Modifier.weight(1f),
-                                style = supportingStyle,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            TextButton(
-                                onClick = { showGuide = true },
-                                shape = XikeShapes.button,
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                            ) {
-                                Text(localizedText("选择参考"), style = guideStyle)
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                MoodChoices(selectedMood, enabled, onSelected, quietStyle = true)
-                if (selectedMood != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = XikeShapes.inner,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(XikeInnerCardPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            MoodEmoji(selectedMood, size = 20.dp)
-                            Spacer(Modifier.width(9.dp))
-                            Text(
-                                selectedMood.momentAffirmation(),
-                                style = MaterialTheme.typography.bodySmall,
-                                color =
-                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                                        alpha = 0.76f
-                                    ),
-                            )
-                        }
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
         }
     }
-
-    if (showGuide) {
-        MoodGuideDialog(onDismiss = { showGuide = false })
+    if (showFeelings && enabled) {
+        FeelingSheet(
+            feelings,
+            onDismiss = { showFeelings = false },
+            onConfirm = {
+                onFeelingsChange(it)
+                showFeelings = false
+            },
+        )
     }
 }
 
-private fun Mood.momentAffirmation(): String =
-    when (this) {
-        Mood.LOW -> localizedText("低落，也值得被好好看见。")
-        Mood.TIRED -> localizedText("疲惫时，可以慢一点。")
-        Mood.CALM -> localizedText("平静，也是一种很好的答案。")
-        Mood.GOOD -> localizedText("轻松，就记住这一刻。")
-        Mood.JOYFUL -> localizedText("愉悦，和自己分享一下。")
-    }
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun MoodGuideDialog(onDismiss: () -> Unit) {
-    AlertDialog(
+private fun FeelingSheet(
+    feelings: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>) -> Unit,
+) {
+    var draft by rememberSaveable { mutableStateOf(feelings) }
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = XikeShapes.dialog,
-        title = { Text(localizedText("五种心情，怎么选？")) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                tr("此刻还有哪些感受？", "What else are you feeling?"),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                tr("可以同时选择不同的感受", "Choose any feelings that fit"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    localizedText("选择最接近此刻的一种即可，不必把复杂的感受说得很准确。"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Mood.entries.forEach { mood ->
-                    val visual = mood.visualStyle()
-                    val isDark = isSystemInDarkTheme()
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = XikeShapes.inner,
-                        color = visual.container.copy(alpha = if (isDark) 0.16f else 0.58f),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(XikeInnerCardPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            MoodEmoji(mood, size = 24.dp)
-                            Spacer(Modifier.width(11.dp))
-                            Column {
-                                Text(mood.label, style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    mood.moodDescription(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
+                Feeling.entries.forEach { feeling ->
+                    FilterChip(
+                        selected = feeling.name in draft,
+                        onClick = {
+                            draft =
+                                if (feeling.name in draft) draft - feeling.name
+                                else draft + feeling.name
+                        },
+                        label = { Text(feeling.label) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        shape = XikeShapes.button,
+                    )
                 }
+                draft
+                    .filter { key -> Feeling.entries.none { it.name == key } }
+                    .forEach { key ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { draft = draft - key },
+                            label = { Text(feelingLabel(key)) },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        )
+                    }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss, shape = XikeShapes.button) {
-                Text(localizedText("知道了"))
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = { onConfirm(draft) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = XikeShapes.button,
+            ) {
+                Text(tr("完成", "Done"))
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -239,57 +192,44 @@ internal fun MoodChoice(
     quietStyle: Boolean = false,
 ) {
     val visual = mood.visualStyle()
-    val isDark = isSystemInDarkTheme()
-    val moodColor =
-        if (quietStyle) MaterialTheme.colorScheme.primary
-        else if (isDark) visual.container else visual.accent
-    val containerColor =
-        when {
-            quietStyle && selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
-            quietStyle -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            selected && isDark -> visual.accent.copy(alpha = 0.28f)
-            selected -> visual.container
-            isDark -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
-            else -> visual.container.copy(alpha = 0.45f)
-        }
-
+    val dark = isSystemInDarkTheme()
+    val ink = if (dark) visual.container else visual.accent
     Column(
-        modifier =
-            modifier
-                .selectable(
-                    selected = selected,
-                    enabled = enabled,
-                    role = Role.RadioButton,
-                    onClick = onClick,
-                )
-                .padding(vertical = 1.dp),
+        modifier
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            modifier = Modifier.size(44.dp),
-            shape = CircleShape,
-            color = containerColor,
-            border =
-                BorderStroke(
-                    if (selected) 2.dp else 1.dp,
-                    if (selected) moodColor else MaterialTheme.colorScheme.outlineVariant,
-                ),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
+            modifier = Modifier.size(48.dp),
+            shape = XikeShapes.inner,
+            color =
+                if (selected) {
+                    if (dark) visual.accent.copy(alpha = .35f) else visual.container
+                } else Color.Transparent,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                MoodEmoji(mood, size = 24.dp)
-            }
+            Box(contentAlignment = Alignment.Center) { MoodEmoji(mood, size = 34.dp) }
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            mood.label,
+            if (quietStyle) mood.overallLabel else mood.label,
             modifier = Modifier.fillMaxWidth(),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) moodColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = if (selected) ink else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(5.dp))
+        Surface(
+            Modifier.size(4.dp),
+            shape = CircleShape,
+            color = if (selected) ink else Color.Transparent,
+        ) {}
     }
 }
 
@@ -300,35 +240,43 @@ internal fun MoodChoices(
     onSelected: (Mood) -> Unit,
     quietStyle: Boolean = false,
 ) {
+    val choices = if (quietStyle) Mood.overallChoices else Mood.legacyChoices
     val textMeasurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+    val style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
     val minWidth =
         with(LocalDensity.current) {
             maxOf(
-                44.dp,
-                Mood.entries
+                48.dp,
+                choices
                     .maxOf {
-                        textMeasurer.measure(it.label, labelStyle, softWrap = false).size.width
+                        textMeasurer
+                            .measure(
+                                if (quietStyle) it.overallLabel else it.label,
+                                style,
+                                softWrap = false,
+                            )
+                            .size
+                            .width
                     }
                     .toDp() + 8.dp,
             )
         }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = ((maxWidth + 3.dp) / (minWidth + 3.dp)).toInt().coerceIn(1, Mood.entries.size)
+        val columns = ((maxWidth + 3.dp) / (minWidth + 3.dp)).toInt().coerceIn(1, choices.size)
         Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Mood.entries.chunked(columns).forEach { moods ->
+            choices.chunked(columns).forEach { moods ->
                 Row(
                     Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     moods.forEach { mood ->
                         MoodChoice(
-                            mood = mood,
-                            selected = selectedMood == mood,
-                            enabled = enabled,
-                            onClick = { onSelected(mood) },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            quietStyle = quietStyle,
+                            mood,
+                            selectedMood == mood,
+                            enabled,
+                            { onSelected(mood) },
+                            Modifier.weight(1f).fillMaxHeight(),
+                            quietStyle,
                         )
                     }
                     repeat(columns - moods.size) { Spacer(Modifier.weight(1f)) }
@@ -342,29 +290,14 @@ private data class MoodVisualStyle(val accent: Color, val container: Color)
 
 private fun Mood.visualStyle(): MoodVisualStyle =
     when (this) {
-        Mood.LOW ->
-            MoodVisualStyle(
-                accent = Color(0xFF596779),
-                container = Color(0xFFE1E5EA),
-            )
-        Mood.TIRED ->
-            MoodVisualStyle(
-                accent = Color(0xFF596F81),
-                container = Color(0xFFE0E8ED),
-            )
-        Mood.CALM ->
-            MoodVisualStyle(
-                accent = Color(0xFF4F7D75),
-                container = Color(0xFFDDEAE5),
-            )
-        Mood.GOOD ->
-            MoodVisualStyle(
-                accent = Color(0xFF8D5636),
-                container = Color(0xFFF1E4D7),
-            )
-        Mood.JOYFUL ->
-            MoodVisualStyle(
-                accent = Color(0xFF8A611B),
-                container = Color(0xFFF5E7C7),
-            )
+        Mood.LOW,
+        Mood.VERY_LOW -> MoodVisualStyle(Color(0xFF506881), Color(0xFFE6EDF5))
+        Mood.TIRED,
+        Mood.BELOW_AVERAGE -> MoodVisualStyle(Color(0xFF766084), Color(0xFFEEE8F3))
+        Mood.CALM,
+        Mood.NEUTRAL -> MoodVisualStyle(Color(0xFF626C65), Color(0xFFEDF0ED))
+        Mood.GOOD,
+        Mood.ABOVE_AVERAGE -> MoodVisualStyle(Color(0xFF427461), Color(0xFFE0EEE8))
+        Mood.JOYFUL,
+        Mood.VERY_GOOD -> MoodVisualStyle(Color(0xFF8B6A2C), Color(0xFFFAF0DA))
     }

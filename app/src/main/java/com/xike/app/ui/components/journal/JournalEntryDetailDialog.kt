@@ -52,6 +52,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
 import com.xike.app.data.JournalEntry
+import com.xike.app.data.displayMoodLabel
+import com.xike.app.data.feelingLabel
 import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.ui.components.JournalPhotoMosaic
@@ -152,7 +154,10 @@ internal fun JournalEntryDetailDialog(
                             }
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(entry.mood.label, style = MaterialTheme.typography.titleLarge)
+                                Text(
+                                    entry.displayMoodLabel,
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
                                 Text(
                                     entry.createdAt.asDetailChineseDateTime(),
                                     style = MaterialTheme.typography.bodyMedium,
@@ -177,6 +182,16 @@ internal fun JournalEntryDetailDialog(
                         }
                     }
 
+                    if (entry.feelings.isNotEmpty()) {
+                        JournalDetailSection(com.xike.app.tr("具体感受", "Feelings")) {
+                            JournalDetailCard {
+                                Text(
+                                    entry.feelings.joinToString(" · ", transform = ::feelingLabel),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
+                    }
                     if (entry.tags.isNotEmpty()) {
                         JournalDetailSection(localizedText("主题")) {
                             JournalDetailCard {

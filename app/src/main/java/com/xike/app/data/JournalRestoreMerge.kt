@@ -32,40 +32,49 @@ internal fun restoreContentKey(
 ): String {
     val values =
         JSONArray(
-            listOf(
-                entry.createdAt,
-                entry.mood.name,
-                JSONArray(entry.tags),
-                entry.note,
-                JSONArray(entry.imageFileNames.map(imageDigest)),
-                entry.audio?.let {
-                    JSONArray(listOf(audioDigest(it.fileName), it.durationMillis, it.mimeType))
-                },
-                entry.video?.let {
-                    JSONArray(
-                        listOf(
-                            videoDigest(it.fileName),
-                            videoDigest(it.coverFileName),
-                            it.durationMillis,
-                            it.sizeBytes,
-                            it.mimeType,
+                listOf(
+                    entry.createdAt,
+                    // Keep preview backup conflict identities stable after the identifier upgrade.
+                    if (entry.mood.isOverallScale)
+                        Mood.legacyChoices.first { it.score == entry.mood.score }.name
+                    else entry.mood.name,
+                    JSONArray(entry.tags),
+                    entry.note,
+                    JSONArray(entry.imageFileNames.map(imageDigest)),
+                    entry.audio?.let {
+                        JSONArray(listOf(audioDigest(it.fileName), it.durationMillis, it.mimeType))
+                    },
+                    entry.video?.let {
+                        JSONArray(
+                            listOf(
+                                videoDigest(it.fileName),
+                                videoDigest(it.coverFileName),
+                                it.durationMillis,
+                                it.sizeBytes,
+                                it.mimeType,
+                            )
                         )
-                    )
-                },
-                entry.outdoor?.let {
-                    JSONArray(
-                        listOf(
-                            it.placeName,
-                            it.temperatureCelsius,
-                            it.weatherCode,
-                            it.capturedAt,
-                            it.source,
-                            it.fullPlaceName,
+                    },
+                    entry.outdoor?.let {
+                        JSONArray(
+                            listOf(
+                                it.placeName,
+                                it.temperatureCelsius,
+                                it.weatherCode,
+                                it.capturedAt,
+                                it.source,
+                                it.fullPlaceName,
+                            )
                         )
-                    )
-                },
+                    },
+                )
             )
-        )
+            .apply {
+                if (entry.feelings.isNotEmpty() || entry.moodScaleVersion != 0) {
+                    put(JSONArray(entry.feelings))
+                    put(entry.moodScaleVersion)
+                }
+            }
     return values.toString().byteInputStream().use(::attachmentDigest)
 }
 
@@ -94,6 +103,8 @@ internal fun planMergedEntries(
             value.tags,
             value.note,
             value.outdoor,
+            value.feelings,
+            value.moodScaleVersion,
             value.imageFileNames.size,
             value.audio?.let { it.durationMillis to it.mimeType },
             value.video?.let { Triple(it.durationMillis, it.sizeBytes, it.mimeType) },

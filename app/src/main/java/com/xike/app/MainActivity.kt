@@ -238,6 +238,7 @@ class MainActivity : FragmentActivity() {
                             onAppLockTimeoutChange = ::changeAppLockTimeout,
                             onLockNow = ::lockNow,
                             onDraftMoodChange = journalViewModel::selectDraftMood,
+                            onDraftFeelingsChange = journalViewModel::updateDraftFeelings,
                             onDraftNoteChange = journalViewModel::updateDraftNote,
                             onDraftTagToggle = journalViewModel::toggleDraftTag,
                             onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,

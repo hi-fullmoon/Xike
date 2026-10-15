@@ -66,6 +66,8 @@ class JournalDraftProcessTest {
                     awaitCondition { !viewModel.isLoading }
                     instrumentation.runOnMainSync {
                         viewModel.updateDraftNote(expected)
+                        viewModel.selectDraftMood(com.xike.app.data.Mood.ABOVE_AVERAGE)
+                        viewModel.updateDraftFeelings(listOf("HOPEFUL", "ANXIOUS"))
                         owner.viewModelStore.clear()
                     }
                     awaitCondition { !store.hasPendingWrite }
@@ -84,9 +86,12 @@ class JournalDraftProcessTest {
                     // A fresh process has no coordinator cache or pending write.
                     assertFalse(store.hasPendingWrite)
                     assertEquals(expected, store.load().note)
+                    assertEquals(listOf("HOPEFUL", "ANXIOUS"), store.load().feelings)
+                    assertEquals(1, store.load().moodScaleVersion)
                     val viewModel = openViewModel()
                     awaitCondition { !viewModel.isLoading }
                     assertEquals(expected, viewModel.draft.note)
+                    assertEquals(listOf("HOPEFUL", "ANXIOUS"), viewModel.draft.feelings)
                     assertTrue(viewModel.hasResumedDraft)
                 } finally {
                     instrumentation.runOnMainSync { owner.viewModelStore.clear() }

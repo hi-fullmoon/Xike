@@ -149,6 +149,7 @@ fun MomentScreen(
     draft: JournalDraft,
     dailyPromptSettings: DailyPromptSettings,
     onDraftMoodChange: (Mood?) -> Unit,
+    onDraftFeelingsChange: (List<String>) -> Unit = {},
     onDraftNoteChange: (String) -> Unit,
     onDraftTagToggle: (String) -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Boolean,
@@ -422,6 +423,9 @@ fun MomentScreen(
 
             MoodPicker(
                 selectedMood = draft.mood,
+                feelings = draft.feelings,
+                overallScale = draft.moodScaleVersion > 0,
+                onFeelingsChange = onDraftFeelingsChange,
                 enabled = !isSaving,
                 onSelected = onDraftMoodChange,
             )
@@ -728,6 +732,8 @@ fun MomentScreen(
                                     audio = draft.audio,
                                     video = draft.video,
                                     outdoor = draft.outdoor,
+                                    feelings = draft.feelings,
+                                    moodScaleVersion = draft.moodScaleVersion,
                                 ),
                                 draft.imageUriStrings.map(Uri::parse),
                             )

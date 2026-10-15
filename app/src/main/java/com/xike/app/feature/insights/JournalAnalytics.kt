@@ -283,15 +283,20 @@ fun journalPeriodSummary(
         averageScore = journals.moodAverage(),
         mostUsedTag = topTags.firstOrNull()?.tag,
         moodDistribution =
-            Mood.entries.map { mood ->
-                val moodEntries = journals.filter { it.mood == mood }
-                MoodDistributionItem(
-                    mood = mood,
-                    entryCount = moodEntries.size,
-                    ratio = moodEntries.size.toDouble() / journals.size.coerceAtLeast(1),
-                    entryIds = moodEntries.map(JournalEntry::id),
-                )
-            },
+            (if (journals.isEmpty() && previousJournals.isEmpty()) Mood.overallChoices
+                else
+                    Mood.entries.filter { mood ->
+                        journals.any { it.mood == mood } || previousJournals.any { it.mood == mood }
+                    })
+                .map { mood ->
+                    val moodEntries = journals.filter { it.mood == mood }
+                    MoodDistributionItem(
+                        mood = mood,
+                        entryCount = moodEntries.size,
+                        ratio = moodEntries.size.toDouble() / journals.size.coerceAtLeast(1),
+                        entryIds = moodEntries.map(JournalEntry::id),
+                    )
+                },
         topTags = topTags,
         weekdayInsight = weekdayInsight,
         weekendInsight = weekendInsight,

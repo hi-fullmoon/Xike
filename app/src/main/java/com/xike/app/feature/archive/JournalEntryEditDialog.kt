@@ -162,6 +162,8 @@ internal fun JournalEntryEditDialog(
         editorKeyboardController?.hide()
     }
     var selectedMoodName by rememberSaveable(entry.id) { mutableStateOf(entry.mood.name) }
+    var selectedFeelings by rememberSaveable(entry.id) { mutableStateOf(entry.feelings) }
+    var moodScaleVersion by rememberSaveable(entry.id) { mutableIntStateOf(entry.moodScaleVersion) }
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
     var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
     var showTopics by rememberSaveable(entry.id) { mutableStateOf(entry.tags.isNotEmpty()) }
@@ -410,6 +412,8 @@ internal fun JournalEntryEditDialog(
     val openCamera = { if (availableImageSlots > 0 && !isSaving) imagePickers.openCamera() }
     val hasUnsavedChanges =
         selectedMood != entry.mood ||
+            selectedFeelings != entry.feelings ||
+            moodScaleVersion != entry.moodScaleVersion ||
             createdAt != entry.createdAt ||
             note != entry.note ||
             selectedTags != entry.tags ||
@@ -458,6 +462,8 @@ internal fun JournalEntryEditDialog(
             entry.copy(
                 createdAt = createdAt,
                 mood = selectedMood,
+                feelings = selectedFeelings,
+                moodScaleVersion = moodScaleVersion,
                 tags = selectedTags,
                 note = note.trim(),
                 audio = retainedAudio,
@@ -621,9 +627,20 @@ internal fun JournalEntryEditDialog(
                             verticalArrangement = Arrangement.spacedBy(XikeContentGap),
                         ) {
                             if (saveError != null && scrollErrorWithContent) errorPanel()
-                            MoodPicker(selectedMood, !isSaving) { mood ->
-                                mood?.let { selectedMoodName = it.name }
-                            }
+                            MoodPicker(
+                                selectedMood = selectedMood,
+                                enabled = !isSaving,
+                                feelings = selectedFeelings,
+                                overallScale = moodScaleVersion > 0,
+                                onFeelingsChange = { selectedFeelings = it },
+                                onSelected = { mood ->
+                                    mood?.let {
+                                        selectedMoodName = it.name
+                                        // Keep the classification shown when the editor opened.
+                                        moodScaleVersion = if (it.isOverallScale) 1 else 0
+                                    }
+                                },
+                            )
                             Column(
                                 Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
