@@ -251,7 +251,7 @@ internal class JournalBackupStorage(
                 validateBackup(version in MIN_STREAMING_BACKUP_VERSION..STREAMING_BACKUP_VERSION) {
                     localizedText("暂不支持这个版本的息刻备份。")
                 }
-                validateBackup(encrypted || version == STREAMING_BACKUP_VERSION) {
+                validateBackup(encrypted || version >= MIN_UNENCRYPTED_BACKUP_VERSION) {
                     localizedText("未加密备份格式不受支持。")
                 }
 
@@ -474,7 +474,8 @@ internal class JournalBackupStorage(
         const val IMAGES_PREFIX = "images/"
         const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
-        const val STREAMING_BACKUP_VERSION = 8
+        const val MIN_UNENCRYPTED_BACKUP_VERSION = 8
+        const val STREAMING_BACKUP_VERSION = 9
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
         const val MAX_BACKUP_AUDIOS = 100_000

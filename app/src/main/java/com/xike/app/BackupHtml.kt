@@ -1,6 +1,7 @@
 package com.xike.app
 
 import com.xike.app.data.JournalEntry
+import com.xike.app.data.feelingLabel
 import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
@@ -91,6 +92,15 @@ internal object BackupHtml {
                 append("</div>")
             }
             append("</div>")
+            if (entry.feelings.isNotEmpty()) {
+                append("<p class=\"weather\">")
+                append(escape(tr("具体感受", "Feelings")))
+                append(" · ")
+                append(
+                    escape(entry.feelings.joinToString(tr("、", ", "), transform = ::feelingLabel))
+                )
+                append("</p>")
+            }
             if (entry.note.isNotBlank()) {
                 append("<p class=\"note\">")
                 append(escape(entry.note))

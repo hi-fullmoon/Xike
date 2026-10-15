@@ -52,6 +52,130 @@ class JournalStoreBackupTest {
     }
 
     @Test
+    fun version9BackupsPreserveOverallMoodAndFeelingsInPlainAndEncryptedArchives() {
+        val source =
+            JournalEntry(
+                id = "mood-v9",
+                mood = Mood.BELOW_AVERAGE,
+                tags = emptyList(),
+                note = "",
+                feelings = listOf("HOPEFUL", "ANXIOUS"),
+            )
+        store.add(source, emptyList())
+        listOf<String?>(null, PASSWORD).forEach { password ->
+            val bytes =
+                ByteArrayOutputStream().also { store.writeBackup(it, password) }.toByteArray()
+            val input =
+                if (password == null) bytes.inputStream()
+                else {
+                    val encrypted = bytes.inputStream()
+                    assertEquals(
+                        BackupCipher.magicSize.toLong(),
+                        encrypted.skip(BackupCipher.magicSize.toLong()),
+                    )
+                    BackupCipher.decryptingStream(encrypted, password)
+                }
+            val parts = mutableMapOf<String, ByteArray>()
+            ZipInputStream(input).use { archive ->
+                var part = archive.nextEntry
+                while (part != null) {
+                    parts[part.name] = archive.readBytes()
+                    archive.closeEntry()
+                    part = archive.nextEntry
+                }
+            }
+            val manifest = JSONObject(parts.getValue("manifest.json").toString(Charsets.UTF_8))
+            assertEquals(9, manifest.getInt("version"))
+            assertEquals(
+                source,
+                JournalEntry.fromJson(manifest.getJSONArray("entries").getJSONObject(0)),
+            )
+            val html = parts.getValue("index.html").toString(Charsets.UTF_8)
+            assertTrue(html.contains("期待、焦虑"))
+            replaceWithLocalEntry()
+            val restored =
+                store
+                    .restoreBackup(bytes.inputStream(), password, mode = BackupRestoreMode.REPLACE)
+                    .single()
+            assertEquals(source, restored)
+        }
+    }
+
+    @Test
+    fun plainAndEncryptedVersion8BackupsRemainRestorableWithoutChangingLegacyMood() {
+        val old = JournalEntry(id = "mood-v8", mood = Mood.TIRED, tags = emptyList(), note = "")
+        val legacyJson =
+            old.toJson().apply {
+                remove("feelings")
+                remove("moodScaleVersion")
+            }
+        listOf<String?>(null, PASSWORD).forEach { password ->
+            val bytes = versionedMoodArchive(8, legacyJson, password)
+            assertEquals(1, store.inspectBackup(bytes.inputStream(), password).entryCount)
+            val restored =
+                store
+                    .restoreBackup(bytes.inputStream(), password, mode = BackupRestoreMode.REPLACE)
+                    .single()
+            assertEquals(old, restored)
+        }
+    }
+
+    @Test
+    fun unsupportedVersionsAreRejectedBeforeReplacingEntries() {
+        val original =
+            store
+                .add(
+                    JournalEntry(id = "keep", mood = Mood.CALM, tags = emptyList(), note = ""),
+                    emptyList(),
+                )
+                .single()
+        listOf(10 to null, 10 to PASSWORD, 7 to null).forEach { (version, password) ->
+            val bytes =
+                versionedMoodArchive(version, original.copy(id = "incoming").toJson(), password)
+            assertTrue(runCatching { store.inspectBackup(bytes.inputStream(), password) }.isFailure)
+            assertTrue(
+                runCatching {
+                    store.restoreBackup(
+                        bytes.inputStream(),
+                        password,
+                        mode = BackupRestoreMode.REPLACE,
+                    )
+                }
+                    .isFailure
+            )
+            assertEquals(listOf(original), store.entries())
+        }
+    }
+
+    private fun versionedMoodArchive(
+        version: Int,
+        entry: JSONObject,
+        password: String?,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        val destination =
+            if (password == null) output else BackupCipher.encryptingStream(output, password)
+        ZipOutputStream(destination).use { archive ->
+            val manifest =
+                JSONObject()
+                    .put("format", "xike")
+                    .put("version", version)
+                    .put("entries", JSONArray(listOf(entry)))
+            listOf(
+                    "manifest.json" to manifest.toString(),
+                    "index.html" to "",
+                    "complete.txt" to "XIKE_BACKUP_COMPLETE",
+                )
+                .forEach { (name, text) ->
+                    archive.putNextEntry(ZipEntry(name))
+                    archive.write(text.toByteArray(Charsets.UTF_8))
+                    archive.closeEntry()
+                }
+        }
+        return output.toByteArray()
+    }
+
+    @Test
     fun backupWithMultipleImagesCanBeInspectedRestoredAndUndone() {
         val imageContents =
             listOf(

@@ -9,6 +9,24 @@ import org.junit.Test
 
 class BackupHtmlTest {
     @Test
+    fun readingCopyKeepsFeelingsInSavedOrderAndEscapesUnknownLabels() {
+        val entry =
+            JournalEntry(
+                mood = Mood.BELOW_AVERAGE,
+                tags = emptyList(),
+                note = "",
+                feelings = listOf("HOPEFUL", "ANXIOUS", "<script>&感受"),
+            )
+        val html = BackupHtml.render(listOf(entry))
+        assertTrue(html.contains("不太好"))
+        assertTrue(html.contains("具体感受 · 期待、焦虑、&lt;script&gt;&amp;感受"))
+        assertFalse(html.contains("<script>&感受"))
+        assertFalse(
+            BackupHtml.render(listOf(entry.copy(feelings = emptyList()))).contains("具体感受 ·")
+        )
+    }
+
+    @Test
     fun renderedReadingCopyEscapesJournalContentAndKeepsOfflineMediaLinks() {
         val entry =
             JournalEntry(
