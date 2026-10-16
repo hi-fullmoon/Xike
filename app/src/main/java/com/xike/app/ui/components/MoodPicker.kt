@@ -236,7 +236,7 @@ internal fun FeelingChip(
         border =
             if (ink != null)
                 BorderStroke(
-                    if (selected) 1.5.dp else 1.dp,
+                    if (selected && filled) 1.5.dp else 1.dp,
                     ink.copy(alpha = if (selected) .65f else .28f),
                 )
             else FilterChipDefaults.filterChipBorder(enabled = true, selected = selected),
