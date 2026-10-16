@@ -226,7 +226,7 @@ private fun OverviewMoodBadge(summary: JournalPeriodSummary) {
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
-                MoodEmoji(summary.averageScore.averageMood(), size = 29.dp)
+                MoodEmoji(summary.averageScore.averageMood(), size = 42.dp)
             }
         }
     }
