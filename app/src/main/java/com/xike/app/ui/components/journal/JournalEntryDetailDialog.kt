@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -155,7 +156,7 @@ internal fun JournalEntryDetailDialog(
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    MoodEmoji(entry.mood, size = 28.dp)
+                                    MoodEmoji(entry.mood, size = 40.dp)
                                 }
                             }
                             Spacer(Modifier.width(14.dp))
@@ -218,7 +219,9 @@ internal fun JournalEntryDetailDialog(
                                         topic = (topic ?: journalTopics.last()).copy(label = tag),
                                         selected = true,
                                         onClick = null,
-                                        minHeight = 36.dp,
+                                        minHeight = FilterChipDefaults.Height,
+                                        verticalPadding = 0.dp,
+                                        horizontalPadding = 16.dp,
                                         labelMaxLines = Int.MAX_VALUE,
                                         filled = false,
                                     )

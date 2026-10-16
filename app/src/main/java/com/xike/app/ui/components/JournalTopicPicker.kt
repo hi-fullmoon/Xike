@@ -164,6 +164,8 @@ internal fun TopicChip(
     minHeight: Dp = 48.dp,
     labelMaxLines: Int = 1,
     filled: Boolean = true,
+    verticalPadding: Dp = 4.dp,
+    horizontalPadding: Dp = 9.dp,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -194,7 +196,8 @@ internal fun TopicChip(
     ) {
         Row(
             modifier =
-                Modifier.heightIn(min = minHeight).padding(horizontal = 9.dp, vertical = 4.dp),
+                Modifier.heightIn(min = minHeight)
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
