@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -151,32 +154,14 @@ private fun FeelingSheet(
             ) {
                 Feeling.entries.forEach { feeling ->
                     val selected = feeling.name in draft
-                    val ink = feeling.labelColor(isSystemInDarkTheme())
-                    FilterChip(
+                    FeelingChip(
+                        key = feeling.name,
                         selected = selected,
                         onClick = {
                             draft =
                                 if (feeling.name in draft) draft - feeling.name
                                 else draft + feeling.name
                         },
-                        label = { Text(feeling.label) },
-                        shape = XikeShapes.button,
-                        colors =
-                            FilterChipDefaults.filterChipColors(
-                                labelColor = ink,
-                                selectedLabelColor =
-                                    feeling.selectedLabelColor(isSystemInDarkTheme()),
-                                selectedContainerColor =
-                                    ink.copy(alpha = .14f)
-                                        .compositeOver(
-                                            MaterialTheme.colorScheme.surfaceContainerLow
-                                        ),
-                            ),
-                        border =
-                            BorderStroke(
-                                if (selected) 1.5.dp else 1.dp,
-                                ink.copy(alpha = if (selected) .65f else .28f),
-                            ),
                     )
                 }
                 draft
@@ -199,6 +184,63 @@ private fun FeelingSheet(
             }
         }
     }
+}
+
+@Composable
+internal fun FeelingChip(
+    key: String,
+    selected: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    filled: Boolean = true,
+) {
+    val feeling = Feeling.entries.find { it.name == key }
+    val dark = isSystemInDarkTheme()
+    val label = feelingLabel(key)
+    val ink = feeling?.labelColor(dark)
+    val selectedInk = feeling?.selectedLabelColor(dark)
+    val container =
+        ink?.copy(alpha = .14f)?.compositeOver(MaterialTheme.colorScheme.surfaceContainerLow)
+    val colors =
+        if (ink != null && selectedInk != null && container != null) {
+            FilterChipDefaults.filterChipColors(
+                labelColor = ink,
+                selectedLabelColor = selectedInk,
+                selectedContainerColor = container,
+                disabledLabelColor = selectedInk,
+                disabledSelectedContainerColor = container,
+            )
+        } else {
+            FilterChipDefaults.filterChipColors(
+                disabledLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                disabledSelectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            )
+        }
+    FilterChip(
+        selected = selected,
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        modifier =
+            if (onClick == null) Modifier.clearAndSetSemantics { text = AnnotatedString(label) }
+            else Modifier,
+        label = { Text(label) },
+        shape = if (feeling != null) XikeShapes.button else FilterChipDefaults.shape,
+        colors =
+            if (filled) colors
+            else
+                colors.copy(
+                    containerColor = Color.Transparent,
+                    selectedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    disabledSelectedContainerColor = Color.Transparent,
+                ),
+        border =
+            if (ink != null)
+                BorderStroke(
+                    if (selected) 1.5.dp else 1.dp,
+                    ink.copy(alpha = if (selected) .65f else .28f),
+                )
+            else FilterChipDefaults.filterChipBorder(enabled = true, selected = selected),
+    )
 }
 
 private fun Feeling.labelColor(dark: Boolean): Color =

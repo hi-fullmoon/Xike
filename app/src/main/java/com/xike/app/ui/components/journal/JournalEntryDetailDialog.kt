@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,12 +28,14 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,15 +54,18 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
+import com.xike.app.canonicalTopic
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
-import com.xike.app.data.feelingLabel
 import com.xike.app.localizedText
 import com.xike.app.tr
+import com.xike.app.ui.components.FeelingChip
 import com.xike.app.ui.components.JournalPhotoMosaic
 import com.xike.app.ui.components.MoodEmoji
 import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.components.TopicChip
 import com.xike.app.ui.components.VoicePlaybackCard
+import com.xike.app.ui.components.journalTopics
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
@@ -184,21 +190,39 @@ internal fun JournalEntryDetailDialog(
 
                     if (entry.feelings.isNotEmpty()) {
                         JournalDetailSection(com.xike.app.tr("具体感受", "Feelings")) {
-                            JournalDetailCard {
-                                Text(
-                                    entry.feelings.joinToString(" · ", transform = ::feelingLabel),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                entry.feelings.forEach { key ->
+                                    CompositionLocalProvider(
+                                        LocalMinimumInteractiveComponentSize provides 0.dp
+                                    ) {
+                                        FeelingChip(key, filled = false)
+                                    }
+                                }
                             }
                         }
                     }
                     if (entry.tags.isNotEmpty()) {
                         JournalDetailSection(localizedText("主题")) {
-                            JournalDetailCard {
-                                Text(
-                                    entry.tags.joinToString("  ·  ") { localizedText(it) },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                entry.tags.forEach { tag ->
+                                    val topic = journalTopics.find {
+                                        it.label == canonicalTopic(tag)
+                                    }
+                                    TopicChip(
+                                        topic = (topic ?: journalTopics.last()).copy(label = tag),
+                                        selected = true,
+                                        onClick = null,
+                                        minHeight = 36.dp,
+                                        labelMaxLines = Int.MAX_VALUE,
+                                        filled = false,
+                                    )
+                                }
                             }
                         }
                     }

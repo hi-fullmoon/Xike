@@ -159,24 +159,30 @@ internal fun TopicChoices(selectedTags: Collection<String>, onToggle: (JournalTo
 internal fun TopicChip(
     topic: JournalTopic,
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     minHeight: Dp = 48.dp,
     labelMaxLines: Int = 1,
+    filled: Boolean = true,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
         modifier =
             modifier
                 .clip(XikeShapes.inner)
-                .selectable(
-                    selected = selected,
-                    role = Role.Checkbox,
-                    onClick = onClick,
+                .then(
+                    if (onClick != null)
+                        Modifier.selectable(
+                            selected = selected,
+                            role = Role.Checkbox,
+                            onClick = onClick,
+                        )
+                    else Modifier
                 ),
         shape = XikeShapes.inner,
         color =
-            if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
+            if (!filled) Color.Transparent
+            else if (selected) topic.accent.copy(alpha = if (isDark) 0.26f else 0.13f)
             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
         border =
             BorderStroke(
