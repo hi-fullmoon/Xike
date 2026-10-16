@@ -192,12 +192,41 @@ internal fun FeelingChip(
     selected: Boolean = true,
     onClick: (() -> Unit)? = null,
     filled: Boolean = true,
+    compact: Boolean = false,
 ) {
     val feeling = Feeling.entries.find { it.name == key }
     val dark = isSystemInDarkTheme()
     val label = feelingLabel(key)
     val ink = feeling?.labelColor(dark)
     val selectedInk = feeling?.selectedLabelColor(dark)
+    if (compact && onClick == null) {
+        Surface(
+            shape = XikeShapes.inner,
+            color =
+                if (filled) (ink ?: MaterialTheme.colorScheme.primary).copy(alpha = .14f)
+                else Color.Transparent,
+            border =
+                if (filled) null
+                else
+                    BorderStroke(
+                        1.dp,
+                        (ink ?: MaterialTheme.colorScheme.primary).copy(alpha = .58f),
+                    ),
+        ) {
+            Row(
+                modifier =
+                    Modifier.heightIn(min = 24.dp).padding(horizontal = 8.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = selectedInk ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
     val container =
         ink?.copy(alpha = .14f)?.compositeOver(MaterialTheme.colorScheme.surfaceContainerLow)
     val colors =

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
+import com.xike.app.canonicalTopic
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
 import com.xike.app.data.feelingLabel
@@ -57,6 +59,7 @@ internal fun JournalEntryCard(
     compactMedia: Boolean = false,
     moodIconSize: Dp = 24.dp,
     compactMoodOnly: Boolean = false,
+    compactLabels: Boolean = false,
 ) {
     val isCompactMoodOnly =
         compactMoodOnly &&
@@ -108,20 +111,66 @@ internal fun JournalEntryCard(
                     }
                     if (entry.feelings.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            entry.feelings.take(3).joinToString(" · ", transform = ::feelingLabel) +
-                                if (entry.feelings.size > 3) " +${entry.feelings.size - 3}" else "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (compactLabels) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                itemVerticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                entry.feelings.take(3).forEach { key ->
+                                    FeelingChip(key, filled = true, compact = true)
+                                }
+                                if (entry.feelings.size > 3) {
+                                    Text(
+                                        "+${entry.feelings.size - 3}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                entry.feelings
+                                    .take(3)
+                                    .joinToString(" · ", transform = ::feelingLabel) +
+                                    if (entry.feelings.size > 3) " +${entry.feelings.size - 3}"
+                                    else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     if (entry.tags.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            entry.tags.joinToString("  ·  ") { localizedText(it) },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        if (compactLabels) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                entry.tags.forEach { tag ->
+                                    val topic = journalTopics.find {
+                                        it.label == canonicalTopic(tag)
+                                    }
+                                    TopicChip(
+                                        topic = (topic ?: journalTopics.last()).copy(label = tag),
+                                        selected = true,
+                                        onClick = null,
+                                        minHeight = 24.dp,
+                                        labelMaxLines = Int.MAX_VALUE,
+                                        filled = false,
+                                        verticalPadding = 3.dp,
+                                        horizontalPadding = 8.dp,
+                                        compact = true,
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                entry.tags.joinToString("  ·  ") { localizedText(it) },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                     entry.outdoor?.let { outdoor ->
                         Spacer(Modifier.height(7.dp))

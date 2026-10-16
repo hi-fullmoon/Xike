@@ -166,6 +166,7 @@ internal fun TopicChip(
     filled: Boolean = true,
     verticalPadding: Dp = 4.dp,
     horizontalPadding: Dp = 9.dp,
+    compact: Boolean = false,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -203,16 +204,18 @@ internal fun TopicChip(
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(if (compact) 14.dp else 18.dp),
                 tint =
                     if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
                     else topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
-            Spacer(Modifier.width(XikeInlineActionGap))
+            Spacer(Modifier.width(if (compact) 4.dp else XikeInlineActionGap))
             Text(
                 localizedText(topic.label),
                 maxLines = labelMaxLines,
-                style = MaterialTheme.typography.labelLarge,
+                style =
+                    if (compact) MaterialTheme.typography.labelSmall
+                    else MaterialTheme.typography.labelLarge,
                 color =
                     when {
                         selected && isDark -> MaterialTheme.colorScheme.onSurface

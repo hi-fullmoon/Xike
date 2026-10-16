@@ -908,6 +908,7 @@ private fun ArchiveTimelineEntry(
         compactMedia = true,
         moodIconSize = 36.dp,
         compactMoodOnly = true,
+        compactLabels = true,
         openImage = openImage,
         onImageClick = onImageClick,
         onClick = onClick,
