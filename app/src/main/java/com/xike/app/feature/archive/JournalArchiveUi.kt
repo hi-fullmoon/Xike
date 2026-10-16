@@ -906,6 +906,8 @@ private fun ArchiveTimelineEntry(
     JournalEntryCard(
         entry = entry,
         compactMedia = true,
+        moodIconSize = 36.dp,
+        compactMoodOnly = true,
         openImage = openImage,
         onImageClick = onImageClick,
         onClick = onClick,

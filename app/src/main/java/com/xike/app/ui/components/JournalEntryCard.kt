@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
@@ -54,7 +55,18 @@ internal fun JournalEntryCard(
     onImageClick: (Int) -> Unit,
     onClick: () -> Unit = {},
     compactMedia: Boolean = false,
+    moodIconSize: Dp = 24.dp,
+    compactMoodOnly: Boolean = false,
 ) {
+    val isCompactMoodOnly =
+        compactMoodOnly &&
+            entry.note.isBlank() &&
+            entry.feelings.isEmpty() &&
+            entry.tags.isEmpty() &&
+            entry.outdoor == null &&
+            entry.imageFileNames.isEmpty() &&
+            entry.audio == null &&
+            entry.video == null
     Surface(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = XikeShapes.card,
@@ -66,14 +78,21 @@ internal fun JournalEntryCard(
             if (!compactMedia && entry.imageFileNames.isNotEmpty()) {
                 JournalPhotoMosaic(entry.imageFileNames, openImage, onImageClick)
             }
-            Row(Modifier.padding(XikeCardPadding), verticalAlignment = Alignment.Top) {
+            Row(
+                Modifier.padding(
+                    horizontal = XikeCardPadding,
+                    vertical = if (isCompactMoodOnly) 10.dp else XikeCardPadding,
+                ),
+                verticalAlignment =
+                    if (isCompactMoodOnly) Alignment.CenterVertically else Alignment.Top,
+            ) {
                 Surface(
                     modifier = Modifier.size(48.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        MoodEmoji(entry.mood, size = 24.dp)
+                        MoodEmoji(entry.mood, size = moodIconSize)
                     }
                 }
                 Spacer(Modifier.width(14.dp))
