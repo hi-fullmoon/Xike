@@ -255,6 +255,17 @@ class ResponsiveChoicesUiTest {
                             .top
                     }
                     assertEquals("Mood choices must stay in one row", 1, rowTops.distinct().size)
+                    if (scale == 1f) {
+                        choices.forEach { mood ->
+                            val label = if (overall) mood.overallLabel else mood.label
+                            val bounds =
+                                composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
+                            assertTrue(
+                                "Mood must fit without scrolling for $style: $label",
+                                bounds.left >= 0.dp && bounds.right <= viewportWidth.value,
+                            )
+                        }
+                    }
                     choices.forEach { mood ->
                         val label = if (overall) mood.overallLabel else mood.label
                         composeRule

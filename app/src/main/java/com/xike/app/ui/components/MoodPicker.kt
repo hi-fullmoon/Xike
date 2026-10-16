@@ -302,40 +302,50 @@ internal fun MoodChoices(
     val choices = if (quietStyle) Mood.overallChoices else Mood.legacyChoices
     val textMeasurer = rememberTextMeasurer()
     val style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
-    val minWidth =
+    val minimumWidths =
         with(LocalDensity.current) {
-            maxOf(
-                48.dp,
-                choices
-                    .maxOf {
-                        textMeasurer
-                            .measure(
-                                if (quietStyle) it.overallLabel else it.label,
-                                style,
-                                softWrap = false,
-                            )
-                            .size
-                            .width
-                    }
-                    .toDp() + 8.dp,
-            )
+            choices.map {
+                maxOf(
+                    48.dp,
+                    textMeasurer
+                        .measure(
+                            if (quietStyle) it.overallLabel else it.label,
+                            style,
+                            softWrap = false,
+                        )
+                        .size
+                        .width
+                        .toDp() + 8.dp,
+                )
+            }
         }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val choiceWidth = maxOf(minWidth, (maxWidth - 3.dp * (choices.size - 1)) / choices.size)
+        val availableWidth = maxWidth - 3.dp * (choices.size - 1)
+        val equalWidth = availableWidth / choices.size
+        val minimumTotalWidth = minimumWidths.fold(0.dp) { total, width -> total + width }
+        val extraWidth =
+            maxOf(
+                0.dp,
+                availableWidth - minimumTotalWidth,
+            ) / choices.size
         Row(
             Modifier.fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
+                .width(maxOf(maxWidth, minimumTotalWidth + 3.dp * (choices.size - 1)))
                 .selectableGroup()
                 .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            choices.forEach { mood ->
+            choices.forEachIndexed { index, mood ->
+                val choiceWidth =
+                    if (minimumWidths.all { it <= equalWidth }) equalWidth
+                    else minimumWidths[index] + extraWidth
                 MoodChoice(
                     mood,
                     selectedMood == mood,
                     enabled,
                     { onSelected(mood) },
-                    Modifier.width(choiceWidth).fillMaxHeight(),
+                    Modifier.weight(choiceWidth.value).fillMaxHeight(),
                     quietStyle,
                 )
             }
