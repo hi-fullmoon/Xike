@@ -137,6 +137,7 @@ fun ProfileSettingsScreen(
     var showReminderDialog by rememberSaveable { mutableStateOf(false) }
     var showPromptStyleDialog by rememberSaveable { mutableStateOf(false) }
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+    var showAutoBackupDialog by rememberSaveable { mutableStateOf(false) }
     val onLanguageChange = LocalLanguageChange.current
 
     ScreenColumn(padding) {
@@ -404,6 +405,20 @@ fun ProfileSettingsScreen(
                         subtitle = localizedText("支持加密和未加密备份"),
                         onClick = onImport,
                     )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 70.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                    SettingsAction(
+                        icon = Icons.Outlined.Schedule,
+                        title = tr("自动备份", "Automatic backup"),
+                        subtitle =
+                            tr(
+                                "自定义时间、目录与保留数量，密码加密",
+                                "Custom schedule, folder and retention; password encrypted",
+                            ),
+                        onClick = { showAutoBackupDialog = true },
+                    )
                     if (canUndoRestore) {
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 70.dp),
@@ -430,6 +445,10 @@ fun ProfileSettingsScreen(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+
+    if (showAutoBackupDialog) {
+        AutoBackupDialog(onDismiss = { showAutoBackupDialog = false })
     }
 
     if (showLanguageDialog) {

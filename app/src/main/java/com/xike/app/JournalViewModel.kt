@@ -47,7 +47,7 @@ internal class JournalOperationFeedback(val message: String, val isError: Boolea
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class JournalViewModel(application: Application) : AndroidViewModel(application) {
-    private val store = JournalStore(application)
+    private val store = com.xike.app.backup.JournalStores.get(application)
     internal val editOperations by lazy {
         JournalEditOperations(application, viewModelScope, store) { draft.imageUriStrings }
     }
