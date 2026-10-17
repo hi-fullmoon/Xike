@@ -215,7 +215,7 @@ internal fun FeelingChip(
         ) {
             Row(
                 modifier =
-                    Modifier.heightIn(min = 24.dp).padding(horizontal = 8.dp, vertical = 3.dp),
+                    Modifier.heightIn(min = 20.dp).padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

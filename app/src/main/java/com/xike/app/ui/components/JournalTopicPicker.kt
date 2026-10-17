@@ -204,12 +204,12 @@ internal fun TopicChip(
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
-                modifier = Modifier.size(if (compact) 14.dp else 18.dp),
+                modifier = Modifier.size(if (compact) 12.dp else 18.dp),
                 tint =
                     if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
                     else topic.accent.copy(alpha = if (selected) 1f else 0.72f),
             )
-            Spacer(Modifier.width(if (compact) 4.dp else XikeInlineActionGap))
+            Spacer(Modifier.width(if (compact) 3.dp else XikeInlineActionGap))
             Text(
                 localizedText(topic.label),
                 maxLines = labelMaxLines,

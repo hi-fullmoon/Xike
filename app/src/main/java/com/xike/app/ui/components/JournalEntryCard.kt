@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ContextualFlowRow
+import androidx.compose.foundation.layout.ContextualFlowRowOverflow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -109,68 +112,26 @@ internal fun JournalEntryCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (entry.feelings.isNotEmpty()) {
+                    if (compactLabels && (entry.feelings.isNotEmpty() || entry.tags.isNotEmpty())) {
                         Spacer(Modifier.height(6.dp))
-                        if (compactLabels) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                itemVerticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                entry.feelings.take(3).forEach { key ->
-                                    FeelingChip(key, filled = true, compact = true)
-                                }
-                                if (entry.feelings.size > 3) {
-                                    Text(
-                                        "+${entry.feelings.size - 3}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        } else {
-                            Text(
-                                entry.feelings
-                                    .take(3)
-                                    .joinToString(" · ", transform = ::feelingLabel) +
-                                    if (entry.feelings.size > 3) " +${entry.feelings.size - 3}"
-                                    else "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        JournalEntryLabelSummary(entry)
                     }
-                    if (entry.tags.isNotEmpty()) {
+                    if (!compactLabels && entry.feelings.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
-                        if (compactLabels) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                entry.tags.forEach { tag ->
-                                    val topic = journalTopics.find {
-                                        it.label == canonicalTopic(tag)
-                                    }
-                                    TopicChip(
-                                        topic = (topic ?: journalTopics.last()).copy(label = tag),
-                                        selected = true,
-                                        onClick = null,
-                                        minHeight = 24.dp,
-                                        labelMaxLines = Int.MAX_VALUE,
-                                        filled = false,
-                                        verticalPadding = 3.dp,
-                                        horizontalPadding = 8.dp,
-                                        compact = true,
-                                    )
-                                }
-                            }
-                        } else {
-                            Text(
-                                entry.tags.joinToString("  ·  ") { localizedText(it) },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
+                        Text(
+                            entry.feelings.take(3).joinToString(" · ", transform = ::feelingLabel) +
+                                if (entry.feelings.size > 3) " +${entry.feelings.size - 3}" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!compactLabels && entry.tags.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            entry.tags.joinToString("  ·  ") { localizedText(it) },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                     entry.outdoor?.let { outdoor ->
                         Spacer(Modifier.height(7.dp))
@@ -276,6 +237,46 @@ internal fun JournalEntryCard(
                 }
                 if (hasMedia) Spacer(Modifier.height(XikeCardPadding))
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun JournalEntryLabelSummary(entry: JournalEntry) {
+    val labelCount = entry.feelings.size + entry.tags.size
+    val allowWrap = LocalDensity.current.fontScale > 1.3f
+    ContextualFlowRow(
+        itemCount = labelCount,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+        maxLines = if (allowWrap) Int.MAX_VALUE else 1,
+        overflow =
+            ContextualFlowRowOverflow.expandIndicator {
+                Text(
+                    "+${labelCount - shownItemCount}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+    ) { index ->
+        if (index < entry.feelings.size) {
+            FeelingChip(entry.feelings[index], filled = true, compact = true)
+        } else {
+            val tag = entry.tags[index - entry.feelings.size]
+            val topic = journalTopics.find { it.label == canonicalTopic(tag) }
+            TopicChip(
+                topic = (topic ?: journalTopics.last()).copy(label = tag),
+                selected = true,
+                onClick = null,
+                minHeight = 20.dp,
+                labelMaxLines = Int.MAX_VALUE,
+                filled = false,
+                verticalPadding = 2.dp,
+                horizontalPadding = 6.dp,
+                compact = true,
+            )
         }
     }
 }
