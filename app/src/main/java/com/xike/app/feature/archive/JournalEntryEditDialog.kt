@@ -113,6 +113,7 @@ import com.xike.app.ui.components.MomentTopicsHeader
 import com.xike.app.ui.components.MoodPicker
 import com.xike.app.ui.components.PaperCard
 import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.components.SecondaryPageHeader
 import com.xike.app.ui.components.TopicChoices
 import com.xike.app.ui.components.VoiceCaptureSheet
 import com.xike.app.ui.components.VoicePendingSaveCard
@@ -539,32 +540,25 @@ internal fun JournalEntryEditDialog(
                         .windowInsetsPadding(WindowInsets.safeDrawing)
                         .imePadding()
             ) {
-                Row(
+                SecondaryPageHeader(
+                    title = localizedText("编辑这一刻"),
+                    closeDescription = localizedText("取消编辑"),
+                    onClose = dismissEditor,
+                    closeEnabled =
+                        !isSaving &&
+                            !isVideoImporting &&
+                            !isAudioImporting &&
+                            !isVideoRemoving &&
+                            !isDiscarding,
                     modifier =
                         Modifier.widthIn(max = XikeContentMaxWidth)
                             .fillMaxWidth()
                             .align(Alignment.CenterHorizontally)
-                            .padding(horizontal = XikeScreenHorizontalPadding, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        enabled =
-                            !isSaving &&
-                                !isVideoImporting &&
-                                !isAudioImporting &&
-                                !isVideoRemoving &&
-                                !isDiscarding,
-                        onClick = dismissEditor,
-                    ) {
-                        Icon(Icons.Outlined.Close, contentDescription = localizedText("取消编辑"))
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        localizedText("编辑这一刻"),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
+                            .padding(
+                                horizontal = XikeScreenHorizontalPadding,
+                                vertical = XikeScreenVerticalPadding,
+                            ),
+                )
 
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     // A short viewport must let the error scroll away so the form stays usable.

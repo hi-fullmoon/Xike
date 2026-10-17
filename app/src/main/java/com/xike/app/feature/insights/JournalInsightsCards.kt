@@ -41,7 +41,6 @@ import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.ui.components.MoodEmoji
 import com.xike.app.ui.components.XikeIcons
-import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeContentCardPadding
 import com.xike.app.ui.theme.XikeInnerCardPadding
 import com.xike.app.ui.theme.XikeShapes
@@ -504,7 +503,7 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
         shape = XikeShapes.card,
         color = MaterialTheme.colorScheme.primary,
     ) {
-        Column(Modifier.padding(XikeCardPadding)) {
+        Column(Modifier.padding(XikeContentCardPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(42.dp),
@@ -546,6 +545,7 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
             Spacer(Modifier.height(14.dp))
             Button(
                 onClick = onOpen,
+                shape = XikeShapes.button,
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors =

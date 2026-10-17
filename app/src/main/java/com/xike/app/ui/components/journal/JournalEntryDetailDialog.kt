@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.ButtonDefaults
@@ -50,7 +49,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
@@ -64,13 +62,13 @@ import com.xike.app.ui.components.FeelingChip
 import com.xike.app.ui.components.JournalPhotoMosaic
 import com.xike.app.ui.components.MoodEmoji
 import com.xike.app.ui.components.PhotoGalleryDialog
+import com.xike.app.ui.components.SecondaryPageHeader
 import com.xike.app.ui.components.TopicChip
 import com.xike.app.ui.components.VoicePlaybackCard
 import com.xike.app.ui.components.journalTopics
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
-import com.xike.app.ui.theme.XikePageTitleStyle
 import com.xike.app.ui.theme.XikeScreenHorizontalPadding
 import com.xike.app.ui.theme.XikeScreenVerticalPadding
 import com.xike.app.ui.theme.XikeShapes
@@ -106,27 +104,21 @@ internal fun JournalEntryDetailDialog(
                         .widthIn(max = XikeContentMaxWidth)
                         .fillMaxWidth()
             ) {
-                Row(
+                SecondaryPageHeader(
+                    title = localizedText("这一刻"),
+                    closeDescription = localizedText("关闭记录详情"),
+                    onClose = onDismiss,
                     modifier =
                         Modifier.fillMaxWidth()
                             .padding(
                                 horizontal = XikeScreenHorizontalPadding,
                                 vertical = XikeScreenVerticalPadding,
                             ),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        localizedText("这一刻"),
-                        modifier = Modifier.weight(1f),
-                        style = XikePageTitleStyle.copy(fontSize = 30.sp, lineHeight = 38.sp),
-                    )
                     if (onRequestEdit != null) {
                         IconButton(onClick = onRequestEdit) {
                             Icon(Icons.Outlined.Edit, contentDescription = localizedText("编辑记录"))
                         }
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, contentDescription = localizedText("关闭记录详情"))
                     }
                 }
 
