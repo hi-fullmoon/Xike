@@ -3,13 +3,16 @@ package com.xike.app.backup
 import java.time.DayOfWeek
 import java.time.ZonedDateTime
 
+internal const val DEFAULT_AUTO_BACKUP_DIRECTORY = "xike:downloads-backup"
+
 internal data class AutoBackupSettings(
     val enabled: Boolean = false,
     val weekday: Int = DayOfWeek.SUNDAY.value,
     val hour: Int = 0,
     val minute: Int = 0,
     val keepCount: Int = 5,
-    val directory: String = "",
+    val directory: String = DEFAULT_AUTO_BACKUP_DIRECTORY,
+    val encrypted: Boolean = true,
 ) {
     init {
         require(weekday in 0..7 && hour in 0..23 && minute in 0..59 && keepCount in 1..100)

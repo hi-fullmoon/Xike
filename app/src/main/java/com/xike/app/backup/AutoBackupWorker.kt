@@ -11,8 +11,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
-import android.provider.DocumentsContract
-import androidx.documentfile.provider.DocumentFile
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -102,12 +100,9 @@ internal object AutoBackup {
                         reconciledAutoBackupAt(settings, preferences.nextAt, ZonedDateTime.now())
                     else nextAutoBackupAt(settings, ZonedDateTime.now()).toInstant().toEpochMilli()
                 if (settings.enabled) {
-                    require((password ?: preferences.password).orEmpty().length >= 8)
-                    val directory =
-                        requireNotNull(
-                            DocumentFile.fromTreeUri(context, Uri.parse(settings.directory))
-                        )
-                    require(directory.isDirectory && directory.canWrite())
+                    if (settings.encrypted)
+                        require((password ?: preferences.password).orEmpty().length >= 8)
+                    AutoBackupStorage.requireWritable(context, settings.directory)
                 }
                 // Arm durable polling before committing. A process interruption must not leave
                 // newly saved preferences dependent on an old, distant calendar wake-up.
@@ -199,7 +194,7 @@ private fun backupForegroundInfo(context: Context): ForegroundInfo {
         Notification.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(tr("自动备份", "Automatic backup"))
-            .setContentText(tr("正在创建加密备份…", "Creating an encrypted backup…"))
+            .setContentText(tr("正在创建备份…", "Creating a backup…"))
             .setOngoing(true)
             .build()
     return ForegroundInfo(403, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -210,12 +205,11 @@ internal suspend fun performAutoBackup(
     preferences: AutoBackupPreferences,
     settings: AutoBackupSettings,
 ) {
-    val password = requireNotNull(preferences.password)
-    require(password.length >= 8)
-    val directory =
-        DocumentFile.fromTreeUri(context, Uri.parse(settings.directory))
-            ?: throw SecurityException()
-    if (!directory.isDirectory || !directory.canWrite()) throw SecurityException()
+    val password =
+        if (settings.encrypted)
+            requireNotNull(preferences.password).also { require(it.length >= 8) }
+        else null
+    AutoBackupStorage.requireWritable(context, settings.directory)
     val store = JournalStores.get(context)
     val coroutine = currentCoroutineContext()
     // A fixed, private staging path is overwritten after a process interruption.
@@ -225,7 +219,7 @@ internal suspend fun performAutoBackup(
         synchronized(store) {
             store.initialize(loadEntries = false)
             staged.outputStream().use { output ->
-                store.writeEncryptedBackup(
+                store.writeBackup(
                     object : FilterOutputStream(output) {
                         override fun write(bytes: ByteArray, offset: Int, length: Int) {
                             coroutine.ensureActive()
@@ -244,14 +238,13 @@ internal suspend fun performAutoBackup(
         }
         coroutine.ensureActive()
         val document =
-            requireNotNull(
-                directory.createFile(
-                    "application/octet-stream",
-                    "xike-auto-${System.currentTimeMillis()}-${UUID.randomUUID()}.xike",
-                )
+            AutoBackupStorage.create(
+                context,
+                settings.directory,
+                "xike-auto-${System.currentTimeMillis()}-${UUID.randomUUID()}.${if (settings.encrypted) "xike" else "zip"}",
             )
-        preferences.pending = preferences.pending + document.uri.toString()
-        requireNotNull(context.contentResolver.openOutputStream(document.uri, "wt")).use { output ->
+        preferences.pending = preferences.pending + document.toString()
+        requireNotNull(context.contentResolver.openOutputStream(document, "wt")).use { output ->
             staged.inputStream().use { input ->
                 val buffer = ByteArray(64 * 1024)
                 while (true) {
@@ -276,12 +269,13 @@ internal suspend fun performAutoBackup(
         check(
             MessageDigest.isEqual(
                 digest(staged.inputStream()),
-                digest(requireNotNull(context.contentResolver.openInputStream(document.uri))),
+                digest(requireNotNull(context.contentResolver.openInputStream(document))),
             )
         )
+        AutoBackupStorage.publish(context, document)
         val now = System.currentTimeMillis()
         preferences.completeBackup(
-            AutoBackupFile(document.uri.toString(), settings.directory, now),
+            AutoBackupFile(document.toString(), settings.directory, now),
             nextAutoBackupAt(settings, ZonedDateTime.now()).toInstant().toEpochMilli(),
         )
         cleanupAutoBackups(context, preferences, settings)
@@ -295,7 +289,7 @@ private suspend fun cleanupPendingBackups(context: Context, preferences: AutoBac
         currentCoroutineContext().ensureActive()
         val removed = runCatching {
             if (preferences.files().any { it.uri == pending }) true
-            else deleteTrackedDocument(context, Uri.parse(pending))
+            else AutoBackupStorage.deleteTracked(context, Uri.parse(pending))
         }
             .getOrDefault(false)
         // An inaccessible old folder must not block backups to a newly selected folder.
@@ -309,7 +303,7 @@ private suspend fun cleanupAutoBackups(
     settings: AutoBackupSettings,
 ) {
     cleanupPendingBackups(context, preferences)
-    // Only prune after the new encrypted file was verified and durably tracked.
+    // Only prune after the new file was verified and durably tracked.
     var cleanupFailed = preferences.pending.isNotEmpty()
     val obsolete =
         preferences
@@ -320,23 +314,13 @@ private suspend fun cleanupAutoBackups(
     for (old in obsolete) {
         currentCoroutineContext().ensureActive()
         val deleted = runCatching {
-            deleteTrackedDocument(context, Uri.parse(old.uri))
+            AutoBackupStorage.deleteTracked(context, Uri.parse(old.uri))
         }
             .getOrDefault(false)
         if (deleted) preferences.saveFiles(preferences.files().filterNot { it.uri == old.uri })
         else cleanupFailed = true
     }
     preferences.recordCleanup(cleanupFailed)
-}
-
-private fun deleteTrackedDocument(context: Context, uri: Uri): Boolean {
-    val document = DocumentFile.fromSingleUri(context, uri) ?: return false
-    if (document.delete()) return true
-    // DocumentFile.exists() also returns false for provider/read errors. Only a successful empty
-    // query proves absence; retain our ledger on revoked access or an unavailable provider.
-    return context.contentResolver
-        .query(uri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)
-        ?.use { it.count == 0 } ?: false
 }
 
 class AutoBackupRescheduleReceiver : BroadcastReceiver() {

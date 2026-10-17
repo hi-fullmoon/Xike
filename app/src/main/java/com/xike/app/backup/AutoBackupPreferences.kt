@@ -30,19 +30,25 @@ internal class AutoBackupPreferences(context: Context) {
             hour = preferences.getInt("hour", 0),
             minute = preferences.getInt("minute", 0),
             keepCount = preferences.getInt("keep", 5),
-            directory = preferences.getString("directory", "").orEmpty(),
+            directory =
+                preferences.getString("directory", null)?.takeIf { it.isNotBlank() }
+                    ?: DEFAULT_AUTO_BACKUP_DIRECTORY,
+            encrypted = preferences.getBoolean("encrypted", true),
         )
 
     fun save(settings: AutoBackupSettings, password: String?, nextAt: Long) {
         update {
             this.putBoolean("enabled", settings.enabled)
+                .putBoolean("encrypted", settings.encrypted)
                 .putInt("weekday", settings.weekday)
                 .putInt("hour", settings.hour)
                 .putInt("minute", settings.minute)
                 .putInt("keep", settings.keepCount)
                 .putString("directory", settings.directory)
                 .putString("next-local", localDeadline(nextAt))
-                .apply { if (password != null) putString("password", password) }
+                .apply {
+                    if (settings.encrypted && password != null) putString("password", password)
+                }
         }
     }
 
