@@ -127,6 +127,8 @@ dependencies {
     implementation("com.google.crypto.tink:tink-android:1.8.0")
     implementation("com.github.promeg:tinypinyin:2.0.3")
     implementation("com.github.promeg:tinypinyin-lexicons-java-cncity:2.0.3")
+    implementation("com.amap.api:location:11.3.101")
+    implementation("cn.hutool:hutool-core:5.8.48")
     implementation("net.zetetic:sqlcipher-android:4.17.0@aar")
 
     ksp("androidx.room:room-compiler:2.8.4")

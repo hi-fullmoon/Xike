@@ -81,15 +81,27 @@ internal suspend fun <Candidate, Value : Any> firstNonNullResult(
     }
 }
 
-internal class OutdoorContextException(message: String, cause: Throwable? = null) :
-    IllegalStateException(message, cause)
+internal class OutdoorContextException(
+    message: String,
+    cause: Throwable? = null,
+    val amapDiagnostic: AmapNetworkDiagnostic? = null,
+) : IllegalStateException(message, cause)
 
-internal class OutdoorContextRepository(context: Context) {
+internal class OutdoorContextRepository(
+    context: Context,
+    private val amapSettings: AmapSettingsStore = AmapSettingsStore(context),
+) {
     private val appContext = context.applicationContext
     private val locationManager =
         appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
     suspend fun current(): OutdoorSnapshot {
+        val settings = withContext(Dispatchers.IO) { amapSettings.read() }
+        if (settings.enabled) {
+            if (!settings.canUseAmap) throw amapFailure(-5)
+            val place = currentAmapPlace(settings)
+            return weatherAt(place.latitude, place.longitude, place.wgs84, place.labels)
+        }
         val location = currentLocation()
         val place = reverseGeocode(location)
         return fetchWeather(
@@ -98,6 +110,34 @@ internal class OutdoorContextRepository(context: Context) {
             place?.label ?: localizedText("当前位置"),
             place?.fullLabel,
         )
+    }
+
+    internal suspend fun weatherAt(
+        latitude: Double,
+        longitude: Double,
+        wgs84: Boolean,
+        labels: PlaceLabels,
+    ): OutdoorSnapshot {
+        val coordinates = weatherCoordinates(latitude, longitude, wgs84)
+        return fetchWeather(
+            coordinates.latitude,
+            coordinates.longitude,
+            labels.label,
+            labels.fullLabel,
+        )
+    }
+
+    private suspend fun currentAmapPlace(settings: AmapSettings): AmapPlace =
+        AmapLocator(appContext).current(settings) { location ->
+            reverseGeocode(location)?.let { PlaceLabels(it.label, it.fullLabel) }
+        }
+
+    internal suspend fun testAmapLocation(settings: AmapSettings): String {
+        val place = currentAmapPlace(settings)
+        return place.labels.fullLabel +
+            if (place.systemAddressCompleted) {
+                com.xike.app.tr("（系统地址服务补全）", " (completed by system address service)")
+            } else ""
     }
 
     suspend fun city(query: String): OutdoorSnapshot {

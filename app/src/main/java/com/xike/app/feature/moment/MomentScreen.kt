@@ -994,8 +994,9 @@ fun MomentScreen(
             title = { Text(localizedText("添加此刻窗外？")) },
             text = {
                 Text(
-                    localizedText(
-                        "息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。系统地址服务会使用坐标查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。"
+                    tr(
+                        "息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。所选定位服务用于查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。",
+                        "Xike requests your location once after you tap to show the district and street. You can also allow only approximate location. The selected location service looks up the place, and approximate coordinates are sent to Open-Meteo for weather.",
                     ) + localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

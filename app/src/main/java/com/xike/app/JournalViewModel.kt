@@ -21,6 +21,8 @@ import com.xike.app.data.model.VideoEditDraft
 import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.media.JournalVideoStore
 import com.xike.app.media.pruneVoiceTemporaryFiles
+import com.xike.app.outdoor.AmapSettingsOperations
+import com.xike.app.outdoor.AmapSettingsStore
 import com.xike.app.outdoor.OutdoorContextRepository
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
@@ -74,7 +76,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             reportOperation = ::reportOperation,
             mediaMutationMutex = mediaMutationMutex,
         )
-    private val outdoorRepository = OutdoorContextRepository(application)
+    private val amapSettingsStore = AmapSettingsStore(application)
+    private val outdoorRepository = OutdoorContextRepository(application, amapSettingsStore)
+    internal val amapSettingsOperations by lazy {
+        AmapSettingsOperations(application, amapSettingsStore, ::cancelOutdoorRequest)
+    }
     private val appearancePreferences = AppearancePreferences(application)
     private var draftGeneration = 0L
     private var outdoorRequestGeneration = 0L
@@ -119,6 +125,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private var draftSessionBackgrounded = false
 
     internal fun onAppBackgrounded() {
+        cancelOutdoorRequest()
         draftSessionBackgrounded = true
     }
 
