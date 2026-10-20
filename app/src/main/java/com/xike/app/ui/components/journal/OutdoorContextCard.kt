@@ -164,8 +164,8 @@ internal fun OutdoorContextCard(
                     }
                     Text(
                         tr(
-                            "获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
-                            "Captured at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
+                            "天气获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
+                            "Weather fetched at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
                         ),
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         style = MaterialTheme.typography.bodySmall,
