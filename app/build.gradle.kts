@@ -125,6 +125,7 @@ dependencies {
     implementation("androidx.sqlite:sqlite:2.6.2")
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("com.google.crypto.tink:tink-android:1.8.0")
+    implementation("com.belerweb:pinyin4j:2.5.1")
     implementation("net.zetetic:sqlcipher-android:4.17.0@aar")
 
     ksp("androidx.room:room-compiler:2.8.4")

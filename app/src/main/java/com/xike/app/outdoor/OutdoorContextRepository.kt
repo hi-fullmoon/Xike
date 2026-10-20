@@ -211,7 +211,9 @@ internal class OutdoorContextRepository(context: Context) {
                         ?: address.countryName
                         ?: fullLabel
                 }
-        return PlaceLabel(label, fullLabel)
+        return withContext(Dispatchers.Default) {
+            PlaceLabel(localizePlaceName(label, locale), localizePlaceName(fullLabel, locale))
+        }
     }
 
     private fun canIncludeStreet(location: Location): Boolean =
@@ -305,10 +307,11 @@ internal class OutdoorContextRepository(context: Context) {
         }
 
     private fun searchCity(query: String): CityCoordinate {
+        val locale = AppLocale.locale
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
         val response =
             requestJson(
-                "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=${AppLocale.locale.language}&format=json"
+                "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=${locale.language}&format=json"
             )
         val result =
             response.optJSONArray("results")?.optJSONObject(0)
@@ -320,8 +323,8 @@ internal class OutdoorContextRepository(context: Context) {
                 query
             }
         return CityCoordinate(
-                label = label.take(MAX_PLACE_NAME_LENGTH),
-                name = name.ifBlank { query }.take(MAX_PLACE_NAME_LENGTH),
+                label = localizePlaceName(label, locale).take(MAX_PLACE_NAME_LENGTH),
+                name = localizePlaceName(name.ifBlank { query }, locale).take(MAX_PLACE_NAME_LENGTH),
                 latitude = result.optDouble("latitude", Double.NaN),
                 longitude = result.optDouble("longitude", Double.NaN),
             )
