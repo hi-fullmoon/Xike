@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -302,19 +303,29 @@ private fun <I, O> rememberActivityResultWithAccess(
                 var started = false
                 try {
                     check(callbacks.canHandleResult()) { localizedText("解锁息刻") }
-                    val intent = launcher.contract.createIntent(context, input)
-                    val info = intent.resolveActivityInfo(context.packageManager, 0)
-                    // Media pickers may hide the caller even when their launch mode suggests
-                    // the same task. Explicit system events detect interruptions; otherwise the
-                    // session applies its conservative elapsed-time gate when returning.
-                    // A camera may also run in its own task.
-                    val sameTask =
-                        !retainReadAccess &&
-                            intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
-                            (info?.launchMode == ActivityInfo.LAUNCH_MULTIPLE ||
-                                info?.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP)
-                    started = true
-                    callbacks.onLaunch(key, sameTask)
+                    val permissionRequest =
+                        launcher.contract is ActivityResultContracts.RequestPermission ||
+                            launcher.contract is ActivityResultContracts.RequestMultiplePermissions
+                    val synchronous = launcher.contract.getSynchronousResult(context, input) != null
+                    // Runtime permission prompts belong to the current foreground interaction.
+                    // Do not give them an external-activity exemption or an elapsed-time lock.
+                    // Real onStop / screen-off events still go through the normal lock policy.
+                    // Keep all results on the existing deferred, unlock-gated delivery path.
+                    if (!permissionRequest && !synchronous) {
+                        val intent = launcher.contract.createIntent(context, input)
+                        val info = intent.resolveActivityInfo(context.packageManager, 0)
+                        // Media pickers may hide the caller even when their launch mode suggests
+                        // the same task. Explicit system events detect interruptions; otherwise the
+                        // session applies its conservative elapsed-time gate when returning.
+                        // A camera may also run in its own task.
+                        val sameTask =
+                            !retainReadAccess &&
+                                intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK == 0 &&
+                                (info?.launchMode == ActivityInfo.LAUNCH_MULTIPLE ||
+                                    info?.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP)
+                        started = true
+                        callbacks.onLaunch(key, sameTask)
+                    }
                     launcher.launch(input, options)
                 } catch (error: Exception) {
                     if (started) callbacks.onLaunchFailed(key)

@@ -56,9 +56,11 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.xike.app.LocalSystemActivityCallbacks
 import com.xike.app.outdoor.AmapConfiguration
 import com.xike.app.outdoor.AmapSettings
 import com.xike.app.outdoor.LocalAmapSettingsOperations
+import com.xike.app.outdoor.hasForegroundLocationPermission
 import com.xike.app.rememberSystemActivityResultLauncher
 import com.xike.app.tr
 import com.xike.app.ui.theme.XikeDialogContentGap
@@ -74,6 +76,7 @@ internal fun AmapSettingsDialog(onDismiss: () -> Unit) {
     val operations = LocalAmapSettingsOperations.current ?: return
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val systemActivityCallbacks = LocalSystemActivityCallbacks.current
     val clipboard = LocalClipboardManager.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var configuration by remember { mutableStateOf<AmapConfiguration?>(null) }
@@ -89,6 +92,8 @@ internal fun AmapSettingsDialog(onDismiss: () -> Unit) {
     val settings = AmapSettings(key, enabled, accepted).normalized()
 
     fun testLocation() {
+        // The direct, already-authorized path must retain the same unlock gate as the launcher.
+        if (busy || testing?.isActive == true || !systemActivityCallbacks.canHandleResult()) return
         testing = scope.launch {
             busy = true
             message = null
@@ -188,12 +193,16 @@ internal fun AmapSettingsDialog(onDismiss: () -> Unit) {
                             enabled =
                                 !busy && configuration != null && key.isNotBlank() && accepted,
                             onClick = {
-                                permissions.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                                if (hasForegroundLocationPermission(context)) {
+                                    testLocation()
+                                } else {
+                                    permissions.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                                        )
                                     )
-                                )
+                                }
                             },
                         ) {
                             Text(if (busy) tr("处理中…", "Working…") else tr("测试定位", "Test location"))

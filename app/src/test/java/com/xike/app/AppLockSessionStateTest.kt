@@ -12,6 +12,47 @@ import org.junit.Test
 
 class AppLockSessionStateTest {
     @Test
+    fun permissionResultWithoutAnExternalLaunchDoesNotLockAnActiveSession() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.finishSystemActivity(
+            operationId = "permission",
+            nowMillis = 2_000L,
+            timeout = AppLockTimeout.IMMEDIATELY,
+        )
+        assertFalse(state.systemActivityInProgress)
+        assertFalse(state.shouldLockOnForeground(2_000L, AppLockTimeout.IMMEDIATELY))
+        assertNull(state.backgroundedAtMillis)
+    }
+
+    @Test
+    fun permissionReturnDoesNotClearRealBackgroundTimeOrBypassTimeouts() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.recordBackgrounded(1_000L)
+        state.finishSystemActivity(
+            operationId = "permission",
+            nowMillis = 2_000L,
+            timeout = AppLockTimeout.IMMEDIATELY,
+        )
+        assertEquals(1_000L, state.backgroundedAtMillis)
+        assertTrue(state.shouldLockOnForeground(2_000L, AppLockTimeout.IMMEDIATELY))
+        assertFalse(state.shouldLockOnForeground(60_999L, AppLockTimeout.ONE_MINUTE))
+        assertTrue(state.shouldLockOnForeground(61_000L, AppLockTimeout.ONE_MINUTE))
+    }
+
+    @Test
+    fun permissionReturnCannotUnlockADeviceLockedDuringThePrompt() {
+        val state = AppLockSessionState().apply { isAppLocked = false }
+        state.recordDeviceLocked()
+        state.finishSystemActivity(
+            operationId = "permission",
+            nowMillis = 2_000L,
+            timeout = AppLockTimeout.THIRTY_MINUTES,
+        )
+        assertTrue(state.isAppLocked)
+        AppLockTimeout.entries.forEach { assertTrue(state.shouldLockOnForeground(2_000L, it)) }
+    }
+
+    @Test
     fun unlockedSessionWithoutBackgroundingStaysUnlockedForEveryTimeout() {
         val state = AppLockSessionState().apply { isAppLocked = false }
 
