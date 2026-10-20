@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cn.hutool.core.util.CoordinateUtil
+import com.xike.app.data.model.LocationSource
 import com.xike.app.outdoor.OutdoorContextRepository
 import com.xike.app.outdoor.PlaceLabels
 import kotlinx.coroutines.runBlocking
@@ -28,6 +29,8 @@ class AmapWeatherTest {
                 PlaceLabels("北京市", "中国 · 北京市"),
             )
         assertEquals("北京市", beijing.placeName)
+        assertEquals(LocationSource.AMAP, beijing.locationSource)
+        assertEquals("Open-Meteo", beijing.source)
         assertEquals("中国 · 北京市", beijing.fullPlaceName)
         assertTrue(beijing.temperatureCelsius.isFinite())
         val hangzhouGcj = CoordinateUtil.wgs84ToGcj02(120.16142, 30.29365)
@@ -54,6 +57,7 @@ class AmapWeatherTest {
                 PlaceLabels("Hangzhou", "Zhejiang · Hangzhou"),
             )
         assertEquals("Hangzhou", weather.placeName)
+        assertEquals(LocationSource.AMAP, weather.locationSource)
         assertEquals("Zhejiang · Hangzhou", weather.fullPlaceName)
         assertTrue(weather.temperatureCelsius.isFinite())
     }

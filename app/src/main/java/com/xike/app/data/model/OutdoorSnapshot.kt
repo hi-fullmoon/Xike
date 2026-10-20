@@ -11,6 +11,7 @@ data class OutdoorSnapshot(
     val capturedAt: Long,
     val source: String = OPEN_METEO_SOURCE,
     val fullPlaceName: String? = null,
+    val locationSource: LocationSource? = null,
 ) {
     fun normalizedOrNull(): OutdoorSnapshot? {
         val normalizedPlace = placeName.trim().take(MAX_PLACE_NAME_LENGTH)
@@ -39,6 +40,7 @@ data class OutdoorSnapshot(
             .put("capturedAt", capturedAt)
             .put("source", source)
             .apply { fullPlaceName?.let { put("fullPlaceName", it) } }
+            .apply { locationSource?.let { put("locationSource", it.id) } }
 
     companion object {
         fun fromJson(json: JSONObject?): OutdoorSnapshot? = json?.let {
@@ -49,9 +51,21 @@ data class OutdoorSnapshot(
                     capturedAt = it.optLong("capturedAt"),
                     source = it.optString("source", OPEN_METEO_SOURCE),
                     fullPlaceName = it.optString("fullPlaceName").takeIf(String::isNotBlank),
+                    locationSource = LocationSource.fromId(it.optString("locationSource")),
                 )
                 .normalizedOrNull()
         }
+    }
+}
+
+/** Stable identifiers are stored independently of translated labels and weather providers. */
+enum class LocationSource(val id: String) {
+    AMAP("amap"),
+    SYSTEM("system"),
+    MANUAL("manual");
+
+    companion object {
+        fun fromId(id: String?): LocationSource? = entries.firstOrNull { it.id == id }
     }
 }
 

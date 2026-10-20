@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import com.xike.app.AppLocale
 import com.xike.app.BuildConfig
+import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.MAX_PLACE_NAME_LENGTH
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.localizedText
@@ -109,6 +110,7 @@ internal class OutdoorContextRepository(
             location.longitude,
             place?.label ?: localizedText("当前位置"),
             place?.fullLabel,
+            LocationSource.SYSTEM,
         )
     }
 
@@ -124,6 +126,7 @@ internal class OutdoorContextRepository(
             coordinates.longitude,
             labels.label,
             labels.fullLabel,
+            LocationSource.AMAP,
         )
     }
 
@@ -144,7 +147,13 @@ internal class OutdoorContextRepository(
         val normalizedQuery = query.trim()
         require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
-        return fetchWeather(city.latitude, city.longitude, city.name, city.label)
+        return fetchWeather(
+            city.latitude,
+            city.longitude,
+            city.name,
+            city.label,
+            LocationSource.MANUAL,
+        )
     }
 
     private suspend fun currentLocation(): Location {
@@ -320,6 +329,7 @@ internal class OutdoorContextRepository(
         longitude: Double,
         placeName: String,
         fullPlaceName: String? = null,
+        locationSource: LocationSource,
     ): OutdoorSnapshot =
         withContext(Dispatchers.IO) {
             // Weather models do not benefit from street-level coordinates. Rounding here keeps
@@ -338,6 +348,7 @@ internal class OutdoorContextRepository(
             OutdoorSnapshot(
                     placeName = placeName,
                     fullPlaceName = fullPlaceName,
+                    locationSource = locationSource,
                     temperatureCelsius = current.optDouble("temperature_2m", Double.NaN),
                     weatherCode = current.optInt("weather_code", -1),
                     capturedAt = System.currentTimeMillis(),

@@ -57,15 +57,19 @@ internal fun restoreContentKey(
                     },
                     entry.outdoor?.let {
                         JSONArray(
-                            listOf(
-                                it.placeName,
-                                it.temperatureCelsius,
-                                it.weatherCode,
-                                it.capturedAt,
-                                it.source,
-                                it.fullPlaceName,
+                                listOf(
+                                    it.placeName,
+                                    it.temperatureCelsius,
+                                    it.weatherCode,
+                                    it.capturedAt,
+                                    it.source,
+                                    it.fullPlaceName,
+                                )
                             )
-                        )
+                            .apply {
+                                // Keep legacy identities unchanged when the field was not recorded.
+                                it.locationSource?.let { source -> put(source.id) }
+                            }
                     },
                 )
             )

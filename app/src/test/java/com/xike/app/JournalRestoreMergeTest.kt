@@ -5,6 +5,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class JournalRestoreMergeTest {
+    @Test
+    fun changedLocationSourceIsPreservedWhileMissingLegacyMetadataStaysStable() {
+        val snapshot = com.xike.app.data.model.OutdoorSnapshot("杭州", 20.0, 1, 123L)
+        val legacy = original.copy(outdoor = snapshot)
+        val restoredLegacy =
+            legacy.copy(
+                outdoor = com.xike.app.data.model.OutdoorSnapshot.fromJson(snapshot.toJson())
+            )
+        assertEquals(key(legacy), key(restoredLegacy))
+        val amap =
+            legacy.copy(
+                outdoor =
+                    snapshot.copy(locationSource = com.xike.app.data.model.LocationSource.AMAP)
+            )
+        val system =
+            legacy.copy(
+                outdoor =
+                    snapshot.copy(locationSource = com.xike.app.data.model.LocationSource.SYSTEM)
+            )
+        assertNotEquals(key(amap), key(system))
+        assertTrue(merge(listOf(amap), listOf(amap)).isEmpty())
+        assertEquals(1, merge(listOf(amap), listOf(system)).size)
+    }
+
     private val original =
         JournalEntry(
             id = "original",

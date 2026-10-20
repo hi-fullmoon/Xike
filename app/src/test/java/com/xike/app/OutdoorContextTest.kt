@@ -1,10 +1,16 @@
 package com.xike.app
 
+import com.xike.app.data.JournalEntry
+import com.xike.app.data.Mood
+import com.xike.app.data.model.JournalDraft
+import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.outdoor.firstNonNullResult
+import com.xike.app.outdoor.locationSourceName
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -15,6 +21,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OutdoorContextTest {
+    @Test
+    fun `location providers survive snapshot draft and backup json independently of weather`() {
+        for (provider in LocationSource.entries) {
+            val snapshot = OutdoorSnapshot("杭州", 20.0, 1, 123L, locationSource = provider)
+            val restored = OutdoorSnapshot.fromJson(snapshot.toJson())!!
+            assertEquals(provider, restored.locationSource)
+            assertEquals("Open-Meteo", restored.source)
+            val draft = JournalDraft(outdoor = snapshot, updatedAt = 123L)
+            assertEquals(provider, JournalDraft.fromJson(draft.toJson()).outdoor!!.locationSource)
+            val entry =
+                JournalEntry(
+                    id = "source-round-trip",
+                    mood = Mood.CALM,
+                    tags = emptyList(),
+                    note = "",
+                    outdoor = snapshot,
+                )
+            assertEquals(provider, JournalEntry.fromJson(entry.toJson()).outdoor!!.locationSource)
+        }
+    }
+
+    @Test
+    fun `legacy and unrecognized location sources remain unknown instead of guessing system`() {
+        val legacy = OutdoorSnapshot("杭州", 20.0, 1, 123L).toJson()
+        assertNull(OutdoorSnapshot.fromJson(legacy)!!.locationSource)
+        legacy.put("locationSource", "future-provider")
+        assertNull(OutdoorSnapshot.fromJson(legacy)!!.locationSource)
+        assertEquals("Open-Meteo", OutdoorSnapshot.fromJson(legacy)!!.source)
+    }
+
+    @Test
+    fun `location source display labels follow the requested language`() {
+        assertEquals("高德定位", locationSourceName(LocationSource.AMAP, Locale.CHINESE))
+        assertEquals("系统定位", locationSourceName(LocationSource.SYSTEM, Locale.CHINESE))
+        assertEquals("手动选择", locationSourceName(LocationSource.MANUAL, Locale.CHINESE))
+        assertEquals("AMap", locationSourceName(LocationSource.AMAP, Locale.ENGLISH))
+        assertEquals("System location", locationSourceName(LocationSource.SYSTEM, Locale.ENGLISH))
+        assertEquals("Manually selected", locationSourceName(LocationSource.MANUAL, Locale.ENGLISH))
+    }
+
     @Test
     fun `snapshot json round trip preserves normalized values`() {
         val snapshot =

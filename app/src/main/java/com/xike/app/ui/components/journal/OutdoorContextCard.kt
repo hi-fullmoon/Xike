@@ -60,10 +60,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.localizedText
+import com.xike.app.outdoor.locationSourceName
 import com.xike.app.tr
 import com.xike.app.ui.components.PaperCard
 import com.xike.app.ui.theme.XikeCardPadding
@@ -162,13 +164,28 @@ internal fun OutdoorContextCard(
                             }
                         }
                     }
+                    val sourceTextStyle =
+                        MaterialTheme.typography.bodySmall.let {
+                            it.copy(fontSize = (it.fontSize.value - 1f).sp)
+                        }
+                    snapshot.locationSource?.let { source ->
+                        val name = locationSourceName(source, AppLocale.locale)
+                        Text(
+                            tr("地点来源：$name", "Location source: $name"),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            style = sourceTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
                         tr(
-                            "天气获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
-                            "Weather fetched at ${snapshot.capturedAt.asOutdoorCapturedTime()} · ${snapshot.source}",
+                            "天气来源：${snapshot.source} · 获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()}",
+                            "Weather source: ${snapshot.source} · Fetched at ${snapshot.capturedAt.asOutdoorCapturedTime()}",
                         ),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        style = MaterialTheme.typography.bodySmall,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .padding(top = if (snapshot.locationSource != null) 2.dp else 8.dp),
+                        style = sourceTextStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (!isLoading && errorMessage != null) {

@@ -29,6 +29,7 @@ import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
 import com.xike.app.data.feelingKeys
 import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.OPEN_METEO_SOURCE
 import com.xike.app.data.model.OutdoorSnapshot
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +57,7 @@ internal data class JournalEntryEntity(
     @ColumnInfo(name = "outdoor_captured_at") val outdoorCapturedAt: Long? = null,
     @ColumnInfo(name = "outdoor_source") val outdoorSource: String? = null,
     @ColumnInfo(name = "outdoor_full_place_name") val outdoorFullPlaceName: String? = null,
+    @ColumnInfo(name = "outdoor_location_source") val outdoorLocationSource: String? = null,
     @ColumnInfo(name = "video_json") val videoJson: String? = null,
     @ColumnInfo(name = "feelings_json") val feelingsJson: String? = null,
     @ColumnInfo(name = "mood_scale_version", defaultValue = "0") val moodScaleVersion: Int = 0,
@@ -176,6 +178,7 @@ internal fun JournalEntry.toBundle(): JournalBundle =
                 outdoorCapturedAt = outdoor?.capturedAt,
                 outdoorSource = outdoor?.source,
                 outdoorFullPlaceName = outdoor?.fullPlaceName,
+                outdoorLocationSource = outdoor?.locationSource?.id,
                 videoJson = video?.toJson()?.toString(),
                 feelingsJson = org.json.JSONArray(feelings).toString(),
                 moodScaleVersion = moodScaleVersion,
@@ -224,6 +227,7 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
                         capturedAt = entry.outdoorCapturedAt ?: return@let null,
                         source = entry.outdoorSource ?: OPEN_METEO_SOURCE,
                         fullPlaceName = entry.outdoorFullPlaceName,
+                        locationSource = LocationSource.fromId(entry.outdoorLocationSource),
                     )
                     .normalizedOrNull()
             },
@@ -515,7 +519,7 @@ internal abstract class JournalDao {
             AppSettingEntity::class,
             JournalSearchEntity::class,
         ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -546,9 +550,19 @@ internal abstract class JournalDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 .build()
         }
+
+        internal val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE journal_entries ADD COLUMN outdoor_location_source TEXT"
+                    )
+                }
+            }
 
         internal val MIGRATION_7_8 =
             object : Migration(7, 8) {

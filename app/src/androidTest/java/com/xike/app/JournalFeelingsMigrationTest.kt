@@ -20,6 +20,7 @@ class JournalFeelingsMigrationTest {
             helper.runMigrationsAndValidate(name, 8, true, JournalDatabase.MIGRATION_7_8).close()
             val database =
                 androidx.room.Room.databaseBuilder(context, JournalDatabase::class.java, name)
+                    .addMigrations(JournalDatabase.MIGRATION_8_9)
                     .allowMainThreadQueries()
                     .build()
             try {
