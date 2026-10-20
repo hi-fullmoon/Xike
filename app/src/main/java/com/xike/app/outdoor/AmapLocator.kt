@@ -226,6 +226,8 @@ internal class AmapLocator(context: Context) {
                     location.street.orEmpty(),
                     location.address.orEmpty(),
                     includeStreet,
+                    poi = location.poiName.orEmpty(),
+                    aoi = location.aoiName.orEmpty(),
                 )
             val wgs84 = location.coordType == AMapLocation.COORD_TYPE_WGS84
             // GPS fixes can precede address lookup, particularly outside mainland China.

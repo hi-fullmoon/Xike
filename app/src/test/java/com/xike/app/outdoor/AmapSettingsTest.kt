@@ -1,9 +1,182 @@
 package com.xike.app.outdoor
 
+import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Test
 
 class AmapSettingsTest {
+    @Test
+    fun `POI takes priority over AOI and street without losing full address`() {
+        val labels =
+            amapPlaceLabels(
+                "中国",
+                "浙江省",
+                "杭州市",
+                "滨江区",
+                "和畅路",
+                "浙江省杭州市滨江区和畅路18号",
+                true,
+                poi = "  咖啡厅  ",
+                aoi = "园区",
+            )!!
+        assertEquals("杭州市 · 滨江区 · 咖啡厅", labels.label)
+        assertEquals("浙江省杭州市滨江区和畅路18号 · 咖啡厅", labels.fullLabel)
+    }
+
+    @Test
+    fun `blank POI falls back to AOI and then to the original street labels`() {
+        val aoi =
+            amapPlaceLabels(
+                "中国",
+                "浙江省",
+                "杭州市",
+                "滨江区",
+                "和畅路",
+                "和畅路18号",
+                true,
+                poi = " \t",
+                aoi = " 园区 ",
+            )!!
+        assertEquals("杭州市 · 滨江区 · 园区", aoi.label)
+        assertEquals("和畅路18号 · 园区", aoi.fullLabel)
+        val street =
+            amapPlaceLabels(
+                "中国",
+                "浙江省",
+                "杭州市",
+                "滨江区",
+                "和畅路",
+                "和畅路18号",
+                true,
+                poi = " ",
+                aoi = "\t",
+            )!!
+        assertEquals("杭州市 · 滨江区 · 和畅路", street.label)
+        assertEquals("和畅路18号", street.fullLabel)
+    }
+
+    @Test
+    fun `coarse location hides POI AOI street and detailed address from both labels`() {
+        val labels =
+            amapPlaceLabels(
+                "中国",
+                "浙江省",
+                "杭州市",
+                "滨江区",
+                "和畅路",
+                "咖啡厅所在的和畅路18号园区",
+                false,
+                poi = "咖啡厅",
+                aoi = "园区",
+            )!!
+        assertEquals("杭州市 · 滨江区", labels.label)
+        assertEquals("中国 · 浙江省 · 杭州市 · 滨江区", labels.fullLabel)
+        assertNull(amapPlaceLabels("", "", "", "", "", "", false, "咖啡厅", "园区"))
+    }
+
+    @Test
+    fun `venue already present in a full address is not appended again`() {
+        val labels =
+            amapPlaceLabels(
+                "China",
+                "Zhejiang",
+                "Hangzhou",
+                "Binjiang",
+                "Road",
+                "18 Road Coffee Shop",
+                true,
+                poi = "coffee shop",
+                aoi = "Park",
+            )!!
+        assertEquals("Hangzhou · Binjiang · coffee shop", labels.label)
+        assertEquals("18 Road Coffee Shop", labels.fullLabel)
+    }
+
+    @Test
+    fun `venue survives missing street and address and can stand alone`() {
+        val labels =
+            amapPlaceLabels(
+                "中国",
+                "浙江省",
+                "杭州市",
+                "滨江区",
+                "",
+                "",
+                true,
+                poi = "咖啡厅",
+                aoi = "园区",
+            )!!
+        assertEquals("杭州市 · 滨江区 · 咖啡厅", labels.label)
+        assertEquals("中国 · 浙江省 · 杭州市 · 滨江区 · 咖啡厅", labels.fullLabel)
+        val standalone = amapPlaceLabels("", "", "", "", "", "", true, aoi = "园区")!!
+        assertEquals("园区", standalone.label)
+        assertEquals("园区", standalone.fullLabel)
+    }
+
+    @Test
+    fun `Chinese POI retains original spelling and English uses the region dictionary fallback`() {
+        val labels =
+            amapPlaceLabels(
+                "中国",
+                "福建省",
+                "厦门市",
+                "思明区",
+                "",
+                "",
+                true,
+                poi = "厦门咖啡",
+                aoi = "园区",
+            )!!
+        assertEquals("厦门市 · 思明区 · 厦门咖啡", localizePlaceName(labels.label, Locale.SIMPLIFIED_CHINESE))
+        assertEquals(
+            "Xiamenshi · Simingqu · Xiamenkafei",
+            localizePlaceName(labels.label, Locale.ENGLISH),
+        )
+        assertEquals(
+            "Zhongguo · Fujiansheng · Xiamenshi · Simingqu · Xiamenkafei",
+            localizePlaceName(labels.fullLabel, Locale.ENGLISH),
+        )
+    }
+
+    @Test
+    fun `English AOI and mixed language POI keep existing Latin text during fallback`() {
+        val english =
+            amapPlaceLabels(
+                "China",
+                "Zhejiang",
+                "Hangzhou",
+                "Binjiang",
+                "Road",
+                "18 Road",
+                true,
+                aoi = "Coffee Park",
+            )!!
+        assertEquals(
+            "Hangzhou · Binjiang · Coffee Park",
+            localizePlaceName(english.label, Locale.ENGLISH),
+        )
+        assertEquals("18 Road · Coffee Park", localizePlaceName(english.fullLabel, Locale.ENGLISH))
+        val mixed =
+            amapPlaceLabels(
+                "China",
+                "Zhejiang",
+                "Hangzhou",
+                "Binjiang",
+                "Road",
+                "18 Road",
+                true,
+                poi = "Coffee 厦门店",
+            )!!
+        assertEquals(
+            "Hangzhou · Binjiang · Coffee Xiamendian",
+            localizePlaceName(mixed.label, Locale.ENGLISH),
+        )
+        assertEquals(
+            "18 Road · Coffee Xiamendian",
+            localizePlaceName(mixed.fullLabel, Locale.ENGLISH),
+        )
+    }
+
     @Test
     fun `only known SDK diagnostic tags leave raw network details`() {
         assertEquals(

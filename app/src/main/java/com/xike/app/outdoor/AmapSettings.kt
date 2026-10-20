@@ -87,12 +87,18 @@ internal fun amapPlaceLabels(
     street: String,
     address: String,
     includeStreet: Boolean,
+    poi: String = "",
+    aoi: String = "",
 ): PlaceLabels? {
     fun List<String>.joined() =
         map(String::trim).filter(String::isNotBlank).distinct().joinToString(" · ")
     val regions = listOf(country, province, city, district).joined()
+    // POI/AOI may identify a nearby venue, not a confirmed visit. Keep the same precision gate
+    // as street details; approximate permission must never expose a venue through either label.
+    val venue = if (includeStreet) poi.trim().ifBlank { aoi.trim() } else ""
+    val detail = if (includeStreet) venue.ifBlank { street.trim() } else ""
     val label =
-        listOf(city, district, street.takeIf { includeStreet }.orEmpty()).joined().ifBlank {
+        listOf(city, district, detail).joined().ifBlank {
             regions
         }
     if (label.isBlank()) return null
@@ -100,5 +106,13 @@ internal fun amapPlaceLabels(
         if (includeStreet)
             address.trim().ifBlank { listOf(country, province, city, district, street).joined() }
         else regions
-    return PlaceLabels(label, full.ifBlank { label })
+    val fullWithVenue =
+        full
+            .ifBlank { label }
+            .let {
+                if (venue.isNotBlank() && !it.contains(venue, ignoreCase = true))
+                    listOf(it, venue).joined()
+                else it
+            }
+    return PlaceLabels(label, fullWithVenue)
 }
