@@ -324,7 +324,8 @@ internal class OutdoorContextRepository(context: Context) {
             }
         return CityCoordinate(
                 label = localizePlaceName(label, locale).take(MAX_PLACE_NAME_LENGTH),
-                name = localizePlaceName(name.ifBlank { query }, locale).take(MAX_PLACE_NAME_LENGTH),
+                name =
+                    localizePlaceName(name.ifBlank { query }, locale).take(MAX_PLACE_NAME_LENGTH),
                 latitude = result.optDouble("latitude", Double.NaN),
                 longitude = result.optDouble("longitude", Double.NaN),
             )

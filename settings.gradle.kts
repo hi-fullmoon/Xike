@@ -15,6 +15,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // TinyPinyin 2.0.3 was published to JCenter; use the upstream-recommended mirror.
+        exclusiveContent {
+            forRepository { maven("https://maven.aliyun.com/repository/public") }
+            filter { includeGroup("com.github.promeg") }
+        }
     }
 }
 
