@@ -1,7 +1,6 @@
 package com.xike.app.feature.settings
 
 import android.app.TimePickerDialog
-import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,7 +85,6 @@ import com.xike.app.ReminderSettings
 import com.xike.app.displayName
 import com.xike.app.feature.lock.AppLockTimeout
 import com.xike.app.localizedText
-import com.xike.app.outdoor.TripleTapGate
 import com.xike.app.tr
 import com.xike.app.ui.components.ScreenHeader
 import com.xike.app.ui.theme.AppStyle
@@ -141,8 +139,6 @@ fun ProfileSettingsScreen(
     var showPromptStyleDialog by rememberSaveable { mutableStateOf(false) }
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showAutoBackupDialog by rememberSaveable { mutableStateOf(false) }
-    var showAmapDialog by rememberSaveable { mutableStateOf(false) }
-    val amapEntryTaps = remember { TripleTapGate() }
     val onLanguageChange = LocalLanguageChange.current
 
     ScreenColumn(padding) {
@@ -446,19 +442,10 @@ fun ProfileSettingsScreen(
 
         Text(
             tr("息刻 · ${BuildConfig.VERSION_NAME}", "Xike · ${BuildConfig.VERSION_NAME}"),
-            modifier =
-                Modifier.fillMaxWidth()
-                    .clickable {
-                        if (amapEntryTaps.tap(SystemClock.elapsedRealtime())) showAmapDialog = true
-                    }
-                    .padding(vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-
-    if (showAmapDialog) {
-        AmapSettingsDialog(onDismiss = { showAmapDialog = false })
     }
 
     if (showAutoBackupDialog) {

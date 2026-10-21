@@ -639,6 +639,7 @@ fun JournalArchiveScreen(
     detailEntry?.let { entry ->
         JournalEntryDetailDialog(
             entry = entry,
+            showLocationSource = true,
             openImage = openImage,
             openAudio = openAudio,
             onDismiss = { detailEntry = null },
@@ -909,6 +910,7 @@ private fun ArchiveTimelineEntry(
         moodIconSize = 36.dp,
         compactMoodOnly = true,
         compactLabels = true,
+        showLocationSource = true,
         openImage = openImage,
         onImageClick = onImageClick,
         onClick = onClick,

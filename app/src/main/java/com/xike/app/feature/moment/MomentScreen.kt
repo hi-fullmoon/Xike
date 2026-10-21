@@ -546,7 +546,7 @@ fun MomentScreen(
             }
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(localizedText("此刻窗外"), style = MaterialTheme.typography.titleMedium)
+                OutdoorSettingsTitle()
                 OutdoorContextCard(
                     snapshot = draft.outdoor,
                     contentPadding = XikeContentCardPadding,

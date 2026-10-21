@@ -41,6 +41,7 @@ import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
 import com.xike.app.data.feelingLabel
 import com.xike.app.localizedText
+import com.xike.app.outdoor.locationSourceName
 import com.xike.app.tr
 import com.xike.app.ui.components.formatAudioDuration
 import com.xike.app.ui.theme.XikeCardPadding
@@ -63,6 +64,7 @@ internal fun JournalEntryCard(
     moodIconSize: Dp = 24.dp,
     compactMoodOnly: Boolean = false,
     compactLabels: Boolean = false,
+    showLocationSource: Boolean = false,
 ) {
     val isCompactMoodOnly =
         compactMoodOnly &&
@@ -151,6 +153,18 @@ internal fun JournalEntryCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        outdoor.locationSource
+                            ?.takeIf { showLocationSource }
+                            ?.let { source ->
+                                val name = locationSourceName(source, AppLocale.locale)
+                                Text(
+                                    tr("地点来源：$name", "Location source: $name"),
+                                    modifier =
+                                        Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                     }
                     if (entry.note.isNotBlank()) {
                         Spacer(Modifier.height(9.dp))

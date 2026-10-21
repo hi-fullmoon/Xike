@@ -57,6 +57,7 @@ import com.xike.app.canonicalTopic
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
 import com.xike.app.localizedText
+import com.xike.app.outdoor.locationSourceName
 import com.xike.app.tr
 import com.xike.app.ui.components.FeelingChip
 import com.xike.app.ui.components.JournalPhotoMosaic
@@ -87,6 +88,7 @@ internal fun JournalEntryDetailDialog(
     onDismiss: () -> Unit,
     onRequestEdit: (() -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
+    showLocationSource: Boolean = false,
 ) {
     var photoPage by remember(entry.id) { mutableIntStateOf(-1) }
     var showFullAddress by remember(entry.id, entry.outdoor) { mutableStateOf(false) }
@@ -255,6 +257,19 @@ internal fun JournalEntryDetailDialog(
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                        outdoor.locationSource
+                                            ?.takeIf { showLocationSource }
+                                            ?.let { source ->
+                                                val name =
+                                                    locationSourceName(source, AppLocale.locale)
+                                                Text(
+                                                    tr("地点来源：$name", "Location source: $name"),
+                                                    modifier = Modifier.padding(top = 2.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color =
+                                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
                                     }
                                 }
                             }
