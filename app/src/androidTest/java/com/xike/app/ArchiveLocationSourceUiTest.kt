@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
@@ -26,8 +25,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
@@ -53,7 +50,7 @@ class ArchiveLocationSourceUiTest {
     @get:Rule val rule = createEmptyComposeRule()
 
     @Test
-    fun savedManualLocationShowsSourceInCardAndDetailAndStillOpensFullAddress() {
+    fun savedLocationKeepsSourcesInDetailAndStillOpensFullAddress() {
         assumeTrue(
             InstrumentationRegistry.getArguments().getString("isolatedArchiveSource") == "true"
         )
@@ -87,7 +84,6 @@ class ArchiveLocationSourceUiTest {
                                 ) {
                                     JournalEntryCard(
                                         saved,
-                                        showLocationSource = true,
                                         compactMedia = true,
                                         moodIconSize = 36.dp,
                                         compactMoodOnly = true,
@@ -109,17 +105,9 @@ class ArchiveLocationSourceUiTest {
                         }
                     }
                     val source = tr("地点来源：手动选择", "Location source: Manually selected")
-                    rule.onNodeWithText(source, useUnmergedTree = true).assertIsDisplayed()
-                    val layouts = mutableListOf<TextLayoutResult>()
-                    rule.onNodeWithText(source, useUnmergedTree = true).performSemanticsAction(
-                        SemanticsActions.GetTextLayoutResult
-                    ) {
-                        it(layouts)
-                    }
-                    assertTrue(
-                        "Source layout: ${layouts.map { listOf(it.size.width, it.size.height, it.didOverflowWidth, it.didOverflowHeight, it.lineCount) }}",
-                        layouts.isNotEmpty() && layouts.none { it.hasVisualOverflow },
-                    )
+                    rule.onNodeWithText(source, useUnmergedTree = true).assertDoesNotExist()
+                    rule.onNode(hasText("Open-Meteo", substring = true)).assertDoesNotExist()
+                    rule.onNode(hasText(weather.placeName, substring = true)).assertIsDisplayed()
                     if (
                         InstrumentationRegistry.getArguments()
                             .getString("archiveSourceScreenshots") == "true"
