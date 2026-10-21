@@ -253,10 +253,23 @@ internal fun JournalEntryDetailDialog(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
-                                            "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)} · ${outdoor.source}",
+                                            "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}" +
+                                                if (showLocationSource) ""
+                                                else " · ${outdoor.source}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                        if (showLocationSource) {
+                                            Text(
+                                                tr(
+                                                    "天气来源：${outdoor.source}",
+                                                    "Weather source: ${outdoor.source}",
+                                                ),
+                                                modifier = Modifier.padding(top = 2.dp),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                         outdoor.locationSource
                                             ?.takeIf { showLocationSource }
                                             ?.let { source ->

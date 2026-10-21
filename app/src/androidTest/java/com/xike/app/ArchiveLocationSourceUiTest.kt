@@ -126,6 +126,11 @@ class ArchiveLocationSourceUiTest {
                     rule.onNode(hasText(weather.placeName, substring = true)).performClick()
                     val detailSource = rule.onNode(hasText(source) and hasAnyAncestor(isDialog()))
                     detailSource.performScrollTo().assertIsDisplayed()
+                    rule
+                        .onNodeWithText(
+                            tr("天气来源：${weather.source}", "Weather source: ${weather.source}")
+                        )
+                        .assertIsDisplayed()
                     if (
                         InstrumentationRegistry.getArguments()
                             .getString("archiveSourceScreenshots") == "true"
