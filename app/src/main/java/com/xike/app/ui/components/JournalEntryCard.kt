@@ -159,8 +159,7 @@ internal fun JournalEntryCard(
                                 val name = locationSourceName(source, AppLocale.locale)
                                 Text(
                                     tr("地点来源：$name", "Location source: $name"),
-                                    modifier =
-                                        Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
