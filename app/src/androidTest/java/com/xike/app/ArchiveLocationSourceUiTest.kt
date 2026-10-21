@@ -126,6 +126,23 @@ class ArchiveLocationSourceUiTest {
                     rule.onNode(hasText(weather.placeName, substring = true)).performClick()
                     val detailSource = rule.onNode(hasText(source) and hasAnyAncestor(isDialog()))
                     detailSource.performScrollTo().assertIsDisplayed()
+                    if (
+                        InstrumentationRegistry.getArguments()
+                            .getString("archiveSourceScreenshots") == "true"
+                    ) {
+                        val folder = requireNotNull(context.getExternalFilesDir("verification"))
+                        File(folder, "archive-source-detail-${language.tag}.png")
+                            .outputStream()
+                            .use {
+                                assertTrue(
+                                    rule
+                                        .onNode(isDialog())
+                                        .captureToImage()
+                                        .asAndroidBitmap()
+                                        .compress(Bitmap.CompressFormat.PNG, 100, it)
+                                )
+                            }
+                    }
                     rule.onNode(hasText("Open-Meteo", substring = true)).assertIsDisplayed()
                     rule
                         .onNode(hasText(weather.placeName) and hasAnyAncestor(isDialog()))
