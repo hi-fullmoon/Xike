@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -167,6 +168,9 @@ internal fun TopicChip(
     verticalPadding: Dp = 4.dp,
     horizontalPadding: Dp = 9.dp,
     compact: Boolean = false,
+    iconSize: Dp = if (compact) 12.dp else 18.dp,
+    labelStyle: TextStyle =
+        if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelLarge,
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -204,7 +208,7 @@ internal fun TopicChip(
             Icon(
                 imageVector = topic.icon,
                 contentDescription = null,
-                modifier = Modifier.size(if (compact) 12.dp else 18.dp),
+                modifier = Modifier.size(iconSize),
                 tint =
                     if (isDark) androidx.compose.ui.graphics.lerp(topic.accent, Color.White, 0.45f)
                     else topic.accent.copy(alpha = if (selected) 1f else 0.72f),
@@ -213,9 +217,7 @@ internal fun TopicChip(
             Text(
                 localizedText(topic.label),
                 maxLines = labelMaxLines,
-                style =
-                    if (compact) MaterialTheme.typography.labelSmall
-                    else MaterialTheme.typography.labelLarge,
+                style = labelStyle,
                 color =
                     when {
                         selected && isDark -> MaterialTheme.colorScheme.onSurface

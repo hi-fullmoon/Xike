@@ -23,10 +23,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xike.app.data.Feeling
 import com.xike.app.data.Mood
@@ -193,6 +195,9 @@ internal fun FeelingChip(
     onClick: (() -> Unit)? = null,
     filled: Boolean = true,
     compact: Boolean = false,
+    compactMinHeight: Dp = 20.dp,
+    compactTextStyle: TextStyle = MaterialTheme.typography.labelSmall,
+    compactHorizontalPadding: Dp = 6.dp,
 ) {
     val feeling = Feeling.entries.find { it.name == key }
     val dark = isSystemInDarkTheme()
@@ -215,12 +220,13 @@ internal fun FeelingChip(
         ) {
             Row(
                 modifier =
-                    Modifier.heightIn(min = 20.dp).padding(horizontal = 6.dp, vertical = 2.dp),
+                    Modifier.heightIn(min = compactMinHeight)
+                        .padding(horizontal = compactHorizontalPadding, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = compactTextStyle,
                     color = selectedInk ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

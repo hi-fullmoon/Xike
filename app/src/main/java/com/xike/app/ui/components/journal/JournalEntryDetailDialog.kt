@@ -25,17 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -190,11 +187,14 @@ internal fun JournalEntryDetailDialog(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 entry.feelings.forEach { key ->
-                                    CompositionLocalProvider(
-                                        LocalMinimumInteractiveComponentSize provides 0.dp
-                                    ) {
-                                        FeelingChip(key, filled = false)
-                                    }
+                                    FeelingChip(
+                                        key,
+                                        filled = false,
+                                        compact = true,
+                                        compactMinHeight = 24.dp,
+                                        compactTextStyle = MaterialTheme.typography.labelMedium,
+                                        compactHorizontalPadding = 8.dp,
+                                    )
                                 }
                             }
                         }
@@ -213,11 +213,14 @@ internal fun JournalEntryDetailDialog(
                                         topic = (topic ?: journalTopics.last()).copy(label = tag),
                                         selected = true,
                                         onClick = null,
-                                        minHeight = FilterChipDefaults.Height,
-                                        verticalPadding = 0.dp,
-                                        horizontalPadding = 16.dp,
+                                        minHeight = 24.dp,
+                                        verticalPadding = 2.dp,
+                                        horizontalPadding = 8.dp,
                                         labelMaxLines = Int.MAX_VALUE,
                                         filled = false,
+                                        compact = true,
+                                        iconSize = 14.dp,
+                                        labelStyle = MaterialTheme.typography.labelMedium,
                                     )
                                 }
                             }
