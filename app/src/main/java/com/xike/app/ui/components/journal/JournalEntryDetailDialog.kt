@@ -182,46 +182,51 @@ internal fun JournalEntryDetailDialog(
 
                     if (entry.feelings.isNotEmpty()) {
                         JournalDetailSection(com.xike.app.tr("具体感受", "Feelings")) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                entry.feelings.forEach { key ->
-                                    FeelingChip(
-                                        key,
-                                        filled = false,
-                                        compact = true,
-                                        compactMinHeight = 24.dp,
-                                        compactTextStyle = MaterialTheme.typography.labelMedium,
-                                        compactHorizontalPadding = 8.dp,
-                                    )
+                            JournalDetailCard {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    entry.feelings.forEach { key ->
+                                        FeelingChip(
+                                            key,
+                                            filled = false,
+                                            compact = true,
+                                            compactMinHeight = 24.dp,
+                                            compactTextStyle = MaterialTheme.typography.labelMedium,
+                                            compactHorizontalPadding = 8.dp,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                     if (entry.tags.isNotEmpty()) {
                         JournalDetailSection(localizedText("主题")) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                entry.tags.forEach { tag ->
-                                    val topic = journalTopics.find {
-                                        it.label == canonicalTopic(tag)
+                            JournalDetailCard {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    entry.tags.forEach { tag ->
+                                        val topic = journalTopics.find {
+                                            it.label == canonicalTopic(tag)
+                                        }
+                                        TopicChip(
+                                            topic =
+                                                (topic ?: journalTopics.last()).copy(label = tag),
+                                            selected = true,
+                                            onClick = null,
+                                            minHeight = 24.dp,
+                                            verticalPadding = 2.dp,
+                                            horizontalPadding = 8.dp,
+                                            labelMaxLines = Int.MAX_VALUE,
+                                            filled = false,
+                                            compact = true,
+                                            iconSize = 14.dp,
+                                            labelStyle = MaterialTheme.typography.labelMedium,
+                                        )
                                     }
-                                    TopicChip(
-                                        topic = (topic ?: journalTopics.last()).copy(label = tag),
-                                        selected = true,
-                                        onClick = null,
-                                        minHeight = 24.dp,
-                                        verticalPadding = 2.dp,
-                                        horizontalPadding = 8.dp,
-                                        labelMaxLines = Int.MAX_VALUE,
-                                        filled = false,
-                                        compact = true,
-                                        iconSize = 14.dp,
-                                        labelStyle = MaterialTheme.typography.labelMedium,
-                                    )
                                 }
                             }
                         }
