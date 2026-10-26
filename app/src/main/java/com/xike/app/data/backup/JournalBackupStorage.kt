@@ -217,7 +217,7 @@ internal class JournalBackupStorage(
 
         return if (prefixSize == BackupCipher.magicSize && BackupCipher.hasStreamingMagic(prefix)) {
             require(!password.isNullOrEmpty()) { localizedText("请输入备份密码。") }
-            readStreamingBackup(source, password, encrypted = true)
+            readStreamingBackup(source, password, encrypted = true, header = prefix)
         } else if (
             prefixSize >= 4 &&
                 prefix[0] == 'P'.code.toByte() &&
@@ -238,6 +238,7 @@ internal class JournalBackupStorage(
         source: InputStream,
         password: String?,
         encrypted: Boolean,
+        header: ByteArray? = null,
     ): PreparedBackup {
         val stagingDirectory = createStagingDirectory()
         return try {
@@ -256,7 +257,12 @@ internal class JournalBackupStorage(
             var completionSeen = false
 
             val archiveSource =
-                if (encrypted) BackupCipher.decryptingStream(source, requireNotNull(password))
+                if (encrypted)
+                    BackupCipher.decryptingStream(
+                        source,
+                        requireNotNull(password),
+                        requireNotNull(header),
+                    )
                 else source
             ZipInputStream(BufferedInputStream(archiveSource)).use { archive ->
                 val manifestEntry = archive.nextEntry
@@ -375,6 +381,14 @@ internal class JournalBackupStorage(
                     entry = archive.nextEntry
                     validateBackup(!completionSeen || entry == null) {
                         localizedText("备份结束标记后包含多余内容。")
+                    }
+                }
+                // ZIP ends before its central directory. Drain through the final authenticated
+                // segment so a truncated or modified encrypted tail cannot be accepted.
+                if (encrypted) {
+                    val tail = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (archiveSource.read(tail) != -1) {
+                        /* Authenticate the remaining ciphertext. */
                     }
                 }
             }

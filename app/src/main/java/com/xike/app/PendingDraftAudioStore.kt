@@ -1,6 +1,7 @@
 package com.xike.app
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey
 import com.xike.app.data.MAX_AUDIO_BYTES
@@ -13,6 +14,9 @@ import java.io.InputStream
 import java.util.UUID
 
 internal data class StagedDraftAudio(val fileName: String, val durationMillis: Long)
+
+internal fun draftRecordingDirectory(context: Context) =
+    File(context.cacheDir, "pending-moment-recordings")
 
 internal class PendingDraftAudioStore(
     context: Context,
@@ -30,7 +34,18 @@ internal class PendingDraftAudioStore(
     fun stage(source: File, durationMillis: Long): StagedDraftAudio {
         require(durationMillis in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音时长需要在 5 分钟以内。") }
         require(source.isFile && source.length() > 0L) { localizedText("录音文件不可用。") }
-        val file = File(directory, "$FILE_PREFIX${UUID.randomUUID()}$FILE_SUFFIX")
+        // A recording can survive a process exit between encryption and source cleanup.
+        // Reuse its completed encrypted copy instead of importing it twice after restart.
+        val identity =
+            if (source.parentFile == draftRecordingDirectory(appContext))
+                source.nameWithoutExtension
+            else UUID.randomUUID().toString()
+        val file = File(directory, "$FILE_PREFIX$identity$FILE_SUFFIX")
+        if (file.exists()) {
+            val completed = runCatching { validate(file) }.getOrNull()
+            if (completed?.durationMillis == durationMillis) return completed
+            check(file.delete()) { localizedText("录音暂存文件暂时无法清理。") }
+        }
         try {
             DataOutputStream(encryptedFile(file).openFileOutput().buffered()).use { output ->
                 output.writeLong(durationMillis)
@@ -43,6 +58,28 @@ internal class PendingDraftAudioStore(
             throw error
         }
         return StagedDraftAudio(file.name, durationMillis)
+    }
+
+    fun recoverRecording(): Pair<File, Long>? {
+        val recordings = draftRecordingDirectory(appContext)
+        if (!recordings.exists()) return null
+        val source =
+            checkNotNull(recordings.listFiles())
+                .filter {
+                    it.isFile && it.name.startsWith("xike-recording-") && it.extension == "m4a"
+                }
+                .maxByOrNull(File::lastModified) ?: return null
+        val probe = MediaMetadataRetriever()
+        val duration =
+            try {
+                probe.setDataSource(source.absolutePath)
+                requireNotNull(probe.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION))
+                    .toLong()
+            } finally {
+                probe.release()
+            }
+        require(duration in 1..MAX_AUDIO_DURATION_MILLIS) { localizedText("录音时长需要在 5 分钟以内。") }
+        return source to duration
     }
 
     fun recover(): StagedDraftAudio? {

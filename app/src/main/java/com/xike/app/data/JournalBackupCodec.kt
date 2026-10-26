@@ -1,5 +1,6 @@
 package com.xike.app.data
 
+import com.google.crypto.tink.subtle.AesGcmHkdfStreaming
 import com.xike.app.localizedText
 import com.xike.app.tr
 import java.io.ByteArrayOutputStream
@@ -9,7 +10,6 @@ import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
-import javax.crypto.CipherOutputStream
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
@@ -88,36 +88,45 @@ internal object BackupCipher {
             'B'.code.toByte(),
             'A'.code.toByte(),
             'I'.code.toByte(),
-            4,
+            5,
         )
+    private val legacyStreamingMagic = streamingMagic.copyOf().apply { this[lastIndex] = 4 }
 
     val magicSize: Int
         get() = streamingMagic.size
 
-    fun hasStreamingMagic(value: ByteArray): Boolean = value.contentEquals(streamingMagic)
+    fun hasStreamingMagic(value: ByteArray): Boolean =
+        value.contentEquals(streamingMagic) || value.contentEquals(legacyStreamingMagic)
 
     fun encryptingStream(output: OutputStream, password: String): OutputStream {
         val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
-        val nonce = ByteArray(NONCE_BYTES).also(SecureRandom()::nextBytes)
         output.write(streamingMagic)
         output.write(salt)
-        output.write(nonce)
         output.flush()
 
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
-        return CipherOutputStream(output, cipher)
+        return streamingCipher(password, salt).newEncryptingStream(output, streamingMagic + salt)
     }
 
-    fun decryptingStream(input: InputStream, password: String): InputStream {
+    fun decryptingStream(
+        input: InputStream,
+        password: String,
+        header: ByteArray = streamingMagic,
+    ): InputStream {
+        validateBackup(hasStreamingMagic(header)) { localizedText("这不是息刻备份文件。") }
         val salt = ByteArray(SALT_BYTES)
-        val nonce = ByteArray(NONCE_BYTES)
         validateBackup(input.readAvailable(salt) == salt.size) { localizedText("备份文件头不完整。") }
+        if (header.contentEquals(streamingMagic)) {
+            return streamingCipher(password, salt).newDecryptingStream(input, header + salt)
+        }
+        val nonce = ByteArray(NONCE_BYTES)
         validateBackup(input.readAvailable(nonce) == nonce.size) { localizedText("备份文件头不完整。") }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
         return CipherInputStream(input, cipher)
     }
+
+    private fun streamingCipher(password: String, salt: ByteArray) =
+        AesGcmHkdfStreaming(key(password, salt).encoded, "HmacSha256", 32, 64 * 1024, 0)
 
     fun encryptLegacy(plainText: String, password: String): String {
         val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)

@@ -22,6 +22,7 @@ data class PendingDraftAudio(
     val durationMillis: Long,
     val draftGeneration: Long,
     val stagedFileName: String? = null,
+    val source: File? = null,
 )
 
 /** Owns media jobs and pending results; durable draft writes remain in the ViewModel. */
@@ -33,6 +34,7 @@ internal class JournalDraftMediaOperations(
     private val currentDraftGeneration: () -> Long,
     private val savingDraft: () -> Boolean,
     private val saveDraft: (JournalDraft, Boolean) -> Boolean,
+    private val awaitDraftPersistence: suspend () -> Boolean,
     private val imageInUse: (Uri) -> Boolean,
     private val onDataError: (String) -> Unit,
     private val reportOperation: (String, Boolean) -> Unit,
@@ -73,12 +75,17 @@ internal class JournalDraftMediaOperations(
             if (pending) pendingDraftImageResults + key else pendingDraftImageResults - key
     }
 
-    fun recoverPendingAudio(): StagedDraftAudio? = pendingAudioStore.recover()
-
-    fun restorePendingAudio(staged: StagedDraftAudio?) {
-        pendingDraftAudio = staged?.let {
+    fun recoverPendingAudio(): PendingDraftAudio? {
+        pendingAudioStore.recoverRecording()?.let { (file, duration) ->
+            return PendingDraftAudio(duration, draftGeneration, source = file)
+        }
+        return pendingAudioStore.recover()?.let {
             PendingDraftAudio(it.durationMillis, draftGeneration, it.fileName)
         }
+    }
+
+    fun restorePendingAudio(pending: PendingDraftAudio?) {
+        pendingDraftAudio = pending?.copy(draftGeneration = draftGeneration)
     }
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean =
@@ -179,7 +186,10 @@ internal class JournalDraftMediaOperations(
     fun removeDraftImage(uriString: String) {
         if (uriString !in draft.imageUriStrings) return
         if (persistDraft(draft.copy(imageUriStrings = draft.imageUriStrings - uriString))) {
-            runCatching { Uri.parse(uriString) }.getOrNull()?.let(::releaseDraftImageAccess)
+            scope.launch {
+                if (awaitDraftPersistence())
+                    runCatching { Uri.parse(uriString) }.getOrNull()?.let(::releaseDraftImageAccess)
+            }
         }
     }
 
@@ -188,26 +198,40 @@ internal class JournalDraftMediaOperations(
             source.delete()
             return
         }
-        val pending = PendingDraftAudio(durationMillis, draftGeneration)
+        val pending = PendingDraftAudio(durationMillis, draftGeneration, source = source)
         pendingDraftAudio = pending
+        stagePendingDraftAudio(pending)
+    }
+
+    private fun stagePendingDraftAudio(pending: PendingDraftAudio) {
+        val source = pending.source ?: return
         isDraftAudioSaving = true
         draftAudioSaveError = null
         scope.launch {
             val staged =
                 try {
                     withContext(Dispatchers.IO) {
-                        try {
-                            pendingAudioStore.stage(source, durationMillis)
-                        } finally {
-                            source.delete()
-                        }
+                        pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) }
+                            ?: pendingAudioStore.stage(source, pending.durationMillis)
                     }
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
                     if (pending === pendingDraftAudio) {
-                        pendingDraftAudio = null
-                        onDataError(error.message ?: localizedText("录音未能加密暂存，请重新录制。"))
+                        val recoverable =
+                            withContext(Dispatchers.IO) {
+                                if (source.isFile && source.length() > 0L) true
+                                else {
+                                    source.delete()
+                                    false
+                                }
+                            }
+                        if (recoverable) {
+                            draftAudioSaveError = error.message ?: localizedText("录音保存失败，请重试。")
+                        } else {
+                            pendingDraftAudio = null
+                            onDataError(error.message ?: localizedText("录音文件不可用。"))
+                        }
                     }
                     isDraftAudioSaving = false
                     return@launch
@@ -221,7 +245,17 @@ internal class JournalDraftMediaOperations(
                 }
                 return@launch
             }
-            pendingDraftAudio = pending.copy(stagedFileName = staged.fileName)
+            val sourceRemoved =
+                withContext(Dispatchers.IO) {
+                    runCatching { source.delete() || !source.exists() }.getOrDefault(false)
+                }
+            if (!sourceRemoved) {
+                pendingDraftAudio = pending.copy(stagedFileName = staged.fileName)
+                draftAudioSaveError = localizedText("录音暂存文件暂时无法清理。")
+                isDraftAudioSaving = false
+                return@launch
+            }
+            pendingDraftAudio = pending.copy(stagedFileName = staged.fileName, source = null)
             isDraftAudioSaving = false
             retryPendingDraftAudio()
         }
@@ -229,6 +263,11 @@ internal class JournalDraftMediaOperations(
 
     fun retryPendingDraftAudio() {
         val pending = pendingDraftAudio ?: return
+        if (isDraftAudioSaving) return
+        if (pending.source != null) {
+            stagePendingDraftAudio(pending)
+            return
+        }
         val staged =
             pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
         if (isDraftAudioSaving) return
@@ -251,7 +290,10 @@ internal class JournalDraftMediaOperations(
                         localizedText("这段录音已经取消。")
                     }
                     val previousAudio = draft.audio
-                    check(persistDraft(draft.copy(audio = audio), reportError = false)) {
+                    check(
+                        persistDraft(draft.copy(audio = audio), reportError = false) &&
+                            awaitDraftPersistence()
+                    ) {
                         localizedText("录音已经完成，但草稿保存失败。")
                     }
                     if (previousAudio != null && previousAudio.fileName != audio.fileName) {
@@ -297,20 +339,34 @@ internal class JournalDraftMediaOperations(
     fun discardPendingDraftAudio() {
         if (isDraftAudioSaving) return
         val pending = pendingDraftAudio ?: return
-        val staged =
-            pending.stagedFileName?.let { StagedDraftAudio(it, pending.durationMillis) } ?: return
-        if (!pendingAudioStore.delete(staged)) {
-            draftAudioSaveError = localizedText("录音暂存文件暂时无法删除，请重试。")
-            return
+        isDraftAudioSaving = true
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    pending.stagedFileName?.let {
+                        check(
+                            pendingAudioStore.delete(StagedDraftAudio(it, pending.durationMillis))
+                        )
+                    }
+                    pending.source?.let { check(it.delete() || !it.exists()) }
+                }
+                pendingDraftAudio = null
+                draftAudioSaveError = null
+            } catch (error: Exception) {
+                draftAudioSaveError = localizedText("录音暂存文件暂时无法删除，请重试。")
+            } finally {
+                isDraftAudioSaving = false
+            }
         }
-        pendingDraftAudio = null
-        draftAudioSaveError = null
     }
 
     fun removeDraftAudio() {
         val removed = draft.audio ?: return
         if (persistDraft(draft.copy(audio = null))) {
-            scope.launch(Dispatchers.IO) { store.deleteUnreferencedAudio(removed.fileName) }
+            scope.launch {
+                if (awaitDraftPersistence())
+                    withContext(Dispatchers.IO) { store.deleteUnreferencedAudio(removed.fileName) }
+            }
         }
     }
 
@@ -324,6 +380,7 @@ internal class JournalDraftMediaOperations(
     }
 
     private fun releaseVideoAccess(uri: Uri) {
+        if (draft.pendingVideoUri == uri.toString()) return
         runCatching {
             context.contentResolver.releasePersistableUriPermission(
                 uri,
@@ -346,12 +403,14 @@ internal class JournalDraftMediaOperations(
         draftVideoProgress = null
         launchMediaMutation {
             try {
+                if (!awaitDraftPersistence()) return@launchMediaMutation
                 importVideo(uri) { progress -> scope.launch { draftVideoProgress = progress } }
                     .onSuccess { video ->
                         val previous = draft.video
                         if (
                             generation == draftGeneration &&
-                                persistDraft(draft.copy(video = video, pendingVideoUri = null))
+                                persistDraft(draft.copy(video = video, pendingVideoUri = null)) &&
+                                awaitDraftPersistence()
                         ) {
                             previous?.let(::releaseVideo)
                             releaseVideoAccess(uri)
@@ -379,8 +438,12 @@ internal class JournalDraftMediaOperations(
         val previous = draft.video
         val pending = draft.pendingVideoUri
         if (persistDraft(draft.copy(video = null, pendingVideoUri = null))) {
-            previous?.let(::releaseVideo)
-            pending?.let { releaseVideoAccess(Uri.parse(it)) }
+            scope.launch {
+                if (awaitDraftPersistence()) {
+                    previous?.let(::releaseVideo)
+                    pending?.let { releaseVideoAccess(Uri.parse(it)) }
+                }
+            }
         }
     }
 
@@ -388,12 +451,14 @@ internal class JournalDraftMediaOperations(
         if (isDraftSaving || isDraftVideoSaving) return
         val pending = draft.pendingVideoUri ?: return
         if (persistDraft(draft.copy(pendingVideoUri = null))) {
-            releaseVideoAccess(Uri.parse(pending))
+            scope.launch {
+                if (awaitDraftPersistence()) releaseVideoAccess(Uri.parse(pending))
+            }
         }
     }
 
     private fun releaseDraftImageAccess(uri: Uri) {
-        if (imageInUse(uri)) return
+        if (imageInUse(uri) || uri.toString() in draft.imageUriStrings) return
         val application = context
         if (isCameraCaptureUri(application, uri)) {
             return

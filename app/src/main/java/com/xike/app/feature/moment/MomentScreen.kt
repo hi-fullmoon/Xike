@@ -811,6 +811,7 @@ fun MomentScreen(
             enabled = !isSaving,
             onRecorded = onDraftAudioRecorded,
             onClosed = { showVoiceCapture = false },
+            recordingDirectory = com.xike.app.draftRecordingDirectory(context),
         )
     }
 

@@ -21,7 +21,9 @@ internal class XikeAudioRecorder(
         check(recordingDirectory.isDirectory || recordingDirectory.mkdirs()) {
             localizedText("无法创建录音暂存目录。")
         }
-        val target = File.createTempFile("xike-recording-", ".m4a", recordingDirectory)
+        val suffix =
+            if (recordingDirectory == draftRecordingDirectory(context)) ".recording" else ".m4a"
+        val target = File.createTempFile("xike-recording-", suffix, recordingDirectory)
         val mediaRecorder =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(context)
@@ -81,6 +83,11 @@ internal class XikeAudioRecorder(
             throw error
         } finally {
             activeRecorder.release()
+        }
+        if (target.extension == "recording") {
+            val completed = File(recordingDirectory, "${target.nameWithoutExtension}.m4a")
+            check(target.renameTo(completed)) { localizedText("录音文件不可用。") }
+            return completed
         }
         return target
     }

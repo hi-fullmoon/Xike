@@ -737,6 +737,7 @@ class JournalStore(context: Context) {
         addAll(dao.audioFileNames())
         pendingDeletedEntry?.audio?.fileName?.let(::add)
         addAll(editAudioPreferences.all.keys)
+        videoDraftStore.load().audio?.fileName?.let(::add)
     }
 
     private fun referencedVideoFiles(): Set<String> =

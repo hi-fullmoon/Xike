@@ -366,7 +366,8 @@ internal fun rememberPreviewBitmap(
     openStream: () -> InputStream?,
 ): ImageBitmap? {
     val providedCache = LocalPreviewBitmapCache.current
-    val cache = providedCache ?: remember { PreviewBitmapCache() }
+    val context = LocalContext.current
+    val cache = providedCache ?: remember(context) { PreviewBitmapCache(context) }
     var bitmap by
         remember(cache, key, maxDimension) {
             mutableStateOf(cache.get(key, maxDimension))

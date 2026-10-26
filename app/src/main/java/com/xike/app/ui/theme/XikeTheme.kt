@@ -520,7 +520,7 @@ fun XikeTheme(
                     )
                 }
         }
-    val previewBitmapCache = remember { PreviewBitmapCache() }
+    val previewBitmapCache = remember(context) { PreviewBitmapCache(context) }
     val colors: ColorScheme =
         if (isSystemInDarkTheme()) {
             darkColorScheme(

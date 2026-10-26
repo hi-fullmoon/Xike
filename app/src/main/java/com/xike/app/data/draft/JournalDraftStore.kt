@@ -71,11 +71,22 @@ internal class JournalDraftStore(context: Context) {
         }
 
     fun flushPending() {
-        val pending =
+        val target =
             synchronized(coordinator) {
-                coordinator.pending?.let { it to coordinator.revision }
-            } ?: return
-        saveIfCurrent(pending.first, pending.second)
+                if (coordinator.pending == null) return
+                coordinator.revision
+            }
+        while (true) {
+            val pending =
+                synchronized(coordinator) {
+                    check(writerSession == coordinator.session) {
+                        localizedText("草稿保存会话已经更新，请重新打开记录页面。")
+                    }
+                    if (coordinator.persistedRevision >= target) return
+                    checkNotNull(coordinator.pending) to coordinator.revision
+                }
+            saveIfCurrent(pending.first, pending.second)
+        }
     }
 
     fun saveIfCurrent(draft: JournalDraft, expectedRevision: Long): Boolean {
@@ -83,6 +94,7 @@ internal class JournalDraftStore(context: Context) {
         synchronized(coordinator) {
             if (writerSession != coordinator.session || coordinator.revision != expectedRevision)
                 return false
+            if (coordinator.persistedRevision >= expectedRevision) return true
             coordinator.pending = normalized
         }
         return synchronized(coordinator.diskLock) {
@@ -91,6 +103,7 @@ internal class JournalDraftStore(context: Context) {
                     writerSession != coordinator.session || coordinator.revision != expectedRevision
                 )
                     return false
+                if (coordinator.persistedRevision >= expectedRevision) return true
             }
             val editor = preferences.edit()
             if (normalized.isEmpty) {
@@ -100,6 +113,8 @@ internal class JournalDraftStore(context: Context) {
             }
             check(editor.commit()) { localizedText("无法保存当前草稿。") }
             synchronized(coordinator) {
+                coordinator.persistedRevision =
+                    maxOf(coordinator.persistedRevision, expectedRevision)
                 if (
                     writerSession == coordinator.session && coordinator.revision == expectedRevision
                 ) {
@@ -114,6 +129,7 @@ internal class JournalDraftStore(context: Context) {
         val diskLock = Any()
         var session = 0L
         var revision = 0L
+        var persistedRevision = 0L
         var pending: JournalDraft? = null
     }
 

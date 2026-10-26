@@ -71,6 +71,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             currentDraftGeneration = { draftGeneration },
             savingDraft = { isDraftSaving },
             saveDraft = ::persistDraft,
+            awaitDraftPersistence = ::awaitDraftPersistence,
             imageInUse = { editOperations.imageInUse(it) },
             onDataError = { dataError = it },
             reportOperation = ::reportOperation,
@@ -330,7 +331,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             systemActivityResultsReady = draftReady && result.isSuccess
             isLoading = false
             if (systemActivityResultsReady) {
-                if (pendingDraftAudio?.stagedFileName != null) retryPendingDraftAudio()
+                if (pendingDraftAudio != null) retryPendingDraftAudio()
                 draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
             }
         }
@@ -500,7 +501,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     }
                     result.mapCatching { snapshot ->
                         check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
-                        check(persistDraft(draft.copy(outdoor = snapshot))) { saveError }
+                        check(
+                            persistDraft(draft.copy(outdoor = snapshot)) && awaitDraftPersistence()
+                        ) {
+                            saveError
+                        }
                     }
                 } finally {
                     if (outdoorRequestJob === operation) {
@@ -536,7 +541,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (persistDraft(JournalDraft())) {
             draftGeneration++
             cancelOutdoorRequest()
-            draftMediaOperations.releaseDiscardedMedia(discardedDraft)
+            viewModelScope.launch {
+                if (awaitDraftPersistence())
+                    draftMediaOperations.releaseDiscardedMedia(discardedDraft)
+            }
         }
     }
 
@@ -578,6 +586,15 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 return@withContext Result.failure(
                     IllegalStateException(
                         tr("请先等待照片添加完成。", "Please wait for the photos to be added.")
+                    )
+                )
+            if (pendingDraftAudio != null)
+                return@withContext Result.failure(
+                    IllegalStateException(
+                        tr(
+                            "请先完成语音保存，或明确放弃这段录音。",
+                            "Finish saving the recording or discard it first.",
+                        )
                     )
                 )
             if (isDraftOutdoorLoading)
@@ -778,18 +795,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
         if (!requireDraftReady(reportError)) return false
         val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
-        return runCatching { draftStore.save(normalized) }
-            .onSuccess {
-                noteSaveJob?.cancel()
-                noteSaveJob = null
-                draft = normalized
-                if (normalized.isEmpty) hasResumedDraft = false
-            }
+        draft = normalized
+        if (normalized.isEmpty) hasResumedDraft = false
+        scheduleNoteSave(0L)
+        return true
+    }
+
+    private suspend fun awaitDraftPersistence(): Boolean =
+        withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
             .onFailure { error ->
-                if (reportError) dataError = error.message ?: localizedText("草稿保存失败，请重试。")
+                dataError = error.message ?: localizedText("草稿保存失败，请重试。")
             }
             .isSuccess
-    }
 
     private fun requireDraftReady(reportError: Boolean = true): Boolean {
         if (draftReady && !isLoading) return true
@@ -812,20 +829,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             Result.failure(error)
         }
 
-    private fun clearDraftAfterSave(savedDraft: JournalDraft) {
+    private suspend fun clearDraftAfterSave(savedDraft: JournalDraft) {
         draftGeneration++
         val currentDraft = draft
         if (currentDraft == savedDraft) {
-            draft = JournalDraft()
-            hasResumedDraft = false
-            runCatching { draftStore.save(draft) }
-                .onSuccess {
-                    noteSaveJob?.cancel()
-                    noteSaveJob = null
-                }
-                .onFailure { error ->
-                    dataError = error.message ?: localizedText("记录已保存，但草稿清理失败。")
-                }
+            persistDraft(JournalDraft())
+            if (!awaitDraftPersistence()) return
         }
         draftMediaOperations.releaseSavedImages(savedDraft)
     }
