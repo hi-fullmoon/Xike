@@ -74,6 +74,20 @@ internal fun restoreContentKey(
                 )
             )
             .apply {
+                if (
+                    entry.labels.any {
+                        it.kind == JournalLabelKind.ACTIVITY ||
+                            it.id != legacyTopicSelection(it.savedName).id
+                    }
+                ) {
+                    put(
+                        JSONArray(
+                            entry.labels.map {
+                                JSONArray(listOf(it.id, it.kind.name, it.savedName))
+                            }
+                        )
+                    )
+                }
                 if (entry.feelings.isNotEmpty() || entry.moodScaleVersion != 0) {
                     put(JSONArray(entry.feelings))
                     put(entry.moodScaleVersion)

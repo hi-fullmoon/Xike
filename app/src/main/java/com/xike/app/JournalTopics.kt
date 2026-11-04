@@ -38,6 +38,13 @@ internal fun canonicalTopic(topic: String): String = mergedTopics[topic] ?: topi
 
 internal fun topicAliases(): Map<String, String> = mergedTopics
 
+internal fun builtinTopicSearchNames(topic: String): List<String> {
+    val canonical = canonicalTopic(topic)
+    return (expandedTopicLabels(listOf(canonical)) +
+            englishTopicKeys.filterValues { it == canonical }.keys)
+        .distinct()
+}
+
 internal fun Collection<String>.canonicalTopics(): List<String> = map(::canonicalTopic).distinct()
 
 internal fun Collection<String>.containsTopic(topic: String): Boolean = any {

@@ -71,7 +71,10 @@ internal fun ArchiveFilters(
     onDatePresetChange: (ArchiveDatePreset) -> Unit,
     onClearDate: () -> Unit,
     onClearAll: () -> Unit,
+    selectedActivities: List<String> = emptyList(),
+    onToggleActivity: (String) -> Unit = {},
 ) {
+    val labelCatalog = com.xike.app.LocalJournalLabelServices.current.catalog
     val selectedContentColor =
         if (isSystemInDarkTheme()) {
             MaterialTheme.colorScheme.primary
@@ -142,7 +145,33 @@ internal fun ArchiveFilters(
                             selected = selectedTags.containsTopic(tag),
                             colors = filterColors,
                             onClick = { onToggleTag(tag) },
-                            label = { Text(localizedText(tag)) },
+                            label = {
+                                Text(
+                                    labelCatalog.firstOrNull { it.id == tag }?.displayName
+                                        ?: localizedText(tag)
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+            val activities = labelCatalog.filter {
+                it.kind == com.xike.app.data.JournalLabelKind.ACTIVITY
+            }
+            if (activities.isNotEmpty()) {
+                FilterTitle(tr("活动", "Activities"))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = XikeCardPadding),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(activities, key = { it.id }) { label ->
+                        FilterChip(
+                            shape = XikeShapes.inner,
+                            selected = label.id in selectedActivities,
+                            colors = filterColors,
+                            onClick = { onToggleActivity(label.id) },
+                            label = { Text(label.displayName) },
                         )
                     }
                 }

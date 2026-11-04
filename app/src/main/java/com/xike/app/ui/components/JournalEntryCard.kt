@@ -68,7 +68,7 @@ internal fun JournalEntryCard(
         compactMoodOnly &&
             entry.note.isBlank() &&
             entry.feelings.isEmpty() &&
-            entry.tags.isEmpty() &&
+            entry.labels.isEmpty() &&
             entry.outdoor == null &&
             entry.imageFileNames.isEmpty() &&
             entry.audio == null &&
@@ -112,7 +112,9 @@ internal fun JournalEntryCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (compactLabels && (entry.feelings.isNotEmpty() || entry.tags.isNotEmpty())) {
+                    if (
+                        compactLabels && (entry.feelings.isNotEmpty() || entry.labels.isNotEmpty())
+                    ) {
                         Spacer(Modifier.height(6.dp))
                         JournalEntryLabelSummary(entry)
                     }
@@ -125,10 +127,10 @@ internal fun JournalEntryCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (!compactLabels && entry.tags.isNotEmpty()) {
+                    if (!compactLabels && entry.labels.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            entry.tags.joinToString("  ·  ") { localizedText(it) },
+                            entry.labels.joinToString("  ·  ") { it.displayName },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -244,7 +246,7 @@ internal fun JournalEntryCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun JournalEntryLabelSummary(entry: JournalEntry) {
-    val labelCount = entry.feelings.size + entry.tags.size
+    val labelCount = entry.feelings.size + entry.labels.size
     val allowWrap = LocalDensity.current.fontScale > 1.3f
     ContextualFlowRow(
         itemCount = labelCount,
@@ -264,10 +266,20 @@ private fun JournalEntryLabelSummary(entry: JournalEntry) {
         if (index < entry.feelings.size) {
             FeelingChip(entry.feelings[index], filled = true, compact = true)
         } else {
-            val tag = entry.tags[index - entry.feelings.size]
-            val topic = journalTopics.find { it.label == canonicalTopic(tag) }
+            val label = entry.labels[index - entry.feelings.size]
+            val definition =
+                com.xike.app.LocalJournalLabelServices.current.catalog.firstOrNull {
+                    it.id == label.id
+                }
+            val topic = journalTopics.find {
+                it.label == (definition?.iconKey ?: canonicalTopic(label.savedName))
+            }
             TopicChip(
-                topic = (topic ?: journalTopics.last()).copy(label = tag),
+                topic =
+                    (topic ?: journalTopics.last()).copy(
+                        label = label.displayName,
+                        translateLabel = false,
+                    ),
                 selected = true,
                 onClick = null,
                 minHeight = 20.dp,

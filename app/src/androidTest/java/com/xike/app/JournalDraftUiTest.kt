@@ -61,8 +61,8 @@ class JournalDraftUiTest {
 
         composeRule.onNodeWithText("放弃草稿").assertDoesNotExist()
         composeRule.onNodeWithText("此刻窗外").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("地点与天气 · 可选").assertIsDisplayed()
-        composeRule.onNodeWithText("添加").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("地点与天气 · 可选").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("添加").performScrollTo().assertIsDisplayed().performClick()
         composeRule.onNodeWithText("添加此刻窗外？").assertIsDisplayed()
         composeRule.onNodeWithText("手动选城市").assertIsDisplayed()
         composeRule.onNodeWithText("允许粗略定位").assertIsDisplayed()
@@ -374,7 +374,7 @@ class JournalDraftUiTest {
     }
 
     @Test
-    fun expandedKeywordListOffersAdditionalEverydayChoices() {
+    fun defaultTopicsAreCompactAndUseStableIds() {
         var selectedTag: String? = null
         composeRule.setContent {
             XikeTheme(AppTheme.OCEAN) {
@@ -394,9 +394,20 @@ class JournalDraftUiTest {
         }
 
         composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
-        composeRule.onNodeWithText("饮食").performScrollTo().assertIsDisplayed().performClick()
-        composeRule.runOnIdle { check(selectedTag == "饮食") }
-        composeRule.onNodeWithText("其他").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("身体").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.runOnIdle {
+            check(
+                selectedTag ==
+                    com.xike.app.data.builtinJournalLabels
+                        .first {
+                            it.kind == com.xike.app.data.JournalLabelKind.TOPIC && it.name == "身体"
+                        }
+                        .id
+            )
+        }
+        listOf("家庭", "睡眠", "饮食", "金钱", "出行", "居住", "其他").forEach { name ->
+            composeRule.onNodeWithText(name).assertDoesNotExist()
+        }
         check(composeRule.onAllNodesWithText("社交").fetchSemanticsNodes().isEmpty())
         check(composeRule.onAllNodesWithText("运动").fetchSemanticsNodes().isEmpty())
         check(composeRule.onAllNodesWithText("创作").fetchSemanticsNodes().isEmpty())

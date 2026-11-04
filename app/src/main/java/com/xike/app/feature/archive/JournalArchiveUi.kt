@@ -160,6 +160,7 @@ fun JournalArchiveScreen(
     var queryText by rememberSaveable { mutableStateOf("") }
     var selectedMoodNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedTags by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var selectedActivities by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var imageFilterName by rememberSaveable { mutableStateOf(JournalImageFilter.ANY.name) }
     var datePresetName by rememberSaveable { mutableStateOf(ArchiveDatePreset.ALL.name) }
     var selectedDateValue by rememberSaveable { mutableStateOf<String?>(null) }
@@ -219,6 +220,7 @@ fun JournalArchiveScreen(
             queryText,
             selectedMoods,
             selectedTags,
+            selectedActivities,
             imageFilter,
             selectedDate,
             presetRange,
@@ -226,7 +228,9 @@ fun JournalArchiveScreen(
             JournalSearchQuery(
                 text = queryText,
                 moods = selectedMoods,
-                tags = selectedTags.toSet(),
+                tags = if (readRepository == null) selectedTags.toSet() else emptySet(),
+                topicIds = if (readRepository != null) selectedTags.toSet() else emptySet(),
+                activities = selectedActivities.toSet(),
                 startDate = selectedDate ?: presetRange.first,
                 endDate = selectedDate ?: presetRange.second,
                 imageFilter = imageFilter,
@@ -334,7 +338,7 @@ fun JournalArchiveScreen(
     LaunchedEffect(readRepository, entries, libraryState.revision) {
         if (readRepository == null) availableTags = legacyTags
         else
-            journalReadResult { readRepository.topics() }
+            journalReadResult { readRepository.topics(ids = true) }
                 .onSuccess { availableTags = it }
                 .onFailure { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
     }
@@ -426,6 +430,10 @@ fun JournalArchiveScreen(
                         selectedMoodNames = selectedMoodNames,
                         availableTags = availableTags,
                         selectedTags = selectedTags,
+                        selectedActivities = selectedActivities,
+                        onToggleActivity = { id ->
+                            selectedActivities = selectedActivities.toggle(id)
+                        },
                         imageFilter = imageFilter,
                         datePreset = datePreset,
                         selectedDate = selectedDate,
@@ -446,6 +454,7 @@ fun JournalArchiveScreen(
                             queryText = ""
                             selectedMoodNames = emptyList()
                             selectedTags = emptyList()
+                            selectedActivities = emptyList()
                             imageFilterName = JournalImageFilter.ANY.name
                             datePresetName = ArchiveDatePreset.ALL.name
                             selectedDateValue = null

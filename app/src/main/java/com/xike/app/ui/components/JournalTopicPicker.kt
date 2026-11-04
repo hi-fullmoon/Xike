@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +54,13 @@ import com.xike.app.tr
 import com.xike.app.ui.theme.XikeInlineActionGap
 import com.xike.app.ui.theme.XikeShapes
 
-internal data class JournalTopic(val label: String, val accent: Color, val icon: ImageVector)
+internal data class JournalTopic(
+    val label: String,
+    val accent: Color,
+    val icon: ImageVector,
+    val translateLabel: Boolean = true,
+    val id: String? = null,
+)
 
 internal val journalTopics =
     listOf(
@@ -73,63 +80,123 @@ internal val journalTopics =
     )
 
 @Composable
-internal fun MomentTopicsHeader(selectedCount: Int, highlightSelection: Boolean = true) {
+internal fun MomentTopicsHeader(
+    selectedCount: Int,
+    highlightSelection: Boolean = true,
+    onManage: (() -> Unit)? = null,
+    manageEnabled: Boolean = true,
+) {
     val title = localizedText("主题")
     val count =
         if (selectedCount == 0) localizedText("可多选")
         else tr("已选 $selectedCount", "$selectedCount selected")
     val titleStyle = MaterialTheme.typography.titleSmall
     val countStyle = MaterialTheme.typography.labelSmall
+    val manageText = tr("管理主题", "Manage topics")
+    val manageStyle = MaterialTheme.typography.labelLarge
     val measurer = rememberTextMeasurer()
     val requiredWidth =
         with(LocalDensity.current) {
             (measurer.measure(title, titleStyle, softWrap = false).size.width +
                     measurer.measure(count, countStyle, softWrap = false).size.width)
-                .toDp() + 8.dp
+                .toDp() +
+                8.dp +
+                if (onManage != null)
+                    measurer.measure(manageText, manageStyle, softWrap = false).size.width.toDp() +
+                        40.dp
+                else 0.dp
         }
+    val titleContent: @Composable () -> Unit = {
+        Text(title, style = titleStyle)
+        Text(
+            localizedText("这一刻与什么有关？"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    val countLabel: @Composable () -> Unit = {
+        Text(
+            count,
+            style = countStyle,
+            color =
+                if (selectedCount == 0 || !highlightSelection)
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.primary,
+        )
+    }
+    val manageButton: @Composable () -> Unit = {
+        TextButton(
+            onClick = { onManage?.invoke() },
+            enabled = manageEnabled,
+            shape = XikeShapes.button,
+        ) {
+            Text(manageText, style = manageStyle)
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val stackCount = requiredWidth > maxWidth
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = if (stackCount) 1 else 2,
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = titleStyle)
-                Text(
-                    localizedText("这一刻与什么有关？"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        if (onManage != null && !stackCount) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f).alignByBaseline()) { titleContent() }
+                Row(
+                    Modifier.alignByBaseline(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    countLabel()
+                    manageButton()
+                }
             }
-            Box(
-                if (stackCount) Modifier.fillMaxWidth() else Modifier,
-                contentAlignment = Alignment.CenterEnd,
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = if (stackCount) 1 else 2,
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    count,
-                    style = countStyle,
-                    color =
-                        if (selectedCount == 0 || !highlightSelection)
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.primary,
-                )
+                Column(Modifier.weight(1f)) {
+                    titleContent()
+                }
+                Box(
+                    if (stackCount) Modifier.fillMaxWidth() else Modifier,
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    if (onManage == null) countLabel()
+                    else
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            countLabel()
+                            manageButton()
+                        }
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun TopicChoices(selectedTags: Collection<String>, onToggle: (JournalTopic) -> Unit) {
+internal fun TopicChoices(
+    selectedTags: Collection<String>,
+    topics: List<JournalTopic> = journalTopics,
+    enabled: Boolean = true,
+    onToggle: (JournalTopic) -> Unit,
+) {
+    if (topics.isEmpty()) return
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelLarge
     val minWidth =
         with(LocalDensity.current) {
-            journalTopics
+            topics
                 .maxOf {
                     textMeasurer
-                        .measure(localizedText(it.label), labelStyle, softWrap = false)
+                        .measure(
+                            if (it.translateLabel) localizedText(it.label) else it.label,
+                            labelStyle,
+                            softWrap = false,
+                        )
                         .size
                         .width
                 }
@@ -138,15 +205,18 @@ internal fun TopicChoices(selectedTags: Collection<String>, onToggle: (JournalTo
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = ((maxWidth + 7.dp) / (minWidth + 7.dp)).toInt().coerceIn(1, 3)
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            journalTopics.chunked(columns).forEach { topics ->
+            topics.chunked(columns).forEach { topics ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     topics.forEach { topic ->
                         TopicChip(
                             topic = topic,
-                            selected = selectedTags.containsTopic(topic.label),
-                            onClick = { onToggle(topic) },
+                            selected =
+                                topic.id?.let { it in selectedTags }
+                                    ?: selectedTags.containsTopic(topic.label),
+                            onClick = if (enabled) ({ onToggle(topic) }) else null,
                             modifier = Modifier.weight(1f),
                             minHeight = 36.dp,
+                            labelMaxLines = if (topic.translateLabel) 1 else Int.MAX_VALUE,
                         )
                     }
                     repeat(columns - topics.size) { Spacer(Modifier.weight(1f)) }
@@ -215,7 +285,7 @@ internal fun TopicChip(
             )
             Spacer(Modifier.width(if (compact) 3.dp else XikeInlineActionGap))
             Text(
-                localizedText(topic.label),
+                if (topic.translateLabel) localizedText(topic.label) else topic.label,
                 maxLines = labelMaxLines,
                 style = labelStyle,
                 color =

@@ -190,6 +190,11 @@ fun MomentScreen(
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var localSaving by remember { mutableStateOf(false) }
     val isSaving = localSaving || isDraftSaving
+    val selectedTopicCount =
+        draft.labels
+            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
+            .distinctBy { it.id }
+            .size
     val chooseVideo =
         rememberVideoChooser(
             enabled = !isSaving && !videoServices.draftSaving,
@@ -511,8 +516,8 @@ fun MomentScreen(
                                 if (draft.tags.isEmpty()) localizedText("选主题 · 可选")
                                 else
                                     tr(
-                                        "已选 ${draft.tags.size} 个主题",
-                                        "${draft.tags.size} topics selected",
+                                        "已选 $selectedTopicCount 个主题",
+                                        "$selectedTopicCount topics selected",
                                     ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -535,14 +540,27 @@ fun MomentScreen(
                             Modifier.bringIntoViewRequester(detailsAnchor)
                                 .padding(XikeContentCardPadding)
                         ) {
-                            MomentTopicsHeader(draft.tags.size)
-                            Spacer(Modifier.height(8.dp))
-                            TopicChoices(draft.tags) { topic ->
-                                if (!isSaving) onDraftTagToggle(topic.label)
-                            }
+                            com.xike.app.ui.components.JournalLabelChoices(
+                                com.xike.app.data.JournalLabelKind.TOPIC,
+                                draft.labels,
+                                !isSaving,
+                                onToggle = { label -> onDraftTagToggle(label.id) },
+                                header = { onManage ->
+                                    MomentTopicsHeader(
+                                        selectedTopicCount,
+                                        onManage = onManage,
+                                        manageEnabled = !isSaving,
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                },
+                            )
                         }
                     }
                 }
+            }
+
+            com.xike.app.ui.components.JournalActivities(draft.labels, !isSaving) {
+                onDraftTagToggle(it.id)
             }
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -727,7 +745,7 @@ fun MomentScreen(
                                 JournalEntry(
                                     createdAt = draft.recordedAt ?: System.currentTimeMillis(),
                                     mood = mood,
-                                    tags = draft.tags.toList(),
+                                    labels = draft.labels,
                                     note = draft.note.trim(),
                                     audio = draft.audio,
                                     video = draft.video,
@@ -944,7 +962,10 @@ fun MomentScreen(
             },
             text = {
                 Text(
-                    localizedText("将清空尚未保存的心情、此刻窗外、注脚、主题、照片、语音、视频和补记时间。已保存的记录不会受影响。"),
+                    tr(
+                        "将清空尚未保存的心情、此刻窗外、注脚、主题、活动、照片、语音、视频和补记时间。已保存的记录不会受影响。",
+                        "This clears the unsaved mood, weather, note, topics, activities, photos, audio, video and recorded time. Saved entries are not affected.",
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },

@@ -26,8 +26,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
+import com.xike.app.data.JournalLabel
+import com.xike.app.data.JournalLabelKind
+import com.xike.app.data.JournalLabelSelection
 import com.xike.app.data.Mood
+import com.xike.app.data.builtinJournalLabels
 import com.xike.app.data.feelingKeys
+import com.xike.app.data.legacyTopicSelection
 import com.xike.app.data.model.JournalVideo
 import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.OPEN_METEO_SOURCE
@@ -40,7 +45,7 @@ internal const val RESTORE_UNDO_TOKEN_SETTING = "restore-undo-token"
 internal const val THEME_STYLE_SETTING = "theme-style"
 internal const val LEGACY_MIGRATION_SETTING = "legacy-shared-preferences-migrated-v1"
 internal const val SEARCH_INDEX_SETTING = "journal-search-index-version"
-internal const val SEARCH_INDEX_VERSION = "1"
+internal const val SEARCH_INDEX_VERSION = "3"
 
 @Entity(
     tableName = "journal_entries",
@@ -73,15 +78,32 @@ internal data class JournalEntryEntity(
                 parentColumns = ["id"],
                 childColumns = ["entry_id"],
                 onDelete = ForeignKey.CASCADE,
-            )
+            ),
+            ForeignKey(
+                entity = JournalLabelEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["label_id"],
+                onDelete = ForeignKey.RESTRICT,
+            ),
         ],
-    indices = [Index(value = ["entry_id"])],
+    indices = [Index(value = ["entry_id"]), Index(value = ["label_id"])],
 )
 internal data class JournalTagEntity(
     @ColumnInfo(name = "entry_id") val entryId: String,
     val position: Int,
     val tag: String,
-)
+    @ColumnInfo(name = "label_id", defaultValue = "''")
+    val labelId: String = legacyTopicSelection(tag).id,
+    @ColumnInfo(name = "label_kind", defaultValue = "'TOPIC'") val labelKind: String = "TOPIC",
+) {
+    fun selection() =
+        JournalLabelSelection(
+            labelId,
+            JournalLabelKind.valueOf(labelKind),
+            tag,
+            builtinJournalLabels.any { it.id == labelId },
+        )
+}
 
 @Entity(
     tableName = "journal_images",
@@ -161,7 +183,10 @@ internal fun JournalBundle.toSearchEntity(): JournalSearchEntity =
     JournalSearchEntity(
         entryId = entry.id,
         searchableText =
-            journalSearchDocument(entry.note, tags.sortedBy { it.position }.map { it.tag }),
+            journalSearchDocument(
+                entry.note,
+                tags.sortedBy { it.position }.flatMap { it.selection().searchNames },
+            ),
     )
 
 internal fun JournalEntry.toBundle(): JournalBundle =
@@ -183,7 +208,10 @@ internal fun JournalEntry.toBundle(): JournalBundle =
                 feelingsJson = org.json.JSONArray(feelings).toString(),
                 moodScaleVersion = moodScaleVersion,
             ),
-        tags = tags.mapIndexed { position, tag -> JournalTagEntity(id, position, tag) },
+        tags =
+            labels.mapIndexed { position, label ->
+                JournalTagEntity(id, position, label.savedName, label.id, label.kind.name)
+            },
         images =
             imageFileNames.mapIndexed { position, fileName ->
                 JournalImageEntity(id, position, fileName)
@@ -204,7 +232,7 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
         id = entry.id,
         createdAt = entry.createdAt,
         mood = Mood.fromName(entry.mood, entry.moodScaleVersion),
-        tags = tags.sortedBy { it.position }.map { it.tag },
+        labels = tags.sortedBy { it.position }.map { it.selection() },
         note = entry.note,
         feelings = entry.feelingsJson?.let { org.json.JSONArray(it).feelingKeys() }.orEmpty(),
         moodScaleVersion = entry.moodScaleVersion,
@@ -235,6 +263,67 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
 
 @Dao
 internal abstract class JournalDao {
+    @Query("SELECT * FROM journal_labels ORDER BY kind, sort_order, id")
+    abstract fun labels(): List<JournalLabelEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract fun insertLabels(labels: List<JournalLabelEntity>)
+
+    @Update abstract fun updateLabel(label: JournalLabelEntity)
+
+    @Query("DELETE FROM journal_labels") protected abstract fun deleteLabels()
+
+    @Transaction
+    open fun ensureLabelCatalog(preserveLegacyTopics: Boolean = false) {
+        val defaults =
+            if (preserveLegacyTopics) builtinJournalLabels
+            else com.xike.app.data.defaultJournalLabels
+        insertLabels(defaults.map { it.toEntity() })
+    }
+
+    private fun ensureLabelReferences(tags: List<JournalTagEntity>) {
+        ensureLabelCatalog()
+        val known = labels().associateBy { it.id }.toMutableMap()
+        tags.forEach { tag ->
+            val existing = known[tag.labelId]
+            check(existing == null || existing.kind == tag.labelKind)
+            if (existing == null) {
+                val definition =
+                    JournalLabel(
+                            tag.labelId,
+                            JournalLabelKind.valueOf(tag.labelKind),
+                            tag.tag,
+                            isArchived = true,
+                        )
+                        .toEntity()
+                insertLabels(listOf(definition))
+                known[tag.labelId] = definition
+            }
+        }
+    }
+
+    private fun searchEntity(bundle: JournalBundle): JournalSearchEntity {
+        val catalog = labels().associateBy { it.id }
+        return JournalSearchEntity(
+            bundle.entry.id,
+            journalSearchDocument(
+                bundle.entry.note,
+                bundle.tags.flatMap {
+                    it.selection().searchNames +
+                        catalog[it.labelId]?.toLabel()?.searchNames.orEmpty()
+                },
+            ),
+        )
+    }
+
+    @Transaction
+    open fun saveLabel(label: JournalLabelEntity) {
+        val previous = labels().firstOrNull { it.id == label.id }
+        updateLabel(label)
+        if (previous?.name != label.name) rebuildSearchIndexFromRecords()
+        putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
+    }
+
     @Query("SELECT id, video_json FROM journal_entries")
     abstract fun videoReferences(): List<JournalVideoReference>
 
@@ -252,6 +341,7 @@ internal abstract class JournalDao {
                 JournalTagEntity::class,
                 JournalImageEntity::class,
                 JournalAudioEntity::class,
+                JournalLabelEntity::class,
             ]
     )
     abstract fun pagedRecords(query: SupportSQLiteQuery): PagingSource<Int, JournalEntryRecord>
@@ -259,6 +349,10 @@ internal abstract class JournalDao {
     @RawQuery abstract fun entryIndex(query: SupportSQLiteQuery): List<JournalEntryIndex>
 
     @RawQuery abstract fun queryCount(query: SupportSQLiteQuery): Int
+
+    @Transaction
+    @RawQuery
+    abstract fun recordsForQuery(query: SupportSQLiteQuery): List<JournalEntryRecord>
 
     @RawQuery abstract fun dayCounts(query: SupportSQLiteQuery): List<JournalDayCount>
 
@@ -425,11 +519,12 @@ internal abstract class JournalDao {
     }
 
     private fun insertJournalContents(bundle: JournalBundle) {
+        ensureLabelReferences(bundle.tags)
         insertEntry(bundle.entry)
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
         bundle.audio?.let(::insertAudio)
-        insertSearchEntry(bundle.toSearchEntity())
+        insertSearchEntry(searchEntity(bundle))
     }
 
     @Transaction
@@ -443,6 +538,7 @@ internal abstract class JournalDao {
 
     @Transaction
     open fun updateJournal(bundle: JournalBundle): List<String> {
+        ensureLabelReferences(bundle.tags)
         val previousImages = imageFileNames(bundle.entry.id)
         check(updateEntry(bundle.entry) == 1) { localizedText("记录不存在或已经删除。") }
         deleteEntryTags(bundle.entry.id)
@@ -452,7 +548,7 @@ internal abstract class JournalDao {
         if (bundle.tags.isNotEmpty()) insertTags(bundle.tags)
         if (bundle.images.isNotEmpty()) insertImages(bundle.images)
         bundle.audio?.let(::insertAudio)
-        insertSearchEntry(bundle.toSearchEntity())
+        insertSearchEntry(searchEntity(bundle))
         putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
         return previousImages
     }
@@ -462,6 +558,7 @@ internal abstract class JournalDao {
         bundles: List<JournalBundle>,
         undoToken: String = "",
         expectedUndoToken: String? = null,
+        catalog: List<JournalLabel>? = null,
     ) {
         if (expectedUndoToken != null)
             check(settingValue(RESTORE_UNDO_TOKEN_SETTING) == expectedUndoToken) {
@@ -475,6 +572,10 @@ internal abstract class JournalDao {
         deleteImages()
         deleteAudios()
         deleteEntries()
+        if (catalog != null) {
+            deleteLabels()
+            insertLabels(catalog.map { it.toEntity() })
+        }
         bundles.forEach(::insertJournalContents)
         putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, undoToken))
     }
@@ -482,7 +583,7 @@ internal abstract class JournalDao {
     @Transaction
     open fun rebuildSearchIndex(bundles: List<JournalBundle>) {
         deleteSearchEntries()
-        bundles.forEach { insertSearchEntry(it.toSearchEntity()) }
+        bundles.forEach { insertSearchEntry(searchEntity(it)) }
         putSetting(AppSettingEntity(SEARCH_INDEX_SETTING, SEARCH_INDEX_VERSION))
     }
 
@@ -492,7 +593,7 @@ internal abstract class JournalDao {
         var offset = 0
         do {
             val records = indexRebuildPage(offset)
-            records.forEach { insertSearchEntry(it.toJournalEntry().toBundle().toSearchEntity()) }
+            records.forEach { insertSearchEntry(searchEntity(it.toJournalEntry().toBundle())) }
             offset += records.size
         } while (records.size == 60)
         putSetting(AppSettingEntity(SEARCH_INDEX_SETTING, SEARCH_INDEX_VERSION))
@@ -501,6 +602,8 @@ internal abstract class JournalDao {
     @Transaction
     open fun importLegacyIfNeeded(bundles: List<JournalBundle>, themeName: String?) {
         if (settingValue(LEGACY_MIGRATION_SETTING) != null) return
+        if (bundles.isNotEmpty() || themeName != null)
+            ensureLabelCatalog(preserveLegacyTopics = true)
         if (entryCount() == 0) bundles.forEach(::insertJournal)
         if (themeName != null && settingValue(THEME_SETTING) == null) {
             putSetting(AppSettingEntity(THEME_SETTING, themeName))
@@ -518,8 +621,9 @@ internal abstract class JournalDao {
             JournalAudioEntity::class,
             AppSettingEntity::class,
             JournalSearchEntity::class,
+            JournalLabelEntity::class,
         ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -551,9 +655,67 @@ internal abstract class JournalDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
                 .build()
         }
+
+        internal val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS journal_labels (id TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL, icon_key TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL, is_builtin INTEGER NOT NULL)"
+                    )
+                    db.execSQL(
+                        "ALTER TABLE journal_tags ADD COLUMN label_id TEXT NOT NULL DEFAULT ''"
+                    )
+                    db.execSQL(
+                        "ALTER TABLE journal_tags ADD COLUMN label_kind TEXT NOT NULL DEFAULT 'TOPIC'"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS index_journal_tags_label_id ON journal_tags(label_id)"
+                    )
+                    builtinJournalLabels.forEach { label ->
+                        db.execSQL(
+                            "INSERT INTO journal_labels VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            arrayOf<Any>(
+                                label.id,
+                                label.kind.name,
+                                label.name,
+                                label.iconKey,
+                                label.sortOrder,
+                                0,
+                                1,
+                            ),
+                        )
+                    }
+                    val names =
+                        db.query("SELECT DISTINCT tag FROM journal_tags").use { cursor ->
+                            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                        }
+                    names.forEach { name ->
+                        val selection = legacyTopicSelection(name)
+                        db.execSQL(
+                            "INSERT OR IGNORE INTO journal_labels VALUES (?, 'TOPIC', ?, '其他', 0, 0, 0)",
+                            arrayOf(selection.id, name),
+                        )
+                        db.execSQL(
+                            "UPDATE journal_tags SET label_id = ? WHERE tag = ?",
+                            arrayOf(selection.id, name),
+                        )
+                    }
+                    db.execSQL(
+                        "CREATE TABLE journal_tags_v10 (entry_id TEXT NOT NULL, position INTEGER NOT NULL, tag TEXT NOT NULL, label_id TEXT NOT NULL DEFAULT '', label_kind TEXT NOT NULL DEFAULT 'TOPIC', PRIMARY KEY(entry_id, position), FOREIGN KEY(entry_id) REFERENCES journal_entries(id) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(label_id) REFERENCES journal_labels(id) ON UPDATE NO ACTION ON DELETE RESTRICT)"
+                    )
+                    db.execSQL(
+                        "INSERT INTO journal_tags_v10 SELECT entry_id, position, tag, label_id, label_kind FROM journal_tags"
+                    )
+                    db.execSQL("DROP TABLE journal_tags")
+                    db.execSQL("ALTER TABLE journal_tags_v10 RENAME TO journal_tags")
+                    db.execSQL("CREATE INDEX index_journal_tags_entry_id ON journal_tags(entry_id)")
+                    db.execSQL("CREATE INDEX index_journal_tags_label_id ON journal_tags(label_id)")
+                }
+            }
 
         internal val MIGRATION_8_9 =
             object : Migration(8, 9) {

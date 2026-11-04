@@ -46,6 +46,11 @@ internal const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
 internal data class PreparedBackup(
     val stagingDirectory: File,
     val entries: List<JournalEntry>,
+    val catalog: List<com.xike.app.data.JournalLabel> =
+        com.xike.app.data.catalogWithSelections(
+            com.xike.app.data.builtinJournalLabels,
+            entries.flatMap { it.labels },
+        ),
 )
 
 /** Reads and writes validated backups; database replacement and undo stay in JournalStore. */
@@ -54,7 +59,16 @@ internal class JournalBackupStorage(
     private val attachments: JournalAttachmentStore,
     private val videos: JournalVideoStore,
 ) {
-    fun writeBackup(currentEntries: List<JournalEntry>, output: OutputStream, password: String?) {
+    fun writeBackup(
+        currentEntries: List<JournalEntry>,
+        output: OutputStream,
+        password: String?,
+        catalog: List<com.xike.app.data.JournalLabel> =
+            com.xike.app.data.catalogWithSelections(
+                com.xike.app.data.builtinJournalLabels,
+                currentEntries.flatMap { it.labels },
+            ),
+    ) {
         val imageNames = currentEntries.flatMap { it.imageFileNames }.distinct()
         val audioNames = currentEntries.mapNotNull { it.audio?.fileName }.distinct()
         val videoNames = currentEntries.flatMap { it.video.files() }.distinct()
@@ -90,6 +104,7 @@ internal class JournalBackupStorage(
                 .put("format", "xike")
                 .put("version", STREAMING_BACKUP_VERSION)
                 .put("entries", JSONArray(exportedEntries.map { it.toJson() }))
+                .put("labelCatalog", JSONArray(catalog.map { it.toJson() }))
                 .toString()
         val html = BackupHtml.render(exportedEntries)
         val manifestBytes = manifest.toByteArray(Charsets.UTF_8)
@@ -243,6 +258,7 @@ internal class JournalBackupStorage(
         val stagingDirectory = createStagingDirectory()
         return try {
             var parsedEntries: List<JournalEntry>? = null
+            var catalog: List<com.xike.app.data.JournalLabel>? = null
             val restoredImages = linkedSetOf<String>()
             val restoredAudios = linkedSetOf<String>()
             val restoredVideos = linkedSetOf<String>()
@@ -283,6 +299,30 @@ internal class JournalBackupStorage(
                 }
 
                 parsedEntries = parseEntries(manifest.getJSONArray("entries"))
+                if (version >= 10) {
+                    val entryValues = manifest.getJSONArray("entries")
+                    require(
+                        (0 until entryValues.length()).all {
+                            entryValues.getJSONObject(it).has("labels")
+                        }
+                    )
+                    val values = manifest.getJSONArray("labelCatalog")
+                    catalog =
+                        List(values.length()) {
+                            com.xike.app.data.JournalLabel.fromJson(values.getJSONObject(it))
+                        }
+                    val definitions = catalog.associateBy { it.id }
+                    require(definitions.size == catalog.size)
+                    require(
+                        parsedEntries.orEmpty().all { entry ->
+                            entry.labels.all { selection ->
+                                definitions[selection.id]?.let {
+                                    it.kind == selection.kind && it.isBuiltin == selection.isBuiltin
+                                } == true
+                            }
+                        }
+                    )
+                }
                 referencedImages =
                     parsedEntries
                         .orEmpty()
@@ -416,7 +456,15 @@ internal class JournalBackupStorage(
             restored.forEach {
                 it.video?.let { video -> videos.validateStaged(stagingDirectory, video) }
             }
-            PreparedBackup(stagingDirectory, restored)
+            PreparedBackup(
+                stagingDirectory,
+                restored,
+                catalog
+                    ?: com.xike.app.data.catalogWithSelections(
+                        com.xike.app.data.builtinJournalLabels,
+                        restored.flatMap { it.labels },
+                    ),
+            )
         } catch (error: Throwable) {
             stagingDirectory.deleteRecursively()
             throw normalizedBackupError(error)
@@ -516,7 +564,7 @@ internal class JournalBackupStorage(
         const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
         const val MIN_UNENCRYPTED_BACKUP_VERSION = 8
-        const val STREAMING_BACKUP_VERSION = 9
+        const val STREAMING_BACKUP_VERSION = 10
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
         const val MAX_BACKUP_AUDIOS = 100_000

@@ -346,6 +346,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         dataError = message
     }
 
+    internal suspend fun saveLabel(label: com.xike.app.data.JournalLabel): Result<Unit> =
+        withContext(Dispatchers.IO) { runCatching { store.saveLabel(label) } }
+
+    internal suspend fun moveLabel(id: String, direction: Int): Result<Unit> =
+        withContext(Dispatchers.IO) { runCatching { store.moveLabel(id, direction) } }
+
     fun selectTheme(theme: AppTheme) {
         selectedTheme = theme
         appearancePreferences.saveTheme(theme)
@@ -417,8 +423,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun toggleDraftTag(tag: String) {
-        val updatedTags = toggleTopic(draft.tags, tag).toSet()
-        persistDraft(draft.copy(tags = updatedTags))
+        val label =
+            libraryState.labels.firstOrNull { it.id == tag }
+                ?: libraryState.labels.firstOrNull {
+                    it.kind == com.xike.app.data.JournalLabelKind.TOPIC &&
+                        it.name == canonicalTopic(tag)
+                }
+        val id = label?.id ?: com.xike.app.data.legacyTopicSelection(tag).id
+        val next =
+            if (draft.labels.any { it.id == id }) draft.labels.filterNot { it.id == id }
+            else if (label != null && !label.isArchived) draft.labels + label.selection()
+            else return
+        persistDraft(draft.copy(labels = next))
     }
 
     fun updateDraftRecordedAt(recordedAt: Long?) {
@@ -560,7 +576,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 JournalEntry(
                     createdAt = snapshot.recordedAt ?: System.currentTimeMillis(),
                     mood = mood,
-                    tags = snapshot.tags.toList(),
+                    labels = snapshot.labels,
                     note = snapshot.note.trim(),
                     audio = snapshot.audio,
                     video = snapshot.video,

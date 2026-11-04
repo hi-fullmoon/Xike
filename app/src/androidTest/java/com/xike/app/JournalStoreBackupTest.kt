@@ -52,7 +52,7 @@ class JournalStoreBackupTest {
     }
 
     @Test
-    fun version9BackupsPreserveOverallMoodAndFeelingsInPlainAndEncryptedArchives() {
+    fun currentBackupsPreserveOverallMoodAndFeelingsInPlainAndEncryptedArchives() {
         val source =
             JournalEntry(
                 id = "mood-v9",
@@ -85,7 +85,7 @@ class JournalStoreBackupTest {
                 }
             }
             val manifest = JSONObject(parts.getValue("manifest.json").toString(Charsets.UTF_8))
-            assertEquals(9, manifest.getInt("version"))
+            assertEquals(10, manifest.getInt("version"))
             assertEquals(
                 source,
                 JournalEntry.fromJson(manifest.getJSONArray("entries").getJSONObject(0)),
@@ -102,12 +102,106 @@ class JournalStoreBackupTest {
     }
 
     @Test
+    fun savingAfterRenameUsesCurrentNameAndLeavesEarlierRecordUnchanged() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            store.saveLabel(
+                com.xike.app.data.JournalLabel(
+                    "duplicate-english",
+                    com.xike.app.data.JournalLabelKind.TOPIC,
+                    "Work",
+                )
+            )
+        }
+        val label =
+            com.xike.app.data.JournalLabel(
+                "rename-in-flight",
+                com.xike.app.data.JournalLabelKind.TOPIC,
+                "个人项目",
+            )
+        store.saveLabel(label)
+        val first =
+            JournalEntry(
+                id = "before-rename",
+                mood = Mood.CALM,
+                note = "",
+                labels = listOf(label.selection()),
+            )
+        store.add(first)
+        store.saveLabel(label.copy(name = "个人计划"))
+        store.add(first.copy(id = "after-rename"))
+        assertEquals("个人项目", store.entries().single { it.id == first.id }.labels.single().savedName)
+        assertEquals(
+            "个人计划",
+            store.entries().single { it.id == "after-rename" }.labels.single().savedName,
+        )
+        assertEquals(2, store.search(JournalSearchQuery(topicIds = setOf(label.id))).totalCount)
+    }
+
+    @Test
+    fun unusedArchivedCatalogAndOrderRoundTripInPlainAndEncryptedBackups() {
+        val topic =
+            com.xike.app.data.JournalLabel(
+                "unused-topic",
+                com.xike.app.data.JournalLabelKind.TOPIC,
+                "长期计划",
+                sortOrder = 20,
+            )
+        val activity =
+            com.xike.app.data.JournalLabel(
+                "archived-activity",
+                com.xike.app.data.JournalLabelKind.ACTIVITY,
+                "晚间散步",
+                isArchived = true,
+                sortOrder = 30,
+            )
+        store.saveLabel(topic)
+        store.saveLabel(activity)
+        listOf<String?>(null, PASSWORD).forEachIndexed { index, password ->
+            val expected = dao.labels().toSet()
+            val output =
+                ByteArrayOutputStream().also { store.writeBackup(it, password) }.toByteArray()
+            val extra = topic.copy(id = "extra-$index", name = "额外主题$index")
+            store.saveLabel(extra)
+            store.restoreBackup(output.inputStream(), password, mode = BackupRestoreMode.REPLACE)
+            assertEquals(expected, dao.labels().toSet())
+            store.undoLastRestore()
+            assertTrue(dao.labels().any { it.id == extra.id })
+        }
+    }
+
+    @Test
+    fun legacyVersion9WithoutCatalogKeepsTopicsAndFeelings() {
+        val source =
+            JournalEntry(
+                id = "legacy-v9",
+                mood = Mood.ABOVE_AVERAGE,
+                note = "",
+                tags = listOf("运动", "个人项目"),
+                feelings = listOf("HOPEFUL"),
+            )
+        val json = source.toJson().apply { remove("labels") }
+        listOf<String?>(null, PASSWORD).forEach { password ->
+            val restored =
+                store
+                    .restoreBackup(
+                        versionedMoodArchive(9, json, password).inputStream(),
+                        password,
+                        mode = BackupRestoreMode.REPLACE,
+                    )
+                    .single()
+            assertEquals(source, restored)
+            assertTrue(restored.labels.all { it.kind == com.xike.app.data.JournalLabelKind.TOPIC })
+        }
+    }
+
+    @Test
     fun plainAndEncryptedVersion8BackupsRemainRestorableWithoutChangingLegacyMood() {
         val old = JournalEntry(id = "mood-v8", mood = Mood.TIRED, tags = emptyList(), note = "")
         val legacyJson =
             old.toJson().apply {
                 remove("feelings")
                 remove("moodScaleVersion")
+                remove("labels")
             }
         listOf<String?>(null, PASSWORD).forEach { password ->
             val bytes = versionedMoodArchive(8, legacyJson, password)

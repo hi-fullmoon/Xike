@@ -82,11 +82,11 @@ internal object BackupHtml {
             append("</span>")
             append(escape(entry.mood.label))
             append("</span>")
-            if (entry.tags.isNotEmpty()) {
+            if (entry.labels.isNotEmpty()) {
                 append("<div class=\"tags\">")
-                entry.tags.forEach { tag ->
+                entry.labels.forEach { label ->
                     append("<span class=\"tag\">")
-                    append(escape(localizedText(tag)))
+                    append(escape(label.displayName))
                     append("</span>")
                 }
                 append("</div>")

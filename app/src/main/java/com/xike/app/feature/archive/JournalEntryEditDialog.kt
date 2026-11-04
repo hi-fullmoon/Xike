@@ -166,7 +166,32 @@ internal fun JournalEntryEditDialog(
     var selectedFeelings by rememberSaveable(entry.id) { mutableStateOf(entry.feelings) }
     var moodScaleVersion by rememberSaveable(entry.id) { mutableIntStateOf(entry.moodScaleVersion) }
     var note by rememberSaveable(entry.id) { mutableStateOf(entry.note) }
-    var selectedTags by rememberSaveable(entry.id) { mutableStateOf(entry.tags) }
+    var selectedLabelJson by
+        rememberSaveable(entry.id) {
+            mutableStateOf(org.json.JSONArray(entry.labels.map { it.toJson() }).toString())
+        }
+    val selectedLabels =
+        org.json.JSONArray(selectedLabelJson).let { values ->
+            List(values.length()) {
+                com.xike.app.data.JournalLabelSelection.fromJson(values.getJSONObject(it))
+            }
+        }
+    val selectedTags =
+        selectedLabels
+            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
+            .map { it.savedName }
+    val selectedTopicCount =
+        selectedLabels
+            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
+            .distinctBy { it.id }
+            .size
+    val toggleLabel: (com.xike.app.data.JournalLabelSelection) -> Unit = { label ->
+        val next =
+            if (selectedLabels.any { it.id == label.id })
+                selectedLabels.filterNot { it.id == label.id }
+            else selectedLabels + label
+        selectedLabelJson = org.json.JSONArray(next.map { it.toJson() }).toString()
+    }
     var showTopics by rememberSaveable(entry.id) { mutableStateOf(entry.tags.isNotEmpty()) }
     val topicsAnchor = remember { BringIntoViewRequester() }
     var revealTopicsRequest by remember { mutableIntStateOf(0) }
@@ -417,7 +442,7 @@ internal fun JournalEntryEditDialog(
             moodScaleVersion != entry.moodScaleVersion ||
             createdAt != entry.createdAt ||
             note != entry.note ||
-            selectedTags != entry.tags ||
+            selectedLabels != entry.labels ||
             retainedAudio != entry.audio ||
             pendingAudio != null ||
             pendingStagedAudio != null ||
@@ -465,7 +490,7 @@ internal fun JournalEntryEditDialog(
                 mood = selectedMood,
                 feelings = selectedFeelings,
                 moodScaleVersion = moodScaleVersion,
-                tags = selectedTags,
+                labels = selectedLabels,
                 note = note.trim(),
                 audio = retainedAudio,
                 video = retainedVideo,
@@ -704,8 +729,8 @@ internal fun JournalEntryEditDialog(
                                             if (selectedTags.isEmpty()) localizedText("选主题 · 可选")
                                             else
                                                 tr(
-                                                    "已选 ${selectedTags.canonicalTopics().size} 个主题",
-                                                    "${selectedTags.canonicalTopics().size} topics selected",
+                                                    "已选 $selectedTopicCount 个主题",
+                                                    "$selectedTopicCount topics selected",
                                                 ),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -732,17 +757,24 @@ internal fun JournalEntryEditDialog(
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         MomentTopicsHeader(
-                                            selectedTags.canonicalTopics().size,
+                                            selectedTopicCount,
                                             highlightSelection = false,
                                         )
-                                        TopicChoices(selectedTags) { topic ->
-                                            if (!isSaving)
-                                                selectedTags =
-                                                    toggleTopic(selectedTags, topic.label)
-                                        }
+                                        com.xike.app.ui.components.JournalLabelChoices(
+                                            com.xike.app.data.JournalLabelKind.TOPIC,
+                                            selectedLabels,
+                                            !isSaving,
+                                            toggleLabel,
+                                        )
                                     }
                                 }
                             }
+
+                            com.xike.app.ui.components.JournalActivities(
+                                selectedLabels,
+                                !isSaving,
+                                toggleLabel,
+                            )
 
                             editedOutdoor?.let { outdoor ->
                                 Column(

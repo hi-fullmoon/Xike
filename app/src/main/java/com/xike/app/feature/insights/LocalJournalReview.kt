@@ -123,8 +123,8 @@ internal fun localJournalReview(summary: JournalPeriodSummary): LocalJournalRevi
                                     )
                                 }
                         tr(
-                            "“${localizedText(tag.tag)}”出现于 ${tag.entryCount} 条记录、${tag.recordedDayCount} 天；伴随的心情：$counts。",
-                            "“${localizedText(tag.tag)}” appears in ${tag.entryCount} entries across ${tag.recordedDayCount} days; recorded moods: $counts.",
+                            "“${tag.displayName}”出现于 ${tag.entryCount} 条记录、${tag.recordedDayCount} 天；伴随的心情：$counts。",
+                            "“${tag.displayName}” appears in ${tag.entryCount} entries across ${tag.recordedDayCount} days; recorded moods: $counts.",
                         )
                     } +
                         tr(
@@ -133,12 +133,39 @@ internal fun localJournalReview(summary: JournalPeriodSummary): LocalJournalRevi
                         ),
                 tags.map {
                     ReviewSource(
-                        tr("回看“${localizedText(it.tag)}”", "Revisit “${localizedText(it.tag)}”"),
+                        tr("回看“${it.displayName}”", "Revisit “${it.displayName}”"),
                         it.entryIds,
                     )
                 },
             )
 
+        if (summary.topActivities.isNotEmpty()) {
+            val activities = summary.topActivities.take(3)
+            sections +=
+                ReviewSection(
+                    tr("记录中的活动", "Recorded activities"),
+                    activities.joinToString("\n") { activity ->
+                        val moods =
+                            activity.moodCounts.entries.joinToString(tr("、", ", ")) {
+                                "${it.key.label} ${it.value}"
+                            }
+                        tr(
+                            "“${activity.displayName}”：${activity.entryCount} 条、${activity.recordedDayCount} 天，前期 ${activity.previousEntryCount} 条；伴随心情：$moods。",
+                            "“${activity.displayName}”: ${activity.entryCount} entries across ${activity.recordedDayCount} days; previously ${activity.previousEntryCount}; recorded moods: $moods.",
+                        )
+                    } +
+                        tr(
+                            "\n共同出现不代表原因，未标记不代表没有发生。",
+                            "\nCo-occurrence does not establish cause; an absent tag does not mean an activity did not happen.",
+                        ),
+                    activities.map {
+                        ReviewSource(
+                            tr("回看“${it.displayName}”", "Revisit “${it.displayName}”"),
+                            it.entryIds,
+                        )
+                    },
+                )
+        }
         sections += comparisonSection(summary)
         if (evidence.canDescribePatterns) sections += highlightsSection(summary)
         val repeated = tags.firstOrNull { it.recordedDayCount >= 2 }
@@ -161,8 +188,8 @@ internal fun localJournalReview(summary: JournalPeriodSummary): LocalJournalRevi
         ReviewSection(
             tr("这份回顾的范围", "Scope of this review"),
             tr(
-                "仅依据本机的日期、心情和主题生成，不分析日记正文、照片或录音。没有记录的日期不参与心情判断，也不等于心情平稳。这些是本机记录的描述性统计，不代表原因、诊断或建议。",
-                "Generated on your device from dates, moods and topic tags; journal text, photos and audio are not analyzed. Unrecorded days are excluded from mood observations and do not imply a steady mood. These descriptive statistics do not establish causes, diagnoses or advice.",
+                "仅依据本机的日期、心情、主题和活动生成，不分析日记正文、照片或录音。没有记录的日期不参与心情判断，也不等于心情平稳。这些是本机记录的描述性统计，不代表原因、诊断或建议。",
+                "Generated on your device from dates, moods, topics and activities; journal text, photos and audio are not analyzed. Unrecorded days are excluded from mood observations and do not imply a steady mood. These descriptive statistics do not establish causes, diagnoses or advice.",
             ),
         )
     return LocalJournalReview(
@@ -226,8 +253,8 @@ private fun comparisonSection(summary: JournalPeriodSummary): ReviewSection {
             summary.topTags.take(2).forEach { tag ->
                 append(
                     tr(
-                        "\n“${localizedText(tag.tag)}”：本期 ${tag.entryCount} 条，前期 ${tag.previousEntryCount} 条。",
-                        "\n“${localizedText(tag.tag)}”: ${tag.entryCount} entries this period, ${tag.previousEntryCount} previously.",
+                        "\n“${tag.displayName}”：本期 ${tag.entryCount} 条，前期 ${tag.previousEntryCount} 条。",
+                        "\n“${tag.displayName}”: ${tag.entryCount} entries this period, ${tag.previousEntryCount} previously.",
                     )
                 )
             }

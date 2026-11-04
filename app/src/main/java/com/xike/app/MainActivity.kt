@@ -195,6 +195,12 @@ class MainActivity : FragmentActivity() {
                     noticesBlocked = appLockEnabled && lockSession.isAppLocked,
                 ) {
                     CompositionLocalProvider(
+                        LocalJournalLabelServices provides
+                            JournalLabelServices(
+                                journalViewModel.libraryState.labels,
+                                journalViewModel::saveLabel,
+                                journalViewModel::moveLabel,
+                            ),
                         LocalAmapSettingsOperations provides
                             journalViewModel.amapSettingsOperations,
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,

@@ -352,15 +352,20 @@ private fun ComparisonMetric(
 internal fun TagTrendsCard(
     tags: List<TagTrendItem>,
     evidence: InsightEvidence,
+    activities: Boolean = false,
     onClick: (TagTrendItem) -> Unit,
 ) {
     InsightSectionCard(
         icon = XikeIcons.Archive,
-        index = localizedText("主题"),
-        title = localizedText("反复出现的主题"),
+        index = if (activities) tr("活动", "Activities") else localizedText("主题"),
+        title = if (activities) tr("记录中的活动", "Recorded activities") else localizedText("反复出现的主题"),
     ) {
         if (tags.isEmpty()) {
-            InsufficientDataNote(localizedText("添加主题后，这里会显示实际出现次数。"))
+            InsufficientDataNote(
+                if (activities)
+                    tr("添加活动后，这里会显示实际出现次数。", "Add activities to see their recorded counts.")
+                else localizedText("添加主题后，这里会显示实际出现次数。")
+            )
         } else {
             tags.forEach { tag ->
                 Row(
@@ -372,7 +377,7 @@ internal fun TagTrendsCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(localizedText(tag.tag), style = MaterialTheme.typography.titleSmall)
+                        Text(tag.displayName, style = MaterialTheme.typography.titleSmall)
                         Text(
                             tr(
                                 "当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次",
@@ -381,6 +386,18 @@ internal fun TagTrendsCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (activities) {
+                            Text(
+                                tr("${tag.recordedDayCount} 天", "${tag.recordedDayCount} days"),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                tag.moodCounts.entries.joinToString(" · ") {
+                                    "${it.key.label} ${it.value}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                     Text(
                         tag.countDelta.deltaLabel(),
@@ -397,7 +414,12 @@ internal fun TagTrendsCard(
             }
             if (!evidence.canDescribePatterns) {
                 Text(
-                    localizedText("样本较少，主题仅按次数排序，不解释其意义。"),
+                    if (activities)
+                        tr(
+                            "仅描述已记录的活动，共同出现不代表原因。",
+                            "Recorded activities are descriptive; co-occurrence does not establish cause.",
+                        )
+                    else localizedText("样本较少，主题仅按次数排序，不解释其意义。"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

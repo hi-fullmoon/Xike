@@ -26,6 +26,7 @@ data class JournalLibraryState(
     val totalCount: Int = 0,
     val todayCount: Int = 0,
     val revision: Long = 0,
+    val labels: List<com.xike.app.data.JournalLabel> = com.xike.app.data.defaultJournalLabels,
 )
 
 data class JournalEntryIndex(val id: String, @ColumnInfo(name = "created_at") val createdAt: Long)
@@ -47,7 +48,7 @@ internal data class JournalAnalyticsRecord(
             createdAt = createdAt,
             mood = Mood.fromName(mood, moodScaleVersion),
             moodScaleVersion = moodScaleVersion,
-            tags = tags.sortedBy { it.position }.map { it.tag },
+            labels = tags.sortedBy { it.position }.map { it.selection() },
             note = "",
         )
 }
@@ -77,6 +78,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
             "journal_tags",
             "journal_images",
             "journal_audios",
+            "journal_labels",
         )
 
     suspend fun libraryState(
@@ -88,6 +90,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
                 dao.entryCount(),
                 count(JournalSearchQuery(startDate = today, endDate = today)),
                 revision,
+                dao.labels().map { it.toLabel() },
             )
         }
     }
@@ -128,7 +131,14 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
 
     suspend fun entry(id: String): JournalEntry? = read { dao.record(id)?.toJournalEntry() }
 
-    suspend fun topics(): List<String> = read {
+    suspend fun topics(ids: Boolean = false): List<String> = read {
+        if (ids)
+            return@read dao.topicCounts(
+                    SimpleSQLiteQuery(
+                        "SELECT t.label_id AS tag, COUNT(DISTINCT t.entry_id) AS count FROM journal_tags t JOIN journal_labels l ON l.id = t.label_id WHERE t.label_kind = 'TOPIC' GROUP BY t.label_id ORDER BY count DESC, l.name ASC, t.label_id ASC"
+                    )
+                )
+                .map { it.tag }
         // Use the same topic normalization as selection; historical aliases in one entry count
         // once.
         val aliases = topicAliases()
@@ -137,7 +147,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
             "CASE tag " + aliases.entries.joinToString(" ") { "WHEN ? THEN ?" } + " ELSE tag END"
         dao.topicCounts(
                 SimpleSQLiteQuery(
-                    "SELECT $canonical AS tag, COUNT(DISTINCT entry_id) AS count FROM journal_tags GROUP BY 1 ORDER BY count DESC, tag ASC",
+                    "SELECT $canonical AS tag, COUNT(DISTINCT entry_id) AS count FROM journal_tags WHERE label_kind = 'TOPIC' GROUP BY 1 ORDER BY count DESC, tag ASC",
                     args.toTypedArray(),
                 )
             )
@@ -171,14 +181,17 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
     suspend fun insights(period: InsightsPeriod, today: LocalDate): JournalPeriodSummary = read {
         val ranges = period.readDateRanges(today)
         val zoneId = ZoneId.systemDefault()
-        val records =
-            database.runInTransaction<List<JournalAnalyticsRecord>> {
-                ranges.flatMap { (start, end) ->
+        val (records, catalog) =
+            database.runInTransaction<
+                Pair<List<JournalAnalyticsRecord>, List<com.xike.app.data.JournalLabel>>
+            > {
+                val records = ranges.flatMap { (start, end) ->
                     dao.analyticsRecords(
                         start.atStartOfDay(zoneId).toInstant().toEpochMilli(),
                         end.atStartOfDay(zoneId).toInstant().toEpochMilli(),
                     )
                 }
+                records to dao.labels().map { it.toLabel() }
             }
         withContext(Dispatchers.Default) {
             journalPeriodSummary(
@@ -186,6 +199,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
                 period,
                 today,
                 zoneId,
+                catalog,
             )
         }
     }
@@ -215,6 +229,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
         prefixArgs: List<Any> = emptyList(),
         zoneId: ZoneId = ZoneId.systemDefault(),
         groupByDay: Boolean = false,
+        pageSize: Int = 60,
     ): SimpleSQLiteQuery {
         val args = prefixArgs.toMutableList()
         val conditions = mutableListOf<String>()
@@ -235,8 +250,19 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
         if (query.tags.isNotEmpty()) {
             val tags = expandedTopicLabels(query.tags)
             conditions +=
-                "EXISTS (SELECT 1 FROM journal_tags t WHERE t.entry_id = e.id AND t.tag IN (${tags.joinToString(",") { "?" }}))"
+                "EXISTS (SELECT 1 FROM journal_tags t WHERE t.entry_id = e.id AND t.label_kind = 'TOPIC' AND (t.tag IN (${tags.joinToString(",") { "?" }}) OR t.label_id IN (${tags.joinToString(",") { "?" }})))"
             args.addAll(tags)
+            args.addAll(tags)
+        }
+        if (query.activities.isNotEmpty()) {
+            conditions +=
+                "EXISTS (SELECT 1 FROM journal_tags t WHERE t.entry_id = e.id AND t.label_kind = 'ACTIVITY' AND t.label_id IN (${query.activities.joinToString(",") { "?" }}))"
+            args.addAll(query.activities)
+        }
+        if (query.topicIds.isNotEmpty()) {
+            conditions +=
+                "EXISTS (SELECT 1 FROM journal_tags t WHERE t.entry_id = e.id AND t.label_kind = 'TOPIC' AND t.label_id IN (${query.topicIds.joinToString(",") { "?" }}))"
+            args.addAll(query.topicIds)
         }
         when (query.imageFilter) {
             JournalImageFilter.ANY -> Unit
@@ -258,7 +284,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
         if (groupByDay) statement += " GROUP BY day"
         if (ordered) statement += " ORDER BY e.created_at DESC, e.id DESC"
         if (offset != null) {
-            statement += " LIMIT 60 OFFSET ?"
+            statement += " LIMIT $pageSize OFFSET ?"
             args += offset
         }
         return SimpleSQLiteQuery(statement, args.toTypedArray())

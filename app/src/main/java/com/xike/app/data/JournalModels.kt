@@ -74,7 +74,6 @@ data class JournalEntry(
     val id: String = UUID.randomUUID().toString(),
     val createdAt: Long = System.currentTimeMillis(),
     val mood: Mood,
-    val tags: List<String>,
     val note: String,
     val imageFileNames: List<String> = emptyList(),
     val audio: JournalAudio? = null,
@@ -82,13 +81,72 @@ data class JournalEntry(
     val outdoor: OutdoorSnapshot? = null,
     val feelings: List<String> = emptyList(),
     val moodScaleVersion: Int = if (mood.isOverallScale) 1 else 0,
+    val labels: List<JournalLabelSelection> = emptyList(),
 ) {
+    // Legacy construction remains an import boundary; labels are the sole writable model.
+    constructor(
+        id: String = UUID.randomUUID().toString(),
+        createdAt: Long = System.currentTimeMillis(),
+        mood: Mood,
+        tags: List<String>,
+        note: String,
+        imageFileNames: List<String> = emptyList(),
+        audio: JournalAudio? = null,
+        video: JournalVideo? = null,
+        outdoor: OutdoorSnapshot? = null,
+        feelings: List<String> = emptyList(),
+        moodScaleVersion: Int = if (mood.isOverallScale) 1 else 0,
+    ) : this(
+        id,
+        createdAt,
+        mood,
+        note,
+        imageFileNames,
+        audio,
+        video,
+        outdoor,
+        feelings,
+        moodScaleVersion,
+        tags.map(::legacyTopicSelection),
+    )
+
+    val tags: List<String>
+        get() = labels.filter { it.kind == JournalLabelKind.TOPIC }.map { it.savedName }
+
+    fun copy(
+        tags: List<String>,
+        id: String = this.id,
+        createdAt: Long = this.createdAt,
+        mood: Mood = this.mood,
+        note: String = this.note,
+        imageFileNames: List<String> = this.imageFileNames,
+        audio: JournalAudio? = this.audio,
+        video: JournalVideo? = this.video,
+        outdoor: OutdoorSnapshot? = this.outdoor,
+        feelings: List<String> = this.feelings,
+        moodScaleVersion: Int = this.moodScaleVersion,
+    ): JournalEntry =
+        copy(
+            id = id,
+            createdAt = createdAt,
+            mood = mood,
+            note = note,
+            imageFileNames = imageFileNames,
+            audio = audio,
+            video = video,
+            outdoor = outdoor,
+            feelings = feelings,
+            moodScaleVersion = moodScaleVersion,
+            labels = tags.map(::legacyTopicSelection),
+        )
+
     fun toJson(): JSONObject =
         JSONObject()
             .put("id", id)
             .put("createdAt", createdAt)
             .put("mood", mood.name)
             .put("tags", JSONArray(tags))
+            .put("labels", JSONArray(labels.map { it.toJson() }))
             .put("note", note)
             .put("imageFileNames", JSONArray(imageFileNames))
             .put("audio", audio?.toJson() ?: JSONObject.NULL)
@@ -103,10 +161,17 @@ data class JournalEntry(
                 id = json.getString("id"),
                 createdAt = json.getLong("createdAt"),
                 mood = Mood.fromName(json.getString("mood"), json.optInt("moodScaleVersion", 0)),
-                tags =
-                    json.optJSONArray("tags")?.let { values ->
-                        List(values.length()) { index -> values.getString(index) }
-                    } ?: emptyList(),
+                labels =
+                    if (json.has("labels")) json.getJSONArray("labels").labelSelections()
+                    else
+                        json
+                            .optJSONArray("tags")
+                            ?.let { values ->
+                                List(values.length()) { index ->
+                                    legacyTopicSelection(values.getString(index))
+                                }
+                            }
+                            .orEmpty(),
                 note = json.optString("note"),
                 imageFileNames =
                     json.optJSONArray("imageFileNames")?.let { values ->

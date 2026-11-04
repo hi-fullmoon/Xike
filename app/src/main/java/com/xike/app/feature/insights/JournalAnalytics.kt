@@ -75,7 +75,13 @@ data class TagTrendItem(
     val entryIds: List<String>,
     val recordedDayCount: Int = 0,
     val moodCounts: Map<Mood, Int> = emptyMap(),
+    val labelId: String = com.xike.app.data.legacyTopicSelection(tag).id,
+    val kind: com.xike.app.data.JournalLabelKind = com.xike.app.data.JournalLabelKind.TOPIC,
+    val isBuiltin: Boolean = com.xike.app.data.legacyTopicSelection(tag).isBuiltin,
 ) {
+    val displayName: String
+        get() = com.xike.app.data.JournalLabelSelection(labelId, kind, tag, isBuiltin).displayName
+
     val countDelta: Int
         get() = entryCount - previousEntryCount
 }
@@ -171,6 +177,7 @@ data class JournalPeriodSummary(
     val entryIds: List<String>,
     val reviewDays: List<MoodTrendPoint> = emptyList(),
     val previousMoodCounts: Map<Mood, Int> = emptyMap(),
+    val topActivities: List<TagTrendItem> = emptyList(),
 ) {
     val averageEntriesPerRecordedDay: Double?
         get() = if (recordedDayCount == 0) null else entryCount.toDouble() / recordedDayCount
@@ -195,6 +202,7 @@ fun journalPeriodSummary(
     period: InsightsPeriod,
     today: LocalDate = LocalDate.now(),
     zoneId: ZoneId = ZoneId.systemDefault(),
+    catalog: List<com.xike.app.data.JournalLabel> = com.xike.app.data.builtinJournalLabels,
 ): JournalPeriodSummary {
     val bounds = period.bounds(today)
     val previousBounds = period.previousBounds(today, bounds)
@@ -234,31 +242,50 @@ fun journalPeriodSummary(
             recordedDayCount = recordedDayCount,
             elapsedDayCount = elapsedDayCount,
         )
-    val previousTagCounts = previousJournals.tagCounts()
-    val topTags =
-        journals
-            .tagCounts()
+    val definitions = catalog.associateBy { it.id }
+    fun counts(values: List<JournalEntry>, kind: com.xike.app.data.JournalLabelKind) =
+        values
+            .flatMap { entry -> entry.labels.filter { it.kind == kind }.map { it.id }.distinct() }
+            .groupingBy { it }
+            .eachCount()
+    fun trends(kind: com.xike.app.data.JournalLabelKind): List<TagTrendItem> {
+        val previousTagCounts = counts(previousJournals, kind)
+        return counts(journals, kind)
             .entries
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(MAX_TAG_INSIGHTS)
-            .map { (tag, count) ->
-                val taggedEntries = journals.filter { it.tags.containsTopic(tag) }
+            .map { (id, count) ->
+                val taggedEntries = journals.filter {
+                    it.labels.any { label -> label.id == id && label.kind == kind }
+                }
+                val selection = taggedEntries.first().labels.first { it.id == id }
+                val definition = definitions[id]
                 TagTrendItem(
-                    tag = tag,
+                    tag = definition?.name ?: selection.savedName,
                     entryCount = count,
-                    previousEntryCount = previousTagCounts[tag] ?: 0,
+                    previousEntryCount = previousTagCounts[id] ?: 0,
                     ratio = count.toDouble() / journals.size.coerceAtLeast(1),
                     averageScore = taggedEntries.moodAverage(),
                     entryIds = taggedEntries.map(JournalEntry::id),
                     recordedDayCount =
                         periodEntries
-                            .filter { it.entry.tags.containsTopic(tag) }
+                            .filter {
+                                it.entry.labels.any { label ->
+                                    label.id == id && label.kind == kind
+                                }
+                            }
                             .map(DatedJournalEntry::date)
                             .distinct()
                             .size,
                     moodCounts = taggedEntries.groupingBy(JournalEntry::mood).eachCount(),
+                    labelId = id,
+                    kind = kind,
+                    isBuiltin = definition?.isBuiltin ?: selection.isBuiltin,
                 )
             }
+    }
+    val topTags = trends(com.xike.app.data.JournalLabelKind.TOPIC)
+    val topActivities = trends(com.xike.app.data.JournalLabelKind.ACTIVITY)
     val weekdayInsight =
         periodEntries.dayTypeInsight(
             type = DayType.WEEKDAY,
@@ -298,6 +325,7 @@ fun journalPeriodSummary(
                     )
                 },
         topTags = topTags,
+        topActivities = topActivities,
         weekdayInsight = weekdayInsight,
         weekendInsight = weekendInsight,
         evidence = evidence,

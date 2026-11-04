@@ -23,6 +23,8 @@ data class JournalSearchQuery(
     val startDate: LocalDate? = null,
     val endDate: LocalDate? = null,
     val imageFilter: JournalImageFilter = JournalImageFilter.ANY,
+    val activities: Set<String> = emptySet(),
+    val topicIds: Set<String> = emptySet(),
 ) {
     val normalizedText: String
         get() = text.trim()
@@ -32,7 +34,8 @@ data class JournalSearchQuery(
             listOf(
                     normalizedText.isNotEmpty(),
                     moods.isNotEmpty(),
-                    tags.isNotEmpty(),
+                    tags.isNotEmpty() || topicIds.isNotEmpty(),
+                    activities.isNotEmpty(),
                     startDate != null || endDate != null,
                     imageFilter != JournalImageFilter.ANY,
                 )
@@ -84,13 +87,30 @@ fun filterJournalEntries(
                 textTerms.isNotEmpty() &&
                     textTerms.all { (term, topicTerms) ->
                         entry.note.contains(term, ignoreCase = true) ||
-                            entry.tags.any { tag ->
-                                topicTerms.any { tag.contains(it, ignoreCase = true) }
+                            entry.labels.any { label ->
+                                label.searchNames.any { name ->
+                                    topicTerms.any { name.contains(it, ignoreCase = true) }
+                                }
                             }
                     }
         val moodMatches = query.moods.isEmpty() || entry.mood in query.moods
         val tagMatches =
-            selectedTopics.isEmpty() || entry.tags.any { canonicalTopic(it) in selectedTopics }
+            selectedTopics.isEmpty() ||
+                entry.labels.any {
+                    it.kind == com.xike.app.data.JournalLabelKind.TOPIC &&
+                        (it.id in selectedTopics || canonicalTopic(it.savedName) in selectedTopics)
+                }
+        val activityMatches =
+            query.activities.isEmpty() ||
+                entry.labels.any {
+                    it.kind == com.xike.app.data.JournalLabelKind.ACTIVITY &&
+                        it.id in query.activities
+                }
+        val topicIdMatches =
+            query.topicIds.isEmpty() ||
+                entry.labels.any {
+                    it.kind == com.xike.app.data.JournalLabelKind.TOPIC && it.id in query.topicIds
+                }
         val startMatches = query.startDate?.let { !date.isBefore(it) } ?: true
         val endMatches = query.endDate?.let { !date.isAfter(it) } ?: true
         val imageMatches =
@@ -99,7 +119,14 @@ fun filterJournalEntries(
                 JournalImageFilter.WITH_IMAGES -> entry.imageFileNames.isNotEmpty()
                 JournalImageFilter.WITHOUT_IMAGES -> entry.imageFileNames.isEmpty()
             }
-        textMatches && moodMatches && tagMatches && startMatches && endMatches && imageMatches
+        textMatches &&
+            moodMatches &&
+            tagMatches &&
+            topicIdMatches &&
+            activityMatches &&
+            startMatches &&
+            endMatches &&
+            imageMatches
     }
 }
 

@@ -2,17 +2,19 @@ package com.xike.app.data.model
 
 import com.xike.app.canonicalTopics
 import com.xike.app.data.JournalAudio
+import com.xike.app.data.JournalLabelSelection
 import com.xike.app.data.MAX_AUDIO_DURATION_MILLIS
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.Mood
 import com.xike.app.data.feelingKeys
+import com.xike.app.data.labelSelections
+import com.xike.app.data.legacyTopicSelection
 import org.json.JSONArray
 import org.json.JSONObject
 
 data class JournalDraft(
     val mood: Mood? = null,
     val note: String = "",
-    val tags: Set<String> = emptySet(),
     val imageUriStrings: List<String> = emptyList(),
     val audio: JournalAudio? = null,
     val video: JournalVideo? = null,
@@ -22,12 +24,48 @@ data class JournalDraft(
     val updatedAt: Long = 0L,
     val feelings: List<String> = emptyList(),
     val moodScaleVersion: Int = if (mood?.isOverallScale == false) 0 else 1,
+    val labels: List<JournalLabelSelection> = emptyList(),
 ) {
+    constructor(
+        mood: Mood? = null,
+        note: String = "",
+        tags: Set<String>,
+        imageUriStrings: List<String> = emptyList(),
+        audio: JournalAudio? = null,
+        video: JournalVideo? = null,
+        pendingVideoUri: String? = null,
+        recordedAt: Long? = null,
+        outdoor: OutdoorSnapshot? = null,
+        updatedAt: Long = 0L,
+        feelings: List<String> = emptyList(),
+        moodScaleVersion: Int = if (mood?.isOverallScale == false) 0 else 1,
+    ) : this(
+        mood,
+        note,
+        imageUriStrings,
+        audio,
+        video,
+        pendingVideoUri,
+        recordedAt,
+        outdoor,
+        updatedAt,
+        feelings,
+        moodScaleVersion,
+        tags.filter(String::isNotBlank).canonicalTopics().map(::legacyTopicSelection),
+    )
+
+    val tags: Set<String>
+        get() =
+            labels
+                .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
+                .map { it.savedName }
+                .toCollection(linkedSetOf())
+
     val isEmpty: Boolean
         get() =
             mood == null &&
                 note.isBlank() &&
-                tags.isEmpty() &&
+                labels.isEmpty() &&
                 feelings.isEmpty() &&
                 imageUriStrings.isEmpty() &&
                 audio == null &&
@@ -39,8 +77,7 @@ data class JournalDraft(
     fun normalized(): JournalDraft {
         val normalizedNote = note.take(MAX_DRAFT_NOTE_LENGTH)
         val normalizedFeelings = feelings.filter(String::isNotBlank).distinct()
-        val normalizedTags =
-            tags.filter(String::isNotBlank).canonicalTopics().toCollection(linkedSetOf())
+        val normalizedLabels = labels.distinctBy { it.id }
         val normalizedImages =
             imageUriStrings.filter(String::isNotBlank).distinct().take(MAX_IMAGES_PER_ENTRY)
         val normalizedAudio = audio?.takeIf {
@@ -55,7 +92,7 @@ data class JournalDraft(
         val normalizedIsEmpty =
             mood == null &&
                 normalizedNote.isBlank() &&
-                normalizedTags.isEmpty() &&
+                normalizedLabels.isEmpty() &&
                 normalizedFeelings.isEmpty() &&
                 normalizedImages.isEmpty() &&
                 normalizedAudio == null &&
@@ -65,7 +102,7 @@ data class JournalDraft(
                 normalizedOutdoor == null
         return copy(
             note = normalizedNote,
-            tags = normalizedTags,
+            labels = normalizedLabels,
             feelings = normalizedFeelings,
             imageUriStrings = normalizedImages,
             audio = normalizedAudio,
@@ -81,6 +118,7 @@ data class JournalDraft(
             .put("mood", mood?.name ?: JSONObject.NULL)
             .put("note", note)
             .put("tags", JSONArray(tags.toList()))
+            .put("labels", JSONArray(labels.map { it.toJson() }))
             .put("imageUriStrings", JSONArray(imageUriStrings))
             .put("audio", audio?.toJson() ?: JSONObject.NULL)
             .put("video", video?.toJson() ?: JSONObject.NULL)
@@ -101,7 +139,15 @@ data class JournalDraft(
                                 ?.let { Mood.fromName(it.name, json.optInt("moodScaleVersion", 0)) }
                         },
                     note = json.optString("note").take(MAX_DRAFT_NOTE_LENGTH),
-                    tags = json.optJSONArray("tags")?.toStringSet().orEmpty(),
+                    labels =
+                        if (json.has("labels")) json.getJSONArray("labels").labelSelections()
+                        else
+                            json
+                                .optJSONArray("tags")
+                                ?.toStringSet()
+                                .orEmpty()
+                                .canonicalTopics()
+                                .map(::legacyTopicSelection),
                     imageUriStrings =
                         json.optJSONArray("imageUriStrings")?.toStringList().orEmpty(),
                     audio = JournalAudio.fromJson(json.optJSONObject("audio")),
@@ -121,7 +167,7 @@ data class JournalDraft(
 }
 
 internal const val MAX_DRAFT_NOTE_LENGTH = 280
-private const val DRAFT_FORMAT_VERSION = 6
+private const val DRAFT_FORMAT_VERSION = 7
 
 internal fun parseJournalDraft(serialized: String?): JournalDraft =
     serialized?.takeIf(String::isNotBlank)?.let { JSONObject(it) }?.let(JournalDraft::fromJson)

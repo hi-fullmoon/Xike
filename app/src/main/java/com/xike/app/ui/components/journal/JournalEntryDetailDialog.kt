@@ -201,31 +201,47 @@ internal fun JournalEntryDetailDialog(
                             }
                         }
                     }
-                    if (entry.tags.isNotEmpty()) {
-                        JournalDetailSection(localizedText("主题")) {
-                            JournalDetailCard {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    entry.tags.forEach { tag ->
-                                        val topic = journalTopics.find {
-                                            it.label == canonicalTopic(tag)
+                    com.xike.app.data.JournalLabelKind.entries.forEach { kind ->
+                        val labels = entry.labels.filter { it.kind == kind }
+                        if (labels.isNotEmpty()) {
+                            JournalDetailSection(
+                                if (kind == com.xike.app.data.JournalLabelKind.TOPIC)
+                                    localizedText("主题")
+                                else tr("活动", "Activities")
+                            ) {
+                                JournalDetailCard {
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        labels.forEach { label ->
+                                            val definition =
+                                                com.xike.app.LocalJournalLabelServices.current
+                                                    .catalog
+                                                    .firstOrNull { it.id == label.id }
+                                            val topic = journalTopics.find {
+                                                it.label ==
+                                                    (definition?.iconKey
+                                                        ?: canonicalTopic(label.savedName))
+                                            }
+                                            TopicChip(
+                                                topic =
+                                                    (topic ?: journalTopics.last()).copy(
+                                                        label = label.displayName,
+                                                        translateLabel = false,
+                                                    ),
+                                                selected = true,
+                                                onClick = null,
+                                                minHeight = 24.dp,
+                                                verticalPadding = 2.dp,
+                                                horizontalPadding = 8.dp,
+                                                labelMaxLines = Int.MAX_VALUE,
+                                                filled = false,
+                                                compact = true,
+                                                iconSize = 14.dp,
+                                                labelStyle = MaterialTheme.typography.labelMedium,
+                                            )
                                         }
-                                        TopicChip(
-                                            topic =
-                                                (topic ?: journalTopics.last()).copy(label = tag),
-                                            selected = true,
-                                            onClick = null,
-                                            minHeight = 24.dp,
-                                            verticalPadding = 2.dp,
-                                            horizontalPadding = 8.dp,
-                                            labelMaxLines = Int.MAX_VALUE,
-                                            filled = false,
-                                            compact = true,
-                                            iconSize = 14.dp,
-                                            labelStyle = MaterialTheme.typography.labelMedium,
-                                        )
                                     }
                                 }
                             }

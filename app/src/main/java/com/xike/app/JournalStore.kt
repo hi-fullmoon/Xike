@@ -94,6 +94,12 @@ class JournalStore(context: Context) {
     @Synchronized
     fun initialize(loadEntries: Boolean = true): JournalSnapshot =
         try {
+            dao.ensureLabelCatalog(
+                preserveLegacyTopics =
+                    dao.settingValue(LEGACY_MIGRATION_SETTING) == null &&
+                        (legacyPreferences.contains(ENTRIES_KEY) ||
+                            legacyPreferences.contains(THEME_KEY))
+            )
             if (dao.settingValue(LEGACY_MIGRATION_SETTING) == null) {
                 val legacyEntries =
                     readLegacyEntries().distinctBy { it.id }.sortedByDescending { it.createdAt }
@@ -119,6 +125,60 @@ class JournalStore(context: Context) {
 
     fun entries(): List<JournalEntry> = readEntries()
 
+    @Synchronized
+    fun saveLabel(value: com.xike.app.data.JournalLabel) {
+        database.runInTransaction {
+            dao.ensureLabelCatalog()
+            com.xike.app.data.validateLabelName(value.name)
+            require(value.iconKey in com.xike.app.data.labelIconKeys)
+            val catalog = dao.labels().map { it.toLabel() }
+            val previous = catalog.firstOrNull { it.id == value.id }
+            require(previous == null || previous.kind == value.kind)
+            require(previous == null || previous.isBuiltin == value.isBuiltin)
+            require(!value.isBuiltin || previous?.name == value.name)
+            require(previous != null || !value.isBuiltin && !value.id.startsWith("builtin:"))
+            val key = com.xike.app.data.normalizedLabelName(value.name)
+            require(
+                previous?.name == value.name ||
+                    catalog.none { other ->
+                        other.id != value.id &&
+                            other.kind == value.kind &&
+                            other.searchNames.any {
+                                com.xike.app.data.normalizedLabelName(it) == key
+                            }
+                    }
+            ) {
+                tr(
+                    "同类中已存在这个名称，请修改名称或恢复已归档项。",
+                    "This name already exists in this category. Rename it or restore the archived item.",
+                )
+            }
+            if (previous == null)
+                dao.insertLabels(listOf(value.copy(name = value.name.trim()).toEntity()))
+            dao.saveLabel(value.copy(name = value.name.trim()).toEntity())
+        }
+    }
+
+    @Synchronized
+    fun moveLabel(id: String, direction: Int) {
+        require(direction == -1 || direction == 1)
+        database.runInTransaction {
+            val catalog = dao.labels().map { it.toLabel() }
+            val selected = catalog.first { it.id == id }
+            val group =
+                catalog
+                    .filter { it.kind == selected.kind && it.isArchived == selected.isArchived }
+                    .toMutableList()
+            val position = group.indexOfFirst { it.id == id }
+            val next = position + direction
+            if (next !in group.indices) return@runInTransaction
+            java.util.Collections.swap(group, position, next)
+            group.forEachIndexed { index, label ->
+                dao.saveLabel(label.copy(sortOrder = index).toEntity())
+            }
+        }
+    }
+
     fun observeEntries(): Flow<List<JournalEntry>> =
         dao.observeRecords().map { records -> records.map(JournalEntryRecord::toJournalEntry) }
 
@@ -131,43 +191,22 @@ class JournalStore(context: Context) {
         try {
             require(offset >= 0) { localizedText("搜索偏移量不能小于 0。") }
             require(limit in 1..200) { localizedText("每页搜索结果需要在 1 到 200 条之间。") }
-            val range = query.epochRange(zoneId)
-            val hasText = if (query.normalizedText.isEmpty()) 0 else 1
-            val ftsQuery =
-                query.normalizedText.takeIf(String::isNotEmpty)?.let(::journalFtsQuery) ?: "\"\""
-            val filterMoods = if (query.moods.isEmpty()) 0 else 1
-            val moods = query.moods.map(Mood::name).ifEmpty { listOf(Mood.CALM.name) }
-            val filterTags = if (query.tags.isEmpty()) 0 else 1
-            val tags = expandedTopicLabels(query.tags).ifEmpty { listOf("") }
-            val imageFilter = query.imageFilter.name
-            val records =
-                dao.searchRecords(
-                        hasText = hasText,
-                        ftsQuery = ftsQuery,
-                        startInclusive = range.startInclusive,
-                        endExclusive = range.endExclusive,
-                        filterMoods = filterMoods,
-                        moods = moods,
-                        filterTags = filterTags,
-                        tags = tags,
-                        imageFilter = imageFilter,
-                        limit = limit,
-                        offset = offset,
-                    )
-                    .map(JournalEntryRecord::toJournalEntry)
-            val totalCount =
-                dao.searchRecordCount(
-                    hasText = hasText,
-                    ftsQuery = ftsQuery,
-                    startInclusive = range.startInclusive,
-                    endExclusive = range.endExclusive,
-                    filterMoods = filterMoods,
-                    moods = moods,
-                    filterTags = filterTags,
-                    tags = tags,
-                    imageFilter = imageFilter,
-                )
-            JournalSearchPage(records, totalCount, offset)
+            database.runInTransaction<JournalSearchPage> {
+                val records =
+                    dao.recordsForQuery(
+                            readRepository.sql(
+                                query,
+                                "e.*",
+                                ordered = true,
+                                offset = offset,
+                                zoneId = zoneId,
+                                pageSize = limit,
+                            )
+                        )
+                        .map(JournalEntryRecord::toJournalEntry)
+                val count = dao.queryCount(readRepository.sql(query, "COUNT(*)", zoneId = zoneId))
+                JournalSearchPage(records, count, offset)
+            }
         } catch (error: Throwable) {
             throw JournalDataException(localizedText("日记搜索暂时不可用，请重试。"), error)
         }
@@ -180,7 +219,19 @@ class JournalStore(context: Context) {
     ): List<JournalEntry> {
         val imported = attachments.importImages(imageUris)
         return runCatching {
-            val storedEntry = entry.copy(imageFileNames = imported)
+            val catalog = dao.labels().map { it.toLabel() }.associateBy { it.id }
+            val storedEntry =
+                entry.copy(
+                    imageFileNames = imported,
+                    labels =
+                        entry.labels.map { selected ->
+                            if (selected.isBuiltin) selected
+                            else
+                                catalog[selected.id]
+                                    ?.takeIf { it.kind == selected.kind }
+                                    ?.selection() ?: selected
+                        },
+                )
             attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
             dao.insertJournal(storedEntry.toBundle())
@@ -392,7 +443,8 @@ class JournalStore(context: Context) {
     @Synchronized
     fun writeBackup(output: OutputStream, password: String?) {
         if (password != null) require(password.length >= 8) { localizedText("备份密码至少需要 8 位。") }
-        backups.writeBackup(readEntries(), output, password)
+        dao.ensureLabelCatalog()
+        backups.writeBackup(readEntries(), output, password, dao.labels().map { it.toLabel() })
     }
 
     fun backupRequiresPassword(input: InputStream): Boolean = backups.backupRequiresPassword(input)
@@ -423,13 +475,27 @@ class JournalStore(context: Context) {
     ): List<JournalEntry> {
         val prepared = backups.readBackup(input, password)
         return try {
+            val localCatalog = dao.labels().map { it.toLabel() }
+            val labelPlan =
+                com.xike.app.data.planLabelRestore(
+                    localCatalog,
+                    prepared.catalog,
+                    prepared.entries,
+                    mode == BackupRestoreMode.MERGE,
+                    videoDraftStore.load().labels,
+                )
             val localEntries = if (mode == BackupRestoreMode.MERGE) readEntries() else emptyList()
             val entriesToInstall =
                 if (mode == BackupRestoreMode.MERGE) {
-                    planRestoreMerge(prepared.stagingDirectory, localEntries, prepared.entries)
-                } else prepared.entries.distinctBy { it.id }
+                    planRestoreMerge(prepared.stagingDirectory, localEntries, labelPlan.entries)
+                } else labelPlan.entries.distinctBy { it.id }
             // A duplicate import is not a mutation and must retain the previous undo snapshot.
-            if (mode == BackupRestoreMode.MERGE && entriesToInstall.isEmpty()) return localEntries
+            if (
+                mode == BackupRestoreMode.MERGE &&
+                    entriesToInstall.isEmpty() &&
+                    labelPlan.catalog.toSet() == localCatalog.toSet()
+            )
+                return localEntries
             val snapshotSwap = createUndoSnapshot()
             try {
                 installRestoredData(
@@ -439,6 +505,7 @@ class JournalStore(context: Context) {
                         retainedVideo,
                         localEntries,
                         undoToken = snapshotSwap.current.file.name,
+                        catalog = labelPlan.catalog,
                     )
                     .also {
                         commitUndoSnapshot(snapshotSwap)
@@ -475,6 +542,11 @@ class JournalStore(context: Context) {
                     retainedAudioFileNames,
                     retainedVideo,
                     expectedUndoToken = snapshot.file.name,
+                    catalog =
+                        com.xike.app.data.catalogWithSelections(
+                            prepared.catalog,
+                            videoDraftStore.load().labels,
+                        ),
                 )
                 .also {
                     clearUndoSnapshot(snapshot)
@@ -625,6 +697,7 @@ class JournalStore(context: Context) {
         localEntries: List<JournalEntry> = emptyList(),
         undoToken: String = "",
         expectedUndoToken: String? = null,
+        catalog: List<com.xike.app.data.JournalLabel>? = null,
     ): List<JournalEntry> {
         val installedFiles = mutableListOf<File>()
         return try {
@@ -701,7 +774,7 @@ class JournalStore(context: Context) {
                 retainedAudioFileNames +
                     listOfNotNull(preservedDraft.audio?.fileName) +
                     editAudioPreferences.all.keys
-            writeEntries(installedEntries, undoToken, expectedUndoToken)
+            writeEntries(installedEntries, undoToken, expectedUndoToken, catalog)
             // The database has committed. A cleanup failure must not remove installed media
             // or roll back the safety snapshot while records already reference the new files.
             runCatching {
@@ -813,12 +886,14 @@ class JournalStore(context: Context) {
         entries: List<JournalEntry>,
         undoToken: String = "",
         expectedUndoToken: String? = null,
+        catalog: List<com.xike.app.data.JournalLabel>? = null,
     ) {
         runCatching {
             dao.replaceJournals(
                 entries.map(JournalEntry::toBundle),
                 undoToken,
                 expectedUndoToken,
+                catalog,
             )
         }
             .getOrElse { error ->
