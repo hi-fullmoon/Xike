@@ -151,6 +151,7 @@ fun JournalArchiveScreen(
     readRepository: JournalReadRepository? = null,
     libraryState: JournalLibraryState = JournalLibraryState(totalCount = entries.size),
     onReadError: (String) -> Unit = {},
+    onSetFavorite: (suspend (String, Boolean) -> Result<JournalEntry>)? = null,
 ) {
     val today = LocalDate.now()
     val context = LocalContext.current
@@ -161,6 +162,8 @@ fun JournalArchiveScreen(
     var selectedMoodNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedTags by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedActivities by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var favoritesOnly by rememberSaveable { mutableStateOf(false) }
+    var showMemories by rememberSaveable { mutableStateOf(false) }
     var imageFilterName by rememberSaveable { mutableStateOf(JournalImageFilter.ANY.name) }
     var datePresetName by rememberSaveable { mutableStateOf(ArchiveDatePreset.ALL.name) }
     var selectedDateValue by rememberSaveable { mutableStateOf<String?>(null) }
@@ -221,6 +224,7 @@ fun JournalArchiveScreen(
             selectedMoods,
             selectedTags,
             selectedActivities,
+            favoritesOnly,
             imageFilter,
             selectedDate,
             presetRange,
@@ -231,6 +235,7 @@ fun JournalArchiveScreen(
                 tags = if (readRepository == null) selectedTags.toSet() else emptySet(),
                 topicIds = if (readRepository != null) selectedTags.toSet() else emptySet(),
                 activities = selectedActivities.toSet(),
+                favoritesOnly = favoritesOnly,
                 startDate = selectedDate ?: presetRange.first,
                 endDate = selectedDate ?: presetRange.second,
                 imageFilter = imageFilter,
@@ -253,7 +258,7 @@ fun JournalArchiveScreen(
     var resultKey by remember { mutableStateOf<Any?>(null) }
     val viewMode =
         ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
-    // 结果状态项之前固定有页头与工具箱两项，其间按需插入筛选面板与月历；列表项增删时同步维护这里。
+    // 往日入口归入工具箱；结果状态之前还可能有筛选面板与月历。
     val resultStatusIndex =
         2 + (if (showFilters) 1 else 0) + (if (viewMode == ArchiveViewMode.CALENDAR) 1 else 0)
     val currentResultStatusIndex by androidx.compose.runtime.rememberUpdatedState(resultStatusIndex)
@@ -412,16 +417,21 @@ fun JournalArchiveScreen(
             }
 
             item(key = "archive-toolbox") {
-                ArchiveToolbox(
-                    queryText = queryText,
-                    viewMode = viewMode,
-                    activeFilterCount = searchQuery.activeFilterCount,
-                    showFilters = showFilters,
-                    onQueryChange = { queryText = it.take(80) },
-                    onClearQuery = { queryText = "" },
-                    onViewModeChange = { viewModeName = it.name },
-                    onToggleFilters = { showFilters = !showFilters },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (readRepository != null) {
+                        ArchiveMemoriesEntry { showMemories = true }
+                    }
+                    ArchiveToolbox(
+                        queryText = queryText,
+                        viewMode = viewMode,
+                        activeFilterCount = searchQuery.activeFilterCount,
+                        showFilters = showFilters,
+                        onQueryChange = { queryText = it.take(80) },
+                        onClearQuery = { queryText = "" },
+                        onViewModeChange = { viewModeName = it.name },
+                        onToggleFilters = { showFilters = !showFilters },
+                    )
+                }
             }
 
             if (filtersVisible) {
@@ -431,6 +441,8 @@ fun JournalArchiveScreen(
                         availableTags = availableTags,
                         selectedTags = selectedTags,
                         selectedActivities = selectedActivities,
+                        favoritesOnly = favoritesOnly,
+                        onFavoritesOnlyChange = { favoritesOnly = it },
                         onToggleActivity = { id ->
                             selectedActivities = selectedActivities.toggle(id)
                         },
@@ -455,6 +467,7 @@ fun JournalArchiveScreen(
                             selectedMoodNames = emptyList()
                             selectedTags = emptyList()
                             selectedActivities = emptyList()
+                            favoritesOnly = false
                             imageFilterName = JournalImageFilter.ANY.name
                             datePresetName = ArchiveDatePreset.ALL.name
                             selectedDateValue = null
@@ -510,9 +523,16 @@ fun JournalArchiveScreen(
                 item(key = "archive-no-results") {
                     ArchiveEmptyState(
                         icon = Icons.Outlined.Search,
-                        title = localizedText("没有找到这一刻"),
+                        title =
+                            if (favoritesOnly)
+                                tr("当前条件下没有收藏的记录", "No favorites match these filters")
+                            else localizedText("没有找到这一刻"),
                         description = localizedText("试试减少筛选条件，或换一个主题。"),
                     )
+                    if (favoritesOnly)
+                        TextButton(onClick = { favoritesOnly = false }, shape = XikeShapes.button) {
+                            Text(tr("清除收藏筛选", "Clear favorite filter"))
+                        }
                 }
             } else {
                 items(
@@ -649,6 +669,7 @@ fun JournalArchiveScreen(
         JournalEntryDetailDialog(
             entry = entry,
             showLocationSource = true,
+            onSetFavorite = onSetFavorite,
             openImage = openImage,
             openAudio = openAudio,
             onDismiss = { detailEntry = null },
@@ -657,6 +678,17 @@ fun JournalArchiveScreen(
                 deleteError = null
                 deleteCandidate = entry
             },
+        )
+    }
+
+    if (showMemories && readRepository != null) {
+        JournalMemoriesDialog(
+            readRepository,
+            libraryState.revision,
+            openImage,
+            openAudio,
+            onDismiss = { showMemories = false },
+            onSetFavorite = onSetFavorite,
         )
     }
 
@@ -915,6 +947,7 @@ private fun ArchiveTimelineEntry(
 ) {
     JournalEntryCard(
         entry = entry,
+        modifier = Modifier.testTag("archive-entry:${entry.id}"),
         compactMedia = true,
         moodIconSize = 36.dp,
         compactMoodOnly = true,

@@ -349,6 +349,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     internal suspend fun saveLabel(label: com.xike.app.data.JournalLabel): Result<Unit> =
         withContext(Dispatchers.IO) { runCatching { store.saveLabel(label) } }
 
+    internal suspend fun setFavorite(entryId: String, favorite: Boolean): Result<JournalEntry> =
+        withContext(Dispatchers.IO) { runCatching { store.setFavorite(entryId, favorite) } }
+
     internal suspend fun moveLabel(id: String, direction: Int): Result<Unit> =
         withContext(Dispatchers.IO) { runCatching { store.moveLabel(id, direction) } }
 

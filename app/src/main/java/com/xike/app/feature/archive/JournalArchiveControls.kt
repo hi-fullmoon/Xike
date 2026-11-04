@@ -27,10 +27,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +57,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
@@ -62,6 +67,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xike.app.localizedText
 import com.xike.app.tr
+import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeShapes
 
 internal enum class ArchiveViewMode {
@@ -93,6 +99,65 @@ internal fun ArchiveToolbox(
             onViewModeChange = onViewModeChange,
             onToggleFilters = onToggleFilters,
         )
+    }
+}
+
+@Composable
+internal fun ArchiveMemoriesEntry(onClick: () -> Unit) {
+    val title = tr("往日回望", "Past moments")
+    val hint = tr("（一个月前 · 往年今天）", "(One month ago · On this day)")
+    val titleStyle = MaterialTheme.typography.labelLarge
+    val hintStyle = MaterialTheme.typography.labelSmall
+    val measurer = rememberTextMeasurer()
+    val textWidth =
+        with(LocalDensity.current) {
+            (measurer.measure(title, titleStyle, softWrap = false).size.width +
+                    measurer.measure(hint, hintStyle, softWrap = false).size.width)
+                .toDp()
+        }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val fixedWidth = XikeCardPadding * 2 + 20.dp * 2 + 8.dp * 3
+        // Allow for pixel rounding when deciding whether both labels fit.
+        val showHint = textWidth + fixedWidth + 1.dp <= maxWidth
+        FilledTonalButton(
+            onClick = onClick,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .testTag("archive-memories-entry")
+                    .semantics {
+                        if (!showHint) contentDescription = tr("$title，$hint", "$title, $hint")
+                    },
+            shape = XikeShapes.button,
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            contentPadding = PaddingValues(horizontal = XikeCardPadding, vertical = 8.dp),
+        ) {
+            Icon(Icons.Outlined.History, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                title,
+                if (showHint) Modifier else Modifier.weight(1f),
+                style = titleStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (showHint) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    hint,
+                    Modifier.weight(1f),
+                    style = hintStyle,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp))
+        }
     }
 }
 

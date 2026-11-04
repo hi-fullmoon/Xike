@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -22,8 +23,10 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,13 +40,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -76,6 +82,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun JournalEntryDetailDialog(
@@ -86,7 +93,14 @@ internal fun JournalEntryDetailDialog(
     onRequestEdit: (() -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
     showLocationSource: Boolean = false,
+    onSetFavorite: (suspend (String, Boolean) -> Result<JournalEntry>)? = null,
+    readError: String? = null,
+    onRetryRead: (() -> Unit)? = null,
 ) {
+    val scope = rememberCoroutineScope()
+    var favorite by remember(entry.id, entry.isFavorite) { mutableStateOf(entry.isFavorite) }
+    var favoriteBusy by remember(entry.id) { mutableStateOf(false) }
+    var favoriteError by remember(entry.id) { mutableStateOf<String?>(null) }
     var photoPage by remember(entry.id) { mutableIntStateOf(-1) }
     var showFullAddress by remember(entry.id, entry.outdoor) { mutableStateOf(false) }
     Dialog(
@@ -103,20 +117,86 @@ internal fun JournalEntryDetailDialog(
                         .widthIn(max = XikeContentMaxWidth)
                         .fillMaxWidth()
             ) {
-                SecondaryPageHeader(
-                    title = localizedText("这一刻"),
-                    closeDescription = localizedText("关闭记录详情"),
-                    onClose = onDismiss,
+                BoxWithConstraints(
                     modifier =
                         Modifier.fillMaxWidth()
                             .padding(
                                 horizontal = XikeScreenHorizontalPadding,
                                 vertical = XikeScreenVerticalPadding,
-                            ),
+                            )
                 ) {
-                    if (onRequestEdit != null) {
-                        IconButton(onClick = onRequestEdit) {
-                            Icon(Icons.Outlined.Edit, contentDescription = localizedText("编辑记录"))
+                    val title = localizedText("这一刻")
+                    val measurer = rememberTextMeasurer()
+                    val titleWidth =
+                        with(LocalDensity.current) {
+                            measurer
+                                .measure(
+                                    title,
+                                    MaterialTheme.typography.titleLarge,
+                                    softWrap = false,
+                                )
+                                .size
+                                .width
+                                .toDp()
+                        }
+                    SecondaryPageHeader(
+                        title = title,
+                        closeDescription = localizedText("关闭记录详情"),
+                        onClose = onDismiss,
+                        actionsBelowTitle =
+                            onRequestEdit != null &&
+                                (onSetFavorite != null || favorite) &&
+                                titleWidth + 144.dp > maxWidth,
+                    ) {
+                        if (onSetFavorite != null) {
+                            IconButton(
+                                enabled = !favoriteBusy,
+                                onClick = {
+                                    if (!favoriteBusy) {
+                                        val target = !favorite
+                                        favoriteBusy = true
+                                        favoriteError = null
+                                        scope.launch {
+                                            try {
+                                                onSetFavorite(entry.id, target)
+                                                    .onSuccess { favorite = it.isFavorite }
+                                                    .onFailure {
+                                                        favoriteError =
+                                                            it.message
+                                                                ?: tr(
+                                                                    "收藏未保存，请重试。",
+                                                                    "Favorite was not saved. Try again.",
+                                                                )
+                                                    }
+                                            } finally {
+                                                favoriteBusy = false
+                                            }
+                                        }
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    if (favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    if (favoriteBusy) tr("正在保存收藏", "Saving favorite")
+                                    else if (favorite) tr("取消收藏", "Remove favorite")
+                                    else tr("收藏这一刻", "Favorite this moment"),
+                                )
+                            }
+                        } else if (favorite) {
+                            Icon(
+                                Icons.Filled.Star,
+                                tr("已收藏", "Favorite"),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(12.dp).size(24.dp),
+                            )
+                        }
+                        if (onRequestEdit != null) {
+                            IconButton(onClick = onRequestEdit) {
+                                Icon(
+                                    Icons.Outlined.Edit,
+                                    contentDescription = localizedText("编辑记录"),
+                                )
+                            }
                         }
                     }
                 }
@@ -133,6 +213,12 @@ internal fun JournalEntryDetailDialog(
                             ),
                     verticalArrangement = Arrangement.spacedBy(XikeContentGap),
                 ) {
+                    favoriteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    readError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                        if (onRetryRead != null)
+                            TextButton(onClick = onRetryRead) { Text(tr("重试", "Retry")) }
+                    }
                     Surface(
                         shape = XikeShapes.card,
                         color = MaterialTheme.colorScheme.primaryContainer,

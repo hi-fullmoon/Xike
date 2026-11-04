@@ -82,6 +82,11 @@ internal object BackupHtml {
             append("</span>")
             append(escape(entry.mood.label))
             append("</span>")
+            if (entry.isFavorite) {
+                append("<span class=\"tag\">")
+                append(escape(tr("已收藏", "Favorite")))
+                append("</span>")
+            }
             if (entry.labels.isNotEmpty()) {
                 append("<div class=\"tags\">")
                 entry.labels.forEach { label ->

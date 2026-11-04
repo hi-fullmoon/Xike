@@ -96,14 +96,36 @@ internal fun restoreContentKey(
     return values.toString().byteInputStream().use(::attachmentDigest)
 }
 
-/** Keep identity: independently created entries with different IDs are not collapsed. */
+internal data class JournalMergePlan(
+    val additions: List<JournalEntry>,
+    val favoriteUpdates: Set<String>,
+    val conflictCount: Int = 0,
+)
+
 internal fun planMergedEntries(
     local: List<JournalEntry>,
     incoming: List<JournalEntry>,
     localKey: (JournalEntry) -> String,
     incomingKey: (JournalEntry) -> String,
-): List<JournalEntry> {
+): List<JournalEntry> = planJournalMerge(local, incoming, localKey, incomingKey).additions
+
+/** Keep identity: independently created entries with different IDs are not collapsed. */
+internal fun planJournalMerge(
+    local: List<JournalEntry>,
+    incoming: List<JournalEntry>,
+    localKey: (JournalEntry) -> String,
+    incomingKey: (JournalEntry) -> String,
+): JournalMergePlan {
     val known = local.associateBy { it.id }.toMutableMap()
+    val localIds = known.keys.toSet()
+    val favoriteUpdates = mutableSetOf<String>()
+    fun mergeFavorite(id: String, incoming: JournalEntry) {
+        val existing = known.getValue(id)
+        if (incoming.isFavorite && !existing.isFavorite) {
+            known[id] = existing.copy(isFavorite = true)
+            if (id in localIds) favoriteUpdates += id
+        }
+    }
     val keys = mutableMapOf<String, String>()
     val versionIds =
         known.keys
@@ -112,6 +134,7 @@ internal fun planMergedEntries(
             .mapValues { (_, ids) -> ids.toMutableSet() }
             .toMutableMap()
     val additions = mutableListOf<JournalEntry>()
+    var conflictCount = 0
     // Earlier builds used opaque UUID v3 IDs. Prefilter by actual metadata so only plausible
     // legacy copies require media comparison and bounded reconstruction of the old ID.
     fun legacyMetadata(value: JournalEntry): List<Any?> =
@@ -138,17 +161,22 @@ internal fun planMergedEntries(
     incoming.forEach { entry ->
         val key = incomingKey(entry)
         known[entry.id]?.let { existing ->
-            if (keys.getOrPut(entry.id) { localKey(existing) } == key) return@forEach
+            if (keys.getOrPut(entry.id) { localKey(existing) } == key) {
+                mergeFavorite(entry.id, entry)
+                return@forEach
+            }
         }
         val origin = entry.id.byteInputStream().use(::attachmentDigest)
         val prefix = "xike-restore-version:$origin:$key"
         // Index every retained version, including those after a deleted collision slot.
-        if (
-            versionIds[prefix].orEmpty().any { id ->
+        val matchingVersion =
+            versionIds[prefix].orEmpty().firstOrNull { id ->
                 keys.getOrPut(id) { localKey(known.getValue(id)) } == key
             }
-        )
+        if (matchingVersion != null) {
+            mergeFavorite(matchingVersion, entry)
             return@forEach
+        }
         fun legacyConflictId(index: Int) =
             UUID.nameUUIDFromBytes(
                     "xike-restore-conflict:${entry.id}:$key:$index".toByteArray(Charsets.UTF_8)
@@ -172,7 +200,11 @@ internal fun planMergedEntries(
                         "Legacy conflict verification exceeded its processing limit. Existing data is unchanged.",
                     )
                 }
-                if (legacyConflictId(index) in matchingLegacyIds) return@forEach
+                val id = legacyConflictId(index)
+                if (id in matchingLegacyIds) {
+                    mergeFavorite(id, entry)
+                    return@forEach
+                }
             }
         }
         var candidate = entry.id
@@ -182,6 +214,7 @@ internal fun planMergedEntries(
             if (existing == null) {
                 val added = entry.copy(id = candidate)
                 additions += added
+                if (candidate != entry.id) conflictCount++
                 known[candidate] = added
                 keys[candidate] = key
                 if (candidate.startsWith("xike-restore-version:")) {
@@ -191,11 +224,14 @@ internal fun planMergedEntries(
                 }
                 break
             }
-            if (keys.getOrPut(candidate) { localKey(existing) } == key) break
+            if (keys.getOrPut(candidate) { localKey(existing) } == key) {
+                mergeFavorite(candidate, entry)
+                break
+            }
             // Stable conflict identities prevent another copy on every import. Probe occupied
             // IDs rather than overwriting an unrelated record or a subsequently edited copy.
             candidate = "$prefix:${collision++}"
         }
     }
-    return additions
+    return JournalMergePlan(additions.map { known.getValue(it.id) }, favoriteUpdates, conflictCount)
 }

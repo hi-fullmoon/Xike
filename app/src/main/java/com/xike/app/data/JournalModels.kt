@@ -82,6 +82,7 @@ data class JournalEntry(
     val feelings: List<String> = emptyList(),
     val moodScaleVersion: Int = if (mood.isOverallScale) 1 else 0,
     val labels: List<JournalLabelSelection> = emptyList(),
+    val isFavorite: Boolean = false,
 ) {
     // Legacy construction remains an import boundary; labels are the sole writable model.
     constructor(
@@ -96,6 +97,7 @@ data class JournalEntry(
         outdoor: OutdoorSnapshot? = null,
         feelings: List<String> = emptyList(),
         moodScaleVersion: Int = if (mood.isOverallScale) 1 else 0,
+        isFavorite: Boolean = false,
     ) : this(
         id,
         createdAt,
@@ -108,6 +110,7 @@ data class JournalEntry(
         feelings,
         moodScaleVersion,
         tags.map(::legacyTopicSelection),
+        isFavorite,
     )
 
     val tags: List<String>
@@ -125,6 +128,7 @@ data class JournalEntry(
         outdoor: OutdoorSnapshot? = this.outdoor,
         feelings: List<String> = this.feelings,
         moodScaleVersion: Int = this.moodScaleVersion,
+        isFavorite: Boolean = this.isFavorite,
     ): JournalEntry =
         copy(
             id = id,
@@ -138,6 +142,7 @@ data class JournalEntry(
             feelings = feelings,
             moodScaleVersion = moodScaleVersion,
             labels = tags.map(::legacyTopicSelection),
+            isFavorite = isFavorite,
         )
 
     fun toJson(): JSONObject =
@@ -147,6 +152,7 @@ data class JournalEntry(
             .put("mood", mood.name)
             .put("tags", JSONArray(tags))
             .put("labels", JSONArray(labels.map { it.toJson() }))
+            .put("isFavorite", isFavorite)
             .put("note", note)
             .put("imageFileNames", JSONArray(imageFileNames))
             .put("audio", audio?.toJson() ?: JSONObject.NULL)
@@ -159,6 +165,11 @@ data class JournalEntry(
         fun fromJson(json: JSONObject): JournalEntry =
             JournalEntry(
                 id = json.getString("id"),
+                isFavorite =
+                    if (json.has("isFavorite")) {
+                        require(json.get("isFavorite") is Boolean)
+                        json.getBoolean("isFavorite")
+                    } else false,
                 createdAt = json.getLong("createdAt"),
                 mood = Mood.fromName(json.getString("mood"), json.optInt("moodScaleVersion", 0)),
                 labels =

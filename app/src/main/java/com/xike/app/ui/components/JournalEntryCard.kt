@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material3.Icon
@@ -63,7 +64,9 @@ internal fun JournalEntryCard(
     moodIconSize: Dp = 24.dp,
     compactMoodOnly: Boolean = false,
     compactLabels: Boolean = false,
+    wrapMoodLabel: Boolean = false,
 ) {
+    val constrainMoodLabel = wrapMoodLabel || entry.isFavorite
     val isCompactMoodOnly =
         compactMoodOnly &&
             entry.note.isBlank() &&
@@ -104,8 +107,21 @@ internal fun JournalEntryCard(
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.displayMoodLabel, style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.weight(1f))
+                        Text(
+                            entry.displayMoodLabel,
+                            modifier = if (constrainMoodLabel) Modifier.weight(1f) else Modifier,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        if (!constrainMoodLabel) Spacer(Modifier.weight(1f))
+                        if (entry.isFavorite) {
+                            Icon(
+                                Icons.Filled.Star,
+                                tr("已收藏", "Favorite"),
+                                Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
                         Text(
                             entry.createdAt.asChineseTime(),
                             style = MaterialTheme.typography.labelSmall,

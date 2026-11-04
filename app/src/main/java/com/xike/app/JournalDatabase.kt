@@ -66,6 +66,7 @@ internal data class JournalEntryEntity(
     @ColumnInfo(name = "video_json") val videoJson: String? = null,
     @ColumnInfo(name = "feelings_json") val feelingsJson: String? = null,
     @ColumnInfo(name = "mood_scale_version", defaultValue = "0") val moodScaleVersion: Int = 0,
+    @ColumnInfo(name = "is_favorite", defaultValue = "0") val isFavorite: Boolean = false,
 )
 
 @Entity(
@@ -207,6 +208,7 @@ internal fun JournalEntry.toBundle(): JournalBundle =
                 videoJson = video?.toJson()?.toString(),
                 feelingsJson = org.json.JSONArray(feelings).toString(),
                 moodScaleVersion = moodScaleVersion,
+                isFavorite = isFavorite,
             ),
         tags =
             labels.mapIndexed { position, label ->
@@ -236,6 +238,7 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
         note = entry.note,
         feelings = entry.feelingsJson?.let { org.json.JSONArray(it).feelingKeys() }.orEmpty(),
         moodScaleVersion = entry.moodScaleVersion,
+        isFavorite = entry.isFavorite,
         imageFileNames = images.sortedBy { it.position }.map { it.fileName },
         video = entry.videoJson?.let { JournalVideo.fromJson(org.json.JSONObject(it)) },
         audio =
@@ -263,6 +266,24 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
 
 @Dao
 internal abstract class JournalDao {
+    @Query("SELECT MIN(created_at) FROM journal_entries") abstract fun earliestCreatedAt(): Long?
+
+    @Query("SELECT MAX(created_at) FROM journal_entries WHERE created_at < :before")
+    abstract fun latestCreatedBefore(before: Long): Long?
+
+    @Query("UPDATE journal_entries SET is_favorite = :favorite WHERE id = :id")
+    protected abstract fun updateFavorite(id: String, favorite: Boolean): Int
+
+    @Transaction
+    open fun setFavorite(id: String, favorite: Boolean): JournalEntry {
+        val current = record(id)?.toJournalEntry() ?: error(localizedText("记录不存在或已经删除。"))
+        if (current.isFavorite != favorite) {
+            check(updateFavorite(id, favorite) == 1)
+            putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
+        }
+        return current.copy(isFavorite = favorite)
+    }
+
     @Query("SELECT * FROM journal_labels ORDER BY kind, sort_order, id")
     abstract fun labels(): List<JournalLabelEntity>
 
@@ -540,7 +561,11 @@ internal abstract class JournalDao {
     open fun updateJournal(bundle: JournalBundle): List<String> {
         ensureLabelReferences(bundle.tags)
         val previousImages = imageFileNames(bundle.entry.id)
-        check(updateEntry(bundle.entry) == 1) { localizedText("记录不存在或已经删除。") }
+        val favorite =
+            record(bundle.entry.id)?.entry?.isFavorite ?: error(localizedText("记录不存在或已经删除。"))
+        check(updateEntry(bundle.entry.copy(isFavorite = favorite)) == 1) {
+            localizedText("记录不存在或已经删除。")
+        }
         deleteEntryTags(bundle.entry.id)
         deleteEntryImages(bundle.entry.id)
         deleteEntryAudio(bundle.entry.id)
@@ -623,7 +648,7 @@ internal abstract class JournalDao {
             JournalSearchEntity::class,
             JournalLabelEntity::class,
         ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 internal abstract class JournalDatabase : RoomDatabase() {
@@ -656,9 +681,19 @@ internal abstract class JournalDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 )
                 .build()
         }
+
+        internal val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE journal_entries ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
 
         internal val MIGRATION_9_10 =
             object : Migration(9, 10) {

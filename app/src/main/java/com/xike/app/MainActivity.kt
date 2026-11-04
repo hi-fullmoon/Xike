@@ -284,6 +284,7 @@ class MainActivity : FragmentActivity() {
                             isBackupExporting = journalViewModel.isBackupExporting,
                             backupRestoreState = journalViewModel.backupRestoreState,
                             onUpdate = journalViewModel::update,
+                            onSetFavorite = journalViewModel::setFavorite,
                             onDelete = journalViewModel::delete,
                             onUndoDelete = journalViewModel::undoDelete,
                             onFinalizeDelete = journalViewModel::finalizeDelete,

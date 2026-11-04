@@ -52,27 +52,44 @@ internal fun SecondaryPageHeader(
     modifier: Modifier = Modifier,
     closeEnabled: Boolean = true,
     subtitle: String? = null,
+    actionsBelowTitle: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
+    val heading: @Composable () -> Unit = {
+        Text(
+            title,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        if (subtitle != null) {
             Text(
-                title,
+                subtitle,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
+    }
+    val buttons: @Composable RowScope.() -> Unit = {
         actions()
         IconButton(onClick = onClose, enabled = closeEnabled) {
             Icon(Icons.Outlined.Close, contentDescription = closeDescription)
+        }
+    }
+    if (actionsBelowTitle) {
+        Column(modifier.fillMaxWidth()) {
+            heading()
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+                content = buttons,
+            )
+        }
+    } else {
+        Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { heading() }
+            buttons()
         }
     }
 }

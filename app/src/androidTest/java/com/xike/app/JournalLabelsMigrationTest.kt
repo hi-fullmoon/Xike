@@ -64,6 +64,7 @@ class JournalLabelsMigrationTest {
             }
             val database =
                 androidx.room.Room.databaseBuilder(context, JournalDatabase::class.java, name)
+                    .addMigrations(JournalDatabase.MIGRATION_10_11)
                     .build()
             try {
                 val dao = database.journalDao()

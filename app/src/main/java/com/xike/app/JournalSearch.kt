@@ -25,6 +25,7 @@ data class JournalSearchQuery(
     val imageFilter: JournalImageFilter = JournalImageFilter.ANY,
     val activities: Set<String> = emptySet(),
     val topicIds: Set<String> = emptySet(),
+    val favoritesOnly: Boolean = false,
 ) {
     val normalizedText: String
         get() = text.trim()
@@ -38,6 +39,7 @@ data class JournalSearchQuery(
                     activities.isNotEmpty(),
                     startDate != null || endDate != null,
                     imageFilter != JournalImageFilter.ANY,
+                    favoritesOnly,
                 )
                 .count { it }
 
@@ -120,6 +122,7 @@ fun filterJournalEntries(
                 JournalImageFilter.WITHOUT_IMAGES -> entry.imageFileNames.isEmpty()
             }
         textMatches &&
+            (!query.favoritesOnly || entry.isFavorite) &&
             moodMatches &&
             tagMatches &&
             topicIdMatches &&

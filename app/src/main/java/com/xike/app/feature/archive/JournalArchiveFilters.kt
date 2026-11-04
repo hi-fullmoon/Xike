@@ -73,6 +73,8 @@ internal fun ArchiveFilters(
     onClearAll: () -> Unit,
     selectedActivities: List<String> = emptyList(),
     onToggleActivity: (String) -> Unit = {},
+    favoritesOnly: Boolean = false,
+    onFavoritesOnlyChange: (Boolean) -> Unit = {},
 ) {
     val labelCatalog = com.xike.app.LocalJournalLabelServices.current.catalog
     val selectedContentColor =
@@ -114,12 +116,20 @@ internal fun ArchiveFilters(
                     Text(localizedText("全部清除"))
                 }
             }
+            FilterChip(
+                modifier = Modifier.padding(horizontal = XikeCardPadding),
+                shape = XikeShapes.inner,
+                selected = favoritesOnly,
+                colors = filterColors,
+                onClick = { onFavoritesOnlyChange(!favoritesOnly) },
+                label = { Text(tr("仅看收藏", "Favorites only")) },
+            )
             FilterTitle(localizedText("心情"))
             LazyRow(
                 contentPadding = PaddingValues(horizontal = XikeCardPadding),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(Mood.entries, key = Mood::name) { mood ->
+                items(Mood.overallChoices, key = Mood::name) { mood ->
                     FilterChip(
                         shape = XikeShapes.inner,
                         selected = mood.name in selectedMoodNames,

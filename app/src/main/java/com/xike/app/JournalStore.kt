@@ -19,7 +19,6 @@ import com.xike.app.data.backup.RESTORE_STAGING_PREFIX
 import com.xike.app.data.draft.JournalDraftStore
 import com.xike.app.data.model.JournalVideo
 import com.xike.app.data.model.files
-import com.xike.app.data.planMergedEntries
 import com.xike.app.data.restoreContentKey
 import com.xike.app.media.JournalAttachmentStore
 import com.xike.app.media.JournalVideoStore
@@ -124,6 +123,13 @@ class JournalStore(context: Context) {
         }
 
     fun entries(): List<JournalEntry> = readEntries()
+
+    @Synchronized
+    fun setFavorite(entryId: String, favorite: Boolean): JournalEntry {
+        val saved = dao.setFavorite(entryId, favorite)
+        discardInvalidUndoSnapshot()
+        return saved
+    }
 
     @Synchronized
     fun saveLabel(value: com.xike.app.data.JournalLabel) {
@@ -271,7 +277,8 @@ class JournalStore(context: Context) {
         }
 
         val imported = attachments.importImages(newImageUris)
-        val storedEntry = entry.copy(imageFileNames = retainedImages + imported)
+        val storedEntry =
+            entry.copy(imageFileNames = retainedImages + imported, isFavorite = original.isFavorite)
         val previousImages = runCatching {
             attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
@@ -454,8 +461,41 @@ class JournalStore(context: Context) {
         inspectBackup(input, password)
 
     @Synchronized
-    fun inspectBackup(input: InputStream, password: String?): BackupSummary =
-        backups.inspectBackup(input, password)
+    fun inspectBackup(input: InputStream, password: String?): BackupSummary {
+        val prepared = backups.readBackup(input, password)
+        return try {
+            val plan =
+                try {
+                    val labels =
+                        com.xike.app.data.planLabelRestore(
+                            dao.labels().map { it.toLabel() },
+                            prepared.catalog,
+                            prepared.entries,
+                            true,
+                        )
+                    planRestoreMerge(prepared.stagingDirectory, readEntries(), labels.entries)
+                } catch (_: JournalDataException) {
+                    // Incoming validation already succeeded. A merge preview must not prevent the
+                    // user from choosing replacement; the actual restore still checks its own plan.
+                    null
+                }
+            BackupSummary(
+                entryCount = prepared.entries.size,
+                imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
+                audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
+                videoCount = prepared.entries.count { it.video != null },
+                videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
+                oldestCreatedAt = prepared.entries.minOfOrNull { it.createdAt },
+                newestCreatedAt = prepared.entries.maxOfOrNull { it.createdAt },
+                favoriteCount = prepared.entries.count { it.isFavorite },
+                mergeNewEntryCount = plan?.let { it.additions.size - it.conflictCount },
+                mergeConflictCount = plan?.conflictCount ?: 0,
+                mergeFavoriteChangeCount = plan?.favoriteUpdates?.size ?: 0,
+            )
+        } finally {
+            prepared.stagingDirectory.deleteRecursively()
+        }
+    }
 
     @Synchronized
     fun restoreEncryptedBackup(
@@ -485,14 +525,20 @@ class JournalStore(context: Context) {
                     videoDraftStore.load().labels,
                 )
             val localEntries = if (mode == BackupRestoreMode.MERGE) readEntries() else emptyList()
-            val entriesToInstall =
+            val mergePlan =
                 if (mode == BackupRestoreMode.MERGE) {
                     planRestoreMerge(prepared.stagingDirectory, localEntries, labelPlan.entries)
-                } else labelPlan.entries.distinctBy { it.id }
+                } else
+                    com.xike.app.data.JournalMergePlan(
+                        labelPlan.entries.distinctBy { it.id },
+                        emptySet(),
+                    )
+            val entriesToInstall = mergePlan.additions
             // A duplicate import is not a mutation and must retain the previous undo snapshot.
             if (
                 mode == BackupRestoreMode.MERGE &&
                     entriesToInstall.isEmpty() &&
+                    mergePlan.favoriteUpdates.isEmpty() &&
                     labelPlan.catalog.toSet() == localCatalog.toSet()
             )
                 return localEntries
@@ -503,7 +549,10 @@ class JournalStore(context: Context) {
                         entriesToInstall,
                         retainedAudioFileNames,
                         retainedVideo,
-                        localEntries,
+                        localEntries.map {
+                            if (it.id in mergePlan.favoriteUpdates) it.copy(isFavorite = true)
+                            else it
+                        },
                         undoToken = snapshotSwap.current.file.name,
                         catalog = labelPlan.catalog,
                     )
@@ -643,7 +692,7 @@ class JournalStore(context: Context) {
         stagingDirectory: File,
         localEntries: List<JournalEntry>,
         restoredEntries: List<JournalEntry>,
-    ): List<JournalEntry> {
+    ): com.xike.app.data.JournalMergePlan {
         return try {
             val localDigests = mutableMapOf<String, String>()
             val stagedDigests = mutableMapOf<String, String>()
@@ -672,7 +721,7 @@ class JournalStore(context: Context) {
                     { digest("video", it) },
                 )
             }
-            planMergedEntries(
+            com.xike.app.data.planJournalMerge(
                 localEntries,
                 restoredEntries,
                 { contentKey(it, false) },

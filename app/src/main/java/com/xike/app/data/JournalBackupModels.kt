@@ -41,4 +41,8 @@ data class BackupSummary(
     val videoBytes: Long = 0,
     val oldestCreatedAt: Long?,
     val newestCreatedAt: Long?,
+    val favoriteCount: Int = 0,
+    val mergeNewEntryCount: Int? = null,
+    val mergeConflictCount: Int = 0,
+    val mergeFavoriteChangeCount: Int = 0,
 )

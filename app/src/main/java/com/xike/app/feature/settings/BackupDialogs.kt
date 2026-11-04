@@ -149,6 +149,24 @@ internal fun RestoreConfirmationDialog(
                         else localizedText("。")
                 )
                 Text(dateRange, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("其中 ${summary.favoriteCount} 条已收藏", "${summary.favoriteCount} favorites"))
+                if (mode == BackupRestoreMode.MERGE && summary.mergeNewEntryCount != null) {
+                    Text(
+                        tr(
+                            "预计新增 ${summary.mergeNewEntryCount} 条、保留冲突副本 ${summary.mergeConflictCount} 条、更新收藏 ${summary.mergeFavoriteChangeCount} 条。恢复时会重新核对。",
+                            "Expected: ${summary.mergeNewEntryCount} new entries, ${summary.mergeConflictCount} conflict copies, ${summary.mergeFavoriteChangeCount} favorite updates. Checked again when restoring.",
+                        )
+                    )
+                }
+                if (mode == BackupRestoreMode.MERGE && summary.mergeNewEntryCount == null) {
+                    Text(
+                        tr(
+                            "暂时无法预估合并变化，正式合并时会重新核对。本机内容尚未修改。",
+                            "The merge preview is unavailable. Checked again when merging; local content is unchanged.",
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (summary.videoCount > 0) {
                     val videoSize =
                         android.text.format.Formatter.formatShortFileSize(
@@ -185,8 +203,8 @@ internal fun RestoreConfirmationDialog(
                 Text(
                     if (mode == BackupRestoreMode.MERGE)
                         tr(
-                            "保留本机日记，补入备份记录。同一记录内容一致时跳过；内容冲突时保留双方版本，重复导入不会再次添加相同版本。",
-                            "Keep local entries and add backup entries. Identical versions of the same entry are skipped; conflicting versions are both kept. Importing again does not add the same version twice.",
+                            "保留本机日记，补入备份记录。相同内容保留任一方的收藏，内容冲突时保留双方版本。重复导入不增加相同版本，但会恢复备份中仍保留的收藏。",
+                            "Keep local entries and add backup entries. Matching versions keep either side’s favorite; conflicting versions are both kept. Importing again adds no duplicate version, but restores favorites retained in the backup.",
                         )
                     else
                         tr(

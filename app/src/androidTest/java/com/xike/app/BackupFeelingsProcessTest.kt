@@ -34,7 +34,7 @@ class BackupFeelingsProcessTest {
                     zip.getInputStream(zip.getEntry("manifest.json")).use {
                         JSONObject(it.reader().readText())
                     }
-                assertEquals(10, manifest.getInt("version"))
+                assertEquals(11, manifest.getInt("version"))
                 val expected =
                     JournalEntry.fromJson(manifest.getJSONArray("entries").getJSONObject(0))
                 val html = zip.getInputStream(zip.getEntry("index.html")).use { it.readBytes() }
@@ -45,7 +45,7 @@ class BackupFeelingsProcessTest {
             "write" -> {
                 File(context.getExternalFilesDir(null), "backup-reading.html")
                     .writeBytes(parts.second)
-                File(context.getExternalFilesDir(null), "feelings-version10.zip")
+                File(context.getExternalFilesDir(null), "feelings-version11.zip")
                     .writeBytes(archive.readBytes())
                 assertEquals(listOf(expected), store.entries())
             }

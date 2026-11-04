@@ -71,6 +71,7 @@ internal fun XikeApp(
     onDraftAudioRemoved: () -> Unit,
     // Archive operations.
     onUpdate: suspend (JournalEntry, List<String>, List<Uri>) -> Result<JournalEntry>,
+    onSetFavorite: (suspend (String, Boolean) -> Result<JournalEntry>)? = null,
     onDelete: suspend (JournalEntry) -> Result<Unit>,
     onUndoDelete: suspend (String) -> Result<Unit>,
     onFinalizeDelete: suspend (String) -> Result<Unit>,
@@ -204,6 +205,7 @@ internal fun XikeApp(
                             onReadError = onReadError,
                             onSearch = onSearch,
                             onUpdate = onUpdate,
+                            onSetFavorite = onSetFavorite,
                             onDelete = onDelete,
                             onUndoDelete = onUndoDelete,
                             onFinalizeDelete = onFinalizeDelete,

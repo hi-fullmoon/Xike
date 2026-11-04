@@ -52,6 +52,112 @@ class JournalStoreBackupTest {
     }
 
     @Test
+    fun favoriteOnlyRestoreCanBeUndoneAndRepeatedMergeDoesNotReplaceUndo() {
+        val source = JournalEntry(id = "favorite-only", mood = Mood.CALM, note = "")
+        store.add(source)
+        listOf<String?>(null, PASSWORD).forEach { password ->
+            store.setFavorite(source.id, true)
+            val bytes =
+                ByteArrayOutputStream().also { store.writeBackup(it, password) }.toByteArray()
+            store.setFavorite(source.id, false)
+            val summary = store.inspectBackup(bytes.inputStream(), password)
+            assertEquals(1, summary.favoriteCount)
+            assertEquals(0, summary.mergeNewEntryCount)
+            assertEquals(0, summary.mergeConflictCount)
+            assertEquals(1, summary.mergeFavoriteChangeCount)
+            assertEquals(1, store.restoreBackup(bytes.inputStream(), password).size)
+            assertTrue(store.entries().single().isFavorite)
+            val token = dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)
+            store.restoreBackup(bytes.inputStream(), password)
+            assertEquals(token, dao.settingValue(RESTORE_UNDO_TOKEN_SETTING))
+            assertFalse(store.undoLastRestore().single().isFavorite)
+            store.restoreBackup(bytes.inputStream(), password)
+            store.setFavorite(source.id, true)
+            assertTrue(store.canUndoLastRestore())
+            store.setFavorite(source.id, false)
+            assertFalse(store.canUndoLastRestore())
+        }
+    }
+
+    @Test
+    fun deleteUndoAndStaleEditingPreserveTheSavedFavorite() {
+        val stale = JournalEntry(id = "favorite-edit", mood = Mood.CALM, note = "")
+        store.add(stale)
+        store.setFavorite(stale.id, true)
+        val saved =
+            store.update(stale.copy(note = "updated"), emptyList(), refreshEntries = false).single()
+        assertTrue(saved.isFavorite)
+        store.delete(stale.id)
+        assertTrue(store.undoDelete(stale.id).single().isFavorite)
+        assertEquals("updated", store.entries().single().note)
+    }
+
+    @Test
+    fun oldLabelBackupDefaultsFavoriteAndInvalidNewFlagsDoNotChangeData() {
+        val source =
+            JournalEntry(id = "favorite-format", mood = Mood.CALM, note = "", isFavorite = true)
+        store.add(source)
+        val backup = ByteArrayOutputStream().also { store.writeBackup(it, null) }.toByteArray()
+        fun changed(version: Int, value: Any?): ByteArray {
+            val out = ByteArrayOutputStream()
+            ZipOutputStream(out).use { zip ->
+                ZipInputStream(backup.inputStream()).use { input ->
+                    var part = input.nextEntry
+                    while (part != null) {
+                        var bytes = input.readBytes()
+                        if (part.name == "manifest.json") {
+                            val json =
+                                JSONObject(bytes.toString(Charsets.UTF_8)).put("version", version)
+                            val entry = json.getJSONArray("entries").getJSONObject(0)
+                            if (value == null) entry.remove("isFavorite")
+                            else entry.put("isFavorite", value)
+                            bytes = json.toString().toByteArray(Charsets.UTF_8)
+                        }
+                        zip.putNextEntry(ZipEntry(part.name))
+                        zip.write(bytes)
+                        zip.closeEntry()
+                        input.closeEntry()
+                        part = input.nextEntry
+                    }
+                }
+            }
+            return out.toByteArray()
+        }
+        listOf(null, "true", 1, JSONObject.NULL).forEach { value ->
+            assertTrue(
+                runCatching { store.restoreBackup(changed(11, value).inputStream(), null) }
+                    .isFailure
+            )
+            assertEquals(listOf(source), store.entries())
+        }
+        store.restoreBackup(
+            changed(10, null).inputStream(),
+            null,
+            mode = com.xike.app.data.BackupRestoreMode.REPLACE,
+        )
+        assertFalse(store.entries().single().isFavorite)
+        assertTrue(store.undoLastRestore().single().isFavorite)
+    }
+
+    @Test
+    fun validatedIncomingBackupRemainsInspectableWhenLocalComparisonFails() {
+        val source = JournalEntry(id = "preview-local-read", mood = Mood.CALM, note = "")
+        val png =
+            java.util.Base64.getDecoder()
+                .decode(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jX/0AAAAASUVORK5CYII="
+                )
+        val stored = store.add(source, imageUris(listOf(png))).single()
+        val backup = ByteArrayOutputStream().also { store.writeBackup(it, null) }.toByteArray()
+        check(java.io.File(journalImagesDirectory(), stored.imageFileNames.single()).delete())
+        val summary = store.inspectBackup(backup.inputStream(), null)
+        assertEquals(1, summary.entryCount)
+        assertNull(summary.mergeNewEntryCount)
+        assertTrue(runCatching { store.restoreBackup(backup.inputStream(), null) }.isFailure)
+        assertEquals(listOf(stored), store.entries())
+    }
+
+    @Test
     fun currentBackupsPreserveOverallMoodAndFeelingsInPlainAndEncryptedArchives() {
         val source =
             JournalEntry(
@@ -85,7 +191,7 @@ class JournalStoreBackupTest {
                 }
             }
             val manifest = JSONObject(parts.getValue("manifest.json").toString(Charsets.UTF_8))
-            assertEquals(10, manifest.getInt("version"))
+            assertEquals(11, manifest.getInt("version"))
             assertEquals(
                 source,
                 JournalEntry.fromJson(manifest.getJSONArray("entries").getJSONObject(0)),
@@ -223,7 +329,7 @@ class JournalStoreBackupTest {
                     emptyList(),
                 )
                 .single()
-        listOf(10 to null, 10 to PASSWORD, 7 to null).forEach { (version, password) ->
+        listOf(12 to null, 12 to PASSWORD, 7 to null).forEach { (version, password) ->
             val bytes =
                 versionedMoodArchive(version, original.copy(id = "incoming").toJson(), password)
             assertTrue(runCatching { store.inspectBackup(bytes.inputStream(), password) }.isFailure)

@@ -219,6 +219,7 @@ internal class JournalBackupStorage(
                 videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
                 oldestCreatedAt = createdAtValues.minOrNull(),
                 newestCreatedAt = createdAtValues.maxOrNull(),
+                favoriteCount = prepared.entries.count { it.isFavorite },
             )
         } finally {
             prepared.stagingDirectory.deleteRecursively()
@@ -299,6 +300,14 @@ internal class JournalBackupStorage(
                 }
 
                 parsedEntries = parseEntries(manifest.getJSONArray("entries"))
+                if (version >= 11) {
+                    val values = manifest.getJSONArray("entries")
+                    require(
+                        (0 until values.length()).all {
+                            values.getJSONObject(it).get("isFavorite") is Boolean
+                        }
+                    )
+                }
                 if (version >= 10) {
                     val entryValues = manifest.getJSONArray("entries")
                     require(
@@ -564,7 +573,7 @@ internal class JournalBackupStorage(
         const val AUDIOS_PREFIX = "audios/"
         const val MIN_STREAMING_BACKUP_VERSION = 4
         const val MIN_UNENCRYPTED_BACKUP_VERSION = 8
-        const val STREAMING_BACKUP_VERSION = 10
+        const val STREAMING_BACKUP_VERSION = 11
         const val MAX_BACKUP_ENTRIES = 100_000
         const val MAX_BACKUP_IMAGES = 10_000
         const val MAX_BACKUP_AUDIOS = 100_000

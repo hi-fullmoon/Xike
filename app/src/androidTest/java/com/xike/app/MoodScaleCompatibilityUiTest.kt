@@ -113,7 +113,7 @@ class MoodScaleCompatibilityUiTest {
                 rule
                     .onNode(
                         hasScrollToIndexAction() and
-                            hasAnyDescendant(hasText("低落")) and
+                            hasAnyDescendant(hasText("很不好")) and
                             !hasTestTag("archive-list")
                     )
                     .fetchSemanticsNode()

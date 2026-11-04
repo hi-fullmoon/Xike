@@ -18,6 +18,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -98,6 +99,8 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
     fun pages(
         query: JournalSearchQuery,
         ids: List<String>? = null,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        enablePlaceholders: Boolean = true,
     ): Flow<PagingData<JournalEntry>> =
         Pager(
                 config =
@@ -106,10 +109,10 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
                         initialLoadSize = 60,
                         prefetchDistance = 20,
                         maxSize = 300,
-                        enablePlaceholders = true,
+                        enablePlaceholders = enablePlaceholders,
                     ),
                 pagingSourceFactory = {
-                    dao.pagedRecords(sql(query, "e.*", ids = ids, ordered = true))
+                    dao.pagedRecords(sql(query, "e.*", ids = ids, ordered = true, zoneId = zoneId))
                 },
             )
             .flow
@@ -130,6 +133,48 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
     }
 
     suspend fun entry(id: String): JournalEntry? = read { dao.record(id)?.toJournalEntry() }
+
+    internal suspend fun memories(
+        today: LocalDate,
+        zoneId: ZoneId,
+    ): com.xike.app.feature.archive.JournalMemories = read {
+        val coroutineContext = kotlin.coroutines.coroutineContext
+        val days =
+            database.runInTransaction<List<com.xike.app.feature.archive.MemoryDay>> {
+                val result = mutableListOf<com.xike.app.feature.archive.MemoryDay>()
+                fun countDay(date: LocalDate, kind: com.xike.app.feature.archive.MemoryKind) {
+                    val count =
+                        dao.queryCount(
+                            sql(
+                                JournalSearchQuery(startDate = date, endDate = date),
+                                "COUNT(*)",
+                                zoneId = zoneId,
+                            )
+                        )
+                    if (count > 0)
+                        result += com.xike.app.feature.archive.MemoryDay(date, kind, count)
+                }
+                countDay(
+                    com.xike.app.feature.archive.monthAgo(today),
+                    com.xike.app.feature.archive.MemoryKind.MONTH_AGO,
+                )
+                val earliest = dao.earliestCreatedAt()
+                var before = today.withDayOfYear(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                // Seek only years that actually contain records, skipping arbitrarily long gaps.
+                while (earliest != null && before > earliest) {
+                    coroutineContext.ensureActive()
+                    val latest = dao.latestCreatedBefore(before) ?: break
+                    val year = java.time.Instant.ofEpochMilli(latest).atZone(zoneId).year
+                    com.xike.app.feature.archive.anniversary(today, year)?.let {
+                        countDay(it, com.xike.app.feature.archive.MemoryKind.PREVIOUS_YEAR)
+                    }
+                    before =
+                        LocalDate.of(year, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                }
+                result
+            }
+        com.xike.app.feature.archive.JournalMemories(today, zoneId, days)
+    }
 
     suspend fun topics(ids: Boolean = false): List<String> = read {
         if (ids)
@@ -235,6 +280,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
         val conditions = mutableListOf<String>()
         val range = query.epochRange(zoneId)
         conditions += "e.created_at >= ? AND e.created_at < ?"
+        if (query.favoritesOnly) conditions += "e.is_favorite = 1"
         args += range.startInclusive
         args += range.endExclusive
         if (query.normalizedText.isNotEmpty()) {
