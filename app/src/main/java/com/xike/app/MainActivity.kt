@@ -203,6 +203,8 @@ class MainActivity : FragmentActivity() {
                             ),
                         LocalAmapSettingsOperations provides
                             journalViewModel.amapSettingsOperations,
+                        com.xike.app.ai.LocalAiReviewOperations provides
+                            journalViewModel.aiReviewOperations,
                         LocalSystemActivityCallbacks provides systemActivityCallbacks,
                         LocalJournalEditOperations provides journalViewModel.editOperations,
                         LocalAudioEditServices provides

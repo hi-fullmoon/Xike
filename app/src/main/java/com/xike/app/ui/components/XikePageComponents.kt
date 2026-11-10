@@ -26,13 +26,18 @@ import com.xike.app.ui.theme.XikePageTitleStyle
 import com.xike.app.ui.theme.XikeShapes
 
 @Composable
-internal fun ScreenHeader(eyebrow: String? = null, title: String, supporting: String? = null) {
+internal fun ScreenHeader(
+    eyebrow: String? = null,
+    title: String,
+    supporting: String? = null,
+    titleModifier: Modifier = Modifier,
+) {
     Column(modifier = Modifier.padding(top = 10.dp, bottom = 5.dp)) {
         if (eyebrow != null) {
             Text(eyebrow, style = XikeEyebrowStyle, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(9.dp))
         }
-        Text(title, style = XikePageTitleStyle)
+        Text(title, style = XikePageTitleStyle, modifier = titleModifier)
         if (supporting != null) {
             Spacer(Modifier.height(7.dp))
             Text(

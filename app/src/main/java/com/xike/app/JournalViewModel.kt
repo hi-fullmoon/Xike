@@ -78,6 +78,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             mediaMutationMutex = mediaMutationMutex,
         )
     private val amapSettingsStore = AmapSettingsStore(application)
+    internal val aiReviewOperations by lazy {
+        com.xike.app.ai.AiReviewOperations(com.xike.app.ai.AiSettingsStore(application))
+    }
     private val outdoorRepository = OutdoorContextRepository(application, amapSettingsStore)
     internal val amapSettingsOperations by lazy {
         AmapSettingsOperations(application, amapSettingsStore, ::cancelOutdoorRequest)

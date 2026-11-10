@@ -134,6 +134,22 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
 
     suspend fun entry(id: String): JournalEntry? = read { dao.record(id)?.toJournalEntry() }
 
+    internal suspend fun aiReviewEntries(start: LocalDate, end: LocalDate): List<JournalEntry> {
+        val result = read {
+            database.runInTransaction<List<JournalEntry>?> {
+                val query = JournalSearchQuery(startDate = start, endDate = end)
+                if (count(query) > com.xike.app.ai.AI_MAX_ENTRIES) null
+                else
+                    dao.recordsForQuery(sql(query, "e.*", ordered = true)).map {
+                        it.toJournalEntry()
+                    }
+            }
+        }
+        return requireNotNull(result) {
+            tr("记录超过 500 条，请选择更短的周期。", "Over 500 entries. Choose a shorter period.")
+        }
+    }
+
     internal suspend fun memories(
         today: LocalDate,
         zoneId: ZoneId,

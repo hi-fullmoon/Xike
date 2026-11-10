@@ -164,7 +164,10 @@ fun ProfileSettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text(localizedText("核心记录离线且加密"), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        localizedText("无需账号；窗外天气仅在主动添加时联网"),
+                        tr(
+                            "无需账号；天气查询与可选 AI 回顾仅在主动操作时联网",
+                            "No account needed; weather and optional AI review connect only when requested",
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
                     )

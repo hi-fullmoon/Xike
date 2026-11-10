@@ -1,7 +1,10 @@
 package com.xike.app.feature.insights
 
+import android.os.SystemClock
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -119,6 +122,9 @@ fun JournalInsightsScreen(
             mutableStateOf<InsightDrilldown?>(null)
         }
     var showReview by rememberSaveable { mutableStateOf(false) }
+    var showAiReview by remember { mutableStateOf(false) }
+    val aiTaps = remember { com.xike.app.outdoor.TripleTapGate() }
+    LaunchedEffect(selectedPeriod, dataRevision, entries, today, language) { showAiReview = false }
     val reviewScrollState =
         rememberSaveable(showReview, saver = ScrollState.Saver) { ScrollState(0) }
     val listState = rememberLazyListState()
@@ -166,6 +172,18 @@ fun JournalInsightsScreen(
                 ScreenHeader(
                     eyebrow = tr("细小的痕迹", "THE LITTLE TRACES"),
                     title = localizedText("轨迹"),
+                    titleModifier =
+                        Modifier.testTag("ai-review-entry").clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            if (
+                                aiTaps.tap(SystemClock.elapsedRealtime()) &&
+                                    readError == null &&
+                                    summary.period == selectedPeriod
+                            )
+                                showAiReview = true
+                        },
                     supporting =
                         tr(
                             "${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。",
@@ -290,6 +308,25 @@ fun JournalInsightsScreen(
                 )
             }
         }
+    }
+
+    if (showAiReview) {
+        AiReviewDialog(
+            summary = summary,
+            entries = entries,
+            readRepository = readRepository,
+            onReadError = onReadError,
+            onOpenSource = { source ->
+                drilldown =
+                    InsightDrilldown(
+                        source.date,
+                        tr("AI 回顾引用的原始记录", "Original entry referenced by AI review"),
+                        listOf(source.entryId),
+                    )
+            },
+            sourceOpen = drilldown != null,
+            onDismiss = { showAiReview = false },
+        )
     }
 
     drilldown?.let { request ->
