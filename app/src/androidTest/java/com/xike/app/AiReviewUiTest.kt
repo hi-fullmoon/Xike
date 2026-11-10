@@ -1,6 +1,5 @@
 package com.xike.app
 
-import android.graphics.Bitmap
 import android.os.Build
 import android.view.View
 import android.view.WindowInsets
@@ -9,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -88,8 +86,10 @@ class AiReviewUiTest {
         try {
             preferences.language = language
             AppLocale.select(context, language)
-            rule.waitUntil(5_000) {
-                context.resources.configuration.locales[0].language == language.locale.language
+            if (Build.VERSION.SDK_INT >= 33) {
+                rule.waitUntil(5_000) {
+                    context.resources.configuration.locales[0].language == language.locale.language
+                }
             }
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
@@ -124,12 +124,9 @@ class AiReviewUiTest {
                         rule.onNodeWithText(configTitle).isDisplayed()
                     }
                 } catch (failure: AssertionError) {
-                    val image = rule.onNode(isDialog()).captureToImage().asAndroidBitmap()
-                    File(context.getExternalFilesDir(null), "ai-layout-failure.png")
-                        .outputStream()
-                        .use {
-                            image.compress(Bitmap.CompressFormat.PNG, 100, it)
-                        }
+                    captureAiDialogWindow(
+                        File(context.getExternalFilesDir(null), "ai-layout-failure.png")
+                    )
                     throw AssertionError(rule.onNode(isDialog()).printToString(), failure)
                 }
                 rule.onNodeWithTag("ai-address").performScrollTo()
@@ -177,14 +174,13 @@ class AiReviewUiTest {
                 if (Build.VERSION.SDK_INT >= 30 && args.getString("keyboard") == "true") {
                     assertButtonsAboveKeyboard()
                 }
-                val screenshot = rule.onNode(isDialog()).captureToImage().asAndroidBitmap()
                 val configuration = context.resources.configuration
-                File(
+                captureAiDialogWindow(
+                    File(
                         context.getExternalFilesDir(null),
                         "ai-settings-${language.name}-${style.name}-${configuration.uiMode}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
                     )
-                    .outputStream()
-                    .use { assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                )
                 rule.onNodeWithText(tr("保存", "Save")).performClick()
                 rule.onNodeWithText(tr("AI 回顾", "AI review")).assertIsDisplayed()
                 assertEquals("https://api.deepseek.com/v1", store.read().address)
@@ -193,13 +189,12 @@ class AiReviewUiTest {
                 rule.onNodeWithText(tr("预览发送内容", "Preview content")).assertIsNotEnabled()
                 assertReviewEndpointSingleLine()
                 assertReviewNotesAlignment()
-                val reviewImage = rule.onNode(isDialog()).captureToImage().asAndroidBitmap()
-                File(
+                captureAiDialogWindow(
+                    File(
                         context.getExternalFilesDir(null),
                         "ai-review-notes-${language.name}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
                     )
-                    .outputStream()
-                    .use { assertTrue(reviewImage.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                )
                 rule.onNodeWithText(tr("关闭", "Close")).performClick()
                 title.performClick().performClick()
                 rule.onNodeWithText(configTitle).assertDoesNotExist()

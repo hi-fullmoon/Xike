@@ -1,11 +1,10 @@
 package com.xike.app
 
-import android.graphics.Bitmap
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -47,9 +46,11 @@ class AiReviewHeightUiTest {
         try {
             preferences.language = language
             AppLocale.select(context, language)
-            // Wait for Android to deliver the locale configuration before creating the Activity.
-            rule.waitUntil(5_000) {
-                context.resources.configuration.locales[0].language == language.locale.language
+            // Android 13+ synchronizes app locales; older releases use the local context wrapper.
+            if (Build.VERSION.SDK_INT >= 33) {
+                rule.waitUntil(5_000) {
+                    context.resources.configuration.locales[0].language == language.locale.language
+                }
             }
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
@@ -157,18 +158,11 @@ class AiReviewHeightUiTest {
     private fun capture(state: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val config = context.resources.configuration
-        val image = rule.onNode(isDialog()).captureToImage().asAndroidBitmap()
-        try {
+        captureAiDialogWindow(
             File(
-                    context.getExternalFilesDir(null),
-                    "ai-height-${AppLocale.language.name}-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}-$state.png",
-                )
-                .outputStream()
-                .use {
-                    assertTrue(image.compress(Bitmap.CompressFormat.PNG, 100, it))
-                }
-        } finally {
-            image.recycle()
-        }
+                context.getExternalFilesDir(null),
+                "ai-height-${AppLocale.language.name}-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}-$state.png",
+            )
+        )
     }
 }

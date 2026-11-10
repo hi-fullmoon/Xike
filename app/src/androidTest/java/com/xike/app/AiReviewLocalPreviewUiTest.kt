@@ -1,12 +1,6 @@
 package com.xike.app
 
-import android.graphics.Bitmap
-import android.os.Handler
-import android.os.Looper
-import android.view.PixelCopy
-import android.view.View
-import android.view.ViewGroup
-import android.view.Window
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,7 +11,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.xike.app.ai.AiReviewOperations
@@ -32,9 +25,6 @@ import com.xike.app.ui.theme.XikeTheme
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -76,8 +66,10 @@ class AiReviewLocalPreviewUiTest {
             )
             languagePreferences.language = AppLanguage.CHINESE
             AppLocale.select(context, AppLanguage.CHINESE)
-            rule.waitUntil(5_000) {
-                context.resources.configuration.locales[0].language == "zh"
+            if (Build.VERSION.SDK_INT >= 33) {
+                rule.waitUntil(5_000) {
+                    context.resources.configuration.locales[0].language == "zh"
+                }
             }
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
@@ -205,50 +197,11 @@ class AiReviewLocalPreviewUiTest {
     private fun capture(state: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val config = context.resources.configuration
-        val copied = CountDownLatch(1)
-        val status = AtomicInteger(PixelCopy.ERROR_UNKNOWN)
-        lateinit var image: Bitmap
-        androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.isRoot())
-            .inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog())
-            .check { view, failure ->
-                if (failure != null) throw failure
-                val window = requireNotNull(dialogWindow(view))
-                image = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                PixelCopy.request(
-                    window,
-                    image,
-                    {
-                        status.set(it)
-                        copied.countDown()
-                    },
-                    Handler(Looper.getMainLooper()),
-                )
-            }
-        check(copied.await(5, TimeUnit.SECONDS))
-        check(status.get() == PixelCopy.SUCCESS)
-        try {
+        captureAiDialogWindow(
             File(
-                    context.getExternalFilesDir(null),
-                    "ai-local-preview-${config.screenWidthDp}-${config.fontScale}-$state.png",
-                )
-                .outputStream()
-                .use {
-                    check(image.compress(Bitmap.CompressFormat.PNG, 100, it))
-                }
-        } finally {
-            image.recycle()
-        }
-    }
-
-    private fun dialogWindow(view: View): Window? {
-        if (view is DialogWindowProvider) return view.window
-        if (view is ViewGroup) {
-            for (index in 0 until view.childCount) {
-                dialogWindow(view.getChildAt(index))?.let {
-                    return it
-                }
-            }
-        }
-        return null
+                context.getExternalFilesDir(null),
+                "ai-local-preview-${config.screenWidthDp}-${config.fontScale}-$state.png",
+            )
+        )
     }
 }
