@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
-import com.xike.app.canonicalTopic
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
 import com.xike.app.data.feelingLabel
@@ -76,7 +75,6 @@ internal fun JournalEntryCard(
         compactMoodOnly &&
             entry.note.isBlank() &&
             entry.feelings.isEmpty() &&
-            entry.labels.isEmpty() &&
             entry.outdoor == null &&
             entry.imageFileNames.isEmpty() &&
             entry.audio == null &&
@@ -133,9 +131,7 @@ internal fun JournalEntryCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (
-                        compactLabels && (entry.feelings.isNotEmpty() || entry.labels.isNotEmpty())
-                    ) {
+                    if (compactLabels && entry.feelings.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
                         JournalEntryLabelSummary(entry)
                     }
@@ -146,14 +142,6 @@ internal fun JournalEntryCard(
                                 if (entry.feelings.size > 3) " +${entry.feelings.size - 3}" else "",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (!compactLabels && entry.labels.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            entry.labels.joinToString("  ·  ") { it.displayName },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     entry.outdoor?.let { outdoor ->
@@ -271,7 +259,7 @@ internal fun JournalEntryCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun JournalEntryLabelSummary(entry: JournalEntry) {
-    val labelCount = entry.feelings.size + entry.labels.size
+    val labelCount = entry.feelings.size
     val allowWrap = LocalDensity.current.fontScale > 1.3f
     ContextualFlowRow(
         itemCount = labelCount,
@@ -288,33 +276,7 @@ private fun JournalEntryLabelSummary(entry: JournalEntry) {
                 )
             },
     ) { index ->
-        if (index < entry.feelings.size) {
-            FeelingChip(entry.feelings[index], filled = true, compact = true)
-        } else {
-            val label = entry.labels[index - entry.feelings.size]
-            val definition =
-                com.xike.app.LocalJournalLabelServices.current.catalog.firstOrNull {
-                    it.id == label.id
-                }
-            val topic = journalTopics.find {
-                it.label == (definition?.iconKey ?: canonicalTopic(label.savedName))
-            }
-            TopicChip(
-                topic =
-                    (topic ?: journalTopics.last()).copy(
-                        label = label.displayName,
-                        translateLabel = false,
-                    ),
-                selected = true,
-                onClick = null,
-                minHeight = 20.dp,
-                labelMaxLines = Int.MAX_VALUE,
-                filled = false,
-                verticalPadding = 2.dp,
-                horizontalPadding = 6.dp,
-                compact = true,
-            )
-        }
+        FeelingChip(entry.feelings[index], filled = true, compact = true)
     }
 }
 

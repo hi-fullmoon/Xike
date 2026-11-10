@@ -349,86 +349,6 @@ private fun ComparisonMetric(
 }
 
 @Composable
-internal fun TagTrendsCard(
-    tags: List<TagTrendItem>,
-    evidence: InsightEvidence,
-    activities: Boolean = false,
-    onClick: (TagTrendItem) -> Unit,
-) {
-    InsightSectionCard(
-        icon = XikeIcons.Archive,
-        index = if (activities) tr("活动", "Activities") else localizedText("主题"),
-        title = if (activities) tr("记录中的活动", "Recorded activities") else localizedText("反复出现的主题"),
-    ) {
-        if (tags.isEmpty()) {
-            InsufficientDataNote(
-                if (activities)
-                    tr("添加活动后，这里会显示实际出现次数。", "Add activities to see their recorded counts.")
-                else localizedText("添加主题后，这里会显示实际出现次数。")
-            )
-        } else {
-            tags.forEach { tag ->
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clickable { onClick(tag) }
-                            .padding(vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(tag.displayName, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            tr(
-                                "当前 ${tag.entryCount} 次 · 前期 ${tag.previousEntryCount} 次",
-                                "Current ${tag.entryCount} · Previous ${tag.previousEntryCount}",
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (activities) {
-                            Text(
-                                tr("${tag.recordedDayCount} 天", "${tag.recordedDayCount} days"),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Text(
-                                tag.moodCounts.entries.joinToString(" · ") {
-                                    "${it.key.label} ${it.value}"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    Text(
-                        tag.countDelta.deltaLabel(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            if (!evidence.canDescribePatterns) {
-                Text(
-                    if (activities)
-                        tr(
-                            "仅描述已记录的活动，共同出现不代表原因。",
-                            "Recorded activities are descriptive; co-occurrence does not establish cause.",
-                        )
-                    else localizedText("样本较少，主题仅按次数排序，不解释其意义。"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun DayTypeCard(
     weekday: DayTypeInsight,
     weekend: DayTypeInsight,
@@ -558,8 +478,8 @@ internal fun LocalReviewCard(enabled: Boolean, periodName: String, onOpen: () ->
             Spacer(Modifier.height(13.dp))
             Text(
                 tr(
-                    "整理心情变化、常见主题和值得回看的片段，形成一份有记录依据的回顾。",
-                    "Review mood changes, recurring topics and moments worth revisiting, grounded in your entries.",
+                    "整理心情变化和值得回看的片段，形成一份有记录依据的回顾。",
+                    "Review mood changes and moments worth revisiting, grounded in your entries.",
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),

@@ -177,8 +177,7 @@ class JournalDraftUiTest {
             composeRule.onNodeWithContentDescription("待保存的第 1 张照片").isDisplayed()
         }
         composeRule.onNodeWithText("主题").assertDoesNotExist()
-        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
-        composeRule.onNodeWithText("再留下一点").performClick()
+        composeRule.onNodeWithText("再留下一点").assertDoesNotExist()
         composeRule.onNodeWithText("主题").assertDoesNotExist()
         composeRule
             .onNodeWithContentDescription("待保存的第 1 张照片")
@@ -366,10 +365,10 @@ class JournalDraftUiTest {
 
         composeRule.waitForIdle()
         composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
+        composeRule.onNodeWithText("再留下一点").assertDoesNotExist()
         check(composeRule.onAllNodesWithText("主题").fetchSemanticsNodes().isEmpty())
         composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("再留下一点").performScrollTo().performClick()
+        composeRule.onNodeWithText("再留下一点").assertDoesNotExist()
         composeRule.onNodeWithText("一直保留的草稿内容").performScrollTo().assertIsDisplayed()
     }
 

@@ -201,7 +201,7 @@ internal fun ArchiveSearchBar(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 placeholder = {
                     Text(
-                        localizedText("搜索注脚或主题"),
+                        tr("搜索记录", "Search entries"),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

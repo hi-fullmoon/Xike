@@ -71,7 +71,7 @@ class JournalArchiveUiTest {
             }
         }
 
-        composeRule.onNodeWithText("搜索注脚或主题").performTextInput("工作")
+        composeRule.onNodeWithText("搜索记录").performTextInput("工作")
         composeRule.waitForIdle()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("找到 1 条").fetchSemanticsNodes().isNotEmpty()

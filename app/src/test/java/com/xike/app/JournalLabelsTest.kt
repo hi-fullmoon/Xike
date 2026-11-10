@@ -39,7 +39,7 @@ class JournalLabelsTest {
     }
 
     @Test
-    fun `renaming preserves entry snapshot and groups by identity across periods`() {
+    fun `retired activity snapshots survive serialization without entering period reviews`() {
         val label = JournalLabel("activity-identity", JournalLabelKind.ACTIVITY, "夜跑")
         val today = LocalDate.of(2026, 11, 4)
         val zone = ZoneId.of("Asia/Shanghai")
@@ -51,7 +51,6 @@ class JournalLabelsTest {
                 note = "",
                 labels = listOf(label.selection()),
             )
-        val renamed = label.copy(name = "跑步")
         val previous =
             entry.copy(
                 id = "previous-entry",
@@ -63,13 +62,14 @@ class JournalLabelsTest {
                 InsightsPeriod.DAYS_30,
                 today,
                 zone,
-                builtinJournalLabels + renamed,
             )
         assertEquals("夜跑", JournalEntry.fromJson(entry.toJson()).labels.single().savedName)
-        assertEquals("跑步", summary.topActivities.single().tag)
-        assertEquals(1, summary.topActivities.single().previousEntryCount)
-        assertEquals(listOf(entry.id), summary.topActivities.single().entryIds)
-        assertTrue(summary.topTags.isEmpty())
+        assertEquals(1, summary.entryCount)
+        assertEquals(1, summary.comparison.entryCount)
+        assertEquals(listOf(entry.id), summary.entryIds)
+        assertFalse(com.xike.app.feature.insights.localReviewText(summary).contains("活动"))
+        assertFalse(com.xike.app.feature.insights.localReviewText(summary).contains("夜跑"))
+        assertFalse(com.xike.app.feature.insights.localReviewText(summary).contains("主题"))
         assertEquals(
             restoreContentKey(entry, { it }, { it }, { it }),
             restoreContentKey(entry.copy(), { it }, { it }, { it }),

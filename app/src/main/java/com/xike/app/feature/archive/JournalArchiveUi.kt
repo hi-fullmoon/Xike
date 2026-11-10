@@ -64,13 +64,11 @@ import com.xike.app.JournalLibraryState
 import com.xike.app.JournalReadRepository
 import com.xike.app.JournalSearchPage
 import com.xike.app.JournalSearchQuery
-import com.xike.app.canonicalTopics
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.Mood
 import com.xike.app.filterJournalEntries
 import com.xike.app.journalReadResult
 import com.xike.app.localizedText
-import com.xike.app.toggleTopic
 import com.xike.app.tr
 import com.xike.app.ui.components.DestructiveConfirmationDialog
 import com.xike.app.ui.components.JournalEntryCard
@@ -160,8 +158,6 @@ fun JournalArchiveScreen(
     val archiveListState = rememberLazyListState()
     var queryText by rememberSaveable { mutableStateOf("") }
     var selectedMoodNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    var selectedTags by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    var selectedActivities by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }
     var showMemories by rememberSaveable { mutableStateOf(false) }
     var imageFilterName by rememberSaveable { mutableStateOf(JournalImageFilter.ANY.name) }
@@ -222,8 +218,6 @@ fun JournalArchiveScreen(
         remember(
             queryText,
             selectedMoods,
-            selectedTags,
-            selectedActivities,
             favoritesOnly,
             imageFilter,
             selectedDate,
@@ -232,9 +226,6 @@ fun JournalArchiveScreen(
             JournalSearchQuery(
                 text = queryText,
                 moods = selectedMoods,
-                tags = if (readRepository == null) selectedTags.toSet() else emptySet(),
-                topicIds = if (readRepository != null) selectedTags.toSet() else emptySet(),
-                activities = selectedActivities.toSet(),
                 favoritesOnly = favoritesOnly,
                 startDate = selectedDate ?: presetRange.first,
                 endDate = selectedDate ?: presetRange.second,
@@ -317,18 +308,6 @@ fun JournalArchiveScreen(
         }
     }
 
-    val legacyTags =
-        remember(entries) {
-            entries
-                .flatMap { it.tags.canonicalTopics() }
-                .groupingBy { it }
-                .eachCount()
-                .entries
-                .sortedWith(
-                    compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }
-                )
-                .map { it.key }
-        }
     val calendarQuery =
         remember(searchQuery) {
             searchQuery.copy(startDate = null, endDate = null)
@@ -337,16 +316,8 @@ fun JournalArchiveScreen(
         YearMonth.parse(visibleMonthValue)
     }
         .getOrDefault(YearMonth.from(today))
-    var availableTags by remember { mutableStateOf(legacyTags) }
     var calendarCounts by remember { mutableStateOf(emptyMap<LocalDate, Int>()) }
     var calendarResultKey by remember { mutableStateOf<Pair<JournalSearchQuery, YearMonth>?>(null) }
-    LaunchedEffect(readRepository, entries, libraryState.revision) {
-        if (readRepository == null) availableTags = legacyTags
-        else
-            journalReadResult { readRepository.topics(ids = true) }
-                .onSuccess { availableTags = it }
-                .onFailure { onReadError(localizedText("日记数据库暂时无法读取，原数据未被覆盖。")) }
-    }
     LaunchedEffect(
         readRepository,
         entries,
@@ -438,21 +409,14 @@ fun JournalArchiveScreen(
                 item(key = "archive-filters") {
                     ArchiveFilters(
                         selectedMoodNames = selectedMoodNames,
-                        availableTags = availableTags,
-                        selectedTags = selectedTags,
-                        selectedActivities = selectedActivities,
                         favoritesOnly = favoritesOnly,
                         onFavoritesOnlyChange = { favoritesOnly = it },
-                        onToggleActivity = { id ->
-                            selectedActivities = selectedActivities.toggle(id)
-                        },
                         imageFilter = imageFilter,
                         datePreset = datePreset,
                         selectedDate = selectedDate,
                         onToggleMood = { mood ->
                             selectedMoodNames = selectedMoodNames.toggle(mood.name)
                         },
-                        onToggleTag = { tag -> selectedTags = toggleTopic(selectedTags, tag) },
                         onImageFilterChange = { imageFilterName = it.name },
                         onDatePresetChange = {
                             datePresetName = it.name
@@ -465,8 +429,6 @@ fun JournalArchiveScreen(
                         onClearAll = {
                             queryText = ""
                             selectedMoodNames = emptyList()
-                            selectedTags = emptyList()
-                            selectedActivities = emptyList()
                             favoritesOnly = false
                             imageFilterName = JournalImageFilter.ANY.name
                             datePresetName = ArchiveDatePreset.ALL.name
@@ -527,7 +489,8 @@ fun JournalArchiveScreen(
                             if (favoritesOnly)
                                 tr("当前条件下没有收藏的记录", "No favorites match these filters")
                             else localizedText("没有找到这一刻"),
-                        description = localizedText("试试减少筛选条件，或换一个主题。"),
+                        description =
+                            tr("试试减少筛选条件，或换个关键词。", "Try fewer filters or a different keyword."),
                     )
                     if (favoritesOnly)
                         TextButton(onClick = { favoritesOnly = false }, shape = XikeShapes.button) {

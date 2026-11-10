@@ -27,21 +27,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,7 +55,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,7 +66,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -89,7 +82,6 @@ import com.xike.app.StagedDraftAudio
 import com.xike.app.VideoCard
 import com.xike.app.VideoImportStatus
 import com.xike.app.canTakePhoto
-import com.xike.app.canonicalTopics
 import com.xike.app.data.JournalAudio
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
@@ -102,19 +94,16 @@ import com.xike.app.isCameraCaptureUri
 import com.xike.app.localizedText
 import com.xike.app.rememberJournalImagePickers
 import com.xike.app.rememberVideoChooser
-import com.xike.app.toggleTopic
 import com.xike.app.tr
 import com.xike.app.ui.components.AddPhotoTile
 import com.xike.app.ui.components.DestructiveConfirmationDialog
 import com.xike.app.ui.components.MomentContentToolbar
 import com.xike.app.ui.components.MomentMediaAction
 import com.xike.app.ui.components.MomentNoteCard
-import com.xike.app.ui.components.MomentTopicsHeader
 import com.xike.app.ui.components.MoodPicker
 import com.xike.app.ui.components.PaperCard
 import com.xike.app.ui.components.PhotoGalleryDialog
 import com.xike.app.ui.components.SecondaryPageHeader
-import com.xike.app.ui.components.TopicChoices
 import com.xike.app.ui.components.VoiceCaptureSheet
 import com.xike.app.ui.components.VoicePendingSaveCard
 import com.xike.app.ui.components.VoicePlaybackCard
@@ -176,31 +165,6 @@ internal fun JournalEntryEditDialog(
                 com.xike.app.data.JournalLabelSelection.fromJson(values.getJSONObject(it))
             }
         }
-    val selectedTags =
-        selectedLabels
-            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
-            .map { it.savedName }
-    val selectedTopicCount =
-        selectedLabels
-            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
-            .distinctBy { it.id }
-            .size
-    val toggleLabel: (com.xike.app.data.JournalLabelSelection) -> Unit = { label ->
-        val next =
-            if (selectedLabels.any { it.id == label.id })
-                selectedLabels.filterNot { it.id == label.id }
-            else selectedLabels + label
-        selectedLabelJson = org.json.JSONArray(next.map { it.toJson() }).toString()
-    }
-    var showTopics by rememberSaveable(entry.id) { mutableStateOf(entry.tags.isNotEmpty()) }
-    val topicsAnchor = remember { BringIntoViewRequester() }
-    var revealTopicsRequest by remember { mutableIntStateOf(0) }
-    LaunchedEffect(revealTopicsRequest) {
-        if (revealTopicsRequest > 0) {
-            withFrameNanos {}
-            topicsAnchor.bringIntoView()
-        }
-    }
     var showAddContent by rememberSaveable(entry.id) { mutableStateOf(false) }
     var retainedAudioJson by
         rememberSaveable(entry.id) { mutableStateOf(entry.audio?.toJson()?.toString()) }
@@ -702,80 +666,6 @@ internal fun JournalEntryEditDialog(
                                 }
                             }
 
-                            PaperCard(contentPadding = PaddingValues(0.dp)) {
-                                Row(
-                                    Modifier.fillMaxWidth()
-                                        .clickable(
-                                            enabled = !isSaving,
-                                            role = Role.Button,
-                                            onClickLabel =
-                                                if (showTopics) localizedText("收起主题")
-                                                else localizedText("展开主题"),
-                                        ) {
-                                            dismissKeyboard()
-                                            showTopics = !showTopics
-                                            if (showTopics) revealTopicsRequest++
-                                        }
-                                        .padding(XikeContentCardPadding)
-                                        .heightIn(min = 42.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            localizedText("再留下一点"),
-                                            style = MaterialTheme.typography.titleSmall,
-                                        )
-                                        Text(
-                                            if (selectedTags.isEmpty()) localizedText("选主题 · 可选")
-                                            else
-                                                tr(
-                                                    "已选 $selectedTopicCount 个主题",
-                                                    "$selectedTopicCount topics selected",
-                                                ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    Icon(
-                                        if (showTopics) Icons.Outlined.ExpandLess
-                                        else Icons.Outlined.ExpandMore,
-                                        null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                if (showTopics) {
-                                    HorizontalDivider(
-                                        Modifier.padding(horizontal = XikeContentCardPadding),
-                                        color =
-                                            MaterialTheme.colorScheme.outlineVariant.copy(
-                                                alpha = 0.7f
-                                            ),
-                                    )
-                                    Column(
-                                        Modifier.bringIntoViewRequester(topicsAnchor)
-                                            .padding(XikeContentCardPadding),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        MomentTopicsHeader(
-                                            selectedTopicCount,
-                                            highlightSelection = false,
-                                        )
-                                        com.xike.app.ui.components.JournalLabelChoices(
-                                            com.xike.app.data.JournalLabelKind.TOPIC,
-                                            selectedLabels,
-                                            !isSaving,
-                                            toggleLabel,
-                                        )
-                                    }
-                                }
-                            }
-
-                            com.xike.app.ui.components.JournalActivities(
-                                selectedLabels,
-                                !isSaving,
-                                toggleLabel,
-                            )
-
                             editedOutdoor?.let { outdoor ->
                                 Column(
                                     Modifier.fillMaxWidth(),
@@ -1112,7 +1002,14 @@ internal fun JournalEntryEditDialog(
             title = localizedText("放弃未保存的修改？"),
             dismissText = localizedText("继续编辑"),
             confirmText = localizedText("放弃修改"),
-            text = { Text(localizedText("心情、时间、注脚、主题和附件的本次修改都不会保存。")) },
+            text = {
+                Text(
+                    tr(
+                        "心情、时间、注脚和附件的本次修改都不会保存。",
+                        "Changes to mood, time, notes and attachments will not be saved.",
+                    )
+                )
+            },
             onConfirm = {
                 showDiscardConfirmation = false
                 discardEditor()

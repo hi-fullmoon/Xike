@@ -44,6 +44,8 @@ gradlew.bat spotlessCheck testDebugUnitTest lintDebug assembleDebug assembleDebu
 ./gradlew connectedDebugAndroidTest
 ```
 
+主题和活动入口移除后的历史数据兼容回归见[分阶段设备验证说明](validation/retired-labels-regression-2026-11-10.md)。涉及保存或恢复的用例必须使用独立环境，并显式传入 `labelsIsolated=true`；设备操作仍须按仓库规范限定到已核对的序列号。
+
 ## 高德定位的模拟器 ABI
 
 当前高德定位 SDK 提供 `armeabi-v7a` 和 `arm64-v8a` 原生库。多 ABI 调试 APK 在 x86_64 模拟器上默认可能以 x86_64 进程启动，无法解析高德的 `libapssdk.so`；这与 Key 配置无关。

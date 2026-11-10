@@ -55,8 +55,8 @@ internal fun localJournalReview(summary: JournalPeriodSummary): LocalJournalRevi
                 when {
                     summary.entryCount == 0 ->
                         tr(
-                            "还没有记录，暂不生成心情或主题判断。",
-                            "There are no entries yet, so no mood or topic observations are made.",
+                            "还没有记录，暂不生成心情判断。",
+                            "There are no entries yet, so no mood observations are made.",
                         )
                     !evidence.canDescribePatterns ->
                         tr(
@@ -102,94 +102,23 @@ internal fun localJournalReview(summary: JournalPeriodSummary): LocalJournalRevi
                     else tr("目前不判断时间趋势。", "Time trends are not interpreted yet."),
             )
 
-        val tags = summary.topTags.take(3)
-        sections +=
-            ReviewSection(
-                tr("哪些主题出现了", "Recorded topics"),
-                if (tags.isEmpty())
-                    tr(
-                        "这些记录没有标记主题，因此不推断生活事件。",
-                        "These entries have no topic tags, so life events are not inferred.",
-                    )
-                else
-                    tags.joinToString("\n") { tag ->
-                        val counts =
-                            tag.moodCounts.entries
-                                .sortedByDescending { it.value }
-                                .joinToString(tr("、", ", ")) {
-                                    tr(
-                                        "${it.key.label} ${it.value} 次",
-                                        "${it.key.label}: ${it.value}",
-                                    )
-                                }
-                        tr(
-                            "“${tag.displayName}”出现于 ${tag.entryCount} 条记录、${tag.recordedDayCount} 天；伴随的心情：$counts。",
-                            "“${tag.displayName}” appears in ${tag.entryCount} entries across ${tag.recordedDayCount} days; recorded moods: $counts.",
-                        )
-                    } +
-                        tr(
-                            "\n主题可能同时标记；共同出现不代表原因，未标记也不代表没有发生。",
-                            "\nTopics may overlap. Co-occurrence does not establish cause, and an absent tag does not mean an event did not happen.",
-                        ),
-                tags.map {
-                    ReviewSource(
-                        tr("回看“${it.displayName}”", "Revisit “${it.displayName}”"),
-                        it.entryIds,
-                    )
-                },
-            )
-
-        if (summary.topActivities.isNotEmpty()) {
-            val activities = summary.topActivities.take(3)
-            sections +=
-                ReviewSection(
-                    tr("记录中的活动", "Recorded activities"),
-                    activities.joinToString("\n") { activity ->
-                        val moods =
-                            activity.moodCounts.entries.joinToString(tr("、", ", ")) {
-                                "${it.key.label} ${it.value}"
-                            }
-                        tr(
-                            "“${activity.displayName}”：${activity.entryCount} 条、${activity.recordedDayCount} 天，前期 ${activity.previousEntryCount} 条；伴随心情：$moods。",
-                            "“${activity.displayName}”: ${activity.entryCount} entries across ${activity.recordedDayCount} days; previously ${activity.previousEntryCount}; recorded moods: $moods.",
-                        )
-                    } +
-                        tr(
-                            "\n共同出现不代表原因，未标记不代表没有发生。",
-                            "\nCo-occurrence does not establish cause; an absent tag does not mean an activity did not happen.",
-                        ),
-                    activities.map {
-                        ReviewSource(
-                            tr("回看“${it.displayName}”", "Revisit “${it.displayName}”"),
-                            it.entryIds,
-                        )
-                    },
-                )
-        }
         sections += comparisonSection(summary)
         if (evidence.canDescribePatterns) sections += highlightsSection(summary)
-        val repeated = tags.firstOrNull { it.recordedDayCount >= 2 }
         sections +=
             ReviewSection(
                 tr("留给自己的一个问题", "A question for reflection"),
-                if (repeated != null)
-                    tr(
-                        "在记录了“${localizedText(repeated.tag)}”的不同日子里，当时的具体情境和感受有什么相同或不同？",
-                        "Across the days tagged “${localizedText(repeated.tag)}”, what was similar or different about the situations and your feelings?",
-                    )
-                else
-                    tr(
-                        "回看其中一条记录：当时发生了什么，哪些细节是你现在仍想记住的？",
-                        "Revisit one entry: what was happening, and which details would you still like to remember?",
-                    ),
+                tr(
+                    "回看其中一条记录：当时发生了什么，哪些细节是你现在仍想记住的？",
+                    "Revisit one entry: what was happening, and which details would you still like to remember?",
+                ),
             )
     }
     sections +=
         ReviewSection(
             tr("这份回顾的范围", "Scope of this review"),
             tr(
-                "仅依据本机的日期、心情、主题和活动生成，不分析日记正文、照片或录音。没有记录的日期不参与心情判断，也不等于心情平稳。这些是本机记录的描述性统计，不代表原因、诊断或建议。",
-                "Generated on your device from dates, moods, topics and activities; journal text, photos and audio are not analyzed. Unrecorded days are excluded from mood observations and do not imply a steady mood. These descriptive statistics do not establish causes, diagnoses or advice.",
+                "仅依据本机的日期和心情生成，不分析日记正文、照片或录音。没有记录的日期不参与心情判断，也不等于心情平稳。这些是本机记录的描述性统计，不代表原因、诊断或建议。",
+                "Generated on your device from dates and moods; journal text, photos and audio are not analyzed. Unrecorded days are excluded from mood observations and do not imply a steady mood. These descriptive statistics do not establish causes, diagnoses or advice.",
             ),
         )
     return LocalJournalReview(
@@ -250,14 +179,6 @@ private fun comparisonSection(summary: JournalPeriodSummary): ReviewSection {
                         )
                     } + tr("。", ".")
             )
-            summary.topTags.take(2).forEach { tag ->
-                append(
-                    tr(
-                        "\n“${tag.displayName}”：本期 ${tag.entryCount} 条，前期 ${tag.previousEntryCount} 条。",
-                        "\n“${tag.displayName}”: ${tag.entryCount} entries this period, ${tag.previousEntryCount} previously.",
-                    )
-                )
-            }
             append(
                 tr(
                     "记录频率和覆盖不同，差异只描述记录本身，不代表整体生活变好或变差。",

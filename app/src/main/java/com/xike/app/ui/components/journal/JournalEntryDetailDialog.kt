@@ -56,7 +56,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xike.app.AppLocale
 import com.xike.app.VideoCard
-import com.xike.app.canonicalTopic
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.displayMoodLabel
 import com.xike.app.localizedText
@@ -67,9 +66,7 @@ import com.xike.app.ui.components.JournalPhotoMosaic
 import com.xike.app.ui.components.MoodEmoji
 import com.xike.app.ui.components.PhotoGalleryDialog
 import com.xike.app.ui.components.SecondaryPageHeader
-import com.xike.app.ui.components.TopicChip
 import com.xike.app.ui.components.VoicePlaybackCard
-import com.xike.app.ui.components.journalTopics
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
@@ -287,53 +284,6 @@ internal fun JournalEntryDetailDialog(
                             }
                         }
                     }
-                    com.xike.app.data.JournalLabelKind.entries.forEach { kind ->
-                        val labels = entry.labels.filter { it.kind == kind }
-                        if (labels.isNotEmpty()) {
-                            JournalDetailSection(
-                                if (kind == com.xike.app.data.JournalLabelKind.TOPIC)
-                                    localizedText("主题")
-                                else tr("活动", "Activities")
-                            ) {
-                                JournalDetailCard {
-                                    FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        labels.forEach { label ->
-                                            val definition =
-                                                com.xike.app.LocalJournalLabelServices.current
-                                                    .catalog
-                                                    .firstOrNull { it.id == label.id }
-                                            val topic = journalTopics.find {
-                                                it.label ==
-                                                    (definition?.iconKey
-                                                        ?: canonicalTopic(label.savedName))
-                                            }
-                                            TopicChip(
-                                                topic =
-                                                    (topic ?: journalTopics.last()).copy(
-                                                        label = label.displayName,
-                                                        translateLabel = false,
-                                                    ),
-                                                selected = true,
-                                                onClick = null,
-                                                minHeight = 24.dp,
-                                                verticalPadding = 2.dp,
-                                                horizontalPadding = 8.dp,
-                                                labelMaxLines = Int.MAX_VALUE,
-                                                filled = false,
-                                                compact = true,
-                                                iconSize = 14.dp,
-                                                labelStyle = MaterialTheme.typography.labelMedium,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     entry.outdoor?.let { outdoor ->
                         JournalDetailSection(localizedText("此刻窗外")) {
                             JournalDetailCard {

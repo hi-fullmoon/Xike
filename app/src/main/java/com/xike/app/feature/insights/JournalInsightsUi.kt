@@ -260,47 +260,6 @@ fun JournalInsightsScreen(
                         )
                 }
             }
-            item(key = "insights-tags") {
-                TagTrendsCard(summary.topTags, summary.evidence) { tag ->
-                    drilldown =
-                        InsightDrilldown(
-                            title =
-                                tr(
-                                    "${tag.displayName} · ${tag.entryCount} 条",
-                                    "${tag.displayName} · ${tag.entryCount} entries",
-                                ),
-                            subtitle =
-                                tr(
-                                    "${displayedPeriod.contextName}的主题",
-                                    "Topics: ${displayedPeriod.contextName}",
-                                ),
-                            entryIds = tag.entryIds,
-                        )
-                }
-            }
-            item(key = "insights-activities") {
-                TagTrendsCard(
-                    summary.topActivities,
-                    summary.evidence,
-                    onClick = { activity ->
-                        drilldown =
-                            InsightDrilldown(
-                                title =
-                                    tr(
-                                        "${activity.displayName} · ${activity.entryCount} 条",
-                                        "${activity.displayName} · ${activity.entryCount} entries",
-                                    ),
-                                subtitle =
-                                    tr(
-                                        "${displayedPeriod.contextName}的活动",
-                                        "Activities: ${displayedPeriod.contextName}",
-                                    ),
-                                entryIds = activity.entryIds,
-                            )
-                    },
-                    activities = true,
-                )
-            }
             item(key = "insights-day-type") {
                 DayTypeCard(
                     weekday = summary.weekdayInsight,

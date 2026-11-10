@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import com.xike.app.AppLocale
 import com.xike.app.JournalImageFilter
-import com.xike.app.containsTopic
 import com.xike.app.data.Mood
 import com.xike.app.localizedText
 import com.xike.app.tr
@@ -60,23 +59,17 @@ internal enum class ArchiveDatePreset(private val sourceLabel: String) {
 @Composable
 internal fun ArchiveFilters(
     selectedMoodNames: List<String>,
-    availableTags: List<String>,
-    selectedTags: List<String>,
     imageFilter: JournalImageFilter,
     datePreset: ArchiveDatePreset,
     selectedDate: LocalDate?,
     onToggleMood: (Mood) -> Unit,
-    onToggleTag: (String) -> Unit,
     onImageFilterChange: (JournalImageFilter) -> Unit,
     onDatePresetChange: (ArchiveDatePreset) -> Unit,
     onClearDate: () -> Unit,
     onClearAll: () -> Unit,
-    selectedActivities: List<String> = emptyList(),
-    onToggleActivity: (String) -> Unit = {},
     favoritesOnly: Boolean = false,
     onFavoritesOnlyChange: (Boolean) -> Unit = {},
 ) {
-    val labelCatalog = com.xike.app.LocalJournalLabelServices.current.catalog
     val selectedContentColor =
         if (isSystemInDarkTheme()) {
             MaterialTheme.colorScheme.primary
@@ -140,50 +133,6 @@ internal fun ArchiveFilters(
                             MoodEmoji(mood, size = 18.dp)
                         },
                     )
-                }
-            }
-
-            if (availableTags.isNotEmpty()) {
-                FilterTitle(localizedText("主题"))
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = XikeCardPadding),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(availableTags, key = { it }) { tag ->
-                        FilterChip(
-                            shape = XikeShapes.inner,
-                            selected = selectedTags.containsTopic(tag),
-                            colors = filterColors,
-                            onClick = { onToggleTag(tag) },
-                            label = {
-                                Text(
-                                    labelCatalog.firstOrNull { it.id == tag }?.displayName
-                                        ?: localizedText(tag)
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-
-            val activities = labelCatalog.filter {
-                it.kind == com.xike.app.data.JournalLabelKind.ACTIVITY
-            }
-            if (activities.isNotEmpty()) {
-                FilterTitle(tr("活动", "Activities"))
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = XikeCardPadding),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(activities, key = { it.id }) { label ->
-                        FilterChip(
-                            shape = XikeShapes.inner,
-                            selected = label.id in selectedActivities,
-                            colors = filterColors,
-                            onClick = { onToggleActivity(label.id) },
-                            label = { Text(label.displayName) },
-                        )
-                    }
                 }
             }
 

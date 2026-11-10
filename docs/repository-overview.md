@@ -21,7 +21,7 @@
 ### 记录此刻
 
 - 5 档心情：低落、疲惫、平静、轻松、愉悦。
-- 保留 13 个内置主题；新安装默认展示工作、学习、关系、身体、兴趣、自我 6 个，其余默认归档并支持恢复。已有用户的目录沿用原设置；旧主题在历史记录中保留，并归入对应主题的筛选与统计。
+- 主题和活动的选择、展示、筛选与统计入口已移除；历史关联、目录和草稿仍保留，继续兼容旧备份，编辑旧记录时不清除这些数据。
 - 最多 280 字注脚。
 - 每条记录可添加 1 段最长 5 分钟的语音，支持暂停、继续和试听。
 - 每条记录最多添加 9 张图片，单张上限 20 MB。
@@ -34,14 +34,14 @@
 
 - 月历和时间流两种浏览方式。
 - 基于 Room FTS4 的本地全文搜索。
-- 可组合筛选心情、主题、日期范围和是否包含图片。
+- 可组合筛选心情、日期范围和是否包含图片；全文搜索继续兼容历史主题和活动文字。
 - 支持查看、编辑和删除已有记录。
 - 删除需要确认，并提供一次短时撤销。
 
 ### 轨迹与洞察
 
 - 支持本周、近 30 天、近 90 天和今年等时间范围。
-- 展示心情分布、记录覆盖度、前一周期对比和主题趋势。
+- 展示心情分布、记录覆盖度和前一周期对比，不再统计历史主题和活动。
 - 提供工作日与周末对照。
 - 每项分析都保留样本范围说明，并可下钻到原始记录。
 - 回顾文字在本机生成；只有用户主动分享时才交给其他应用。
@@ -106,7 +106,7 @@ flowchart TD
 
 典型的保存链路如下：
 
-1. 用户在 `MomentScreen` 中选择心情、主题、注脚和图片。
+1. 用户在 `MomentScreen` 中选择心情、具体感受、注脚和图片。
 2. `JournalViewModel` 持有当前草稿状态，并将草稿同步到加密偏好设置。
 3. 保存时，`JournalStore` 先导入并加密图片，再通过事务写入日记、主题、图片引用和全文搜索文档。
 4. Room 的 `Flow` 推送最新记录列表，Compose 界面自动刷新。
@@ -134,7 +134,7 @@ flowchart TD
 | [`JournalDraftStore.kt`](../app/src/main/java/com/xike/app/data/draft/JournalDraftStore.kt) | 加密草稿持久化与顺序写入协调。 |
 | [`JournalVideo.kt`](../app/src/main/java/com/xike/app/data/model/JournalVideo.kt)、[`JournalVideoStore.kt`](../app/src/main/java/com/xike/app/media/JournalVideoStore.kt) | 视频模型与加密视频存储、导入及可寻址解密。 |
 | [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
-| [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度、主题与工作日/周末分析。 |
+| [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度与工作日/周末分析。 |
 | [`SystemActivityCallbacks.kt`](../app/src/main/java/com/xike/app/SystemActivityCallbacks.kt) | 系统 Activity 结果协调的 CompositionLocal 声明。 |
 | [`JournalInputComponents.kt`](../app/src/main/java/com/xike/app/ui/components/JournalInputComponents.kt) | 此刻与编辑共用的注脚、工具栏和媒体操作组件。 |
 | [`RecordedAtPicker.kt`](../app/src/main/java/com/xike/app/ui/components/RecordedAtPicker.kt) | 原生日期和时间选择，保留未来时间校验及弹窗协调。 |
@@ -153,7 +153,7 @@ flowchart TD
 | [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt) | 回望页面与搜索协调、页面状态、详情及删除。 |
 | [`JournalArchiveControls.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveControls.kt)、[`JournalArchiveFilters.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveFilters.kt)、[`JournalMonthCalendar.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalMonthCalendar.kt) | 搜索与模式控件、组合筛选和日期规则，以及月历展示。 |
 | [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsUi.kt) | 轨迹页面、周期选择、计算状态与下钻跳转协调。 |
-| [`JournalInsightsCards.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCards.kt) | 轨迹概况、周期比较、主题、日期类型及本地回顾入口卡片。 |
+| [`JournalInsightsCards.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCards.kt) | 轨迹概况、周期比较、日期类型及本地回顾入口卡片。 |
 | [`JournalInsightsCharts.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |
 | [`JournalInsightsSection.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsSection.kt) | 轨迹组件共用的分节卡片、比例条与样本说明。 |
 | [`LocalReviewDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/LocalReviewDialog.kt)、[`InsightDrilldownDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/InsightDrilldownDialog.kt) | 本地回顾与原始记录弹窗，继续复用共享日记详情。 |

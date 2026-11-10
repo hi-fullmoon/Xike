@@ -39,7 +39,7 @@ class JournalAnalyticsTest {
         assertEquals(LocalDate.of(2026, 8, 17), summary.weekStart)
         assertEquals(3, summary.entryCount)
         assertEquals(3.33, summary.averageScore!!, 0.01)
-        assertEquals("工作", summary.mostUsedTag)
+        assertEquals(2, summary.days.count { it.entryCount > 0 })
     }
 
     @Test
@@ -130,7 +130,7 @@ class JournalAnalyticsTest {
     }
 
     @Test
-    fun `deep insight reports distributions tags and day types without double counting tags`() {
+    fun `deep insight preserves mood and day statistics while omitting historical topics`() {
         val entries =
             listOf(
                 entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("工作", "工作")),
@@ -142,7 +142,6 @@ class JournalAnalyticsTest {
         val summary = journalPeriodSummary(entries, InsightsPeriod.DAYS_30, today, zone)
 
         assertEquals(1, summary.moodDistribution.single { it.mood == Mood.JOYFUL }.entryCount)
-        assertEquals(2, summary.topTags.single { it.tag == "工作" }.entryCount)
         assertEquals(1, summary.weekdayInsight.entryCount)
         assertEquals(3, summary.weekendInsight.entryCount)
         assertEquals(2, summary.weekendInsight.recordedDayCount)
@@ -151,15 +150,16 @@ class JournalAnalyticsTest {
         assertEquals(InsightEvidenceLevel.DEVELOPING, summary.evidence.level)
         assertEquals(3, summary.reviewDays.size)
         assertEquals(4.0, summary.reviewDays.last().averageScore!!, 0.0)
-        assertEquals(2, summary.topTags.single { it.tag == "工作" }.recordedDayCount)
         val review = localJournalReview(summary)
+        assertFalse(review.text.contains("主题"))
+        assertFalse(review.text.contains("工作"))
         assertTrue(review.text.contains("没有单一最常见的心情"))
         val sources = review.sections.flatMap { it.sources }.flatMap { it.entryIds }
         assertTrue(sources.all { id -> entries.any { it.id == id } })
     }
 
     @Test
-    fun `insights combine retired topics per entry and across periods`() {
+    fun `historical topics survive serialization without entering period reviews`() {
         val currentFirst =
             entry(LocalDate.of(2026, 8, 17), Mood.GOOD, listOf("关系", "社交"))
                 .copy(id = "current-first")
@@ -174,15 +174,14 @@ class JournalAnalyticsTest {
                 today,
                 zone,
             )
-        val relationships = summary.topTags.single { it.tag == "关系" }
-
-        assertEquals(2, relationships.entryCount)
-        assertEquals(1, relationships.previousEntryCount)
-        assertEquals(listOf("current-first", "current-second"), relationships.entryIds)
-        assertEquals(2.5, relationships.averageScore!!, 0.01)
-        assertEquals("关系", summary.mostUsedTag)
-        assertEquals(2, relationships.recordedDayCount)
-        assertEquals(mapOf(Mood.GOOD to 1, Mood.LOW to 1), relationships.moodCounts)
+        assertEquals(2, summary.entryCount)
+        assertEquals(1, summary.comparison.entryCount)
+        assertEquals(2.5, summary.averageScore!!, 0.01)
+        assertEquals(2, summary.recordedDayCount)
+        assertFalse(localReviewText(summary).contains("关系"))
+        assertFalse(localReviewText(summary).contains("社交"))
+        assertEquals(currentFirst.labels, JournalEntry.fromJson(currentFirst.toJson()).labels)
+        assertEquals(currentSecond.labels, JournalEntry.fromJson(currentSecond.toJson()).labels)
     }
 
     @Test

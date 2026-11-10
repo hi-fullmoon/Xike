@@ -226,17 +226,14 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
     suspend fun insights(period: InsightsPeriod, today: LocalDate): JournalPeriodSummary = read {
         val ranges = period.readDateRanges(today)
         val zoneId = ZoneId.systemDefault()
-        val (records, catalog) =
-            database.runInTransaction<
-                Pair<List<JournalAnalyticsRecord>, List<com.xike.app.data.JournalLabel>>
-            > {
-                val records = ranges.flatMap { (start, end) ->
+        val records =
+            database.runInTransaction<List<JournalAnalyticsRecord>> {
+                ranges.flatMap { (start, end) ->
                     dao.analyticsRecords(
                         start.atStartOfDay(zoneId).toInstant().toEpochMilli(),
                         end.atStartOfDay(zoneId).toInstant().toEpochMilli(),
                     )
                 }
-                records to dao.labels().map { it.toLabel() }
             }
         withContext(Dispatchers.Default) {
             journalPeriodSummary(
@@ -244,7 +241,6 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
                 period,
                 today,
                 zoneId,
-                catalog,
             )
         }
     }

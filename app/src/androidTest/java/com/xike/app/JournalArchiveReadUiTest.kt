@@ -148,8 +148,8 @@ class JournalArchiveReadUiTest {
                 model.readRepository.indexPage(query, 60, first.totalCount).entries.map { it.id },
             )
             rule.onNodeWithTag("navigation-archive").performClick()
-            rule.onNodeWithText(tr("时间线", "Timeline")).performClick()
-            rule.onNodeWithText(localizedText("搜索注脚或主题")).performTextInput(prefix)
+            rule.onNodeWithText(localizedText("时间流")).performClick()
+            rule.onNodeWithText(tr("搜索记录", "Search entries")).performTextInput(prefix)
             rule.onNode(hasSetTextAction()).performImeAction()
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             rule.waitUntil(15_000) {
@@ -187,7 +187,7 @@ class JournalArchiveReadUiTest {
                 rule.onNodeWithText(notes.last()).assertIsDisplayed()
             }
             rule.onNodeWithTag("archive-list").performScrollToIndex(0)
-            rule.onNodeWithText(tr("时间线", "Timeline")).performClick()
+            rule.onNodeWithText(localizedText("时间流")).performClick()
             rule.onNodeWithTag("archive-list").performScrollToNode(hasText(localizedText("加载更多记录")))
             rule.onNodeWithText(localizedText("加载更多记录")).performClick()
             rule.waitUntil(15_000) {
@@ -315,7 +315,7 @@ class JournalArchiveReadUiTest {
         }
         assertEquals(updatedNote, repository.entry(saved.id)?.note)
         rule.onNodeWithTag("archive-list").performScrollToIndex(0)
-        rule.onNodeWithText(localizedText("搜索注脚或主题")).performTextInput("回望")
+        rule.onNodeWithText(tr("搜索记录", "Search entries")).performTextInput("回望")
         val matchingCount = repository.indexPage(JournalSearchQuery(text = "回望"), 0).totalCount
         rule.waitUntil(15_000) {
             rule

@@ -37,14 +37,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +70,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -104,11 +100,9 @@ import com.xike.app.ui.components.DestructiveConfirmationDialog
 import com.xike.app.ui.components.MomentContentToolbar
 import com.xike.app.ui.components.MomentMediaAction
 import com.xike.app.ui.components.MomentNoteCard
-import com.xike.app.ui.components.MomentTopicsHeader
 import com.xike.app.ui.components.MoodPicker
 import com.xike.app.ui.components.PaperCard
 import com.xike.app.ui.components.PhotoGalleryDialog
-import com.xike.app.ui.components.TopicChoices
 import com.xike.app.ui.components.VoiceCaptureSheet
 import com.xike.app.ui.components.VoicePendingSaveCard
 import com.xike.app.ui.components.VoicePlaybackCard
@@ -184,17 +178,9 @@ fun MomentScreen(
 ) {
     var previewUri by rememberSaveable { mutableStateOf<String?>(null) }
     val videoServices = LocalVideoServices.current
-    var showDetails by rememberSaveable { mutableStateOf(false) }
-    var revealDetailsRequest by remember { mutableIntStateOf(0) }
-    val detailsAnchor = remember { BringIntoViewRequester() }
     var showDiscardConfirmation by rememberSaveable { mutableStateOf(false) }
     var localSaving by remember { mutableStateOf(false) }
     val isSaving = localSaving || isDraftSaving
-    val selectedTopicCount =
-        draft.labels
-            .filter { it.kind == com.xike.app.data.JournalLabelKind.TOPIC }
-            .distinctBy { it.id }
-            .size
     val chooseVideo =
         rememberVideoChooser(
             enabled = !isSaving && !videoServices.draftSaving,
@@ -314,16 +300,6 @@ fun MomentScreen(
     }
     val today = LocalDate.now()
     val todayEntryCount = recordedTodayCount ?: entriesOnDate(entries, today)
-    val draftHasDetails = draft.tags.isNotEmpty()
-    LaunchedEffect(draftHasDetails) {
-        if (draftHasDetails) showDetails = true
-    }
-    LaunchedEffect(revealDetailsRequest) {
-        if (revealDetailsRequest > 0) {
-            withFrameNanos {}
-            detailsAnchor.bringIntoView()
-        }
-    }
     var showPhotoSourceDialog by rememberSaveable { mutableStateOf(false) }
     var showAddContent by rememberSaveable { mutableStateOf(false) }
     var showRecordedAtOptions by rememberSaveable { mutableStateOf(false) }
@@ -481,86 +457,6 @@ fun MomentScreen(
                     }
                 Spacer(Modifier.height(8.dp))
                 DraftSecurityRow(statusText = draftSecurityStatus)
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = XikeShapes.card,
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Column {
-                    Row(
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .clickable(
-                                    enabled = !isSaving,
-                                    onClickLabel =
-                                        if (showDetails) localizedText("收起主题")
-                                        else localizedText("展开主题"),
-                                    role = Role.Button,
-                                ) {
-                                    if (showDetails) dismissKeyboard()
-                                    showDetails = !showDetails
-                                    if (showDetails) revealDetailsRequest++
-                                }
-                                .padding(XikeContentCardPadding)
-                                .heightIn(min = 42.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                localizedText("再留下一点"),
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Text(
-                                if (draft.tags.isEmpty()) localizedText("选主题 · 可选")
-                                else
-                                    tr(
-                                        "已选 $selectedTopicCount 个主题",
-                                        "$selectedTopicCount topics selected",
-                                    ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Icon(
-                            if (showDetails) Icons.Outlined.ExpandLess
-                            else Icons.Outlined.ExpandMore,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-
-                    if (showDetails) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = XikeContentCardPadding),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-                        )
-                        Column(
-                            Modifier.bringIntoViewRequester(detailsAnchor)
-                                .padding(XikeContentCardPadding)
-                        ) {
-                            com.xike.app.ui.components.JournalLabelChoices(
-                                com.xike.app.data.JournalLabelKind.TOPIC,
-                                draft.labels,
-                                !isSaving,
-                                onToggle = { label -> onDraftTagToggle(label.id) },
-                                header = { onManage ->
-                                    MomentTopicsHeader(
-                                        selectedTopicCount,
-                                        onManage = onManage,
-                                        manageEnabled = !isSaving,
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            com.xike.app.ui.components.JournalActivities(draft.labels, !isSaving) {
-                onDraftTagToggle(it.id)
             }
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -756,7 +652,6 @@ fun MomentScreen(
                                 draft.imageUriStrings.map(Uri::parse),
                             )
                             .onSuccess {
-                                showDetails = false
                                 if (!saveFeedbackHandledExternally)
                                     XikeNotice.makeText(
                                             context,
@@ -958,13 +853,12 @@ fun MomentScreen(
             onConfirm = {
                 onDraftDiscard()
                 showDiscardConfirmation = false
-                showDetails = false
             },
             text = {
                 Text(
                     tr(
-                        "将清空尚未保存的心情、此刻窗外、注脚、主题、活动、照片、语音、视频和补记时间。已保存的记录不会受影响。",
-                        "This clears the unsaved mood, weather, note, topics, activities, photos, audio, video and recorded time. Saved entries are not affected.",
+                        "将清空尚未保存的心情、此刻窗外、注脚、照片、语音、视频和补记时间。已保存的记录不会受影响。",
+                        "This clears the unsaved mood, weather, note, photos, audio, video and recorded time. Saved entries are not affected.",
                     ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

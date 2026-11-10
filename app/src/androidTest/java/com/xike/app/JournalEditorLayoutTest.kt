@@ -187,10 +187,9 @@ class JournalEditorLayoutTest {
             rule.waitUntil(5_000) { !keyboardVisible.get() }
             rule.onNodeWithText(localizedText("完成")).assertDoesNotExist()
         }
-        rule.onNodeWithTag("journal-edit-body").performScrollToNode(hasText(localizedText("再留下一点")))
-        rule.onNodeWithText(localizedText("再留下一点")).performClick()
-        rule.onNodeWithTag("journal-edit-body").performScrollToNode(hasText(localizedText("主题")))
-        rule.onNodeWithText(localizedText("主题")).assertIsDisplayed()
+        rule.onNodeWithText(tr("活动", "Activities")).assertDoesNotExist()
+        rule.onNodeWithText(localizedText("再留下一点")).assertDoesNotExist()
+        rule.onNodeWithText(localizedText("主题")).assertDoesNotExist()
         rule.onNodeWithContentDescription(tr("添加内容", "Add content")).assertExists()
         rule.onNodeWithContentDescription(localizedText("取消编辑")).assertIsDisplayed()
         rule.onNodeWithText(localizedText("保存")).assertIsDisplayed()
