@@ -949,6 +949,7 @@ private fun ArchiveTimelineEntry(
         entry = entry,
         modifier = Modifier.testTag("archive-entry:${entry.id}"),
         compactMedia = true,
+        alignCompactMediaWithContent = true,
         moodIconSize = 36.dp,
         compactMoodOnly = true,
         compactLabels = true,

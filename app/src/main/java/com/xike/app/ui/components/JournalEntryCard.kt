@@ -65,7 +65,12 @@ internal fun JournalEntryCard(
     compactMoodOnly: Boolean = false,
     compactLabels: Boolean = false,
     wrapMoodLabel: Boolean = false,
+    alignCompactMediaWithContent: Boolean = false,
 ) {
+    val moodBadgeSize = 48.dp
+    val moodContentSpacing = 14.dp
+    val mediaStartIndent =
+        if (alignCompactMediaWithContent) moodBadgeSize + moodContentSpacing else 0.dp
     val constrainMoodLabel = wrapMoodLabel || entry.isFavorite
     val isCompactMoodOnly =
         compactMoodOnly &&
@@ -96,7 +101,7 @@ internal fun JournalEntryCard(
                     if (isCompactMoodOnly) Alignment.CenterVertically else Alignment.Top,
             ) {
                 Surface(
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(moodBadgeSize),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f),
                 ) {
@@ -104,7 +109,7 @@ internal fun JournalEntryCard(
                         MoodEmoji(entry.mood, size = moodIconSize)
                     }
                 }
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(moodContentSpacing))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -211,7 +216,7 @@ internal fun JournalEntryCard(
                     ) {
                         val thumbnailWidth = (maxWidth - 16.dp) / 3
                         LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(start = mediaStartIndent),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             entry.video?.let { video ->
@@ -240,14 +245,18 @@ internal fun JournalEntryCard(
                             }
                         }
                     }
-                    if (mediaCount > 3) {
+                    if (mediaCount > if (alignCompactMediaWithContent) 2 else 3) {
                         Text(
                             tr(
                                 "共 $mediaCount 项媒体 · 左右滑动查看",
                                 "$mediaCount media items · Swipe to view",
                             ),
                             modifier =
-                                Modifier.padding(horizontal = XikeCardPadding).padding(top = 8.dp),
+                                Modifier.padding(
+                                    start = XikeCardPadding + mediaStartIndent,
+                                    end = XikeCardPadding,
+                                    top = 8.dp,
+                                ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
