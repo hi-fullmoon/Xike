@@ -113,6 +113,7 @@ class AiReviewUiTest {
                 }
                 val title = rule.onNodeWithTag("ai-review-entry")
                 val configTitle = tr("AI 接口配置", "AI service settings")
+                val reviewTitle = tr("AI 回顾", "AI review")
                 title.performClick()
                 rule.onNodeWithText(configTitle).assertDoesNotExist()
                 Thread.sleep(2_100)
@@ -121,6 +122,7 @@ class AiReviewUiTest {
                 title.performClick()
                 try {
                     rule.waitUntil(10_000) {
+                        rule.onNodeWithText(reviewTitle).assertDoesNotExist()
                         rule.onNodeWithText(configTitle).isDisplayed()
                     }
                 } catch (failure: AssertionError) {
@@ -201,7 +203,8 @@ class AiReviewUiTest {
                 title.performClick()
                 // Address and model are sufficient to reopen local preview without a Key.
                 rule.waitUntil(10_000) {
-                    rule.onNodeWithText(tr("AI 回顾", "AI review")).isDisplayed()
+                    rule.onNodeWithText(configTitle).assertDoesNotExist()
+                    rule.onNodeWithText(reviewTitle).isDisplayed()
                 }
                 rule.waitUntil(10_000) {
                     runCatching {

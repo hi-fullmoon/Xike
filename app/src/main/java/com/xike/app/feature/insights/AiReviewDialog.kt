@@ -92,8 +92,9 @@ internal fun AiReviewDialog(
 
     LaunchedEffect(operations) {
         try {
-            settings = operations.load()
-            showSettings = settings?.canPreview != true
+            val loadedSettings = operations.load()
+            showSettings = !loadedSettings.canPreview
+            settings = loadedSettings
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Exception) {
@@ -120,6 +121,8 @@ internal fun AiReviewDialog(
             job?.cancel()
         }
     }
+
+    if (settings == null && error == null) return
 
     if (showSettings) {
         AiSettingsDialog(
