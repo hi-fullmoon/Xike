@@ -24,6 +24,7 @@ import com.xike.app.JournalStore
 import com.xike.app.R
 import com.xike.app.tr
 import java.io.File
+import java.io.FilterInputStream
 import java.io.FilterOutputStream
 import java.security.MessageDigest
 import java.time.ZonedDateTime
@@ -234,7 +235,22 @@ internal suspend fun performAutoBackup(
                     password,
                 )
             }
-            staged.inputStream().use { store.inspectBackup(it, password) }
+        }
+        staged.inputStream().use { input ->
+            // The export is immutable here. Validate the archive without reading live journals.
+            val cancellableInput =
+                object : FilterInputStream(input) {
+                    override fun read(): Int {
+                        coroutine.ensureActive()
+                        return super.read()
+                    }
+
+                    override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                        coroutine.ensureActive()
+                        return super.read(bytes, offset, length)
+                    }
+                }
+            store.prepareRestore(cancellableInput, password).close()
         }
         coroutine.ensureActive()
         val document =

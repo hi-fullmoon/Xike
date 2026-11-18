@@ -1,6 +1,7 @@
 package com.xike.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -90,6 +91,56 @@ class JournalStoreBackupTest {
         store.delete(stale.id)
         assertTrue(store.undoDelete(stale.id).single().isFavorite)
         assertEquals("updated", store.entries().single().note)
+    }
+
+    @Test
+    fun editingRemovesOnlyPhotosNoLongerReferencedByAnotherRecordOrUndo() {
+        val photo = pngPhoto()
+        val first = store.add(entry("edit-photo-first", 1L, ""), imageUris(listOf(photo))).single()
+        val fileName = first.imageFileNames.single()
+        val second = first.copy(id = "edit-photo-second")
+        val third = first.copy(id = "edit-photo-third")
+        dao.insertJournal(second.toBundle())
+        dao.insertJournal(third.toBundle())
+
+        store.update(first.copy(note = "移除照片"), emptyList(), refreshEntries = false)
+        store.openImage(fileName).use { assertArrayEquals(photo, requireNotNull(it).readBytes()) }
+        store.delete(third.id, refreshEntries = false)
+        store.update(second, emptyList(), refreshEntries = false)
+        val restored = store.undoDelete(third.id, refreshEntries = false).single()
+        assertEquals(listOf(fileName), restored.imageFileNames)
+        store.openImage(fileName).use { assertArrayEquals(photo, requireNotNull(it).readBytes()) }
+        store.update(restored, emptyList(), refreshEntries = false)
+        assertNull(store.openImage(fileName))
+    }
+
+    @Test
+    fun missingStagedPhotoStopsReplacementAndPreservesPriorUndo() {
+        val photo = pngPhoto()
+        val original =
+            store.add(entry("restore-staged-photo", 100L, ""), imageUris(listOf(photo))).single()
+        val bytes = ByteArrayOutputStream().also { store.writeBackup(it, null) }.toByteArray()
+        val beforeRestore =
+            store.update(original.copy(note = "替换前"), original.imageFileNames).single()
+        store.restoreBackup(bytes.inputStream(), null, mode = BackupRestoreMode.REPLACE)
+        val existing = store.entries().single()
+        val token = dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)
+
+        store.prepareRestore(bytes.inputStream(), null).use { staged ->
+            val name = staged.entries.single().imageFileNames.single()
+            check(File(staged.stagingDirectory, name).delete())
+            assertTrue(
+                runCatching {
+                    store.restoreBackup(staged, emptySet(), null, BackupRestoreMode.REPLACE)
+                }
+                    .isFailure
+            )
+        }
+        assertEquals(existing, store.entries().single())
+        assertEquals(token, dao.settingValue(RESTORE_UNDO_TOKEN_SETTING))
+        val undone = store.undoLastRestore().single()
+        assertEquals(beforeRestore.note, undone.note)
+        assertImageContents(undone, listOf(photo))
     }
 
     @Test
@@ -770,6 +821,17 @@ class JournalStoreBackupTest {
     private fun journalImagesDirectory(): File = File(context.filesDir, "journal-images")
 
     private fun journalAudiosDirectory(): File = File(context.filesDir, "journal-audios")
+
+    private fun pngPhoto(): ByteArray {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        return try {
+            ByteArrayOutputStream()
+                .also { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                .toByteArray()
+        } finally {
+            bitmap.recycle()
+        }
+    }
 
     private fun restorePreferences() =
         EncryptedSharedPreferences.create(

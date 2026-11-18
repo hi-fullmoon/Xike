@@ -3,7 +3,6 @@ package com.xike.app.data.backup
 import android.content.Context
 import com.xike.app.BackupHtml
 import com.xike.app.data.BackupCipher
-import com.xike.app.data.BackupSummary
 import com.xike.app.data.BackupValidationException
 import com.xike.app.data.JournalDataException
 import com.xike.app.data.JournalEntry
@@ -28,22 +27,45 @@ import com.xike.app.media.isSafeImageFileName
 import com.xike.app.tr
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.Closeable
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
+private const val RESTORE_STAGING_PREFIX = "journal-images-restore-"
+private val activeBackupStages = ConcurrentHashMap.newKeySet<File>()
 
-internal data class PreparedBackup(
+internal fun pruneAbandonedBackupStages(context: Context) {
+    context.filesDir.listFiles()?.forEach { directory ->
+        if (
+            directory.isDirectory &&
+                directory.name.startsWith(RESTORE_STAGING_PREFIX) &&
+                directory !in activeBackupStages
+        )
+            directory.deleteRecursively()
+    }
+}
+
+private fun releaseBackupStage(directory: File) {
+    try {
+        directory.deleteRecursively()
+    } finally {
+        activeBackupStages.remove(directory)
+    }
+}
+
+internal class PreparedBackup(
     val stagingDirectory: File,
     val entries: List<JournalEntry>,
     val catalog: List<com.xike.app.data.JournalLabel> =
@@ -51,7 +73,9 @@ internal data class PreparedBackup(
             com.xike.app.data.builtinJournalLabels,
             entries.flatMap { it.labels },
         ),
-)
+) : Closeable {
+    override fun close() = releaseBackupStage(stagingDirectory)
+}
 
 /** Reads and writes validated backups; database replacement and undo stay in JournalStore. */
 internal class JournalBackupStorage(
@@ -204,25 +228,6 @@ internal class JournalBackupStorage(
                 prefix[3] == 4.toByte() -> false
             count > 0 && prefix[0] == '{'.code.toByte() -> true
             else -> throw IllegalArgumentException(localizedText("这不是息刻备份文件。"))
-        }
-    }
-
-    fun inspectBackup(input: InputStream, password: String?): BackupSummary {
-        val prepared = readBackup(input, password)
-        return try {
-            val createdAtValues = prepared.entries.map { it.createdAt }
-            BackupSummary(
-                entryCount = prepared.entries.size,
-                imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
-                audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
-                videoCount = prepared.entries.count { it.video != null },
-                videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
-                oldestCreatedAt = createdAtValues.minOrNull(),
-                newestCreatedAt = createdAtValues.maxOrNull(),
-                favoriteCount = prepared.entries.count { it.isFavorite },
-            )
-        } finally {
-            prepared.stagingDirectory.deleteRecursively()
         }
     }
 
@@ -475,7 +480,7 @@ internal class JournalBackupStorage(
                     ),
             )
         } catch (error: Throwable) {
-            stagingDirectory.deleteRecursively()
+            releaseBackupStage(stagingDirectory)
             throw normalizedBackupError(error)
         }
     }
@@ -523,7 +528,7 @@ internal class JournalBackupStorage(
                 )
             PreparedBackup(stagingDirectory, restored)
         } catch (error: Throwable) {
-            stagingDirectory.deleteRecursively()
+            releaseBackupStage(stagingDirectory)
             throw normalizedBackupError(error)
         }
     }
@@ -532,6 +537,7 @@ internal class JournalBackupStorage(
         when (error) {
             is BackupValidationException -> IllegalArgumentException(error.message, error)
             is JournalDataException -> error
+            is CancellationException -> error
             else -> IllegalArgumentException(localizedText("密码错误或备份文件已损坏。"), error)
         }
 
@@ -549,7 +555,13 @@ internal class JournalBackupStorage(
                 "$RESTORE_STAGING_PREFIX${UUID.randomUUID()}",
             )
             .also { directory ->
-                check(directory.mkdir()) { localizedText("无法创建恢复临时目录。") }
+                activeBackupStages.add(directory)
+                try {
+                    check(directory.mkdir()) { localizedText("无法创建恢复临时目录。") }
+                } catch (error: Throwable) {
+                    activeBackupStages.remove(directory)
+                    throw error
+                }
             }
 
     private fun validateEntryCount(count: Int) {

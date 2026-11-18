@@ -15,7 +15,8 @@ import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.Mood
 import com.xike.app.data.attachmentDigest
 import com.xike.app.data.backup.JournalBackupStorage
-import com.xike.app.data.backup.RESTORE_STAGING_PREFIX
+import com.xike.app.data.backup.PreparedBackup
+import com.xike.app.data.backup.pruneAbandonedBackupStages
 import com.xike.app.data.draft.JournalDraftStore
 import com.xike.app.data.model.JournalVideo
 import com.xike.app.data.model.files
@@ -39,11 +40,6 @@ import org.json.JSONArray
 private data class UndoSnapshot(
     val file: File,
     val password: String,
-)
-
-private data class UndoSnapshotSwap(
-    val previous: UndoSnapshot?,
-    val current: UndoSnapshot,
 )
 
 class JournalStore(context: Context) {
@@ -222,7 +218,12 @@ class JournalStore(context: Context) {
         entry: JournalEntry,
         imageUris: List<Uri> = emptyList(),
         refreshEntries: Boolean = true,
+        submittedDraft: Boolean = false,
     ): List<JournalEntry> {
+        if (submittedDraft && hasSavedDraft(entry.id)) {
+            return if (refreshEntries) readEntries()
+            else listOfNotNull(dao.record(entry.id)?.toJournalEntry())
+        }
         val imported = attachments.importImages(imageUris)
         return runCatching {
             val catalog = dao.labels().map { it.toLabel() }.associateBy { it.id }
@@ -240,7 +241,7 @@ class JournalStore(context: Context) {
                 )
             attachments.validateAudioReference(storedEntry.audio)
             videos.requireReadable(storedEntry.video)
-            dao.insertJournal(storedEntry.toBundle())
+            dao.insertJournal(storedEntry.toBundle(), submittedDraft)
             discardInvalidUndoSnapshot()
             storedEntry
         }
@@ -253,6 +254,8 @@ class JournalStore(context: Context) {
             }
             .let { storedEntry -> if (refreshEntries) readEntries() else listOf(storedEntry) }
     }
+
+    internal fun hasSavedDraft(id: String): Boolean = dao.settingValue(SAVED_DRAFT_SETTING) == id
 
     @Synchronized
     fun update(
@@ -289,15 +292,25 @@ class JournalStore(context: Context) {
                 if (error is JournalDataException) throw error
                 throw JournalDataException(localizedText("记录修改失败，请重试。"), error)
             }
-        val referencedImages = referencedImageFileNames()
-        previousImages
-            .filterNot { it in storedEntry.imageFileNames || it in referencedImages }
-            .forEach(attachments::deleteImage)
-        original.audio
-            ?.fileName
-            ?.takeIf { it != storedEntry.audio?.fileName && it !in referencedAudioFileNames() }
-            ?.let(attachments::deleteAudio)
-        original.video?.let { deleteUnreferencedVideo(it) }
+        // The edit has committed. Defer failed cleanup to the normal orphan sweep.
+        runCatching {
+            val removedImages = previousImages.filterNot {
+                it in storedEntry.imageFileNames ||
+                    it in pendingDeletedEntry?.imageFileNames.orEmpty()
+            }
+            if (removedImages.isNotEmpty()) {
+                val referenced = dao.referencedImageFileNames(removedImages).toSet()
+                removedImages.filterNot { it in referenced }.forEach(attachments::deleteImage)
+            }
+            original.audio
+                ?.fileName
+                ?.takeIf { it != storedEntry.audio?.fileName }
+                ?.let(::deleteUnreferencedAudio)
+            val keptVideoFiles = storedEntry.video.files()
+            original.video
+                ?.takeIf { it.fileName !in keptVideoFiles || it.coverFileName !in keptVideoFiles }
+                ?.let(::deleteUnreferencedVideo)
+        }
         return if (refreshEntries) readEntries() else listOf(storedEntry)
     }
 
@@ -383,7 +396,13 @@ class JournalStore(context: Context) {
 
     @Synchronized
     fun deleteUnreferencedAudio(fileName: String) {
-        if (fileName !in referencedAudioFileNames()) attachments.deleteAudio(fileName)
+        if (
+            pendingDeletedEntry?.audio?.fileName != fileName &&
+                !editAudioPreferences.contains(fileName) &&
+                videoDraftStore.load().audio?.fileName != fileName &&
+                !dao.hasAudioReference(fileName)
+        )
+            attachments.deleteAudio(fileName)
     }
 
     @Synchronized
@@ -417,7 +436,7 @@ class JournalStore(context: Context) {
         cleanupStaleVideoEdits()
         val referencedImages = referencedImageFileNames()
         val referencedAudios = referencedAudioFileNames() + listOfNotNull(activeDraftAudioFileName)
-        val activeUndoFileName = currentUndoSnapshot()?.file?.name
+        val activeUndoFileName = dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)
         videos.prune(referencedVideoFiles() + activeDraftVideo.files())
         attachments.imagesDirectory
             .listFiles()
@@ -427,10 +446,7 @@ class JournalStore(context: Context) {
             .listFiles()
             ?.filter { it.name !in referencedAudios }
             ?.forEach(File::delete)
-        appContext.filesDir
-            .listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith(RESTORE_STAGING_PREFIX) }
-            ?.forEach(File::deleteRecursively)
+        pruneAbandonedBackupStages(appContext)
         appContext.filesDir
             .listFiles()
             ?.filter {
@@ -461,40 +477,42 @@ class JournalStore(context: Context) {
         inspectBackup(input, password)
 
     @Synchronized
-    fun inspectBackup(input: InputStream, password: String?): BackupSummary {
-        val prepared = backups.readBackup(input, password)
-        return try {
-            val plan =
-                try {
-                    val labels =
-                        com.xike.app.data.planLabelRestore(
-                            dao.labels().map { it.toLabel() },
-                            prepared.catalog,
-                            prepared.entries,
-                            true,
-                        )
-                    planRestoreMerge(prepared.stagingDirectory, readEntries(), labels.entries)
-                } catch (_: JournalDataException) {
-                    // Incoming validation already succeeded. A merge preview must not prevent the
-                    // user from choosing replacement; the actual restore still checks its own plan.
-                    null
-                }
-            BackupSummary(
-                entryCount = prepared.entries.size,
-                imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
-                audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
-                videoCount = prepared.entries.count { it.video != null },
-                videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
-                oldestCreatedAt = prepared.entries.minOfOrNull { it.createdAt },
-                newestCreatedAt = prepared.entries.maxOfOrNull { it.createdAt },
-                favoriteCount = prepared.entries.count { it.isFavorite },
-                mergeNewEntryCount = plan?.let { it.additions.size - it.conflictCount },
-                mergeConflictCount = plan?.conflictCount ?: 0,
-                mergeFavoriteChangeCount = plan?.favoriteUpdates?.size ?: 0,
-            )
-        } finally {
-            prepared.stagingDirectory.deleteRecursively()
-        }
+    fun inspectBackup(input: InputStream, password: String?): BackupSummary =
+        prepareRestore(input, password).use(::inspectBackup)
+
+    internal fun prepareRestore(input: InputStream, password: String?): PreparedBackup =
+        backups.readBackup(input, password)
+
+    @Synchronized
+    internal fun inspectBackup(prepared: PreparedBackup): BackupSummary {
+        val plan =
+            try {
+                val labels =
+                    com.xike.app.data.planLabelRestore(
+                        dao.labels().map { it.toLabel() },
+                        prepared.catalog,
+                        prepared.entries,
+                        true,
+                    )
+                planRestoreMerge(prepared.stagingDirectory, readEntries(), labels.entries)
+            } catch (_: JournalDataException) {
+                // Incoming validation already succeeded. A merge preview must not prevent the
+                // user from choosing replacement; the actual restore still checks its own plan.
+                null
+            }
+        return BackupSummary(
+            entryCount = prepared.entries.size,
+            imageCount = prepared.entries.flatMap { it.imageFileNames }.distinct().size,
+            audioCount = prepared.entries.mapNotNull { it.audio?.fileName }.distinct().size,
+            videoCount = prepared.entries.count { it.video != null },
+            videoBytes = prepared.entries.sumOf { it.video?.sizeBytes ?: 0L },
+            oldestCreatedAt = prepared.entries.minOfOrNull { it.createdAt },
+            newestCreatedAt = prepared.entries.maxOfOrNull { it.createdAt },
+            favoriteCount = prepared.entries.count { it.isFavorite },
+            mergeNewEntryCount = plan?.let { it.additions.size - it.conflictCount },
+            mergeConflictCount = plan?.conflictCount ?: 0,
+            mergeFavoriteChangeCount = plan?.favoriteUpdates?.size ?: 0,
+        )
     }
 
     @Synchronized
@@ -512,59 +530,60 @@ class JournalStore(context: Context) {
         retainedAudioFileNames: Set<String> = emptySet(),
         retainedVideo: JournalVideo? = null,
         mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+    ): List<JournalEntry> =
+        prepareRestore(input, password).use { prepared ->
+            restoreBackup(prepared, retainedAudioFileNames, retainedVideo, mode)
+        }
+
+    @Synchronized
+    internal fun restoreBackup(
+        prepared: PreparedBackup,
+        retainedAudioFileNames: Set<String>,
+        retainedVideo: JournalVideo?,
+        mode: BackupRestoreMode,
     ): List<JournalEntry> {
-        val prepared = backups.readBackup(input, password)
-        return try {
-            val localCatalog = dao.labels().map { it.toLabel() }
-            val labelPlan =
-                com.xike.app.data.planLabelRestore(
-                    localCatalog,
-                    prepared.catalog,
-                    prepared.entries,
-                    mode == BackupRestoreMode.MERGE,
-                    videoDraftStore.load().labels,
-                )
-            val localEntries = if (mode == BackupRestoreMode.MERGE) readEntries() else emptyList()
-            val mergePlan =
-                if (mode == BackupRestoreMode.MERGE) {
-                    planRestoreMerge(prepared.stagingDirectory, localEntries, labelPlan.entries)
-                } else
-                    com.xike.app.data.JournalMergePlan(
-                        labelPlan.entries.distinctBy { it.id },
-                        emptySet(),
-                    )
-            val entriesToInstall = mergePlan.additions
-            // A duplicate import is not a mutation and must retain the previous undo snapshot.
-            if (
-                mode == BackupRestoreMode.MERGE &&
-                    entriesToInstall.isEmpty() &&
-                    mergePlan.favoriteUpdates.isEmpty() &&
-                    labelPlan.catalog.toSet() == localCatalog.toSet()
+        val localCatalog = dao.labels().map { it.toLabel() }
+        val labelPlan =
+            com.xike.app.data.planLabelRestore(
+                localCatalog,
+                prepared.catalog,
+                prepared.entries,
+                mode == BackupRestoreMode.MERGE,
+                videoDraftStore.load().labels,
             )
-                return localEntries
-            val snapshotSwap = createUndoSnapshot()
-            try {
-                installRestoredData(
-                        prepared.stagingDirectory,
-                        entriesToInstall,
-                        retainedAudioFileNames,
-                        retainedVideo,
-                        localEntries.map {
-                            if (it.id in mergePlan.favoriteUpdates) it.copy(isFavorite = true)
-                            else it
-                        },
-                        undoToken = snapshotSwap.current.file.name,
-                        catalog = labelPlan.catalog,
-                    )
-                    .also {
-                        commitUndoSnapshot(snapshotSwap)
-                    }
-            } catch (error: Throwable) {
-                rollbackUndoSnapshot(snapshotSwap)
-                throw error
-            }
+        val localEntries = if (mode == BackupRestoreMode.MERGE) readEntries() else emptyList()
+        val mergePlan =
+            if (mode == BackupRestoreMode.MERGE) {
+                planRestoreMerge(prepared.stagingDirectory, localEntries, labelPlan.entries)
+            } else
+                com.xike.app.data.JournalMergePlan(
+                    labelPlan.entries.distinctBy { it.id },
+                    emptySet(),
+                )
+        val entriesToInstall = mergePlan.additions
+        // A duplicate import is not a mutation and must retain the previous undo snapshot.
+        if (
+            mode == BackupRestoreMode.MERGE &&
+                entriesToInstall.isEmpty() &&
+                mergePlan.favoriteUpdates.isEmpty() &&
+                labelPlan.catalog.toSet() == localCatalog.toSet()
+        )
+            return localEntries
+        val snapshot = createUndoSnapshot()
+        return try {
+            installRestoredData(
+                prepared.stagingDirectory,
+                entriesToInstall,
+                retainedAudioFileNames,
+                retainedVideo,
+                localEntries.map {
+                    if (it.id in mergePlan.favoriteUpdates) it.copy(isFavorite = true) else it
+                },
+                undoToken = snapshot.file.name,
+                catalog = labelPlan.catalog,
+            )
         } finally {
-            prepared.stagingDirectory.deleteRecursively()
+            discardInvalidUndoSnapshot()
         }
     }
 
@@ -584,7 +603,7 @@ class JournalStore(context: Context) {
             snapshot.file.inputStream().use { input ->
                 backups.readBackup(input, snapshot.password)
             }
-        return try {
+        return prepared.use {
             installRestoredData(
                     prepared.stagingDirectory,
                     prepared.entries,
@@ -598,15 +617,12 @@ class JournalStore(context: Context) {
                         ),
                 )
                 .also {
-                    clearUndoSnapshot(snapshot)
+                    discardInvalidUndoSnapshot()
                 }
-        } finally {
-            prepared.stagingDirectory.deleteRecursively()
         }
     }
 
-    private fun createUndoSnapshot(): UndoSnapshotSwap {
-        val previous = currentUndoSnapshot()
+    private fun createUndoSnapshot(): UndoSnapshot {
         val passwordBytes = ByteArray(32).also(SecureRandom()::nextBytes)
         val snapshot =
             UndoSnapshot(
@@ -619,54 +635,26 @@ class JournalStore(context: Context) {
                 writeEncryptedBackup(output, snapshot.password)
             }
             val saved =
-                restorePreferences
-                    .edit()
-                    .putString(RESTORE_UNDO_FILE_KEY, snapshot.file.name)
-                    .putString(RESTORE_UNDO_PASSWORD_KEY, snapshot.password)
-                    .commit()
+                restorePreferences.edit().putString(snapshot.file.name, snapshot.password).commit()
             if (!saved) error(localizedText("无法保存撤销快照信息。"))
-            return UndoSnapshotSwap(previous, snapshot)
+            return snapshot
         } catch (error: Throwable) {
             snapshot.file.delete()
             throw JournalDataException(localizedText("无法创建恢复撤销快照，设备内容未被替换。"), error)
         }
     }
 
-    private fun commitUndoSnapshot(swap: UndoSnapshotSwap) {
-        swap.previous?.file?.takeIf { it != swap.current.file }?.delete()
-    }
-
-    private fun rollbackUndoSnapshot(swap: UndoSnapshotSwap) {
-        val editor = restorePreferences.edit()
-        if (swap.previous == null) {
-            editor.remove(RESTORE_UNDO_FILE_KEY).remove(RESTORE_UNDO_PASSWORD_KEY)
-        } else {
-            editor
-                .putString(RESTORE_UNDO_FILE_KEY, swap.previous.file.name)
-                .putString(RESTORE_UNDO_PASSWORD_KEY, swap.previous.password)
-        }
-        if (editor.commit()) swap.current.file.delete()
-    }
-
-    private fun clearUndoSnapshot(snapshot: UndoSnapshot) {
-        val cleared =
-            restorePreferences
-                .edit()
-                .remove(RESTORE_UNDO_FILE_KEY)
-                .remove(RESTORE_UNDO_PASSWORD_KEY)
-                .commit()
-        if (cleared) snapshot.file.delete()
-    }
-
     private fun currentUndoSnapshot(): UndoSnapshot? {
         val fileName =
-            restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null)?.takeIf {
-                it.startsWith(RESTORE_UNDO_PREFIX) && File(it).name == it
-            } ?: return null
-        if (dao.settingValue(RESTORE_UNDO_TOKEN_SETTING) != fileName) return null
-        val password =
-            restorePreferences.getString(RESTORE_UNDO_PASSWORD_KEY, null)?.takeIf { it.length >= 8 }
+            dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)?.takeIf(::isUndoSnapshotName)
                 ?: return null
+        val password =
+            (restorePreferences.getString(fileName, null)
+                    ?: restorePreferences
+                        .getString(RESTORE_UNDO_FILE_KEY, null)
+                        ?.takeIf { it == fileName }
+                        ?.let { restorePreferences.getString(RESTORE_UNDO_PASSWORD_KEY, null) })
+                ?.takeIf { it.length >= 8 } ?: return null
         val file = File(appContext.filesDir, fileName).takeIf(File::isFile) ?: return null
         return UndoSnapshot(file, password)
     }
@@ -675,18 +663,27 @@ class JournalStore(context: Context) {
         // The database marker is authoritative and changes in the same transaction as journals.
         // Cleanup is best effort: a crash or preference-write failure cannot re-enable undo.
         runCatching {
-            val name = restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null) ?: return
-            if (dao.settingValue(RESTORE_UNDO_TOKEN_SETTING) == name) return
-            if (name.startsWith(RESTORE_UNDO_PREFIX) && File(name).name == name) {
+            val active = dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)
+            val obsolete =
+                restorePreferences.all.keys.filter { isUndoSnapshotName(it) && it != active }
+            val legacy =
+                restorePreferences.getString(RESTORE_UNDO_FILE_KEY, null)?.takeIf { it != active }
+            if (obsolete.isEmpty() && legacy == null) return
+            val editor = restorePreferences.edit()
+            for (name in obsolete) {
                 File(appContext.filesDir, name).delete()
+                editor.remove(name)
             }
-            restorePreferences
-                .edit()
-                .remove(RESTORE_UNDO_FILE_KEY)
-                .remove(RESTORE_UNDO_PASSWORD_KEY)
-                .commit()
+            if (legacy != null) {
+                if (isUndoSnapshotName(legacy)) File(appContext.filesDir, legacy).delete()
+                editor.remove(RESTORE_UNDO_FILE_KEY).remove(RESTORE_UNDO_PASSWORD_KEY)
+            }
+            editor.commit()
         }
     }
+
+    private fun isUndoSnapshotName(name: String): Boolean =
+        name.startsWith(RESTORE_UNDO_PREFIX) && File(name).name == name
 
     private fun planRestoreMerge(
         stagingDirectory: File,
@@ -750,9 +747,16 @@ class JournalStore(context: Context) {
     ): List<JournalEntry> {
         val installedFiles = mutableListOf<File>()
         return try {
-            val stagedFiles = stagingDirectory.listFiles().orEmpty()
+            val stagedFiles =
+                checkNotNull(stagingDirectory.listFiles()) {
+                    localizedText("备份文件不完整。")
+                }
             val imageNames = entriesToInstall.flatMap { it.imageFileNames }.toSet()
             val audioNames = entriesToInstall.mapNotNull { it.audio?.fileName }.toSet()
+            val stagedNames = stagedFiles.map { it.name }.toSet()
+            check(stagedNames.containsAll(imageNames) && stagedNames.containsAll(audioNames)) {
+                localizedText("备份文件不完整。")
+            }
             val renamedImages =
                 stagedFiles
                     .filter { it.name in imageNames }
@@ -804,13 +808,12 @@ class JournalStore(context: Context) {
                         entriesToInstall.map { entry ->
                             entry.copy(
                                 video = entry.video?.let(renamedVideos::getValue),
-                                imageFileNames =
-                                    entry.imageFileNames.mapNotNull(renamedImages::get),
+                                imageFileNames = entry.imageFileNames.map(renamedImages::getValue),
                                 audio =
                                     entry.audio?.let { audio ->
-                                        renamedAudios[audio.fileName]?.let {
-                                            audio.copy(fileName = it)
-                                        }
+                                        audio.copy(
+                                            fileName = renamedAudios.getValue(audio.fileName)
+                                        )
                                     },
                             )
                         })
@@ -882,7 +885,18 @@ class JournalStore(context: Context) {
     @Synchronized
     fun deleteUnreferencedVideo(video: JournalVideo) {
         // A failed reference read must never turn into an empty reference set.
-        val references = runCatching(::referencedVideoFiles).getOrNull() ?: return
+        val references =
+            runCatching {
+                // The file names are ASCII identifiers. Check the decoded references after
+                // filtering.
+                dao.videoReferences(video.fileName, video.coverFileName)
+                    .flatMap { it.video().files() }
+                    .toSet() +
+                    pendingDeletedEntry?.video.files() +
+                    videoDraftStore.load().video.files() +
+                    videos.editReferences()
+            }
+                .getOrNull() ?: return
         videos.deleteExcept(video, references)
     }
 

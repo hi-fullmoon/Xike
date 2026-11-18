@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -126,9 +127,13 @@ class MomentRecoveryUiTest {
                     // A static emulator screen can yield a zero-duration video. Record an actual
                     // interaction.
                     SystemClock.sleep(500L)
-                    rule.onNodeWithText(localizedText("再留下一点")).performScrollTo().performClick()
+                    rule
+                        .onNodeWithContentDescription(tr("添加内容", "Add content"))
+                        .performScrollTo()
+                        .performClick()
                     java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }
                 }
+            androidx.test.espresso.Espresso.pressBack()
             assertTrue(
                 "Actual screen recording is unavailable",
                 source.isFile && source.length() > 0L,

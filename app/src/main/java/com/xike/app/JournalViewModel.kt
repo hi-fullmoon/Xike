@@ -28,6 +28,7 @@ import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
 import java.io.File
 import java.io.InputStream
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -245,6 +246,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     dataError =
                         draftResult.exceptionOrNull()?.message
                             ?: draftFlushResult.exceptionOrNull()?.message
+                    if (draftReady) reconcileSavedDraft()
                     pendingResult
                         .onSuccess { staged ->
                             draftMediaOperations.restorePendingAudio(staged)
@@ -329,6 +331,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
                 .onFailure { error ->
+                    if (draft.submissionId != null) draftReady = false
                     dataError = error.message ?: localizedText("日记数据库暂时无法读取，原数据未被覆盖。")
                 }
             systemActivityResultsReady = draftReady && result.isSuccess
@@ -397,6 +400,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 .copy(
                     note = note.take(MAX_DRAFT_NOTE_LENGTH),
                     updatedAt = System.currentTimeMillis(),
+                    submissionId = null,
                 )
                 .normalized()
         if (draft.isEmpty) hasResumedDraft = false
@@ -404,7 +408,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun flushDraft() {
-        if (noteSaveJob != null && draftStore.hasPendingWrite) scheduleNoteSave(0L)
+        if (!isDraftSaving && noteSaveJob != null && draftStore.hasPendingWrite)
+            scheduleNoteSave(0L)
     }
 
     private fun scheduleNoteSave(delayMillis: Long) {
@@ -580,6 +585,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     )
             save(
                 JournalEntry(
+                    id = snapshot.submissionId ?: UUID.randomUUID().toString(),
                     createdAt = snapshot.recordedAt ?: System.currentTimeMillis(),
                     mood = mood,
                     labels = snapshot.labels,
@@ -591,10 +597,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     moodScaleVersion = snapshot.moodScaleVersion,
                 ),
                 snapshot.imageUriStrings.map(Uri::parse),
+                submittedDraft = true,
             )
         }
 
     suspend fun save(entry: JournalEntry, imageUris: List<Uri>): Result<Unit> =
+        save(entry, imageUris, submittedDraft = false)
+
+    private suspend fun save(
+        entry: JournalEntry,
+        imageUris: List<Uri>,
+        submittedDraft: Boolean,
+    ): Result<Unit> =
         withContext(Dispatchers.Main.immediate) {
             if (!requireDraftReady() || !libraryReady)
                 return@withContext Result.failure(
@@ -633,6 +647,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 )
             isDraftSaving = true
             val savedDraft = draft
+            val submission = savedDraft.copy(submissionId = entry.id).takeIf { submittedDraft }
+            val submissionRevision = submission?.let {
+                noteSaveJob?.cancel()
+                draftStore.queue(it)
+            }
             // The operation belongs to the ViewModel even if the requesting page leaves
             // composition.
             viewModelScope
@@ -640,7 +659,24 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     try {
                         val result =
                             withContext(Dispatchers.IO) {
-                                runCatching { store.add(entry, imageUris, refreshEntries = false) }
+                                runCatching {
+                                    if (submission != null) {
+                                        check(
+                                            draftStore.saveIfCurrent(
+                                                submission,
+                                                requireNotNull(submissionRevision),
+                                            )
+                                        ) {
+                                            localizedText("草稿已发生变化，请重新保存。")
+                                        }
+                                    }
+                                    store.add(
+                                        entry,
+                                        imageUris,
+                                        refreshEntries = false,
+                                        submittedDraft = submittedDraft,
+                                    )
+                                }
                             }
                         result
                             .onSuccess {
@@ -651,6 +687,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                                 )
                             }
                             .onFailure {
+                                if (submission != null && draft == savedDraft) draft = submission
                                 reportOperation(
                                     it.message ?: localizedText("保存失败，请重试"),
                                     isError = true,
@@ -741,8 +778,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     suspend fun backupRequiresPassword(uri: Uri): Result<Boolean> =
         backupOperations.backupRequiresPassword(uri)
 
-    suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> =
-        backupOperations.inspectBackup(uri, password)
+    internal suspend fun previewBackup(
+        uri: Uri,
+        password: String?,
+        confirm: suspend (BackupSummary) -> BackupRestoreMode?,
+    ): Result<Unit> = backupOperations.previewBackup(uri, password, confirm)
 
     suspend fun restoreBackup(
         uri: Uri,
@@ -816,7 +856,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     private fun persistDraft(updated: JournalDraft, reportError: Boolean = true): Boolean {
         if (!requireDraftReady(reportError)) return false
-        val normalized = updated.copy(updatedAt = System.currentTimeMillis()).normalized()
+        val normalized =
+            updated.copy(updatedAt = System.currentTimeMillis(), submissionId = null).normalized()
         draft = normalized
         if (normalized.isEmpty) hasResumedDraft = false
         scheduleNoteSave(0L)
@@ -859,6 +900,33 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             if (!awaitDraftPersistence()) return
         }
         draftMediaOperations.releaseSavedImages(savedDraft)
+    }
+
+    private suspend fun reconcileSavedDraft() {
+        val submitted = draft
+        val id = submitted.submissionId ?: return
+        val cleared =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    if (!store.hasSavedDraft(id)) false
+                    else {
+                        draftStore.save(JournalDraft())
+                        true
+                    }
+                }
+            }
+        cleared
+            .onSuccess {
+                if (it) {
+                    draft = JournalDraft()
+                    hasResumedDraft = false
+                    draftMediaOperations.releaseSavedImages(submitted)
+                }
+            }
+            .onFailure {
+                draftReady = false
+                dataError = it.message ?: localizedText("草稿保存失败，请重试。")
+            }
     }
 
     private fun loadAccessibleDraft(): JournalDraft {

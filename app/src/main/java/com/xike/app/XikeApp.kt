@@ -98,8 +98,8 @@ internal fun XikeApp(
     backupRestoreState: BackupRestoreState,
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
-    onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
-    onRestoreBackup: suspend (Uri, String?, BackupRestoreMode) -> Result<Int>,
+    onPreviewBackup:
+        suspend (Uri, String?, suspend (BackupSummary) -> BackupRestoreMode?) -> Result<Unit>,
     canUndoRestore: Boolean,
     onUndoRestore: suspend () -> Result<Int>,
     // Navigation requests.
@@ -122,8 +122,7 @@ internal fun XikeApp(
         canUndoRestore = canUndoRestore,
         onExportBackup = onExportBackup,
         onBackupRequiresPassword = onBackupRequiresPassword,
-        onInspectBackup = onInspectBackup,
-        onRestoreBackup = onRestoreBackup,
+        onPreviewBackup = onPreviewBackup,
         onUndoRestore = onUndoRestore,
     ) { onExport, onImport, onUndoRestore, snackbarHostState ->
         Scaffold(

@@ -16,7 +16,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.xike.app.data.BackupRestoreMode
+import com.xike.app.data.Mood
 import com.xike.app.data.attachmentDigest
+import com.xike.app.data.overallLabel
 import com.xike.app.data.restoreContentKey
 import com.xike.app.media.JournalVideoStore
 import java.io.File
@@ -27,6 +29,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -35,6 +38,62 @@ import org.junit.Test
 /** Only run on a fresh, explicitly isolated device. Uses real microphone audio and backup files. */
 class BackupRestoreLifecycleTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun confirmedRestoreUsesPreviewedBackupAfterSourceChanges(): Unit = runBlocking {
+        val model = model()
+        val context = rule.activity.application
+        val store = com.xike.app.backup.JournalStores.get(context)
+        val originalIds = store.entries().map { it.id }.toSet()
+        val selected = File.createTempFile("selected-backup-", ".zip", context.cacheDir)
+        val replacement = File.createTempFile("replacement-backup-", ".zip", context.cacheDir)
+        try {
+            saveMoment(model, "恢复确认 " + java.util.UUID.randomUUID())
+            val previewedContents = contents(store)
+            selected.outputStream().use { store.writeBackup(it, null) }
+            saveMoment(model, "当前文件已变化 " + java.util.UUID.randomUUID())
+            val localContents = contents(store)
+            replacement.outputStream().use { store.writeBackup(it, null) }
+            val existingStages = stages(context)
+            withContext(Dispatchers.Main) {
+                model
+                    .previewBackup(Uri.fromFile(selected), null) { summary ->
+                        assertEquals(previewedContents.size, summary.entryCount)
+                        null
+                    }
+                    .getOrThrow()
+            }
+            assertEquals(existingStages, stages(context))
+            assertEquals(localContents, contents(store))
+
+            withContext(Dispatchers.Main) {
+                model
+                    .previewBackup(Uri.fromFile(selected), null) { summary ->
+                        assertEquals(previewedContents.size, summary.entryCount)
+                        withContext(Dispatchers.IO) {
+                            val stage = (stages(context) - existingStages).single()
+                            replacement.copyTo(selected, overwrite = true)
+                            store.removeOrphanedMedia()
+                            assertTrue(stage.isDirectory)
+                        }
+                        BackupRestoreMode.REPLACE
+                    }
+                    .getOrThrow()
+            }
+            assertEquals(previewedContents, contents(store))
+            assertEquals(existingStages, stages(context))
+        } finally {
+            store
+                .entries()
+                .filterNot { it.id in originalIds }
+                .forEach {
+                    store.delete(it.id, refreshEntries = false)
+                    store.finalizeDelete(it.id)
+                }
+            selected.delete()
+            replacement.delete()
+        }
+    }
 
     @Test
     fun audioPublicationAndRestoreAreSerializedAcrossRecreation(): Unit = runBlocking {
@@ -71,7 +130,7 @@ class BackupRestoreLifecycleTest {
                 model.pendingDraftAudio?.stagedFileName != null && model.isDraftAudioSaving
             }
             val restore = requester.async {
-                model.restoreBackup(Uri.fromFile(backup), null, BackupRestoreMode.REPLACE)
+                model.previewBackup(Uri.fromFile(backup), null) { BackupRestoreMode.REPLACE }
             }
             rule.waitUntil(10_000) {
                 model.backupRestoreState.operation == RestoreOperation.RESTORE
@@ -206,8 +265,10 @@ class BackupRestoreLifecycleTest {
 
     private fun saveMoment(model: JournalViewModel, note: String) {
         val count = model.libraryState.totalCount
+        val moodLabel =
+            if (model.draft.moodScaleVersion > 0) Mood.NEUTRAL.overallLabel else Mood.CALM.label
         rule.onNodeWithTag("navigation-home").performClick()
-        rule.onNodeWithText(com.xike.app.data.Mood.CALM.label).performScrollTo().performClick()
+        rule.onNodeWithText(moodLabel).performScrollTo().performClick()
         rule
             .onNodeWithContentDescription(localizedText("此刻的注脚"))
             .performScrollTo()
@@ -226,6 +287,13 @@ class BackupRestoreLifecycleTest {
             it.isAccessible = true
             it.get(model) as Mutex
         }
+
+    private fun stages(context: android.content.Context): Set<File> =
+        context.filesDir
+            .listFiles()
+            .orEmpty()
+            .filter { it.name.startsWith("journal-images-restore-") }
+            .toSet()
 
     // Replacement and undo legitimately rename private attachment copies. Compare every
     // record field and the decrypted media, so real existing photos/audio remain covered.

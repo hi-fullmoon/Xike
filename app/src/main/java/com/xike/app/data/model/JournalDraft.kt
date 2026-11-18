@@ -25,6 +25,7 @@ data class JournalDraft(
     val feelings: List<String> = emptyList(),
     val moodScaleVersion: Int = if (mood?.isOverallScale == false) 0 else 1,
     val labels: List<JournalLabelSelection> = emptyList(),
+    val submissionId: String? = null,
 ) {
     constructor(
         mood: Mood? = null,
@@ -109,6 +110,7 @@ data class JournalDraft(
             recordedAt = normalizedRecordedAt,
             outdoor = normalizedOutdoor,
             updatedAt = if (normalizedIsEmpty) 0L else updatedAt,
+            submissionId = submissionId.takeUnless { normalizedIsEmpty },
         )
     }
 
@@ -128,6 +130,7 @@ data class JournalDraft(
             .put("updatedAt", updatedAt)
             .put("feelings", JSONArray(feelings))
             .put("moodScaleVersion", moodScaleVersion)
+            .apply { submissionId?.let { put("submissionId", it) } }
 
     companion object {
         fun fromJson(json: JSONObject): JournalDraft =
@@ -161,6 +164,7 @@ data class JournalDraft(
                     updatedAt = json.optLong("updatedAt"),
                     feelings = json.optJSONArray("feelings")?.feelingKeys().orEmpty(),
                     moodScaleVersion = json.optInt("moodScaleVersion", 0),
+                    submissionId = json.optString("submissionId", "").takeIf(String::isNotBlank),
                 )
                 .normalized()
     }

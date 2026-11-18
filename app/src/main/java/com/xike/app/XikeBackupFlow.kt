@@ -26,6 +26,7 @@ import com.xike.app.ui.components.ProcessingDialog
 import com.xike.app.ui.components.XikeNotice
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
 private enum class BackupAction {
@@ -34,9 +35,8 @@ private enum class BackupAction {
 }
 
 private data class PendingRestore(
-    val uri: Uri,
-    val password: String?,
     val summary: BackupSummary,
+    val decision: CompletableDeferred<BackupRestoreMode?> = CompletableDeferred(),
 )
 
 @Composable
@@ -47,8 +47,8 @@ internal fun XikeBackupFlow(
     canUndoRestore: Boolean,
     onExportBackup: (Uri, String?) -> Unit,
     onBackupRequiresPassword: suspend (Uri) -> Result<Boolean>,
-    onInspectBackup: suspend (Uri, String?) -> Result<BackupSummary>,
-    onRestoreBackup: suspend (Uri, String?, BackupRestoreMode) -> Result<Int>,
+    onPreviewBackup:
+        suspend (Uri, String?, suspend (BackupSummary) -> BackupRestoreMode?) -> Result<Unit>,
     onUndoRestore: suspend () -> Result<Int>,
     content:
         @Composable
@@ -106,17 +106,28 @@ internal fun XikeBackupFlow(
 
     suspend fun inspectSelectedBackup(uri: Uri, password: String?) {
         busyMessage = localizedText("正在验证备份…")
-        onInspectBackup(uri, password)
-            .onSuccess { summary -> pendingRestore = PendingRestore(uri, password, summary) }
-            .onFailure {
-                XikeNotice.makeText(
-                        context,
-                        it.message ?: localizedText("备份验证失败"),
-                        XikeNotice.LENGTH_LONG,
-                    )
-                    .show()
-            }
-        busyMessage = null
+        try {
+            onPreviewBackup(uri, password) { summary ->
+                    val request = PendingRestore(summary)
+                    pendingRestore = request
+                    busyMessage = null
+                    try {
+                        request.decision.await()
+                    } finally {
+                        if (pendingRestore === request) pendingRestore = null
+                    }
+                }
+                .onFailure {
+                    XikeNotice.makeText(
+                            context,
+                            it.message ?: localizedText("备份验证失败"),
+                            XikeNotice.LENGTH_LONG,
+                        )
+                        .show()
+                }
+        } finally {
+            busyMessage = null
+        }
     }
 
     fun handleExportSelection(uri: Uri?) {
@@ -249,13 +260,8 @@ internal fun XikeBackupFlow(
         RestoreConfirmationDialog(
             summary = request.summary,
             localEntryCount = localEntryCount,
-            onDismiss = { pendingRestore = null },
-            onConfirm = { mode ->
-                pendingRestore = null
-                scope.launch {
-                    onRestoreBackup(request.uri, request.password, mode)
-                }
-            },
+            onDismiss = { request.decision.complete(null) },
+            onConfirm = { mode -> request.decision.complete(mode) },
         )
     }
 

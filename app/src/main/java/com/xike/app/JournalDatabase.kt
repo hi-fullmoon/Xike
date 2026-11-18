@@ -42,6 +42,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 internal const val THEME_SETTING = "theme"
 internal const val RESTORE_UNDO_TOKEN_SETTING = "restore-undo-token"
+internal const val SAVED_DRAFT_SETTING = "saved-draft-id"
 internal const val THEME_STYLE_SETTING = "theme-style"
 internal const val LEGACY_MIGRATION_SETTING = "legacy-shared-preferences-migrated-v1"
 internal const val SEARCH_INDEX_SETTING = "journal-search-index-version"
@@ -348,6 +349,14 @@ internal abstract class JournalDao {
     @Query("SELECT id, video_json FROM journal_entries")
     abstract fun videoReferences(): List<JournalVideoReference>
 
+    @Query(
+        "SELECT id, video_json FROM journal_entries WHERE instr(video_json, :fileName) > 0 OR instr(video_json, :coverFileName) > 0"
+    )
+    abstract fun videoReferences(
+        fileName: String,
+        coverFileName: String,
+    ): List<JournalVideoReference>
+
     @Transaction
     @Query(
         "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 60 OFFSET :offset"
@@ -404,10 +413,16 @@ internal abstract class JournalDao {
 
     @Query("SELECT file_name FROM journal_images") abstract fun imageFileNames(): List<String>
 
+    @Query("SELECT DISTINCT file_name FROM journal_images WHERE file_name IN (:fileNames)")
+    abstract fun referencedImageFileNames(fileNames: List<String>): List<String>
+
     @Query("SELECT file_name FROM journal_images WHERE entry_id = :entryId ORDER BY position")
     protected abstract fun imageFileNames(entryId: String): List<String>
 
     @Query("SELECT file_name FROM journal_audios") abstract fun audioFileNames(): List<String>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM journal_audios WHERE file_name = :fileName)")
+    abstract fun hasAudioReference(fileName: String): Boolean
 
     @Transaction
     @Query(
@@ -534,8 +549,9 @@ internal abstract class JournalDao {
     protected abstract fun deleteEntry(entryId: String): Int
 
     @Transaction
-    open fun insertJournal(bundle: JournalBundle) {
+    open fun insertJournal(bundle: JournalBundle, submittedDraft: Boolean = false) {
         insertJournalContents(bundle)
+        if (submittedDraft) putSetting(AppSettingEntity(SAVED_DRAFT_SETTING, bundle.entry.id))
         putSetting(AppSettingEntity(RESTORE_UNDO_TOKEN_SETTING, ""))
     }
 

@@ -8,9 +8,13 @@ import androidx.compose.runtime.setValue
 import com.xike.app.data.BackupRestoreMode
 import com.xike.app.data.BackupSummary
 import com.xike.app.data.JournalEntry
+import com.xike.app.data.backup.PreparedBackup
 import com.xike.app.data.model.JournalDraft
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -93,52 +97,89 @@ internal class JournalBackupOperations(
             }
             .await()
 
-    suspend fun inspectBackup(uri: Uri, password: String?): Result<BackupSummary> =
-        scope
-            .async(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        store.inspectBackup(input, password)
-                    } ?: error(localizedText("无法读取备份文件"))
+    suspend fun previewBackup(
+        uri: Uri,
+        password: String?,
+        confirm: suspend (BackupSummary) -> BackupRestoreMode?,
+    ): Result<Unit> {
+        var staged: PreparedBackup? = null
+        try {
+            val preview = journalReadResult {
+                withContext(Dispatchers.IO) {
+                    val backup =
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            store.prepareRestore(input, password).also { staged = it }
+                        } ?: error(localizedText("无法读取备份文件"))
+                    store.inspectBackup(backup)
                 }
             }
-            .await()
+            val summary = preview.getOrElse {
+                return Result.failure(it)
+            }
+            val mode = confirm(summary) ?: return Result.success(Unit)
+            val backup = checkNotNull(staged)
+            val restore =
+                startRestore(RestoreOperation.RESTORE, mode, backup) { snapshot ->
+                    store.restoreBackup(
+                        backup,
+                        setOfNotNull(snapshot.audio?.fileName),
+                        snapshot.video,
+                        mode,
+                    )
+                }
+            staged = null // The ViewModel now owns the staging directory.
+            restore.await()
+            return Result.success(Unit)
+        } finally {
+            staged?.let { withContext(NonCancellable + Dispatchers.IO) { it.close() } }
+        }
+    }
 
     suspend fun restoreBackup(
         uri: Uri,
         password: String?,
         mode: BackupRestoreMode = BackupRestoreMode.MERGE,
     ): Result<Int> =
-        runRestore(RestoreOperation.RESTORE, mode) { snapshot ->
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                store.restoreBackup(
-                    input,
-                    password,
-                    setOfNotNull(snapshot.audio?.fileName),
-                    snapshot.video,
-                    mode,
-                )
-            } ?: error(localizedText("无法读取备份文件"))
-        }
+        startRestore(RestoreOperation.RESTORE, mode) { snapshot ->
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    store.restoreBackup(
+                        input,
+                        password,
+                        setOfNotNull(snapshot.audio?.fileName),
+                        snapshot.video,
+                        mode,
+                    )
+                } ?: error(localizedText("无法读取备份文件"))
+            }
+            .await()
 
     suspend fun undoRestore(): Result<Int> =
-        runRestore(RestoreOperation.UNDO) { snapshot ->
-            store.undoLastRestore(setOfNotNull(snapshot.audio?.fileName), snapshot.video)
-        }
+        startRestore(RestoreOperation.UNDO) { snapshot ->
+                store.undoLastRestore(setOfNotNull(snapshot.audio?.fileName), snapshot.video)
+            }
+            .await()
 
-    private suspend fun runRestore(
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun startRestore(
         operation: RestoreOperation,
         mode: BackupRestoreMode = BackupRestoreMode.MERGE,
+        staged: PreparedBackup? = null,
         work: (JournalDraft) -> List<JournalEntry>,
-    ): Result<Int> =
-        scope
-            .async {
-                if (restoreState.operation != null)
-                    return@async Result.failure(
-                        IllegalStateException(
-                            tr("请等待当前操作完成。", "Please wait for the current operation to finish.")
+    ) =
+        scope.async(start = CoroutineStart.ATOMIC) {
+            // Enter the cleanup block even if the ViewModel is cancelled after accepting a preview.
+            try {
+                if (restoreState.operation != null) {
+                    val failure =
+                        Result.failure<Int>(
+                            IllegalStateException(
+                                tr("请等待当前操作完成。", "Please wait for the current operation to finish.")
+                            )
                         )
-                    )
+                    if (staged != null)
+                        reportOperation(requireNotNull(failure.exceptionOrNull()?.message), true)
+                    return@async failure
+                }
                 restoreState.operation = operation
                 try {
                     val result = mediaMutationMutex.withLock {
@@ -182,6 +223,8 @@ internal class JournalBackupOperations(
                 } finally {
                     restoreState.operation = null
                 }
+            } finally {
+                staged?.let { withContext(NonCancellable + Dispatchers.IO) { it.close() } }
             }
-            .await()
+        }
 }
