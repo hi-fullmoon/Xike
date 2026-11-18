@@ -167,12 +167,8 @@ internal fun AiSettingsDialog(onDismiss: () -> Unit, onSaved: (AiSettings) -> Un
                             OutlinedTextField(
                                 value = settings.address,
                                 onValueChange = {
-                                    settings =
-                                        settings.copy(
-                                            address = it,
-                                            consent = false,
-                                            enabled = false,
-                                        )
+                                    settings = settings.withAddress(it)
+                                    if (settings.apiKey.isEmpty()) showKey = false
                                     message = null
                                 },
                                 label = { Text(tr("HTTPS 服务地址", "HTTPS service address")) },

@@ -131,6 +131,11 @@ class AiReviewUiTest {
                     )
                     throw AssertionError(rule.onNode(isDialog()).printToString(), failure)
                 }
+                rule.onNodeWithText(tr("取消", "Cancel")).performClick()
+                rule.onNodeWithText(configTitle).assertDoesNotExist()
+                rule.onNodeWithText(reviewTitle).assertDoesNotExist()
+                title.assertIsDisplayed().performClick().performClick().performClick()
+                rule.waitUntil(10_000) { rule.onNodeWithText(configTitle).isDisplayed() }
                 rule.onNodeWithTag("ai-address").performScrollTo()
                 // Encrypted settings are loaded asynchronously after the window is shown.
                 rule.waitUntil(10_000) {
@@ -189,7 +194,7 @@ class AiReviewUiTest {
                 assertFalse(store.read().enabled)
                 assertEquals("", store.read().apiKey)
                 rule.onNodeWithText(tr("预览发送内容", "Preview content")).assertIsNotEnabled()
-                assertReviewEndpointSingleLine()
+                assertReviewEndpointIsReadable()
                 assertReviewNotesAlignment()
                 captureAiDialogWindow(
                     File(
@@ -304,35 +309,14 @@ class AiReviewUiTest {
         )
     }
 
-    private fun assertReviewEndpointSingleLine() {
-        val endpoint = rule.onNodeWithTag("ai-review-endpoint").performScrollTo()
-        endpoint.assertTextEquals(
+    private fun assertReviewEndpointIsReadable() {
+        val address =
             tr(
                 "接收地址：https://api.deepseek.com/v1/chat/completions",
                 "Destination: https://api.deepseek.com/v1/chat/completions",
             )
-        )
-        val layouts = mutableListOf<TextLayoutResult>()
-        val node = endpoint.fetchSemanticsNode()
-        assertTrue(
-            requireNotNull(node.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
-        )
-        assertEquals(1, layouts.single().lineCount)
-        val range = node.config[SemanticsProperties.HorizontalScrollAxisRange]
-        assertTrue(range.maxValue() > 0)
-        endpoint.performSemanticsAction(SemanticsActions.ScrollBy) { it(10_000f, 0f) }
-        rule.waitUntil(5_000) {
-            val current =
-                endpoint.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
-            current.value() >= current.maxValue()
-        }
-        endpoint.performSemanticsAction(SemanticsActions.ScrollBy) { it(-10_000f, 0f) }
-        rule.waitUntil(5_000) {
-            endpoint
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.HorizontalScrollAxisRange]
-                .value() == 0f
-        }
+        rule.onNodeWithTag("ai-review-endpoint").performScrollTo().assertTextEquals(address)
+        assertCompleteText(address, checkWidth = true)
     }
 
     private fun assertReviewNotesAlignment() {
@@ -381,13 +365,14 @@ class AiReviewUiTest {
         row.performScrollTo()
     }
 
-    private fun assertCompleteText(text: String) {
+    private fun assertCompleteText(text: String, checkWidth: Boolean = false) {
         val node = rule.onNodeWithText(text).assertIsDisplayed().fetchSemanticsNode()
         val layouts = mutableListOf<TextLayoutResult>()
         assertTrue(
             requireNotNull(node.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
         )
         val layout = layouts.single()
+        if (checkWidth) assertFalse(layout.didOverflowWidth)
         assertFalse(layout.didOverflowHeight)
         repeat(layout.lineCount) { assertFalse(layout.isLineEllipsized(it)) }
     }

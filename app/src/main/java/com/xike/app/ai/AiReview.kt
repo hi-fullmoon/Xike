@@ -78,8 +78,8 @@ internal fun aiReviewInput(
             .put(
                 "moodDistribution",
                 JSONArray(
-                    summary.moodDistribution.map {
-                        JSONObject().put("mood", it.mood.label).put("count", it.entryCount)
+                    ordered.groupingBy(JournalEntry::mood).eachCount().map { (mood, count) ->
+                        JSONObject().put("mood", mood.label).put("count", count)
                     }
                 ),
             )
@@ -169,8 +169,8 @@ internal fun parseAiReview(content: String, input: AiReviewInput): AiReviewResul
                     .distinct()
             require(valid.isNotEmpty())
             AiObservation(
-                row.getString("title").also { require(it.isNotBlank() && it.length <= 120) },
-                row.getString("text").also { require(it.isNotBlank() && it.length <= 4000) },
+                reviewText(row.get("title"), maxLength = 120),
+                reviewText(row.get("text"), maxLength = 4000),
                 valid,
             )
         }
@@ -178,10 +178,11 @@ internal fun parseAiReview(content: String, input: AiReviewInput): AiReviewResul
     require(questions.length() in 1..3)
     return AiReviewResult(
         parsed,
-        (0 until questions.length()).map {
-            questions.getString(it).also { text ->
-                require(text.isNotBlank() && text.length <= 1000)
-            }
-        },
+        (0 until questions.length()).map { reviewText(questions.get(it), maxLength = 1000) },
     )
+}
+
+private fun reviewText(value: Any, maxLength: Int): String {
+    require(value is String && value.isNotBlank() && value.length <= maxLength)
+    return value
 }

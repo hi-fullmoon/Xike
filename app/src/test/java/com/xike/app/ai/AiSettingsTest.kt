@@ -38,6 +38,35 @@ class AiSettingsTest {
     }
 
     @Test
+    fun `credentials apply only to the same resolved endpoint`() {
+        val original =
+            AiSettings(
+                address = "https://api.deepseek.com/v1",
+                apiKey = UUID.randomUUID().toString(),
+                model = "deepseek-flash",
+                enabled = true,
+                consent = true,
+            )
+        val sameEndpoint = original.withAddress("https://api.deepseek.com/v1/chat/completions/")
+        assertTrue(sameEndpoint.canUse)
+        assertTrue(sameEndpoint.apiKey == original.apiKey)
+
+        listOf(
+                "https://api.deepseek.com",
+                "https://api.openai.com/v1",
+                "http://api.deepseek.com/v1",
+            )
+            .forEach { address ->
+                val changed = original.withAddress(address)
+                assertTrue(changed.apiKey.isEmpty())
+                assertFalse(changed.consent)
+                assertFalse(changed.enabled)
+                assertFalse(changed.copy(consent = true).configured)
+                assertTrue(changed.withAddress(original.address).apiKey.isEmpty())
+            }
+    }
+
+    @Test
     fun `insecure and ambiguous destinations are rejected`() {
         listOf(
                 "http://api.deepseek.com",

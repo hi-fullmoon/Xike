@@ -102,12 +102,24 @@ class AiReviewLocalPreviewUiTest {
                     rule.onAllNodesWithTag("ai-preview").fetchSemanticsNodes().isNotEmpty()
                 }
                 rule.onNodeWithTag("ai-send").assertIsNotEnabled()
+                rule.onNodeWithTag("ai-preview-heading").assertIsDisplayed()
+                rule
+                    .onNodeWithTag("ai-review-endpoint")
+                    .assertIsDisplayed()
+                    .assertTextEquals("接收地址：https://api.deepseek.com/v1/chat/completions")
                 assertStable(window, close)
-                captureStaticPreview("after-top")
+                captureStaticPreview("confirmation")
 
-                rule.onNodeWithTag("ai-preview-heading").performScrollTo()
+                rule.onNodeWithText("配置").performClick()
+                rule.onNodeWithText("取消").performClick()
+                rule.onNodeWithTag("ai-preview-heading").assertIsDisplayed()
+                rule.onNodeWithTag("ai-preview").assertExists()
+                rule.onNodeWithText("配置").performClick()
+                val save = rule.onNodeWithText("保存")
+                rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
+                save.performClick()
+                rule.onNodeWithTag("ai-preview").assertExists()
                 assertStable(window, close)
-                captureStaticPreview("request-heading")
                 rule.onNodeWithTag("ai-review-content").performTouchInput {
                     swipeUp(startY = height * 0.75f, endY = height * 0.35f)
                 }
@@ -137,6 +149,15 @@ class AiReviewLocalPreviewUiTest {
                 assertEquals("", operations.load().apiKey)
                 rule.onNodeWithTag("ai-include-notes").performScrollTo().performClick()
                 assertTrue(rule.onAllNodesWithTag("ai-preview").fetchSemanticsNodes().isEmpty())
+                preview.assertIsEnabled()
+                preview.performClick()
+                rule.waitUntil(15_000) { rule.onNodeWithTag("ai-preview-heading").isDisplayed() }
+                rule.onNodeWithText("配置").performClick()
+                val model = rule.onNodeWithTag("ai-model")
+                rule.waitUntil(5_000) { runCatching { model.assertIsEnabled() }.isSuccess }
+                model.performScrollTo().performTextReplacement("deepseek-reasoner")
+                save.performClick()
+                rule.onNodeWithTag("ai-preview").assertDoesNotExist()
                 preview.assertIsEnabled()
             }
         } catch (failure: Throwable) {

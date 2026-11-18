@@ -16,6 +16,12 @@ internal data class AiSettings(
 ) {
     fun normalized() = copy(address = address.trim(), apiKey = apiKey.trim(), model = model.trim())
 
+    fun withAddress(address: String): AiSettings {
+        val updated = copy(address = address)
+        return if (endpoint() == updated.endpoint()) updated
+        else updated.copy(apiKey = "", enabled = false, consent = false)
+    }
+
     fun endpoint(): HttpUrl? {
         val url = address.toHttpUrlOrNull() ?: return null
         if (

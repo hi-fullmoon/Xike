@@ -168,9 +168,9 @@ internal class AiReviewOperations(private val store: AiSettingsStore) {
                             "The result is incomplete. Shorten the period or check the model.",
                         )
                     )
-                choice.getJSONObject("message").getString("content").also {
-                    require(it.isNotBlank())
-                }
+                val content = choice.getJSONObject("message").get("content")
+                require(content is String && content.isNotBlank())
+                content
             } catch (error: AiServiceException) {
                 throw error
             } catch (_: Exception) {

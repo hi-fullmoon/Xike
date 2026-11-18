@@ -1,7 +1,6 @@
 package com.xike.app.feature.insights
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private enum class AiSettingsEntry {
+    INITIAL,
+    REVIEW,
+}
+
 @Composable
 internal fun AiReviewDialog(
     summary: JournalPeriodSummary,
@@ -79,7 +85,7 @@ internal fun AiReviewDialog(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
     var settings by remember { mutableStateOf<AiSettings?>(null) }
-    var showSettings by remember { mutableStateOf(false) }
+    var settingsEntry by remember { mutableStateOf<AiSettingsEntry?>(null) }
     var includeNotes by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf<AiReviewInput?>(null) }
     var request by remember { mutableStateOf<String?>(null) }
@@ -87,13 +93,14 @@ internal fun AiReviewDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
+    var revealPreview by remember { mutableStateOf(false) }
     // Session-only state: a new result must not restore the preview's saved scroll offset.
     val scroll = remember(result) { ScrollState(0) }
 
     LaunchedEffect(operations) {
         try {
             val loadedSettings = operations.load()
-            showSettings = !loadedSettings.canPreview
+            if (!loadedSettings.canPreview) settingsEntry = AiSettingsEntry.INITIAL
             settings = loadedSettings
         } catch (failure: CancellationException) {
             throw failure
@@ -124,18 +131,32 @@ internal fun AiReviewDialog(
 
     if (settings == null && error == null) return
 
-    if (showSettings) {
+    if (settingsEntry != null) {
         AiSettingsDialog(
-            onDismiss = { showSettings = false },
-            onSaved = {
-                settings = it
-                showSettings = false
+            onDismiss = {
+                if (settingsEntry == AiSettingsEntry.INITIAL) onDismiss() else settingsEntry = null
+            },
+            onSaved = { saved ->
+                val previous = settings
+                if (
+                    previous?.endpoint() != saved.endpoint() ||
+                        previous?.copy(address = saved.address) != saved
+                ) {
+                    input = null
+                    request = null
+                    result = null
+                    error = null
+                }
+                settings = saved
+                settingsEntry = null
             },
         )
         return
     }
     if (sourceOpen) return
 
+    val previewBody = request.takeIf { result == null }
+    val destination = settings?.endpoint()?.let { tr("接收地址：$it", "Destination: $it") }
     AlertDialog(
         onDismissRequest = onDismiss,
         // Keep the window steady when content or action labels change. Short screens constrain
@@ -169,17 +190,11 @@ internal fun AiReviewDialog(
                     )
                     settings?.let { config ->
                         Text(tr("模型：${config.model}", "Model: ${config.model}"))
-                        config.endpoint()?.let {
+                        if (previewBody == null && destination != null)
                             Text(
-                                tr("接收地址：$it", "Destination: $it"),
-                                modifier =
-                                    Modifier.testTag("ai-review-endpoint")
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                maxLines = 1,
-                                softWrap = false,
+                                destination,
+                                modifier = Modifier.fillMaxWidth().testTag("ai-review-endpoint"),
                             )
-                        }
                         if (!config.canUse)
                             Text(
                                 tr(
@@ -204,7 +219,7 @@ internal fun AiReviewDialog(
                                         onValueChange = {
                                             if (
                                                 !busy &&
-                                                    !showSettings &&
+                                                    settingsEntry == null &&
                                                     result == null &&
                                                     includeNotes != it
                                             ) {
@@ -262,6 +277,34 @@ internal fun AiReviewDialog(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                    if (previewBody != null) {
+                        var previewTop by remember { mutableIntStateOf(-1) }
+                        LaunchedEffect(revealPreview, previewTop) {
+                            if (revealPreview && previewTop >= 0) {
+                                scroll.scrollTo(previewTop)
+                                revealPreview = false
+                            }
+                        }
+                        Column(
+                            Modifier.onPlaced { previewTop = it.positionInParent().y.roundToInt() },
+                            verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
+                        ) {
+                            Text(
+                                tr(
+                                    "以下是将发送的完整请求正文（不含 Key）：",
+                                    "Full request body to be sent (Key excluded):",
+                                ),
+                                modifier = Modifier.testTag("ai-preview-heading"),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            if (destination != null)
+                                Text(
+                                    destination,
+                                    modifier =
+                                        Modifier.fillMaxWidth().testTag("ai-review-endpoint"),
+                                )
+                        }
+                    }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (busy) Text(tr("处理中，可取消本次操作…", "Working. You can cancel this operation…"))
                     result?.let { review ->
@@ -317,23 +360,13 @@ internal fun AiReviewDialog(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    if (result == null)
-                        request?.let { body ->
+                    if (previewBody != null)
+                        SelectionContainer {
                             Text(
-                                tr(
-                                    "以下是将发送的完整请求正文（不含 Key）：",
-                                    "Full request body to be sent (Key excluded):",
-                                ),
-                                modifier = Modifier.testTag("ai-preview-heading"),
-                                style = MaterialTheme.typography.titleSmall,
+                                previewBody,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("ai-preview"),
                             )
-                            SelectionContainer {
-                                Text(
-                                    body,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.testTag("ai-preview"),
-                                )
-                            }
                         }
                 }
             }
@@ -343,13 +376,8 @@ internal fun AiReviewDialog(
                 TextButton(
                     enabled = settings != null && !busy,
                     onClick = {
-                        if (!busy && !showSettings && settings != null) {
-                            job?.cancel()
-                            input = null
-                            request = null
-                            result = null
-                            error = null
-                            showSettings = true
+                        if (!busy && settingsEntry == null && settings != null) {
+                            settingsEntry = AiSettingsEntry.REVIEW
                         }
                     },
                 ) {
@@ -366,7 +394,7 @@ internal fun AiReviewDialog(
                 } else if (result != null) {
                     TextButton(
                         onClick = {
-                            if (!busy && !showSettings && result != null) {
+                            if (!busy && settingsEntry == null && result != null) {
                                 result = null
                                 input = null
                                 request = null
@@ -384,7 +412,7 @@ internal fun AiReviewDialog(
                             val previewIncludeNotes = includeNotes
                             if (
                                 !busy &&
-                                    !showSettings &&
+                                    settingsEntry == null &&
                                     result == null &&
                                     request == null &&
                                     previewSettings?.canPreview == true &&
@@ -413,6 +441,7 @@ internal fun AiReviewDialog(
                                         ensureActive()
                                         input = prepared.first
                                         request = prepared.second
+                                        revealPreview = true
                                     } catch (failure: CancellationException) {
                                         throw failure
                                     } catch (failure: com.xike.app.data.JournalDataException) {
@@ -444,7 +473,7 @@ internal fun AiReviewDialog(
                         onClick = {
                             if (
                                 !busy &&
-                                    !showSettings &&
+                                    settingsEntry == null &&
                                     result == null &&
                                     previewSettings?.canUse == true &&
                                     previewInput != null &&
