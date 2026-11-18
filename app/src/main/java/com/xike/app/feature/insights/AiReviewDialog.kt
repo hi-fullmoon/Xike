@@ -4,6 +4,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -33,8 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -93,9 +93,9 @@ internal fun AiReviewDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
-    var revealPreview by remember { mutableStateOf(false) }
-    // Session-only state: a new result must not restore the preview's saved scroll offset.
-    val scroll = remember(result) { ScrollState(0) }
+    var requestExpanded by remember(request) { mutableStateOf(false) }
+    // Start each stage at the top, and keep its scroll position when returning from settings.
+    val scroll = remember(result, request != null) { ScrollState(0) }
 
     LaunchedEffect(operations) {
         try {
@@ -155,8 +155,26 @@ internal fun AiReviewDialog(
     }
     if (sourceOpen) return
 
+    val previewSettings = settings
     val previewBody = request.takeIf { result == null }
-    val destination = settings?.endpoint()?.let { tr("接收地址：$it", "Destination: $it") }
+    val destination = previewSettings?.endpoint()?.let { tr("接收地址：$it", "Destination: $it") }
+    val reviewNotice =
+        tr(
+            "主动发送后才会联网。AI 解读可能有误，请结合原始记录理解。",
+            "The service is contacted only when you send. AI interpretations may be inaccurate; consult the original entries.",
+        )
+    val sendDisabledReason =
+        if (previewBody != null && !busy && previewSettings?.canUse != true) {
+            when {
+                previewSettings?.canPreview != true ->
+                    tr("请在配置中检查服务地址和模型。", "Check the service address and model in Settings.")
+                previewSettings.apiKey.isBlank() ->
+                    tr("请在配置中填写 API Key。", "Add an API Key in Settings.")
+                !previewSettings.consent ->
+                    tr("请在配置中同意发送说明。", "Accept the data notice in Settings.")
+                else -> tr("请在配置中启用 AI 回顾。", "Enable AI review in Settings.")
+            }
+        } else null
     AlertDialog(
         onDismissRequest = onDismiss,
         // Keep the window steady when content or action labels change. Short screens constrain
@@ -167,27 +185,36 @@ internal fun AiReviewDialog(
         title = { Text(tr("AI 回顾", "AI review")) },
         text = {
             key(result) {
-                Column(
-                    Modifier.fillMaxHeight()
-                        .clipToBounds()
-                        .verticalScroll(scroll)
-                        .testTag("ai-review-content"),
-                    verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
-                ) {
-                    Text(summary.dateRangeLabel(), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        tr(
-                            "${summary.entryCount} 条记录 · ${summary.recordedDayCount} 个记录日",
-                            "${summary.entryCount} entries · ${summary.recordedDayCount} recorded days",
+                AiReviewContent(scroll, sendDisabledReason) {
+                    if (previewBody == null) {
+                        Text(summary.dateRangeLabel(), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            tr(
+                                "${summary.entryCount} 条记录 · ${summary.recordedDayCount} 个记录日",
+                                "${summary.entryCount} entries · ${summary.recordedDayCount} recorded days",
+                            )
                         )
-                    )
-                    Text(
-                        tr(
-                            "主动发送后才会联网。AI 解读可能有误，请结合原始记录理解。",
-                            "The service is contacted only when you send. AI interpretations may be inaccurate; consult the original entries.",
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    } else {
+                        val period = summary.dateRangeLabel()
+                        val count = input?.sources?.size ?: summary.entryCount
+                        val notes =
+                            if (includeNotes) tr("包含日记原文", "Journal notes included")
+                            else tr("不含日记原文", "Journal notes excluded")
+                        Text(
+                            tr("发送确认", "Confirm what to send"),
+                            modifier = Modifier.testTag("ai-preview-heading"),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        if (destination != null)
+                            Text(
+                                destination,
+                                modifier = Modifier.fillMaxWidth().testTag("ai-review-endpoint"),
+                            )
+                        Text(tr("周期：$period", "Period: $period"))
+                        Text(tr("$count 条记录 · $notes", "Entries: $count · $notes"))
+                    }
+                    if (previewBody == null)
+                        Text(reviewNotice, style = MaterialTheme.typography.bodySmall)
                     settings?.let { config ->
                         Text(tr("模型：${config.model}", "Model: ${config.model}"))
                         if (previewBody == null && destination != null)
@@ -195,7 +222,7 @@ internal fun AiReviewDialog(
                                 destination,
                                 modifier = Modifier.fillMaxWidth().testTag("ai-review-endpoint"),
                             )
-                        if (!config.canUse)
+                        if (previewBody == null && !config.canUse)
                             Text(
                                 tr(
                                     "请在配置中同意发送说明并启用 AI 回顾。",
@@ -256,53 +283,27 @@ internal fun AiReviewDialog(
                                 },
                             )
                         }
-                        Text(
-                            if (includeNotes)
-                                tr(
-                                    "将发送日期、心情、感受和日记文字。",
-                                    "Dates, moods, feelings and notes will be sent.",
-                                )
-                            else
-                                tr(
-                                    "仅发送日期、心情和感受，不含日记文字。",
-                                    "Only dates, moods and feelings will be sent; notes are excluded.",
-                                ),
-                            modifier = Modifier.testTag("ai-review-scope"),
-                        )
-                        Text(
-                            tr(
-                                "不发送照片、录音、视频、位置或天气。",
-                                "Photos, audio, video, location and weather are excluded.",
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    if (previewBody != null) {
-                        var previewTop by remember { mutableIntStateOf(-1) }
-                        LaunchedEffect(revealPreview, previewTop) {
-                            if (revealPreview && previewTop >= 0) {
-                                scroll.scrollTo(previewTop)
-                                revealPreview = false
-                            }
-                        }
-                        Column(
-                            Modifier.onPlaced { previewTop = it.positionInParent().y.roundToInt() },
-                            verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
-                        ) {
+                        if (previewBody == null) {
+                            Text(
+                                if (includeNotes)
+                                    tr(
+                                        "将发送日期、心情、感受和日记文字。",
+                                        "Dates, moods, feelings and notes will be sent.",
+                                    )
+                                else
+                                    tr(
+                                        "仅发送日期、心情和感受，不含日记文字。",
+                                        "Only dates, moods and feelings will be sent; notes are excluded.",
+                                    ),
+                                modifier = Modifier.testTag("ai-review-scope"),
+                            )
                             Text(
                                 tr(
-                                    "以下是将发送的完整请求正文（不含 Key）：",
-                                    "Full request body to be sent (Key excluded):",
+                                    "不发送照片、录音、视频、位置或天气。",
+                                    "Photos, audio, video, location and weather are excluded.",
                                 ),
-                                modifier = Modifier.testTag("ai-preview-heading"),
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.bodySmall,
                             )
-                            if (destination != null)
-                                Text(
-                                    destination,
-                                    modifier =
-                                        Modifier.fillMaxWidth().testTag("ai-review-endpoint"),
-                                )
                         }
                     }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -360,14 +361,31 @@ internal fun AiReviewDialog(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    if (previewBody != null)
-                        SelectionContainer {
+                    if (previewBody != null) {
+                        TextButton(
+                            onClick = { requestExpanded = !requestExpanded },
+                            contentPadding = PaddingValues(horizontal = 0.dp),
+                        ) {
                             Text(
-                                previewBody,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.testTag("ai-preview"),
+                                if (requestExpanded) tr("收起完整请求", "Hide full request")
+                                else tr("查看完整请求", "View full request")
                             )
                         }
+                        if (requestExpanded) {
+                            Text(
+                                tr("请求正文不含 API Key。", "The request body excludes the API Key."),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            SelectionContainer {
+                                Text(
+                                    previewBody,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.testTag("ai-preview"),
+                                )
+                            }
+                        }
+                        Text(reviewNotice, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         },
@@ -441,7 +459,6 @@ internal fun AiReviewDialog(
                                         ensureActive()
                                         input = prepared.first
                                         request = prepared.second
-                                        revealPreview = true
                                     } catch (failure: CancellationException) {
                                         throw failure
                                     } catch (failure: com.xike.app.data.JournalDataException) {
@@ -465,7 +482,6 @@ internal fun AiReviewDialog(
                         Text(tr("预览发送内容", "Preview content"))
                     }
                 } else {
-                    val previewSettings = settings
                     val previewInput = input
                     val previewRequest = request
                     TextButton(
@@ -518,4 +534,26 @@ internal fun AiReviewDialog(
             }
         },
     )
+}
+
+@Composable
+private fun AiReviewContent(
+    scroll: ScrollState,
+    sendDisabledReason: String?,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(Modifier.fillMaxHeight()) {
+        Column(
+            Modifier.weight(1f).clipToBounds().verticalScroll(scroll).testTag("ai-review-content"),
+            verticalArrangement = Arrangement.spacedBy(XikeDialogContentGap),
+            content = content,
+        )
+        if (sendDisabledReason != null) {
+            Text(
+                sendDisabledReason,
+                modifier = Modifier.padding(top = XikeDialogContentGap).testTag("ai-send-disabled"),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
 }

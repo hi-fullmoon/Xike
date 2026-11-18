@@ -10,7 +10,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.xike.app.ai.AiReviewOperations
@@ -19,6 +18,8 @@ import com.xike.app.ai.AiSettingsStore
 import com.xike.app.ai.LocalAiReviewOperations
 import com.xike.app.feature.insights.AiReviewDialog
 import com.xike.app.feature.insights.InsightsPeriod
+import com.xike.app.feature.insights.JournalPeriodSummary
+import com.xike.app.feature.insights.dateRangeLabel
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
 import com.xike.app.ui.theme.XikeTheme
@@ -38,7 +39,11 @@ class AiReviewLocalPreviewUiTest {
 
     @Test
     fun localPreviewWithoutKeyPreservesWindowAndScrollsToBothEnds() = runBlocking {
-        assumeTrue(InstrumentationRegistry.getArguments().getString("existingAiPreview") == "true")
+        val arguments = InstrumentationRegistry.getArguments()
+        assumeTrue(arguments.getString("existingAiPreview") == "true")
+        val language =
+            if (arguments.getString("language") == "en") AppLanguage.ENGLISH
+            else AppLanguage.CHINESE
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = JournalReadRepository { JournalDatabase.get(context) }
         val summary =
@@ -64,11 +69,11 @@ class AiReviewLocalPreviewUiTest {
                     )
                     .isSuccess
             )
-            languagePreferences.language = AppLanguage.CHINESE
-            AppLocale.select(context, AppLanguage.CHINESE)
+            languagePreferences.language = language
+            AppLocale.select(context, language)
             if (Build.VERSION.SDK_INT >= 33) {
                 rule.waitUntil(5_000) {
-                    context.resources.configuration.locales[0].language == "zh"
+                    context.resources.configuration.locales[0].language == language.locale.language
                 }
             }
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
@@ -76,7 +81,7 @@ class AiReviewLocalPreviewUiTest {
                     activity.setContent {
                         CompositionLocalProvider(
                             LocalAiReviewOperations provides operations,
-                            LocalContext provides activity.forLanguage(AppLanguage.CHINESE),
+                            LocalContext provides activity.forLanguage(language),
                         ) {
                             XikeTheme(AppTheme.PINE, AppStyle.BREATHE) {
                                 AiReviewDialog(
@@ -92,40 +97,68 @@ class AiReviewLocalPreviewUiTest {
                         }
                     }
                 }
-                val preview = rule.onNodeWithText("预览发送内容")
+                val preview = rule.onNodeWithText(tr("预览发送内容", "Preview content"))
+                val settings = rule.onNodeWithText(tr("配置", "Settings"))
+                val save = rule.onNodeWithText(tr("保存", "Save"))
+                val confirmation = rule.onNodeWithTag("ai-preview-heading")
+                val reason = rule.onNodeWithTag("ai-send-disabled")
+                val fullRequest = rule.onNodeWithTag("ai-preview")
+                val expand = rule.onNodeWithText(tr("查看完整请求", "View full request"))
+                val collapse = rule.onNodeWithText(tr("收起完整请求", "Hide full request"))
+                fun preparePreview() {
+                    preview.assertIsEnabled().performClick()
+                    rule.waitUntil(15_000) { confirmation.isDisplayed() }
+                }
+                fun saveSettings() {
+                    rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
+                    save.performClick()
+                }
                 rule.waitUntil(15_000) { runCatching { preview.assertIsEnabled() }.isSuccess }
                 val window = rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
-                val close = rule.onNodeWithText("关闭").fetchSemanticsNode().boundsInWindow
+                val close =
+                    rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
                 capture("before")
-                preview.performClick()
-                rule.waitUntil(15_000) {
-                    rule.onAllNodesWithTag("ai-preview").fetchSemanticsNodes().isNotEmpty()
-                }
-                rule.onNodeWithTag("ai-send").assertIsNotEnabled()
-                rule.onNodeWithTag("ai-preview-heading").assertIsDisplayed()
+                preparePreview()
                 rule
                     .onNodeWithTag("ai-review-endpoint")
                     .assertIsDisplayed()
-                    .assertTextEquals("接收地址：https://api.deepseek.com/v1/chat/completions")
+                    .assertTextEquals(
+                        tr(
+                            "接收地址：https://api.deepseek.com/v1/chat/completions",
+                            "Destination: https://api.deepseek.com/v1/chat/completions",
+                        )
+                    )
+                val period = summary.dateRangeLabel()
+                rule.onNodeWithText(tr("周期：$period", "Period: $period")).assertIsDisplayed()
+                rule
+                    .onNodeWithText(
+                        tr(
+                            "${summary.entryCount} 条记录 · 不含日记原文",
+                            "Entries: ${summary.entryCount} · Journal notes excluded",
+                        )
+                    )
+                    .assertIsDisplayed()
+                reason
+                    .assertIsDisplayed()
+                    .assertTextEquals(tr("请在配置中填写 API Key。", "Add an API Key in Settings."))
+                expand.assertIsDisplayed()
+                fullRequest.assertDoesNotExist()
                 assertStable(window, close)
-                captureStaticPreview("confirmation")
+                capture("confirmation")
 
-                rule.onNodeWithText("配置").performClick()
-                rule.onNodeWithText("取消").performClick()
-                rule.onNodeWithTag("ai-preview-heading").assertIsDisplayed()
-                rule.onNodeWithTag("ai-preview").assertExists()
-                rule.onNodeWithText("配置").performClick()
-                val save = rule.onNodeWithText("保存")
-                rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
-                save.performClick()
-                rule.onNodeWithTag("ai-preview").assertExists()
+                settings.performClick()
+                rule.onNodeWithText(tr("取消", "Cancel")).performClick()
+                confirmation.assertIsDisplayed()
+                fullRequest.assertDoesNotExist()
+                settings.performClick()
+                saveSettings()
+                confirmation.assertIsDisplayed()
+                fullRequest.assertDoesNotExist()
                 assertStable(window, close)
-                rule.onNodeWithTag("ai-review-content").performTouchInput {
-                    swipeUp(startY = height * 0.75f, endY = height * 0.35f)
-                }
-                assertStable(window, close)
-                captureStaticPreview("request-scroll")
 
+                expand.performScrollTo().performClick()
+                collapse.assertExists()
+                assertRequestScope(summary, includeNotes = false)
                 val content = rule.onNodeWithTag("ai-review-content")
                 content.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 1_000_000f) }
                 rule.waitUntil(5_000) {
@@ -136,6 +169,7 @@ class AiReviewLocalPreviewUiTest {
                     range.maxValue() > 0 && range.value() == range.maxValue()
                 }
                 assertStable(window, close)
+                reason.assertIsDisplayed()
                 // Do not capture the end of the request: it contains private journal fields.
                 content.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, -1_000_000f) }
                 rule.waitUntil(5_000) {
@@ -145,20 +179,62 @@ class AiReviewLocalPreviewUiTest {
                         .value() == 0f
                 }
                 assertStable(window, close)
+                collapse.performScrollTo().performClick()
+                expand.assertExists()
+                fullRequest.assertDoesNotExist()
                 assertFalse(operations.load().canUse)
                 assertEquals("", operations.load().apiKey)
                 rule.onNodeWithTag("ai-include-notes").performScrollTo().performClick()
-                assertTrue(rule.onAllNodesWithTag("ai-preview").fetchSemanticsNodes().isEmpty())
-                preview.assertIsEnabled()
-                preview.performClick()
-                rule.waitUntil(15_000) { rule.onNodeWithTag("ai-preview-heading").isDisplayed() }
-                rule.onNodeWithText("配置").performClick()
+                confirmation.assertDoesNotExist()
+                preparePreview()
+                rule
+                    .onNodeWithText(
+                        tr(
+                            "${summary.entryCount} 条记录 · 包含日记原文",
+                            "Entries: ${summary.entryCount} · Journal notes included",
+                        )
+                    )
+                    .assertIsDisplayed()
+                fullRequest.assertDoesNotExist()
+                expand.performScrollTo().performClick()
+                assertRequestScope(summary, includeNotes = true)
+
+                settings.performClick()
                 val model = rule.onNodeWithTag("ai-model")
                 rule.waitUntil(5_000) { runCatching { model.assertIsEnabled() }.isSuccess }
                 model.performScrollTo().performTextReplacement("deepseek-reasoner")
-                save.performClick()
-                rule.onNodeWithTag("ai-preview").assertDoesNotExist()
-                preview.assertIsEnabled()
+                // A local random value exercises the encrypted settings without contacting a
+                // service.
+                rule
+                    .onNodeWithTag("ai-key")
+                    .performScrollTo()
+                    .performTextReplacement(UUID.randomUUID().toString())
+                androidx.test.espresso.Espresso.closeSoftKeyboard()
+                saveSettings()
+                confirmation.assertDoesNotExist()
+                preparePreview()
+                reason
+                    .assertIsDisplayed()
+                    .assertTextEquals(tr("请在配置中同意发送说明。", "Accept the data notice in Settings."))
+                rule.onNodeWithTag("ai-send").assertIsNotEnabled()
+
+                settings.performClick()
+                rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
+                rule.onNodeWithTag("ai-consent").performScrollTo().performClick().assertIsOn()
+                saveSettings()
+                preparePreview()
+                reason
+                    .assertIsDisplayed()
+                    .assertTextEquals(tr("请在配置中启用 AI 回顾。", "Enable AI review in Settings."))
+                rule.onNodeWithTag("ai-send").assertIsNotEnabled()
+
+                settings.performClick()
+                rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
+                rule.onNodeWithTag("ai-enabled").performScrollTo().performClick().assertIsOn()
+                saveSettings()
+                preparePreview()
+                rule.onNodeWithTag("ai-send").assertIsEnabled()
+                reason.assertDoesNotExist()
             }
         } catch (failure: Throwable) {
             // Compose assertion messages may include the full request. Preserve locations only.
@@ -177,42 +253,29 @@ class AiReviewLocalPreviewUiTest {
     private fun assertStable(window: Rect, close: Rect) {
         rule.waitForIdle()
         assertEquals(window, rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow)
-        val currentClose = rule.onNodeWithText("关闭").fetchSemanticsNode().boundsInWindow
+        val currentClose =
+            rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
         assertEquals(close.top, currentClose.top, 1f)
         assertEquals(close.bottom, currentClose.bottom, 1f)
-        rule.onNodeWithText("配置").assertIsDisplayed()
+        rule.onNodeWithText(tr("配置", "Settings")).assertIsDisplayed()
         rule.onNodeWithTag("ai-send").assertIsDisplayed().assertIsNotEnabled()
     }
 
-    private fun captureStaticPreview(state: String) {
-        rule.waitForIdle()
-        val preview = rule.onNodeWithTag("ai-preview")
-        val node = preview.fetchSemanticsNode()
+    private fun assertRequestScope(summary: JournalPeriodSummary, includeNotes: Boolean) {
+        val node = rule.onNodeWithTag("ai-preview").fetchSemanticsNode()
         val body = node.config[SemanticsProperties.Text].single().text
-        val privateContent =
-            JSONObject(body).getJSONArray("messages").getJSONObject(1).getString("content")
-        val privateOffset = body.indexOf(JSONObject.quote(privateContent))
-        check(privateOffset >= 0)
-        val layouts = mutableListOf<TextLayoutResult>()
-        check(
-            requireNotNull(node.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
-        )
-        val layout = layouts.single()
-        val density =
-            InstrumentationRegistry.getInstrumentation()
-                .targetContext
-                .resources
-                .displayMetrics
-                .density
-        val privateTop =
-            preview.getUnclippedBoundsInRoot().top.value * density +
-                layout.getLineTop(layout.getLineForOffset(privateOffset))
-        val viewportBottom =
-            rule.onNodeWithTag("ai-review-content").fetchSemanticsNode().boundsInRoot.bottom
-        check(privateTop >= viewportBottom) {
-            "Private journal content must stay outside screenshots"
+        val payload =
+            JSONObject(
+                JSONObject(body).getJSONArray("messages").getJSONObject(1).getString("content")
+            )
+        assertEquals(summary.startDate.toString(), payload.getString("startDate"))
+        assertEquals(summary.endDate.toString(), payload.getString("endDate"))
+        assertEquals(summary.entryCount, payload.getInt("entryCount"))
+        assertEquals(includeNotes, payload.getBoolean("includesNotes"))
+        val records = payload.getJSONArray("entries")
+        repeat(records.length()) {
+            assertEquals(includeNotes, records.getJSONObject(it).has("note"))
         }
-        capture(state)
     }
 
     private fun capture(state: String) {
