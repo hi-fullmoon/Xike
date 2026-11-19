@@ -13,9 +13,9 @@ internal class JournalDraftStore(context: Context) {
     private val coordinator =
         coordinators.computeIfAbsent(appContext.filesDir.absolutePath) { WriteCoordinator() }
     private var writerSession: Long? = null
-    private val masterKey =
-        MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-    private val preferences =
+    private val preferences by lazy {
+        val masterKey =
+            MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
         EncryptedSharedPreferences.create(
             appContext,
             PREFERENCES_NAME,
@@ -23,6 +23,7 @@ internal class JournalDraftStore(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
+    }
 
     fun load(): JournalDraft {
         synchronized(coordinator) {

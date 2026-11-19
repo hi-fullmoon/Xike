@@ -35,6 +35,7 @@ import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
 import org.json.JSONArray
 
 private data class UndoSnapshot(
@@ -53,6 +54,7 @@ class JournalStore(context: Context) {
     private val database by lazy { JournalDatabase.get(appContext) }
     private val dao by lazy { database.journalDao() }
     val readRepository by lazy { JournalReadRepository { database } }
+    internal val draftMediaMutationMutex = Mutex()
     private val editAudioPreferences by lazy {
         EncryptedSharedPreferences.create(
             appContext,
@@ -81,6 +83,7 @@ class JournalStore(context: Context) {
         )
     }
     private var pendingDeletedEntry: JournalEntry? = null
+    private var videoMutationStarted = false
 
     init {
         attachments.initializeDirectories()
@@ -432,12 +435,30 @@ class JournalStore(context: Context) {
     fun removeOrphanedMedia(
         activeDraftAudioFileName: String? = null,
         activeDraftVideo: JournalVideo? = null,
+    ) = removeOrphanedMedia(activeDraftAudioFileName, activeDraftVideo, pruneVideos = true)
+
+    @Synchronized
+    internal fun removeOrphanedMediaAtStartup(
+        activeDraftAudioFileName: String?,
+        activeDraftVideo: JournalVideo?,
     ) {
-        cleanupStaleVideoEdits()
+        // An editor can finish importing a video before its durable edit reference is written.
+        // Leave video collection to a later process if a foreground operation got there first.
+        removeOrphanedMedia(activeDraftAudioFileName, activeDraftVideo, !videoMutationStarted)
+    }
+
+    private fun removeOrphanedMedia(
+        activeDraftAudioFileName: String?,
+        activeDraftVideo: JournalVideo?,
+        pruneVideos: Boolean,
+    ) {
         val referencedImages = referencedImageFileNames()
         val referencedAudios = referencedAudioFileNames() + listOfNotNull(activeDraftAudioFileName)
         val activeUndoFileName = dao.settingValue(RESTORE_UNDO_TOKEN_SETTING)
-        videos.prune(referencedVideoFiles() + activeDraftVideo.files())
+        if (pruneVideos) {
+            discardStaleVideoEdits()
+            videos.prune(referencedVideoFiles() + activeDraftVideo.files())
+        }
         attachments.imagesDirectory
             .listFiles()
             ?.filter { it.name !in referencedImages }
@@ -871,16 +892,29 @@ class JournalStore(context: Context) {
             videoDraftStore.load().video.files() +
             videos.editReferences()
 
-    private fun cleanupStaleVideoEdits() {
+    private fun discardStaleVideoEdits(): List<JournalVideo> {
         val references =
             dao.videoReferences().associate { it.id to it.video()?.fileName }.toMutableMap()
         pendingDeletedEntry?.let { references[it.id] = it.video?.fileName }
-        videos.discardStaleEdits(references).forEach(::deleteUnreferencedVideo)
+        return videos.discardStaleEdits(references)
+    }
+
+    private fun cleanupStaleVideoEdits() =
+        discardStaleVideoEdits().forEach(::deleteUnreferencedVideo)
+
+    @Synchronized
+    fun importVideo(uri: Uri, onProgress: (Float) -> Unit = {}): JournalVideo {
+        videoMutationStarted = true
+        return videos.import(uri, onProgress)
     }
 
     @Synchronized
-    fun importVideo(uri: Uri, onProgress: (Float) -> Unit = {}): JournalVideo =
-        videos.import(uri, onProgress)
+    internal fun saveVideoEditDraft(entry: JournalEntry, video: JournalVideo?) {
+        videoMutationStarted = true
+        videos.saveEdit(entry, video)
+    }
+
+    @Synchronized internal fun clearVideoEditDraft(entryId: String) = videos.clearEdit(entryId)
 
     @Synchronized
     fun deleteUnreferencedVideo(video: JournalVideo) {

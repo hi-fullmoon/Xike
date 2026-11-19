@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import com.xike.app.backup.JournalStores
 import com.xike.app.data.JournalEntry
 import com.xike.app.data.MAX_IMAGES_PER_ENTRY
 import com.xike.app.data.Mood
@@ -151,6 +152,15 @@ class MomentRecoveryUiTest {
                     }
                 }
             assertTrue(finishVideoCapture(rule.activity, uri, true))
+            val store = JournalStores.get(rule.activity)
+            val unpublishedVideo = store.importVideo(uri)
+            try {
+                // Startup cleanup can overlap the gap between import and publishing an edit.
+                store.removeOrphanedMediaAtStartup(null, null)
+                store.requireReadableVideo(unpublishedVideo)
+            } finally {
+                store.deleteUnreferencedVideo(unpublishedVideo)
+            }
             rule.runOnIdle { assertTrue(model.queueDraftVideo(uri)) }
             rule.waitUntil(30_000) { !model.isDraftVideoSaving }
             val imported =
@@ -173,7 +183,6 @@ class MomentRecoveryUiTest {
                 assertEquals(imported, model.draft.video)
                 assertEquals(imported, JournalDraftStore(rule.activity).load().video)
             }
-            val store = JournalStore(rule.activity)
             store.requireReadableVideo(imported)
             assertTrue(JournalVideoStore(rule.activity).dataSource(imported).use { it.size > 0L })
         } finally {

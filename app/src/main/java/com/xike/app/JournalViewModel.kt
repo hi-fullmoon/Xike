@@ -43,7 +43,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal class JournalOperationFeedback(val message: String, val isError: Boolean)
@@ -62,7 +62,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         get() = draftMediaOperations.draftVideoProgress
 
     private val draftStore = JournalDraftStore(application)
-    private val mediaMutationMutex = Mutex()
+    private val mediaMutationMutex = store.draftMediaMutationMutex
     private val draftMediaOperations =
         JournalDraftMediaOperations(
             application,
@@ -209,25 +209,30 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (initializationJob?.isActive == true) return
         isLoading = true
         initializationJob = viewModelScope.launch {
-            val draftResult = withContext(Dispatchers.IO) { runCatching(::loadAccessibleDraft) }
-            val draftFlushResult =
-                withContext(Dispatchers.IO) { runCatching { draftStore.flushPending() } }
+            val library =
+                async(Dispatchers.IO) {
+                    runCatching {
+                        store.initialize(loadEntries = false) to readRepository.libraryState(0)
+                    }
+                }
+            val pendingAudio =
+                async(Dispatchers.IO) {
+                    runCatching(draftMediaOperations::recoverPendingAudio)
+                }
+            val application = getApplication<Application>()
+            val (draftResult, draftFlushResult) =
+                withContext(Dispatchers.IO) {
+                    val loaded = runCatching(draftStore::load)
+                    loaded to runCatching(draftStore::flushPending)
+                }
             // Draft recovery does not depend on the journal database opening successfully.
             draftResult.onSuccess {
                 draft = it
                 hasResumedDraft = !it.isEmpty
             }
             draftReady = draftResult.isSuccess && draftFlushResult.isSuccess
-            val result =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        store.initialize(loadEntries = false) to readRepository.libraryState(0)
-                    }
-                }
-            val pendingResult =
-                withContext(Dispatchers.IO) {
-                    runCatching(draftMediaOperations::recoverPendingAudio)
-                }
+            val result = library.await()
+            val pendingResult = pendingAudio.await()
             result
                 .onSuccess { (snapshot, initialState) ->
                     libraryReady = true
@@ -255,55 +260,6 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                         .onFailure { error ->
                             dataError = error.message ?: localizedText("录音暂存文件暂时无法读取。")
                         }
-                    val audioResult =
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                draft.audio?.let { store.requireReadableAudio(it.fileName) }
-                            }
-                        }
-                    audioResult.onFailure {
-                        dataError =
-                            it.message
-                                ?: tr(
-                                    "草稿录音暂时无法读取，原文件已保留。",
-                                    "Draft audio cannot be read. The original file is preserved.",
-                                )
-                    }
-                    val imageResult =
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                draft.imageUriStrings.forEach { uriString ->
-                                    getApplication<Application>()
-                                        .contentResolver
-                                        .openAssetFileDescriptor(Uri.parse(uriString), "r")
-                                        ?.use {} ?: error("草稿照片暂时无法读取，原引用已保留。")
-                                }
-                            }
-                        }
-                    imageResult.onFailure { dataError = "草稿照片暂时无法读取，原引用已保留。" }
-                    val videoResult =
-                        withContext(Dispatchers.IO) {
-                            runCatching { store.requireReadableVideo(draft.video) }
-                        }
-                    videoResult.onFailure {
-                        dataError =
-                            tr(
-                                "草稿视频暂时无法读取，原引用已保留。",
-                                "Draft video cannot be read. Its reference is preserved.",
-                            )
-                    }
-                    if (
-                        draftResult.isSuccess &&
-                            audioResult.isSuccess &&
-                            imageResult.isSuccess &&
-                            videoResult.isSuccess
-                    ) {
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                store.removeOrphanedMedia(draft.audio?.fileName, draft.video)
-                            }
-                        }
-                    }
                     observationJob?.cancel()
                     observationJob = viewModelScope.launch {
                         merge(readRepository.changes().map { Unit }, readRefreshRequests)
@@ -337,8 +293,72 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             systemActivityResultsReady = draftReady && result.isSuccess
             isLoading = false
             if (systemActivityResultsReady) {
+                val restoredDraft = draft
+                viewModelScope.launch {
+                    checkRestoredDraftMedia(restoredDraft, pruneOrphans = pendingResult.isSuccess)
+                }
                 if (pendingDraftAudio != null) retryPendingDraftAudio()
                 draft.pendingVideoUri?.let { queueDraftVideo(Uri.parse(it)) }
+            }
+            viewModelScope.launch(Dispatchers.IO) { pruneCameraCaptures(application) }
+        }
+    }
+
+    private suspend fun checkRestoredDraftMedia(
+        restoredDraft: JournalDraft,
+        pruneOrphans: Boolean,
+    ) {
+        val (audio, images, video) =
+            withContext(Dispatchers.IO) {
+                Triple(
+                    runCatching {
+                        restoredDraft.audio?.let { store.requireReadableAudio(it.fileName) }
+                    },
+                    runCatching {
+                        val resolver = getApplication<Application>().contentResolver
+                        restoredDraft.imageUriStrings.forEach { uriString ->
+                            checkNotNull(
+                                    resolver.openAssetFileDescriptor(Uri.parse(uriString), "r")
+                                )
+                                .use {}
+                        }
+                    },
+                    runCatching { store.requireReadableVideo(restoredDraft.video) },
+                )
+            }
+        // The user may have replaced or removed an attachment while its startup check ran.
+        if (dataError == null) {
+            dataError =
+                when {
+                    video.isFailure && draft.video == restoredDraft.video ->
+                        tr(
+                            "草稿视频暂时无法读取，原引用已保留。",
+                            "Draft video cannot be read. Its reference is preserved.",
+                        )
+                    images.isFailure && draft.imageUriStrings == restoredDraft.imageUriStrings ->
+                        localizedText("草稿照片暂时无法读取，原引用已保留。")
+                    audio.isFailure && draft.audio == restoredDraft.audio ->
+                        audio.exceptionOrNull()?.message
+                            ?: tr(
+                                "草稿录音暂时无法读取，原文件已保留。",
+                                "Draft audio cannot be read. The original file is preserved.",
+                            )
+                    else -> null
+                }
+        }
+        if (pruneOrphans && audio.isSuccess && images.isSuccess && video.isSuccess) {
+            mediaMutationMutex.withLock {
+                val activeDraft = draft
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        // A newly removed attachment may still be referenced by the draft on disk.
+                        draftStore.flushPending()
+                        store.removeOrphanedMediaAtStartup(
+                            activeDraft.audio?.fileName,
+                            activeDraft.video,
+                        )
+                    }
+                }
             }
         }
     }
@@ -814,10 +834,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         entry: JournalEntry,
         video: JournalVideo?,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) { runCatching { videoStore.saveEdit(entry, video) } }
+        withContext(Dispatchers.IO) { runCatching { store.saveVideoEditDraft(entry, video) } }
 
     internal suspend fun clearVideoEditDraft(entryId: String): Result<Unit> =
-        withContext(Dispatchers.IO) { runCatching { videoStore.clearEdit(entryId) } }
+        withContext(Dispatchers.IO) { runCatching { store.clearVideoEditDraft(entryId) } }
 
     fun openVideoCover(name: String): InputStream? = runCatching {
         videoStore.open(name)
@@ -927,12 +947,5 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 draftReady = false
                 dataError = it.message ?: localizedText("草稿保存失败，请重试。")
             }
-    }
-
-    private fun loadAccessibleDraft(): JournalDraft {
-        val loaded = draftStore.load()
-        val application = getApplication<Application>()
-        pruneCameraCaptures(application)
-        return loaded
     }
 }
