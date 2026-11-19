@@ -153,7 +153,7 @@ class MomentRaceUiTest {
                         assertFalse(model.isDraftOutdoorLoading)
                     }
                     if (model.draft.isEmpty) {
-                        model.selectDraftMood(Mood.CALM)
+                        model.selectDraftMood(Mood.NEUTRAL)
                         model.updateDraftNote(note)
                     }
                     model.saveDraft().getOrThrow()
@@ -185,7 +185,7 @@ class MomentRaceUiTest {
 
     private fun enterDraft(): String {
         val note = "Moment race ${UUID.randomUUID()}"
-        rule.onNodeWithText(Mood.CALM.label).performScrollTo().performClick()
+        rule.onNodeWithText(Mood.NEUTRAL.label).performScrollTo().performClick()
         rule
             .onNodeWithContentDescription(localizedText("此刻的注脚"))
             .performScrollTo()
