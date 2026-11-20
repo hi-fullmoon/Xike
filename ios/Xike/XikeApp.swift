@@ -20,6 +20,7 @@ struct XikeApp: App {
 enum XikeServices {
     static let store = JournalStore()
     static let automaticBackup = AutomaticBackup(store: store)
+    static let reminders = JournalReminders()
 }
 
 extension Notification.Name {
@@ -32,6 +33,13 @@ final class XikeAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         BGTaskScheduler.shared.register(forTaskWithIdentifier: AutomaticBackup.taskID, using: nil) { task in
             let worker = Task {
                 let success = await XikeServices.automaticBackup.runIfDue()
+                task.setTaskCompleted(success: success && !Task.isCancelled)
+            }
+            task.expirationHandler = { worker.cancel() }
+        }
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: JournalReminders.taskID, using: nil) { task in
+            let worker = Task {
+                let success = await XikeServices.reminders.reconcile()
                 task.setTaskCompleted(success: success && !Task.isCancelled)
             }
             task.expirationHandler = { worker.cancel() }
@@ -104,15 +112,15 @@ private struct XikeRoot: View {
     var body: some View {
         ZStack {
             palette.background.ignoresSafeArea()
-            if let error = model.blocked {
+            if model.isLocked {
+                lockScreen
+            } else if let error = model.blocked {
                 VStack(spacing: 16) {
                     Label(error, systemImage: "exclamationmark.circle").multilineTextAlignment(.center)
                     XikeAction(title: language.text("重试", "Try again")) { Task { await model.start() } }
                 }.padding(24)
             } else if !model.isLoaded {
                 ProgressView(language.text("正在打开息刻…", "Opening Xike…"))
-            } else if model.isLocked {
-                lockScreen
             } else {
                 VStack(spacing: 0) {
                     page
@@ -135,7 +143,7 @@ private struct XikeRoot: View {
                     }
                 }
             }
-            if phase != .active {
+            if phase != .active || !model.sceneIsActive {
                 palette.background.ignoresSafeArea().overlay { BrandMark(diameter: 54) }
                     .accessibilityHidden(true)
             }
@@ -143,15 +151,18 @@ private struct XikeRoot: View {
         .foregroundStyle(palette.text)
         .tint(palette.primary)
         .environment(\.palette, palette)
-        .task {
-            await model.start()
+        .onChange(of: phase, initial: true) { _, phase in
+            model.phaseChanged(phase)
             consumeShortcut()
-            await model.phaseChanged(phase)
-        }
-        .onChange(of: phase) { _, phase in
-            Task { await model.phaseChanged(phase); consumeShortcut() }
+            if phase == .active { Task { await model.refreshForeground() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .quickRecord)) { _ in consumeShortcut() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            Task { await model.refreshForeground() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataWillBecomeUnavailableNotification)) { _ in
+            model.lockNow()
+        }
         .alert(language.text("操作提示", "Xike"), isPresented: Binding(get: { model.errorMessage != nil },
                set: { if !$0 { model.errorMessage = nil } })) {
             Button(language.text("好", "OK")) { model.errorMessage = nil }

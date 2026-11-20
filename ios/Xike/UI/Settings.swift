@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum SettingsRoute: String, Identifiable {
-    case language, lock, reminder, prompt, export, restore, automaticBackup, ai, amap, privacy
+    case language, lock, reminder, prompt, export, restore, automaticBackup, privacy
     var id: Self { self }
 }
 
@@ -59,12 +59,6 @@ struct SettingsScreen: View {
                     caption: model.preferences.backup.enabled ? language.text("已开启", "On") : language.text("已关闭", "Off"))
             }
             section(language.text("高级设置", "Advanced")) {
-                row(.ai, icon: "sparkles", title: language.text("AI 回顾配置", "AI review settings"),
-                    caption: language.text("自定义 HTTPS 服务", "Custom HTTPS service"))
-                Divider()
-                row(.amap, icon: "location", title: language.text("高德定位配置", "AMap location settings"),
-                    caption: language.text("可选的单次定位服务", "Optional one-time location"))
-                Divider()
                 row(.privacy, icon: "hand.raised", title: language.text("数据与隐私", "Data and privacy"),
                     caption: language.text("记录、天气与 AI 的数据范围", "Journal, weather, and AI data"))
             }
@@ -186,11 +180,19 @@ struct SettingsScreen: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle(language.text("应用锁", "App lock"), isOn: Binding(get: { model.preferences.lock },
                             set: { value in Task { await model.setLock(value) } }))
+                            .disabled(model.isAuthenticating)
                         Picker(language.text("离开后锁定", "Lock after leaving"), selection: $model.preferences.lockDelay) {
-                            ForEach([0, 30, 60, 300], id: \.self) { second in
+                            ForEach(LocalPreferences.lockDelays, id: \.self) { second in
                                 Text(lockDelayLabel(second, language)).tag(second)
                             }
                         }.disabled(!model.preferences.lock)
+                        if model.preferences.lock {
+                            Button(language.text("立即锁定", "Lock now"), systemImage: "lock") {
+                                self.route = nil
+                                model.lockNow()
+                                Task { await model.promptForUnlockIfNeeded() }
+                            }.disabled(model.isAuthenticating)
+                        }
                         Text(language.text("使用面容 ID、触控 ID 或设备密码解锁。", "Unlock with Face ID, Touch ID, or the device passcode."))
                             .font(.footnote).foregroundStyle(palette.muted)
                     }
@@ -215,8 +217,6 @@ struct SettingsScreen: View {
         case .export: BackupPanel(model: model, startingWithExport: true)
         case .restore: BackupPanel(model: model, startingWithExport: false)
         case .automaticBackup: AutoBackupPanel(model: model, draft: model.preferences.backup)
-        case .ai: AISettingsPanel()
-        case .amap: AMapSettingsPanel()
         case .privacy:
             ModalPage(title: language.text("数据与隐私", "Data and privacy")) {
                 XikeCard {
@@ -260,11 +260,11 @@ private struct ReminderPanel: View {
                         DatePicker(language.text("开始", "From"), selection: minuteBinding($draft.quietStart), displayedComponents: .hourAndMinute)
                         DatePicker(language.text("结束", "To"), selection: minuteBinding($draft.quietEnd), displayedComponents: .hourAndMinute)
                     }
-                    if draft.pausedUntil.map({ $0 > .now }) == true {
-                        Button(language.text("恢复提醒", "Resume reminders")) { draft.pausedUntil = nil }
+                    if draft.pauseDeadline.map({ $0 > .now }) == true {
+                        Button(language.text("恢复提醒", "Resume reminders")) { draft.pause(until: nil) }
                     } else {
                         Button(language.text("暂停一周", "Pause for a week")) {
-                            draft.pausedUntil = Calendar.xike.date(byAdding: .day, value: 7, to: Calendar.xike.startOfDay(for: .now))
+                            draft.pause(until: Calendar.xike.date(byAdding: .day, value: 7, to: Calendar.xike.startOfDay(for: .now)))
                         }.disabled(!draft.enabled)
                     }
                 }
@@ -272,11 +272,9 @@ private struct ReminderPanel: View {
             XikeAction(title: language.text("保存", "Save"), enabled: !saving && (!draft.enabled || !draft.weekdays.isEmpty)) {
                 saving = true
                 Task {
-                    do {
-                        try await model.reminders.apply(draft, language: language, requestPermission: draft.enabled && !model.preferences.reminder.enabled)
-                        model.preferences.reminder = draft
+                    if await model.updateReminders(draft, requestPermission: draft.enabled && !model.preferences.reminder.enabled) {
                         dismiss()
-                    } catch { model.report(error) }
+                    }
                     saving = false
                 }
             }
@@ -302,7 +300,6 @@ private struct ReminderPanel: View {
 func lockDelayLabel(_ second: Int, _ language: XikeLanguage) -> String {
     switch second {
     case 0: language.text("立即锁定", "Immediately")
-    case 30: language.text("30 秒后", "After 30 seconds")
     default: language.text("\(second / 60) 分钟后", "After \(second / 60) min")
     }
 }

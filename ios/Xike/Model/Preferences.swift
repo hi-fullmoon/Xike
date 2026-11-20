@@ -57,11 +57,21 @@ struct ReminderOptions: Codable, Equatable {
     var quietStart = 22 * 60
     var quietEnd = 8 * 60
     var pausedUntil: Date?
+    var pausedUntilDay: DateComponents?
+
+    var pauseDeadline: Date? {
+        pausedUntilDay.flatMap { Calendar.xike.date(from: $0) } ?? pausedUntil
+    }
+
+    mutating func pause(until date: Date?) {
+        pausedUntil = date
+        pausedUntilDay = date.map { Calendar.xike.dateComponents([.year, .month, .day], from: $0) }
+    }
 
     func deliveredDate(_ day: Date, calendar: Calendar) -> Date? {
         guard weekdays.contains(calendar.component(.weekday, from: day)),
               let time = calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day),
-              pausedUntil.map({ time >= $0 }) ?? true else { return nil }
+              pauseDeadline.map({ time >= $0 }) ?? true else { return nil }
         guard quiet, quietStart != quietEnd else { return time }
         let crossesMidnight = quietStart > quietEnd
         let quietTime = crossesMidnight ? minutes >= quietStart || minutes < quietEnd
@@ -92,14 +102,23 @@ struct AutoBackupOptions: Codable, Equatable {
 }
 
 struct AutoBackupStatus: Codable {
+    var configuredOptions: AutoBackupOptions?
     var due: Date?
+    var localDeadline: DateComponents?
     var success: Date?
     var retry: Date?
+    var cleanupRetry: Date?
     var failed = false
     var files: [String] = []
+
+    mutating func setDeadline(_ date: Date?) {
+        due = date
+        localDeadline = date.map { Calendar.xike.dateComponents([.year, .month, .day, .hour, .minute], from: $0) }
+    }
 }
 
 struct LocalPreferences: Codable, Equatable {
+    static let lockDelays = [0, 60, 300, 1_800]
     var accent = Accent.ocean
     var style = AppStyle.breathe
     var languageName = XikeLanguage.automatic.rawValue
@@ -114,8 +133,11 @@ struct LocalPreferences: Codable, Equatable {
 
     static let storageKey = "xike-preferences-v1"
     static func read() -> Self {
-        UserDefaults.standard.data(forKey: storageKey)
+        var preferences = UserDefaults.standard.data(forKey: storageKey)
             .flatMap { try? JSONDecoder().decode(Self.self, from: $0) } ?? Self()
+        if preferences.lockDelay == 30 { preferences.lockDelay = 60 }
+        if let options = AutomaticBackup.status().configuredOptions { preferences.backup = options }
+        return preferences
     }
     func save() {
         UserDefaults.standard.set(try? JSONEncoder().encode(self), forKey: Self.storageKey)
@@ -136,24 +158,66 @@ enum ApplicationLock {
 }
 
 actor JournalReminders {
+    static let taskID = "com.xike.app.reminders"
     private static let prefix = "xike-reminder-"
     private var revision = 0
+    private var pendingUpdate: Task<Void, Error>?
+    private var currentOptions: ReminderOptions?
 
     func apply(_ options: ReminderOptions, language: XikeLanguage, requestPermission: Bool) async throws {
+        try await enqueue {
+            try await self.synchronize(options, language: language, requestPermission: requestPermission)
+            self.currentOptions = options
+        }
+    }
+
+    func reconcile() async -> Bool {
+        do {
+            try await enqueue {
+                let prefs = LocalPreferences.read()
+                let options = self.currentOptions ?? prefs.reminder
+                do { try await self.synchronize(options, language: prefs.language, requestPermission: false) }
+                catch {
+                    if options.enabled, let deadline = options.pauseDeadline {
+                        self.scheduleResume(after: max(deadline, .now.addingTimeInterval(900)))
+                    }
+                    throw error
+                }
+            }
+            return true
+        } catch { return false }
+    }
+
+    private func enqueue(_ update: @escaping () async throws -> Void) async throws {
+        let pending = pendingUpdate
         revision += 1
         let operation = revision
+        let task = Task {
+            _ = await pending?.result
+            try Task.checkCancellation()
+            try await update()
+        }
+        pendingUpdate = task
+        defer { if revision == operation { pendingUpdate = nil } }
+        try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+    }
+
+    private func synchronize(_ options: ReminderOptions, language: XikeLanguage, requestPermission: Bool) async throws {
         let center = UNUserNotificationCenter.current()
-        let existing = await center.pendingNotificationRequests()
-        guard operation == revision else { return }
-        center.removePendingNotificationRequests(withIdentifiers: existing.map(\.identifier).filter { $0.hasPrefix(Self.prefix) })
-        guard options.enabled else { return }
+        let existing = await center.pendingNotificationRequests().filter { $0.identifier.hasPrefix(Self.prefix) }
+        try Task.checkCancellation()
+        guard options.enabled else {
+            center.removePendingNotificationRequests(withIdentifiers: existing.map(\.identifier))
+            scheduleResume(after: nil)
+            return
+        }
         if requestPermission {
             guard try await center.requestAuthorization(options: [.alert, .sound]) else { throw JournalError.unavailable }
         }
         let settings = await center.notificationSettings()
         guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus)
         else { throw JournalError.unavailable }
-        guard operation == revision else { return }
+        try Task.checkCancellation()
 
         let now = Date()
         let calendar = Calendar.xike
@@ -164,21 +228,61 @@ actor JournalReminders {
         content.sound = .default
         content.userInfo = ["action": "record"]
 
-        let paused = options.pausedUntil.map { $0 > now } ?? false
-        var dates = Set<DateComponents>()
+        let pause = options.pauseDeadline.flatMap { $0 > now ? $0 : nil }
+        let paused = pause != nil
+        var effective = options
+        if !paused { effective.pause(until: nil) }
+        var patterns: Set<DateComponents> = []
+        var dates: [DateComponents] = []
         for day in 0..<(paused ? 64 : 7) {
             guard let date = calendar.date(byAdding: .day, value: day, to: today),
-                  let delivery = options.deliveredDate(date, calendar: calendar),
+                  let delivery = effective.deliveredDate(date, calendar: calendar),
                   !paused || delivery > now else { continue }
             let pattern: Set<Calendar.Component> = paused ? [.year, .month, .day, .hour, .minute] : [.weekday, .hour, .minute]
-            dates.insert(calendar.dateComponents(pattern, from: delivery))
+            let components = calendar.dateComponents(pattern, from: delivery)
+            if patterns.insert(components).inserted { dates.append(components) }
         }
-        for (index, components) in dates.enumerated() {
-            guard operation == revision else { return }
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: !paused)
-            let request = UNNotificationRequest(identifier: Self.prefix + String(index), content: content, trigger: trigger)
-            try await center.add(request)
+        // Reuse request IDs so switching schedules stays within the pending notification limit.
+        let old = Dictionary(uniqueKeysWithValues: existing.map { ($0.identifier, $0) })
+        var required = Set<String>()
+        var touched: [String] = []
+        do {
+            for (index, components) in dates.enumerated() {
+                try Task.checkCancellation()
+                let id = Self.prefix + String(index)
+                required.insert(id)
+                if let existing = old[id], let trigger = existing.trigger as? UNCalendarNotificationTrigger,
+                   trigger.repeats == !paused, trigger.dateComponents == components,
+                   existing.content.body == content.body, existing.content.title == content.title { continue }
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: !paused)
+                let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+                touched.append(id)
+                try await center.add(request)
+            }
+            try Task.checkCancellation()
+        } catch {
+            var remove: [String] = []
+            for id in touched {
+                if let request = old[id], let trigger = request.trigger as? UNCalendarNotificationTrigger,
+                   trigger.nextTriggerDate() != nil {
+                    try? await center.add(request)
+                } else {
+                    remove.append(id)
+                }
+            }
+            center.removePendingNotificationRequests(withIdentifiers: remove)
+            throw error
         }
+        center.removePendingNotificationRequests(withIdentifiers: existing.map(\.identifier).filter { !required.contains($0) })
+        scheduleResume(after: pause)
+    }
+
+    private func scheduleResume(after date: Date?) {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskID)
+        guard let date else { return }
+        let request = BGAppRefreshTaskRequest(identifier: Self.taskID)
+        request.earliestBeginDate = date
+        try? BGTaskScheduler.shared.submit(request)
     }
 }
 
@@ -187,21 +291,37 @@ actor AutomaticBackup {
     private static let statusKey = "xike-auto-backup-status-v1"
     private let store: JournalStore
     private var inProgress = false
+    private var configurationRevision = 0
 
     init(store: JournalStore) { self.store = store }
 
     nonisolated static func status() -> AutoBackupStatus {
-        UserDefaults.standard.data(forKey: statusKey)
+        var status = UserDefaults.standard.data(forKey: statusKey)
             .flatMap { try? JSONDecoder().decode(AutoBackupStatus.self, from: $0) } ?? AutoBackupStatus()
+        if let localDeadline = status.localDeadline, let due = Calendar.xike.date(from: localDeadline) { status.due = due }
+        return status
     }
 
-    func configure(_ options: AutoBackupOptions, resetSchedule: Bool, resetFolder: Bool) {
+    func configure(_ options: AutoBackupOptions, password: String?) throws {
+        if options.enabled && options.encrypted {
+            let bytes = try password.map { Data($0.utf8) } ?? DeviceSecrets.read("backup-password")
+            guard let bytes, let value = String(data: bytes, encoding: .utf8), value.utf16.count >= 8 else {
+                throw JournalError.password
+            }
+            if password != nil { try DeviceSecrets.write("backup-password", bytes) }
+        }
         var status = Self.status()
+        let previous = status.configuredOptions ?? LocalPreferences.read().backup
+        let resetSchedule = options.enabled != previous.enabled || options.weekly != previous.weekly
+            || options.weekday != previous.weekday || options.minutes != previous.minutes
         if resetSchedule || status.due == nil {
-            status.due = options.enabled ? options.next(after: .now) : nil
+            status.setDeadline(options.enabled ? options.next(after: .now) : nil)
             status.retry = nil
         }
-        if resetFolder { status.files = [] }
+        if options.folder != previous.folder { status.files = [] }
+        if options.folder != previous.folder || options.keep != previous.keep { status.cleanupRetry = nil }
+        status.configuredOptions = options
+        configurationRevision &+= 1
         save(status)
         schedule(options, status: status)
     }
@@ -209,66 +329,68 @@ actor AutomaticBackup {
     func runIfDue() async -> Bool {
         guard !inProgress else { return true }
         let prefs = LocalPreferences.read()
-        let options = prefs.backup
         var status = Self.status()
+        let options = status.configuredOptions ?? prefs.backup
         guard options.enabled else { return true }
+        let revision = configurationRevision
         guard let due = status.due else {
-            configure(options, resetSchedule: true, resetFolder: false)
-            return true
-        }
-        guard due <= .now, status.retry.map({ $0 <= .now }) ?? true else {
+            status.configuredOptions = options
+            status.setDeadline(options.next(after: .now))
+            save(status)
             schedule(options, status: status)
             return true
         }
         inProgress = true
         defer { inProgress = false }
+        if status.localDeadline == nil || status.configuredOptions == nil {
+            status.configuredOptions = options
+            status.setDeadline(due)
+            save(status)
+        }
+        guard due <= .now, status.retry.map({ $0 <= .now }) ?? true else {
+            cleanup(options, status: &status)
+            schedule(options, status: status)
+            return true
+        }
         do {
             let key = try options.encrypted ? DeviceSecrets.read("backup-password") : nil
             let password = key.flatMap { String(data: $0, encoding: .utf8) }
             if options.encrypted && password == nil { throw JournalError.key }
-            let local = try await store.export(password: password, language: prefs.language)
+            let local = try await store.export(password: password, language: prefs.language, verify: true)
             defer { try? FileManager.default.removeItem(at: local.deletingLastPathComponent()) }
             try Task.checkCancellation()
-            guard LocalPreferences.read().backup == options else { return true }
-            let folder = try resolveFolder(options.folder)
-            let accessed = folder.startAccessingSecurityScopedResource()
-            defer { if accessed { folder.stopAccessingSecurityScopedResource() } }
-            if options.folder != nil && !accessed { throw JournalError.io }
+            guard revision == configurationRevision else { return true }
             let name = "Xike-\(Date.now.epochMillis)-\(UUID().uuidString.prefix(8)).\(local.pathExtension)"
-            let destination = folder.appending(path: name)
-            let partial = folder.appending(path: "." + name + ".partial")
-            var coordination: NSError?
-            var result: Result<Void, Error>?
-            NSFileCoordinator().coordinate(writingItemAt: folder, options: [], error: &coordination) { _ in
-                result = Result {
-                    defer { try? FileManager.default.removeItem(at: partial) }
-                    try FileManager.default.copyItem(at: local, to: partial)
-                    guard try FileDigest.equals(local, partial) else { throw JournalError.io }
-                    try FileManager.default.moveItem(at: partial, to: destination)
+            try withBackupFolder(options) { folder in
+                let destination = folder.appending(path: name)
+                let partial = folder.appending(path: "." + name + ".partial")
+                var coordination: NSError?
+                var result: Result<Void, Error>?
+                NSFileCoordinator().coordinate(writingItemAt: folder, options: [], error: &coordination) { _ in
+                    result = Result {
+                        defer { try? FileManager.default.removeItem(at: partial) }
+                        try FileManager.default.copyItem(at: local, to: partial)
+                        guard try FileDigest.equals(local, partial) else { throw JournalError.io }
+                        try Task.checkCancellation()
+                        try FileManager.default.moveItem(at: partial, to: destination)
+                    }
                 }
+                if let coordination { throw coordination }
+                guard let result else { throw JournalError.io }
+                try result.get()
             }
-            if let coordination { throw coordination }
-            guard let result else { throw JournalError.io }
-            try result.get()
             status.files.append(name)
             status.success = .now
             status.failed = false
             status.retry = nil
-            status.due = options.next(after: .now)
+            status.setDeadline(options.next(after: .now))
+            status.cleanupRetry = status.files.count > max(1, options.keep) ? .now : nil
             save(status)
-            while status.files.count > max(1, options.keep), let oldest = status.files.first {
-                let file = folder.appending(path: oldest)
-                if FileManager.default.fileExists(atPath: file.path) {
-                    do { try FileManager.default.removeItem(at: file) }
-                    catch { break }
-                }
-                status.files.removeFirst()
-            }
-            save(status)
+            cleanup(options, status: &status)
             schedule(options, status: status)
             return true
         } catch {
-            if LocalPreferences.read().backup == options {
+            if revision == configurationRevision {
                 status.failed = true
                 status.retry = Date.now.addingTimeInterval(900)
                 save(status)
@@ -276,6 +398,34 @@ actor AutomaticBackup {
             }
             return false
         }
+    }
+
+    private func cleanup(_ options: AutoBackupOptions, status: inout AutoBackupStatus) {
+        let keep = max(1, options.keep)
+        guard status.files.count > keep, let retry = status.cleanupRetry, retry <= .now else { return }
+        do {
+            try withBackupFolder(options) { folder in
+                while status.files.count > keep, let oldest = status.files.first {
+                    try Task.checkCancellation()
+                    let file = folder.appending(path: oldest)
+                    do { try FileManager.default.removeItem(at: file) }
+                    catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {}
+                    status.files.removeFirst()
+                }
+            }
+            status.cleanupRetry = nil
+        } catch {
+            status.cleanupRetry = .now.addingTimeInterval(900)
+        }
+        save(status)
+    }
+
+    private func withBackupFolder<T>(_ options: AutoBackupOptions, _ work: (URL) throws -> T) throws -> T {
+        let folder = try resolveFolder(options.folder)
+        let accessed = folder.startAccessingSecurityScopedResource()
+        defer { if accessed { folder.stopAccessingSecurityScopedResource() } }
+        if options.folder != nil && !accessed { throw JournalError.io }
+        return try work(folder)
     }
 
     private func resolveFolder(_ bookmark: Data?) throws -> URL {
@@ -300,7 +450,9 @@ actor AutomaticBackup {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskID)
         guard options.enabled, let due = status.due else { return }
         let request = BGProcessingTaskRequest(identifier: Self.taskID)
-        request.earliestBeginDate = max(due, status.retry ?? due)
+        let nextBackup = max(due, status.retry ?? due)
+        let nextCleanup = status.cleanupRetry ?? nextBackup
+        request.earliestBeginDate = min(nextBackup, nextCleanup)
         try? BGTaskScheduler.shared.submit(request)
     }
 }

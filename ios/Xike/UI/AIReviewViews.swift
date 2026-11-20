@@ -138,7 +138,7 @@ struct AIReviewPanel: View {
         }
         .task { reloadSettings() }
         .interactiveDismissDisabled(request != nil || report != nil)
-        .onChange(of: model.records) { cancel(); dismiss() }
+        .onChange(of: model.libraryRevision) { cancel(); dismiss() }
         .onChange(of: model.insightsPeriod) { cancel(); dismiss() }
         .onDisappear { cancel() }
         .sheet(isPresented: $configuring) { AISettingsPanel(onSave: reloadSettings) }
@@ -155,10 +155,12 @@ struct AIReviewPanel: View {
                 Text(language.text("使用轨迹页选定的周期。先在本机准备和预览。", "Uses the period selected in Patterns. Prepare and preview on this device first."))
                     .font(.subheadline).foregroundStyle(palette.muted)
                 LabeledContent(language.text("记录数", "Entries"), value: String(review.current.entries.count))
-                Toggle(language.text("包含日记文字", "Include journal text"), isOn: $includeNotes)
-                if !settings.canSend {
-                    Button(language.text("配置 AI 服务", "Configure AI service")) { configuring = true }
+                if review.current.entries.isEmpty {
+                    Text(language.text("当前周期没有可用于回顾的记录。", "There are no entries to review in this period."))
+                        .font(.footnote).foregroundStyle(palette.muted)
                 }
+                Toggle(language.text("包含日记文字", "Include journal text"), isOn: $includeNotes)
+                Button(language.text("配置 AI 服务", "Configure AI service"), systemImage: "gearshape") { configuring = true }
                 XikeAction(title: language.text("预览发送内容", "Preview request"), enabled: settings.canPreview && !review.current.entries.isEmpty) {
                     do { preview = try AIReview.prepare(settings: settings, review: review, includeNotes: includeNotes, language: language) }
                     catch { feedback = model.message(for: error) }
@@ -187,9 +189,7 @@ struct AIReviewPanel: View {
                     }
                     Button(language.text("取消请求", "Cancel request")) { cancel() }
                 } else {
-                    if !settings.canSend {
-                        Button(language.text("配置 AI 服务", "Configure AI service")) { configuring = true }
-                    }
+                    Button(language.text("配置 AI 服务", "Configure AI service"), systemImage: "gearshape") { configuring = true }
                     XikeAction(title: language.text("同意并发送", "Agree and send"), enabled: settings.canSend) { send(preview) }
                     Button(language.text("返回修改范围", "Change scope")) { self.preview = nil; feedback = nil }
                 }

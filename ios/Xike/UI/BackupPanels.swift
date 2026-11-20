@@ -175,6 +175,9 @@ private struct RestoreConfirmation: View {
     let model: JournalAppModel
     @State private var replace = false
     @State private var working = false
+    @State private var preview: RestoreResult?
+    @State private var loadingPreview = true
+    @State private var feedback: String?
 
     var body: some View {
         ModalPage(title: language.text("恢复备份", "Restore backup")) {
@@ -189,13 +192,34 @@ private struct RestoreConfirmation: View {
             }
             Text(language.text("合并保留本机记录，内容冲突时保留双方版本。", "Merge keeps local entries and preserves both versions of a conflict."))
                 .font(.subheadline).foregroundStyle(palette.muted)
-            XikeAction(title: language.text("合并恢复", "Merge backup"), enabled: !working) { restore(.merge) }
+            if let preview {
+                let added = preview.additions - preview.conflicts
+                Text(language.text(
+                    "预计新增 \(added) 条，保留冲突副本 \(preview.conflicts) 条，更新收藏 \(preview.favorites) 条。恢复时会重新核对。",
+                    "Estimated: \(added) new entries, \(preview.conflicts) conflict copies, and \(preview.favorites) favorite updates. Checked again when restoring."))
+                    .font(.footnote).foregroundStyle(palette.muted).accessibilityIdentifier("restore-merge-summary")
+            } else if loadingPreview {
+                ProgressView(language.text("正在估算合并结果…", "Estimating merge results…"))
+            }
+            if let feedback { Text(feedback).font(.footnote).foregroundStyle(palette.muted) }
+            XikeAction(title: language.text("合并恢复", "Merge backup"), enabled: !working && !loadingPreview) { restore(.merge) }
                 .accessibilityIdentifier("restore-merge")
             Button(language.text("替换全部内容", "Replace all entries"), role: .destructive) { replace = true }
                 .disabled(working).frame(minHeight: 44)
             if working { ProgressView(language.text("正在恢复…", "Restoring…")) }
         }
         .interactiveDismissDisabled(working)
+        .task(id: model.libraryRevision) {
+            guard !working else { return }
+            loadingPreview = true
+            defer { loadingPreview = false }
+            do {
+                let counts = try await model.store.previewMerge(backup)
+                if !Task.isCancelled { preview = counts }
+            } catch {
+                if !Task.isCancelled { feedback = model.message(for: error) }
+            }
+        }
         .confirmationDialog(language.text("替换本机的全部记录？", "Replace all local entries?"), isPresented: $replace, titleVisibility: .visible) {
             Button(language.text("确认替换", "Confirm replacement"), role: .destructive) { restore(.replace) }
             Button(language.text("取消", "Cancel"), role: .cancel) {}
@@ -204,10 +228,13 @@ private struct RestoreConfirmation: View {
 
     private func restore(_ mode: RestoreMode) {
         working = true
+        feedback = nil
         Task {
-            await model.applyBackup(backup, mode: mode)
-            working = false
-            dismiss()
+            defer { working = false }
+            do {
+                try await model.applyBackup(backup, mode: mode)
+                dismiss()
+            } catch { feedback = model.message(for: error) }
         }
     }
 }
@@ -243,6 +270,7 @@ struct AutoBackupPanel: View {
     @State private var chooseFolder = false
     @State private var feedback: String?
     @State private var status = AutomaticBackup.status()
+    @State private var saving = false
 
     var body: some View {
         ModalPage(title: language.text("自动备份", "Automatic backup")) {
@@ -285,13 +313,18 @@ struct AutoBackupPanel: View {
                         Text(language.text("上次备份失败。息刻会重试。", "The last backup failed. Xike will retry."))
                             .font(.footnote)
                     }
+                    if status.cleanupRetry != nil {
+                        Text(language.text("旧备份暂时无法清理，息刻会重试。", "Older backups could not be removed. Xike will retry."))
+                            .font(.footnote)
+                    }
                     Text(language.text("后台执行时机会随系统条件变化，打开息刻时会检查到期备份。", "iOS chooses when background tasks run. Xike checks for due backups when opened."))
                         .font(.footnote).foregroundStyle(palette.muted)
                 }
             }
             if let feedback { Text(feedback).font(.footnote).foregroundStyle(.red) }
-            XikeAction(title: language.text("保存", "Save"), enabled: valid) { save() }
+            XikeAction(title: language.text("保存", "Save"), enabled: valid && !saving) { save() }
         }
+        .interactiveDismissDisabled(saving)
         .task { hasPassword = ((try? DeviceSecrets.read("backup-password")) != nil) }
         .fileImporter(isPresented: $chooseFolder, allowedContentTypes: [.folder]) { result in
             do {
@@ -309,20 +342,18 @@ struct AutoBackupPanel: View {
     }
 
     private func save() {
-        do {
-            if draft.enabled && draft.encrypted && !password.isEmpty {
-                try DeviceSecrets.write("backup-password", Data(password.utf8))
-            }
-            let previous = model.preferences.backup
-            model.preferences.backup = draft
-            password = ""
-            Task {
-                let reset = draft.enabled != previous.enabled || draft.weekly != previous.weekly
-                    || draft.weekday != previous.weekday || draft.minutes != previous.minutes
-                await model.automaticBackup.configure(draft, resetSchedule: reset, resetFolder: draft.folder != previous.folder)
+        let options = draft
+        let newPassword = password.isEmpty ? nil : password
+        saving = true
+        Task {
+            defer { saving = false }
+            do {
+                try await model.automaticBackup.configure(options, password: newPassword)
+                model.preferences.backup = options
+                password = ""
                 dismiss()
-            }
-        } catch { feedback = model.message(for: error) }
+            } catch { feedback = model.message(for: error) }
+        }
     }
 
     private func formatDate(_ date: Date) -> String {

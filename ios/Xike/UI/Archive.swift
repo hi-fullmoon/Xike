@@ -1,5 +1,13 @@
 import SwiftUI
 
+private struct ArchiveRequest: Equatable {
+    let filter: ArchiveFilter
+    let date: Date
+    let calendar: Calendar
+    let revision: Int
+    let retry: Int
+}
+
 struct ArchiveScreen: View {
     @Environment(\.palette) private var palette
     @Environment(\.xikeLanguage) private var language
@@ -8,15 +16,30 @@ struct ArchiveScreen: View {
     @State private var showMemories = false
     @State private var selected: RecordLink?
     @State private var month = Date.now
-    @State private var selectedDay: Date?
+    @State private var page: ArchivePage?
+    @State private var loadedRequest: ArchiveRequest?
+    @State private var counts: [Date: Int] = [:]
+    @State private var error: String?
+    @State private var calendarError: String?
+    @State private var retry = 0
+    @State private var more: Task<Void, Never>?
 
-    private var filtered: [JournalRecord] {
-        let filter = model.archiveFilter
-        return model.records.filter(filter.matches)
+    private var request: ArchiveRequest {
+        ArchiveRequest(filter: model.archiveFilter, date: model.today, calendar: .xike,
+                       revision: model.libraryRevision, retry: retry)
+    }
+
+    private var monthRequest: ArchiveRequest? {
+        guard model.calendarMode else { return nil }
+        var filter = model.archiveFilter
+        filter.day = nil
+        filter.datePreset = .all
+        return ArchiveRequest(filter: filter, date: month, calendar: .xike, revision: model.libraryRevision, retry: retry)
     }
 
     var body: some View {
-        let visible = filtered
+        let query = request
+        let monthQuery = monthRequest
         PageScroll {
             archiveHeader
             Button {
@@ -42,7 +65,7 @@ struct ArchiveScreen: View {
                     Text(language.text("时间流", "Timeline")).tag(false)
                 }.pickerStyle(.segmented)
                 Button {
-                    showFilter = true
+                    showFilter.toggle()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "slider.horizontal.3")
@@ -51,23 +74,69 @@ struct ArchiveScreen: View {
                     .background(palette.surface, in: RoundedRectangle(cornerRadius: palette.buttonRadius))
                 }.buttonStyle(.plain).foregroundStyle(palette.primary)
                  .accessibilityLabel(language.text("打开筛选", "Open filters"))
+                 .accessibilityIdentifier("archive-filter-toggle")
             }
+            if showFilter { ArchiveFilterControls(filter: $model.archiveFilter) }
             if model.calendarMode {
-                MonthGrid(month: $month, selected: $selectedDay, entries: visible)
-                if let selectedDay {
-                    XikeTitle(title: formatMomentDay(selectedDay, language), large: false)
-                    rows(visible.filter { Calendar.xike.isDate($0.date, inSameDayAs: selectedDay) })
+                MonthGrid(month: $month, selected: model.archiveFilter.day, counts: counts) { date in
+                    model.archiveFilter.day = model.archiveFilter.day == date ? nil : date
+                    model.archiveFilter.datePreset = .all
                 }
-            } else {
-                timeline(visible)
             }
+            if query != loadedRequest {
+                ProgressView(language.text("正在读取记录…", "Loading entries…"))
+            } else {
+                if let page { timeline(page) }
+                if let error { readError(error) }
+            }
+            if let calendarError, model.calendarMode { readError(calendarError) }
         }
         .accessibilityIdentifier("archive-page")
+        .task(id: query) { await load(query, offset: 0) }
+        .task(id: monthQuery) {
+            counts = [:]
+            calendarError = nil
+            guard let monthQuery else { return }
+            do {
+                let result = try await model.store.calendarCounts(filter: monthQuery.filter, month: monthQuery.date, calendar: monthQuery.calendar)
+                if !Task.isCancelled { counts = result }
+            } catch {
+                if !Task.isCancelled { calendarError = model.message(for: error) }
+            }
+        }
+        .onDisappear { more?.cancel(); more = nil }
         .sheet(item: $selected) { link in JournalDetail(model: model, recordID: link.id) }
-        .sheet(isPresented: $showFilter) { ArchiveFilterPanel(filter: $model.archiveFilter) }
         .sheet(isPresented: $showMemories) {
-            RecordListPanel(title: language.text("往日回望", "On this day"), model: model,
-                            entries: ArchiveFilter.memories(model.records))
+            PastMomentsPanel(model: model)
+        }
+    }
+
+    private func load(_ query: ArchiveRequest, offset: Int) async {
+        if offset == 0 {
+            more?.cancel()
+            more = nil
+            page = nil
+        }
+        error = nil
+        do {
+            if offset == 0, query.filter.hasSearchText { try await Task.sleep(for: .milliseconds(200)) }
+            let result = try await model.store.archivePage(filter: query.filter, today: query.date, calendar: query.calendar, offset: offset)
+            guard !Task.isCancelled, query == request else { return }
+            if offset > 0, let page {
+                self.page = ArchivePage(records: page.records + result.records, total: result.total)
+            } else { page = result }
+            loadedRequest = query
+        } catch {
+            guard !Task.isCancelled, query == request else { return }
+            self.error = model.message(for: error)
+            loadedRequest = query
+        }
+    }
+
+    private func readError(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(message).font(.footnote).foregroundStyle(palette.muted)
+            Button(language.text("重试", "Retry")) { retry += 1 }
         }
     }
 
@@ -77,6 +146,9 @@ struct ArchiveScreen: View {
             TextField(language.text("搜索记录", "Search entries"), text: $model.archiveFilter.text)
                 .submitLabel(.search)
                 .accessibilityIdentifier("archive-search")
+                .onChange(of: model.archiveFilter.text) { _, value in
+                    if value.count > 80 { model.archiveFilter.text = String(value.prefix(80)) }
+                }
             if !model.archiveFilter.text.isEmpty {
                 Button {
                     model.archiveFilter.text = ""
@@ -96,7 +168,7 @@ struct ArchiveScreen: View {
             HStack {
                 XikeTitle(title: language.text("回望", "Memories"))
                 Spacer()
-                countLabel(model.records.count)
+                countLabel(model.library.total)
             }
             Text(language.text("翻一翻走过的日子，看见当时的自己。", "Look through past days and meet who you were then."))
                 .font(.subheadline).foregroundStyle(palette.muted)
@@ -105,14 +177,16 @@ struct ArchiveScreen: View {
     }
 
     @ViewBuilder
-    private func timeline(_ entries: [JournalRecord]) -> some View {
+    private func timeline(_ page: ArchivePage) -> some View {
+        let entries = page.records
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                XikeTitle(title: language.text("最近的时刻", "Recent moments"), large: false)
+                XikeTitle(title: model.archiveFilter.day.map { formatMomentDay($0, language) }
+                          ?? language.text("最近的时刻", "Recent moments"), large: false)
                 Text(language.text("最新在前", "Newest first")).font(.footnote).foregroundStyle(palette.muted)
             }
             Spacer()
-            countLabel(entries.count)
+            countLabel(page.total)
         }
         if entries.isEmpty {
             rows(entries)
@@ -127,6 +201,15 @@ struct ArchiveScreen: View {
                         .font(.caption).foregroundStyle(palette.muted)
                 }
                 rows(records)
+            }
+            if entries.count < page.total {
+                Button(language.text("加载更多", "Load more")) {
+                    let query = request
+                    more = Task {
+                        await load(query, offset: entries.count)
+                        if !Task.isCancelled { more = nil }
+                    }
+                }.frame(minHeight: 44).disabled(more != nil)
             }
         }
     }
@@ -143,9 +226,9 @@ struct ArchiveScreen: View {
         if entries.isEmpty {
             XikeCard {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(model.records.isEmpty ? language.text("还没有记录", "No entries yet") : language.text("没有符合条件的记录", "No matching entries"))
+                    Text(model.library.total == 0 ? language.text("还没有记录", "No entries yet") : language.text("没有符合条件的记录", "No matching entries"))
                         .font(.headline)
-                    if model.records.isEmpty {
+                    if model.library.total == 0 {
                         Text(language.text("记下一个此刻，就能在这里回望。", "Save a moment to revisit it here."))
                             .font(.subheadline).foregroundStyle(palette.muted)
                     }
@@ -232,9 +315,30 @@ struct JournalDetail: View {
     @State private var delete = false
     @State private var photoIndex = 0
     @State private var gallery = false
+    @State private var loaded = false
+    @State private var record: JournalRecord?
+    @State private var readError: String?
+    @State private var retry = 0
 
     var body: some View {
-        if let record = model.records.first(where: { $0.id == recordID }) {
+        Group {
+            details
+        }.task(id: [model.libraryRevision, retry]) {
+            do {
+                let latest = try await model.store.entry(recordID)
+                try Task.checkCancellation()
+                record = latest
+                loaded = true
+                readError = nil
+            } catch {
+                if !Task.isCancelled { readError = model.message(for: error) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var details: some View {
+        if let record {
             ModalPage(title: language.text("记录详情", "Entry details")) {
                 XikeCard {
                     VStack(alignment: .leading, spacing: 13) {
@@ -307,7 +411,12 @@ struct JournalDetail: View {
             }
         } else {
             ModalPage(title: language.text("记录详情", "Entry details")) {
-                Text(language.text("这条记录已移除。", "This entry was removed."))
+                if let readError {
+                    Text(readError)
+                    Button(language.text("重试", "Retry")) { retry += 1 }
+                } else if loaded {
+                    Text(language.text("这条记录已移除。", "This entry was removed."))
+                } else { ProgressView() }
             }
         }
     }
@@ -334,52 +443,104 @@ struct JournalDetail: View {
     }
 }
 
-private struct ArchiveFilterPanel: View {
+private struct ArchiveFilterControls: View {
     @Environment(\.xikeLanguage) private var language
-    @Environment(\.dismiss) private var dismiss
     @Binding var filter: ArchiveFilter
-    @State private var draft = ArchiveFilter()
 
     var body: some View {
-        ModalPage(title: language.text("筛选记录", "Filters")) {
-            XikeCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    XikeTitle(title: language.text("心情", "Mood"), large: false)
-                    MoodSelector(selected: draft.moods) { mood in
-                        if draft.moods.contains(mood.score) { draft.moods.remove(mood.score) }
-                        else { draft.moods.insert(mood.score) }
-                    }
+        XikeCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    XikeTitle(title: language.text("筛选这段记忆", "Filter memories"), large: false)
+                    Spacer()
+                    Button(language.text("全部清除", "Clear all")) { filter = ArchiveFilter(text: filter.text) }
+                }
+                Toggle(language.text("仅看收藏", "Favorites only"), isOn: $filter.favorites)
+                XikeTitle(title: language.text("心情", "Mood"), large: false)
+                MoodSelector(selected: filter.moods) { mood in
+                    if filter.moods.contains(mood.score) { filter.moods.remove(mood.score) }
+                    else { filter.moods.insert(mood.score) }
+                }
+                if let day = filter.day {
+                    Button(formatMomentDay(day, language), systemImage: "xmark.circle") { filter.day = nil }
+                        .accessibilityLabel(language.text("清除指定日期", "Clear selected day"))
+                }
+                Picker(language.text("日期", "Date"), selection: Binding(get: { filter.day == nil ? filter.datePreset : nil }, set: { selected in
+                    if let selected { filter.datePreset = selected; filter.day = nil }
+                })) {
+                    if let day = filter.day { Text(formatMomentDay(day, language)).tag(nil as ArchiveDatePreset?) }
+                    ForEach(ArchiveDatePreset.allCases) { Text($0.label(language)).tag(Optional($0)) }
+                }.accessibilityIdentifier("archive-date-preset")
+                Picker(language.text("照片", "Photos"), selection: $filter.photos) {
+                    ForEach(PhotoFilter.allCases) { Text($0.label(language)).tag($0) }
                 }
             }
-            XikeCard {
-                VStack(alignment: .leading, spacing: 7) {
-                    dateChoice(language.text("起始日期", "From"), value: $draft.from)
-                    Divider()
-                    dateChoice(language.text("结束日期", "To"), value: $draft.to)
-                }
-            }
-            XikeCard {
-                VStack {
-                    Picker(language.text("照片", "Photos"), selection: $draft.photos) {
-                        ForEach(PhotoFilter.allCases) { Text($0.label(language)).tag($0) }
-                    }
-                    Toggle(language.text("只看收藏", "Favorites only"), isOn: $draft.favorites)
-                }
-            }
-            XikeAction(title: language.text("应用筛选", "Apply filters"), enabled: (draft.from ?? .distantPast) <= (draft.to ?? .distantFuture)) {
-                filter = draft
-                dismiss()
-            }
-            Button(language.text("清除筛选", "Clear filters")) { draft = ArchiveFilter(text: draft.text) }
-        }.onAppear { draft = filter }
+        }
     }
+}
 
-    @ViewBuilder
-    private func dateChoice(_ title: String, value: Binding<Date?>) -> some View {
-        Toggle(title, isOn: Binding(get: { value.wrappedValue != nil }, set: { value.wrappedValue = $0 ? .now : nil }))
-        if let date = value.wrappedValue {
-            DatePicker(title, selection: Binding(get: { value.wrappedValue ?? date }, set: { value.wrappedValue = $0 }),
-                       displayedComponents: .date).labelsHidden()
+private struct PastMomentsPanel: View {
+    @Environment(\.xikeLanguage) private var language
+    let model: JournalAppModel
+    @State private var days: [MemoryDay]?
+    @State private var selected: MemoryDay?
+    @State private var message: String?
+    @State private var retry = 0
+
+    var body: some View {
+        ModalPage(title: language.text("往日回望", "Past moments")) {
+            if let message {
+                Text(message)
+                Button(language.text("重试", "Retry")) { retry += 1 }
+            } else if let days {
+                if days.isEmpty { XikeCard { Text(language.text("这些日子还没有留下记录", "No entries from these dates yet")) } }
+                ForEach(days) { day in
+                    XikeCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(day.isMonthAgo ? language.text("一个月前", "One month ago") : language.text("往年今天", "On this day"))
+                                .font(.headline)
+                            Text(day.date.formatted(.dateTime.year().month().day().locale(language.locale)))
+                            Text(language.text("\(day.count) 条记录", "\(day.count) entries")).font(.footnote)
+                            Button(language.text("查看记录", "View entries")) { selected = day }.frame(minHeight: 44)
+                        }
+                    }
+                }
+            } else { ProgressView() }
+        }
+        .task(id: [model.libraryRevision, retry]) {
+            do {
+                let result = try await model.store.memoryDays(today: model.today, calendar: .xike)
+                try Task.checkCancellation()
+                days = result
+                message = nil
+            } catch {
+                if !Task.isCancelled { message = model.message(for: error) }
+            }
+        }
+        .sheet(item: $selected) { day in MemoryDayPanel(model: model, date: day.date) }
+    }
+}
+
+private struct MemoryDayPanel: View {
+    @Environment(\.xikeLanguage) private var language
+    let model: JournalAppModel
+    let date: Date
+    @State private var entries: [JournalRecord]?
+    @State private var message: String?
+
+    var body: some View {
+        let title = date.formatted(.dateTime.year().month().day().locale(language.locale))
+        Group {
+            if let entries { RecordListPanel(title: title, model: model, entries: entries) }
+            else { ModalPage(title: title) { if let message { Text(message) } else { ProgressView() } } }
+        }.task(id: model.libraryRevision) {
+            guard let interval = Calendar.xike.dateInterval(of: .day, for: date) else { return }
+            do {
+                let result = try await model.store.entries(in: interval)
+                if !Task.isCancelled { entries = result }
+            } catch {
+                if !Task.isCancelled { message = model.message(for: error) }
+            }
         }
     }
 }
@@ -388,15 +549,15 @@ private struct MonthGrid: View {
     @Environment(\.palette) private var palette
     @Environment(\.xikeLanguage) private var language
     @Binding var month: Date
-    @Binding var selected: Date?
-    let entries: [JournalRecord]
+    let selected: Date?
+    let counts: [Date: Int]
+    let select: (Date) -> Void
     private var calendar: Calendar { .xike }
 
     var body: some View {
         let start = calendar.dateInterval(of: .month, for: month)?.start ?? month
         let blanks = (calendar.component(.weekday, from: start) + 5) % 7
         let days = calendar.range(of: .day, in: .month, for: month)?.count ?? 30
-        let marks = Dictionary(grouping: entries, by: { calendar.startOfDay(for: $0.date) })
         XikeCard {
             VStack(spacing: 8) {
                 HStack {
@@ -412,14 +573,16 @@ private struct MonthGrid: View {
                         if offset < blanks { Color.clear.frame(height: 1) }
                         else if let date = calendar.date(byAdding: .day, value: offset - blanks, to: start) {
                             let active = selected.map { calendar.isDate(date, inSameDayAs: $0) } ?? false
-                            Button { selected = date } label: {
+                            let count = counts[calendar.startOfDay(for: date), default: 0]
+                            Button { select(date) } label: {
                                 VStack(spacing: 3) {
                                     Text(String(offset - blanks + 1)).font(.footnote.monospacedDigit())
-                                    Circle().fill(marks[date] == nil ? .clear : palette.primary).frame(width: 5, height: 5)
+                                    Capsule().fill(count == 0 ? .clear : palette.primary).frame(width: count > 1 ? 10 : 4, height: 4)
                                 }.frame(maxWidth: .infinity, minHeight: 43)
                                  .background(active ? palette.accentSurface : Color.clear, in: RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain).accessibilityAddTraits(active ? .isSelected : [])
+                            .disabled(count == 0 && !active)
                             .accessibilityLabel(formatMomentDay(date, language))
                         }
                     }
@@ -434,7 +597,7 @@ private struct MonthGrid: View {
 
     private func arrow(_ name: String, label: String, value: Int) -> some View {
         Button {
-            if let next = calendar.date(byAdding: .month, value: value, to: month) { month = next; selected = nil }
+            if let next = calendar.date(byAdding: .month, value: value, to: month) { month = next }
         } label: { Image(systemName: name).frame(width: 38, height: 36) }
         .buttonStyle(.plain).foregroundStyle(palette.primary).accessibilityLabel(label)
     }

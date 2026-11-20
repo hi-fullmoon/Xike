@@ -4,11 +4,12 @@ import PhotosUI
 import SwiftUI
 
 private enum ComposerPanel: String, Identifiable {
-    case feelings, date, weather, voice, video, pictures
+    case feelings, date, weather, voice, video, pictures, amap
     var id: Self { self }
 }
 
 struct JournalComposer: View {
+    private static let noteLimit = 280
     @Environment(\.palette) private var palette
     @Environment(\.xikeLanguage) private var language
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +23,8 @@ struct JournalComposer: View {
     @State private var camera: Bool?
     @State private var photoIndex = 0
     @State private var confirmDiscard = false
+    @State private var showTimeOptions = false
+    @State private var confirmNow = false
     @State private var mediaLoading = false
     @FocusState private var noteFocused: Bool
 
@@ -30,20 +33,12 @@ struct JournalComposer: View {
     var body: some View {
         PageScroll {
             if !editing { momentHeader }
+            if model.preferences.dailyQuestion && !editing { dailyQuestion }
             moodCard
             noteCard
             if !editing {
                 Label(language.text("草稿自动加密保存在本机", "Drafts are automatically encrypted on this device"), systemImage: "shield")
                     .font(.footnote).foregroundStyle(palette.muted)
-            }
-            if model.preferences.dailyQuestion && !editing {
-                XikeCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        XikeTitle(title: language.text("每日一问", "Daily question"), large: false)
-                        Text(DailyQuestions.question(style: model.preferences.promptStyle, language: language))
-                            .foregroundStyle(palette.muted)
-                    }
-                }
             }
             mediaContent
             weatherCard
@@ -68,12 +63,35 @@ struct JournalComposer: View {
                 }.ignoresSafeArea()
             }
         }
-        .confirmationDialog(language.text("放弃本次编辑？", "Discard these changes?"), isPresented: $confirmDiscard,
+        .confirmationDialog(editing ? language.text("放弃本次编辑？", "Discard these changes?")
+                            : language.text("放弃这份草稿？", "Discard this draft?"), isPresented: $confirmDiscard,
                             titleVisibility: .visible) {
-            Button(language.text("放弃修改", "Discard changes"), role: .destructive) {
-                Task { await model.discardEdit(); dismiss() }
+            Button(editing ? language.text("放弃修改", "Discard changes") : language.text("放弃草稿", "Discard draft"),
+                   role: .destructive) {
+                Task {
+                    if await model.discardDraft(editing: editing), editing { dismiss() }
+                }
             }
-            Button(language.text("继续编辑", "Keep editing"), role: .cancel) {}
+            Button(editing ? language.text("继续编辑", "Keep editing") : language.text("继续保留", "Keep draft"), role: .cancel) {}
+        } message: {
+            if !editing {
+                Text(language.text("将清空这份未保存的草稿。已保存的记录不会受影响。",
+                                   "This clears the unsaved draft. Saved entries are unaffected."))
+            }
+        }
+        .confirmationDialog(language.text("记录时间", "Entry time"), isPresented: $showTimeOptions, titleVisibility: .visible) {
+            Button(language.text("修改日期时间", "Change date and time")) { panel = .date }
+            Button(language.text("改为现在", "Use current time")) {
+                if let weatherDate, !Calendar.xike.isDateInToday(weatherDate) { confirmNow = true }
+                else { applyDate(nil) }
+            }
+            Button(language.text("取消", "Cancel"), role: .cancel) {}
+        }
+        .confirmationDialog(language.text("改为现在？", "Use current time?"), isPresented: $confirmNow, titleVisibility: .visible) {
+            Button(language.text("改为现在", "Use current time")) { applyDate(nil) }
+            Button(language.text("取消", "Cancel"), role: .cancel) {}
+        } message: {
+            Text(language.text("改变日期会移除这条记录的窗外信息。", "Changing the day clears the weather snapshot."))
         }
     }
 
@@ -92,15 +110,49 @@ struct JournalComposer: View {
                 BrandMark()
                 Text(language.text("息刻", "Xike")).font(.headline)
                 Spacer()
-                Text(formatMomentDay(.now, language)).font(.footnote.weight(.medium)).foregroundStyle(palette.muted)
+                if !draft.isEmpty {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { headerDate; discardButton }
+                        VStack(alignment: .trailing, spacing: 0) { headerDate; discardButton }
+                    }
+                } else { headerDate }
             }
             Text(language.text("留一刻给自己", "A MOMENT FOR YOURSELF"))
                 .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(palette.primary)
             XikeTitle(title: language.text("给这一刻，\n留个位置。", "Make room\nfor this moment."))
-            Text(language.text("不用解释，先感受自己。", "No explanation needed. Just notice how you feel."))
+            let todayCount = model.library.todayCount
+            Text(todayCount == 0 ? language.text("不用解释，先感受自己。", "No explanation needed. Just notice how you feel.")
+                 : language.text("今天已经停下来听见自己 \(todayCount) 次。", "You have paused to listen to yourself \(todayCount) times today."))
                 .font(.subheadline).foregroundStyle(palette.muted)
         }
         .padding(.bottom, 3)
+    }
+
+    private var headerDate: some View {
+        Text(formatMomentDay(model.today, language)).font(.footnote.weight(.medium)).foregroundStyle(palette.muted)
+    }
+
+    private var discardButton: some View {
+        Button {
+            noteFocused = false
+            confirmDiscard = true
+        } label: {
+            Text(language.text("放弃草稿", "Discard draft")).font(.footnote.weight(.semibold))
+                .frame(minHeight: 44).foregroundStyle(.red)
+        }
+        .buttonStyle(.plain)
+        .disabled(model.busy || mediaLoading)
+        .accessibilityIdentifier("discard-draft")
+    }
+
+    private var dailyQuestion: some View {
+        XikeCard {
+            VStack(alignment: .leading, spacing: 8) {
+                XikeTitle(title: language.text("每日一问", "Daily question"), large: false)
+                Text(DailyQuestions.question(style: model.preferences.promptStyle, language: language, date: model.today))
+                    .foregroundStyle(palette.muted)
+            }
+        }
     }
 
     private var moodCard: some View {
@@ -143,13 +195,18 @@ struct JournalComposer: View {
                                 .padding(.top, 8).padding(.leading, 4)
                                 .allowsHitTesting(false).accessibilityHidden(true)
                         }
-                        TextEditor(text: Binding(get: { draft.note }, set: { note in change { $0.note = note } }))
+                        TextEditor(text: Binding(get: { draft.note }, set: changeNote))
                             .scrollContentBackground(.hidden).scrollDisabled(true)
                             .focused($noteFocused)
                             .frame(minHeight: 75)
                             .accessibilityLabel(language.text("这一刻的注脚", "A note for this moment"))
                             .accessibilityIdentifier(editing ? "edit-note" : "moment-note")
                     }.font(.body)
+                    if !draft.note.isEmpty {
+                        Text("\(draft.note.utf16.count) / \(Self.noteLimit)")
+                            .font(.caption.monospacedDigit()).foregroundStyle(palette.muted)
+                            .frame(maxWidth: .infinity, alignment: .trailing).padding(.bottom, 6)
+                    }
                     Divider().overlay(palette.outline)
                     HStack {
                         Menu {
@@ -158,6 +215,7 @@ struct JournalComposer: View {
                             Button(language.text("从相册选择照片", "Choose photos"), systemImage: "photo.on.rectangle") { pickPhotos = true }
                                 .disabled(draft.photos.count >= 9)
                             Button(language.text("录音", "Record audio"), systemImage: "mic") { panel = .voice }
+                                .disabled(!editing && draft.audio != nil)
                             Button(language.text("拍摄视频", "Record video"), systemImage: "video") { openCamera(video: true) }
                             Button(language.text("从相册选择视频", "Choose a video"), systemImage: "film") { pickVideo = true }
                         } label: {
@@ -167,11 +225,16 @@ struct JournalComposer: View {
                         Spacer()
                         Button {
                             noteFocused = false
-                            panel = .date
+                            if !editing && draft.date != nil { showTimeOptions = true }
+                            else { panel = .date }
                         } label: {
-                            Text(draft.date.map { formatMomentDay($0, language) } ?? language.text("今天 · 修改时间", "Today · Change time"))
+                            Text(draft.date.map { date in
+                                let time = date.formatted(.dateTime.hour().minute().locale(language.locale))
+                                return "\(formatMomentDay(date, language)) · \(time)"
+                            } ?? language.text("今天 · 修改时间", "Today · Change time"))
                                 .font(.subheadline).padding(.vertical, 12).multilineTextAlignment(.trailing)
                         }.buttonStyle(.plain).foregroundStyle(palette.muted)
+                            .accessibilityIdentifier("entry-time")
                     }
                     .padding(.bottom, -9)
                 }
@@ -187,7 +250,8 @@ struct JournalComposer: View {
             }
             let title = editing ? language.text("保存修改", "Save changes")
                 : (draft.mood == nil ? language.text("先选择一种心情", "Choose a mood first")
-                   : language.text("留住这一刻", "Save this moment"))
+                   : (draft.date == nil ? language.text("记下此刻", "Save this moment")
+                      : language.text("补记这一刻", "Save this past moment")))
             XikeAction(title: mediaLoading ? language.text("正在导入…", "Importing…") : title,
                        enabled: draft.mood != nil && !model.busy && !mediaLoading) {
                 noteFocused = false
@@ -255,7 +319,14 @@ struct JournalComposer: View {
 
     private var weatherCard: some View {
         VStack(alignment: .leading, spacing: 9) {
-            XikeTitle(title: language.text("此刻窗外", "Outside now"), large: false)
+            if editing {
+                XikeTitle(title: language.text("此刻窗外", "Outside now"), large: false)
+            } else {
+                HiddenSettingsTitle(title: language.text("此刻窗外", "Outside now"), large: false) {
+                    noteFocused = false
+                    panel = .amap
+                }.accessibilityIdentifier("amap-settings-entry")
+            }
             XikeCard {
                 HStack(spacing: 12) {
                     Image(systemName: draft.outdoor?.weatherIcon ?? "cloud.sun").font(.title2)
@@ -270,7 +341,7 @@ struct JournalComposer: View {
                     Spacer()
                     if draft.outdoor == nil {
                         Button(language.text("添加", "Add")) { panel = .weather }.font(.subheadline.weight(.medium))
-                            .disabled(!Calendar.xike.isDateInToday(draft.date ?? .now))
+                            .disabled(editing ? !Calendar.xike.isDateInToday(draft.date ?? .now) : draft.date != nil)
                     } else {
                         removeButton(language.text("移除天气", "Remove weather")) { change { $0.outdoor = nil } }
                     }
@@ -291,14 +362,11 @@ struct JournalComposer: View {
         case .feelings:
             FeelingsPanel(selection: draft.feelings) { values in change { $0.feelings = values } }
         case .date:
-            ChooseEntryDate(date: draft.date ?? .now, hasWeather: draft.outdoor != nil) { date in
-                change {
-                    if !Calendar.xike.isDate($0.date ?? .now, inSameDayAs: date) { $0.outdoor = nil }
-                    $0.date = date
-                }
-            }
+            ChooseEntryDate(date: draft.date ?? .now, weatherDate: weatherDate, onApply: { applyDate($0) })
         case .weather:
             WeatherPanel { weather in change { $0.outdoor = weather } }
+        case .amap:
+            AMapSettingsPanel()
         case .voice:
             if let folder = model.captureDirectory {
                 VoiceCapturePanel(folder: folder) { url, duration in
@@ -324,6 +392,34 @@ struct JournalComposer: View {
         var value = draft
         update(&value)
         model.setDraft(value, editing: editing)
+    }
+
+    private func changeNote(_ note: String) {
+        let limit = max(Self.noteLimit, draft.note.utf16.count)
+        if note.utf16.count <= limit {
+            change { $0.note = note }
+        } else {
+            var length = 0
+            let prefix = note.prefix { character in
+                length += String(character).utf16.count
+                return length <= limit
+            }
+            change { $0.note = String(prefix) }
+        }
+    }
+
+    private var weatherDate: Date? {
+        guard let weather = draft.outdoor else { return nil }
+        if editing { return draft.date }
+        return Date(timeIntervalSince1970: Double(weather.capturedAt) / 1_000)
+    }
+
+    private func applyDate(_ selected: Date?) {
+        let source = weatherDate
+        change {
+            if let source, !Calendar.xike.isDate(source, inSameDayAs: selected ?? .now) { $0.outdoor = nil }
+            $0.date = selected
+        }
     }
 
     private func openCamera(video: Bool) {
@@ -462,15 +558,15 @@ private struct ChooseEntryDate: View {
     @Environment(\.xikeLanguage) private var language
     @Environment(\.dismiss) private var dismiss
     @State private var date: Date
-    let original: Date
-    let hasWeather: Bool
+    let latest: Date
+    let weatherDate: Date?
     let onApply: (Date) -> Void
     @State private var confirm = false
 
-    init(date: Date, hasWeather: Bool, onApply: @escaping (Date) -> Void) {
+    init(date: Date, weatherDate: Date?, onApply: @escaping (Date) -> Void) {
         _date = State(initialValue: date)
-        original = date
-        self.hasWeather = hasWeather
+        latest = max(.now, date)
+        self.weatherDate = weatherDate
         self.onApply = onApply
     }
 
@@ -478,10 +574,10 @@ private struct ChooseEntryDate: View {
         ModalPage(title: language.text("修改日期时间", "Change date and time")) {
             XikeCard {
                 DatePicker(language.text("记录时间", "Entry time"), selection: $date,
-                           in: ...max(.now, date), displayedComponents: [.date, .hourAndMinute]).datePickerStyle(.graphical)
+                           in: ...latest, displayedComponents: [.date, .hourAndMinute]).datePickerStyle(.graphical)
             }
             XikeAction(title: language.text("完成", "Done")) {
-                if hasWeather && !Calendar.xike.isDate(date, inSameDayAs: original) { confirm = true }
+                if let weatherDate, !Calendar.xike.isDate(date, inSameDayAs: weatherDate) { confirm = true }
                 else { onApply(date); dismiss() }
             }
         }

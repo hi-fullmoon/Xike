@@ -37,7 +37,7 @@ private final class EncryptedDatabase {
                     PRAGMA user_version=1;
                     """)
             }
-        case 1: break
+        case 1, 2: break
         default: throw JournalError.storage
         }
     }
@@ -67,20 +67,25 @@ private final class EncryptedDatabase {
     }
 
     func rows<T>(_ sql: String, _ arguments: [BindValue] = [], read: (OpaquePointer) throws -> T) throws -> [T] {
+        var values: [T] = []
+        try forEachRow(sql, arguments) { values.append(try read($0)) }
+        return values
+    }
+
+    func forEachRow(_ sql: String, _ arguments: [BindValue] = [], read: (OpaquePointer) throws -> Void) throws {
         let statement = try prepare(sql, arguments)
         defer { sqlite3_finalize(statement) }
-        var values: [T] = []
         while true {
             switch sqlite3_step(statement) {
-            case SQLITE_ROW: values.append(try read(statement))
-            case SQLITE_DONE: return values
+            case SQLITE_ROW: try read(statement)
+            case SQLITE_DONE: return
             default: throw JournalError.storage
             }
         }
     }
 
-    private func firstInteger(_ sql: String) throws -> Int64? {
-        try rows(sql) { sqlite3_column_int64($0, 0) }.first
+    func firstInteger(_ sql: String, _ arguments: [BindValue] = []) throws -> Int64? {
+        try rows(sql, arguments) { sqlite3_column_int64($0, 0) }.first
     }
 
     private func prepare(_ sql: String, _ arguments: [BindValue]) throws -> OpaquePointer {
@@ -116,12 +121,17 @@ private final class EncryptedDatabase {
 }
 
 struct LoadedJournal {
-    let records: [JournalRecord]
+    let library: JournalLibraryStatus
     let draft: JournalDraft?
     let editDraft: JournalDraft?
     let media: MediaDirectory
     let captureDirectory: URL
-    let canUndoRestore: Bool
+}
+
+struct JournalLibraryStatus {
+    var total = 0
+    var todayCount = 0
+    var canUndoRestore = false
 }
 
 struct RestoreResult {
@@ -136,7 +146,27 @@ private struct DeletedRecord: Codable {
     var until: Date
 }
 
+private struct RestorePlan {
+    let contents: JournalContents
+    let result: RestoreResult
+}
+
+private struct LegacyConflictGroup: Hashable {
+    let timestamp: Int64
+    let mood: Mood
+    let note: String
+    let photoCount: Int
+
+    init(_ record: JournalRecord) {
+        timestamp = record.createdAt
+        mood = record.mood
+        note = record.note
+        photoCount = record.imageFileNames.count
+    }
+}
+
 actor JournalStore {
+    static let archivePageSize = 60
     private var database: EncryptedDatabase?
     private var media: MediaDirectory?
     private var root: URL?
@@ -146,7 +176,7 @@ actor JournalStore {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    func open() throws -> LoadedJournal {
+    func open(today: Date = .now) throws -> LoadedJournal {
         if database == nil {
             let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                        appropriateFor: nil, create: true)
@@ -159,6 +189,7 @@ actor JournalStore {
             let mediaFolder = folder.appending(path: "Attachments", directoryHint: .isDirectory)
             try SecureDirectory.make(mediaFolder)
             let db = try EncryptedDatabase(file, key: key)
+            try migrateSearchIndex(db)
             let temporary = folder.appending(path: "Capture", directoryHint: .isDirectory)
             let staging = folder.appending(path: "Restore", directoryHint: .isDirectory)
             for url in [temporary, staging] where FileManager.default.fileExists(atPath: url.path) {
@@ -171,17 +202,105 @@ actor JournalStore {
             root = folder
             try? prune(db, media: requireMedia())
         }
-        return try current()
-    }
-
-    func current() throws -> LoadedJournal {
         let db = try requireDatabase()
-        return LoadedJournal(records: try contents(db).entries,
+        return LoadedJournal(library: try libraryStatus(today: today),
                              draft: try state(JournalDraft.self, "draft", db),
                              editDraft: try state(JournalDraft.self, "edit", db),
                              media: try requireMedia(),
-                             captureDirectory: try requireRoot().appending(path: "Capture"),
-                             canUndoRestore: try hasState("restore-undo", db))
+                             captureDirectory: try requireRoot().appending(path: "Capture"))
+    }
+
+    func libraryStatus(today: Date) throws -> JournalLibraryStatus {
+        let db = try requireDatabase()
+        let total = try db.firstInteger("SELECT count(*) FROM journal_entry") ?? 0
+        let todayCount: Int64
+        if let day = Calendar.xike.dateInterval(of: .day, for: today) {
+            todayCount = try db.firstInteger("SELECT count(*) FROM journal_entry WHERE created_at >= ? AND created_at < ?",
+                                             [.integer(day.start.epochMillis), .integer(day.end.epochMillis)]) ?? 0
+        } else { todayCount = 0 }
+        return JournalLibraryStatus(total: Int(total), todayCount: Int(todayCount),
+                                    canUndoRestore: try hasState("restore-undo", db))
+    }
+
+    func entry(_ id: String) throws -> JournalRecord? {
+        try record(id: id, requireDatabase())
+    }
+
+    func entries(in interval: DateInterval? = nil) throws -> [JournalRecord] {
+        let db = try requireDatabase()
+        let (clause, args) = archiveCondition(ArchiveFilter(), interval: interval)
+        return try readRecords(db, clause: clause + " ORDER BY created_at DESC, id", arguments: args)
+    }
+
+    func archivePage(filter: ArchiveFilter, today: Date, calendar: Calendar, offset: Int) throws -> ArchivePage {
+        let db = try requireDatabase()
+        let (clause, args) = archiveCondition(filter, interval: filter.interval(today: today, calendar: calendar))
+        let records = try readRecords(db, clause: clause + " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
+                                      arguments: args + [.integer(Int64(Self.archivePageSize)), .integer(Int64(offset))])
+        let total = try db.firstInteger("SELECT count(*) FROM journal_entry" + clause, args) ?? 0
+        return ArchivePage(records: records, total: Int(total))
+    }
+
+    func review(period: InsightsPeriod, today: Date, calendar: Calendar) throws -> JournalReview {
+        let ranges = period.ranges(today: today, calendar: calendar)
+        func slice(_ interval: DateInterval) throws -> ReviewSlice {
+            ReviewSlice(start: interval.start, end: interval.end, entries: try entries(in: interval))
+        }
+        return try JournalReview(current: slice(ranges.current), previous: slice(ranges.previous), period: period, calendar: calendar)
+    }
+
+    func calendarCounts(filter: ArchiveFilter, month: Date, calendar: Calendar) throws -> [Date: Int] {
+        guard let interval = calendar.dateInterval(of: .month, for: month) else { return [:] }
+        let (clause, args) = archiveCondition(filter, interval: interval)
+        return try dayCounts(clause: clause, arguments: args, calendar: calendar)
+    }
+
+    func memoryDays(today: Date, calendar: Calendar) throws -> [MemoryDay] {
+        let monthAgo = calendar.date(byAdding: .month, value: -1, to: today)
+        let current = calendar.dateComponents([.year, .month, .day], from: today)
+        let counts = try dayCounts(clause: " WHERE created_at < ?", arguments: [.integer(today.epochMillis)], calendar: calendar)
+        return counts.compactMap { date, count -> MemoryDay? in
+            let day = calendar.dateComponents([.year, .month, .day], from: date)
+            let previousYear = (day.year ?? 0) < (current.year ?? 0) && day.month == current.month && day.day == current.day
+            let isMonthAgo = date == monthAgo
+            return previousYear || isMonthAgo ? MemoryDay(date: date, count: count, isMonthAgo: isMonthAgo) : nil
+        }.sorted { $0.date > $1.date }
+    }
+
+    private func dayCounts(clause: String, arguments: [BindValue], calendar: Calendar) throws -> [Date: Int] {
+        let db = try requireDatabase()
+        var counts: [Date: Int] = [:]
+        try db.forEachRow("SELECT created_at FROM journal_entry" + clause, arguments) { row in
+            let date = Date(timeIntervalSince1970: Double(sqlite3_column_int64(row, 0)) / 1_000)
+            counts[calendar.startOfDay(for: date), default: 0] += 1
+        }
+        return counts
+    }
+
+    private func archiveCondition(_ filter: ArchiveFilter, interval: DateInterval?) -> (String, [BindValue]) {
+        var conditions: [String] = []
+        var arguments: [BindValue] = []
+        if let interval {
+            conditions.append("created_at >= ? AND created_at < ?")
+            arguments += [.integer(interval.start.epochMillis), .integer(interval.end.epochMillis)]
+        }
+        if filter.hasSearchText {
+            guard let expression = JournalSearch.expression(filter.text) else { return (" WHERE 0", []) }
+            conditions.append("rowid IN (SELECT docid FROM journal_search WHERE journal_search MATCH ?)")
+            arguments.append(.text(expression))
+        }
+        let moods = Mood.choices.filter { filter.moods.contains($0.score) }
+        if !moods.isEmpty {
+            let placeholders = Array(repeating: "?", count: moods.count).joined(separator: ",")
+            conditions.append("mood IN (\(placeholders))")
+            arguments += moods.map { .text($0.rawValue) }
+        }
+        if filter.photos != .any {
+            conditions.append("has_photos = ?")
+            arguments.append(.integer(filter.photos == .present ? 1 : 0))
+        }
+        if filter.favorites { conditions.append("is_favorite = 1") }
+        return (conditions.isEmpty ? "" : " WHERE " + conditions.joined(separator: " AND "), arguments)
     }
 
     func saveDraft(_ draft: JournalDraft?, revision: Int, editing: Bool) throws {
@@ -229,6 +348,7 @@ actor JournalStore {
         let db = try requireDatabase()
         guard let record = try record(id: id, db) else { throw JournalError.changed }
         try db.transaction {
+            try db.execute("DELETE FROM journal_search WHERE docid=(SELECT rowid FROM journal_entry WHERE id=?)", [.text(id)])
             try db.execute("DELETE FROM journal_entry WHERE id=?", [.text(id)])
             try setState(DeletedRecord(record: record, until: .now.addingTimeInterval(7)), "delete-undo", db)
             try removeState("restore-undo", db)
@@ -295,7 +415,7 @@ actor JournalStore {
         }
     }
 
-    func export(password: String?, language: XikeLanguage) throws -> URL {
+    func export(password: String?, language: XikeLanguage, verify: Bool = false) throws -> URL {
         let _ = try open()
         let base = try requireRoot().appending(path: "Capture")
         let protection: FileProtectionType = password == nil ? .complete : .completeUntilFirstUserAuthentication
@@ -303,7 +423,7 @@ actor JournalStore {
         let url = folder.appending(path: password == nil ? "Xike.zip" : "Xike.xike")
         do {
             try JournalBackup.write(contents(requireDatabase()), media: requireMedia(), destination: url,
-                                    password: password, language: language)
+                                    password: password, language: language, verify: verify)
             return url
         } catch {
             try? FileManager.default.removeItem(at: folder)
@@ -311,25 +431,18 @@ actor JournalStore {
         }
     }
 
+    func previewMerge(_ prepared: PreparedBackup) throws -> RestoreResult {
+        let db = try requireDatabase()
+        return try planRestore(prepared, mode: .merge, previous: contents(db), media: requireMedia()).result
+    }
+
     func restore(_ prepared: PreparedBackup, mode: RestoreMode) throws -> RestoreResult {
         let db = try requireDatabase()
         let media = try requireMedia()
         let previous = try contents(db)
-        var incoming = prepared.contents
-        let catalog = try combineCatalog(local: previous.labelCatalog, incoming: &incoming, mode: mode)
-        var records: [JournalRecord]
-        var result: RestoreResult
-        switch mode {
-        case .merge:
-            (records, result) = try merged(previous.entries, incoming.entries, localMedia: media, importedMedia: prepared.media)
-        case .replace:
-            var seen = Set<String>()
-            records = incoming.entries.filter { seen.insert($0.id).inserted }
-            result = RestoreResult(additions: records.count, conflicts: 0, favorites: 0, changed: true)
-        }
-        result.changed = result.changed || catalog != previous.labelCatalog
-        guard result.changed else { return result }
-        let files = Set(records.flatMap { $0.attachments.keys }).intersection(prepared.contents.files)
+        let plan = try planRestore(prepared, mode: mode, previous: previous, media: media)
+        guard plan.result.changed else { return plan.result }
+        let files = plan.contents.files.intersection(prepared.contents.files)
         var moved: [String] = []
         do {
             for name in files.sorted() {
@@ -337,10 +450,11 @@ actor JournalStore {
                 try FileManager.default.moveItem(at: prepared.media.path(name), to: media.path(name))
                 moved.append(name)
             }
+            try Task.checkCancellation()
             try db.transaction {
                 try setState(previous, "restore-undo", db)
-                try replaceEntries(records, db)
-                try setState(catalog, "labels", db)
+                try setState(plan.contents.labelCatalog, "labels", db)
+                try replaceEntries(plan.contents.entries, catalog: plan.contents.labelCatalog, db)
                 try removeState("delete-undo", db)
                 if mode == .replace { try removeState("edit", db) }
             }
@@ -353,7 +467,25 @@ actor JournalStore {
             throw error
         }
         try? prune(db, media: media)
-        return result
+        return plan.result
+    }
+
+    private func planRestore(_ prepared: PreparedBackup, mode: RestoreMode, previous: JournalContents,
+                             media: MediaDirectory) throws -> RestorePlan {
+        var incoming = prepared.contents
+        let catalog = try combineCatalog(local: previous.labelCatalog, incoming: &incoming, mode: mode)
+        let records: [JournalRecord]
+        var result: RestoreResult
+        switch mode {
+        case .merge:
+            (records, result) = try merged(previous.entries, incoming.entries, localMedia: media, importedMedia: prepared.media)
+        case .replace:
+            var seen = Set<String>()
+            records = incoming.entries.filter { seen.insert($0.id).inserted }
+            result = RestoreResult(additions: records.count, conflicts: 0, favorites: 0, changed: true)
+        }
+        result.changed = result.changed || catalog != previous.labelCatalog
+        return RestorePlan(contents: JournalContents(entries: records, labelCatalog: catalog), result: result)
     }
 
     func undoRestore() throws {
@@ -362,8 +494,8 @@ actor JournalStore {
         let media = try requireMedia()
         for name in snapshot.files { _ = try media.reader(name) }
         try db.transaction {
-            try replaceEntries(snapshot.entries, db)
             try setState(snapshot.labelCatalog, "labels", db)
+            try replaceEntries(snapshot.entries, catalog: snapshot.labelCatalog, db)
             try removeState("restore-undo", db)
             try removeState("edit", db)
         }
@@ -386,29 +518,75 @@ actor JournalStore {
     }
 
     private func contents(_ db: EncryptedDatabase) throws -> JournalContents {
-        let records = try db.rows("SELECT payload FROM journal_entry ORDER BY created_at DESC, id") {
+        let records = try readRecords(db, clause: " ORDER BY created_at DESC, id")
+        return JournalContents(entries: records, labelCatalog: try labelCatalog(db))
+    }
+
+    private func readRecords(_ db: EncryptedDatabase, clause: String, arguments: [BindValue] = []) throws -> [JournalRecord] {
+        try db.rows("SELECT payload FROM journal_entry" + clause, arguments) {
             try decoder.decode(JournalRecord.self, from: EncryptedDatabase.data($0))
         }
-        let catalog = try state([JournalLabel].self, "labels", db) ?? JournalLabel.builtin
-        return JournalContents(entries: records, labelCatalog: catalog)
     }
 
     private func record(id: String, _ db: EncryptedDatabase) throws -> JournalRecord? {
-        try db.rows("SELECT payload FROM journal_entry WHERE id=?", [.text(id)]) {
-            try decoder.decode(JournalRecord.self, from: EncryptedDatabase.data($0))
-        }.first
+        try readRecords(db, clause: " WHERE id=?", arguments: [.text(id)]).first
     }
 
-    private func upsert(_ record: JournalRecord, _ db: EncryptedDatabase) throws {
+    private func labelCatalog(_ db: EncryptedDatabase) throws -> [JournalLabel] {
+        try state([JournalLabel].self, "labels", db) ?? JournalLabel.builtin
+    }
+
+    private func migrateSearchIndex(_ db: EncryptedDatabase) throws {
+        guard try db.firstInteger("PRAGMA user_version") == 1 else { return }
+        try db.transaction {
+            try db.execute("""
+                ALTER TABLE journal_entry ADD COLUMN mood TEXT NOT NULL DEFAULT '';
+                ALTER TABLE journal_entry ADD COLUMN has_photos INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE journal_entry ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
+                CREATE VIRTUAL TABLE journal_search USING fts4(searchable_text, tokenize=unicode61);
+                """)
+            let labels = Dictionary(uniqueKeysWithValues: try labelCatalog(db).map { ($0.id, $0) })
+            var lastRow: Int64 = 0
+            while true {
+                let page = try db.rows("SELECT payload, rowid FROM journal_entry WHERE rowid > ? ORDER BY rowid LIMIT ?",
+                                       [.integer(lastRow), .integer(Int64(Self.archivePageSize))]) { row in
+                    (try decoder.decode(JournalRecord.self, from: EncryptedDatabase.data(row)), sqlite3_column_int64(row, 1))
+                }
+                for (record, rowID) in page {
+                    try db.execute("UPDATE journal_entry SET mood=?, has_photos=?, is_favorite=? WHERE id=?",
+                                   [.text(record.mood.rawValue), .integer(record.imageFileNames.isEmpty ? 0 : 1),
+                                    .integer(record.isFavorite ? 1 : 0), .text(record.id)])
+                    try index(record, labels: labels, db)
+                    lastRow = rowID
+                }
+                if page.count < Self.archivePageSize { break }
+            }
+            try db.execute("PRAGMA user_version=2")
+        }
+    }
+
+    private func upsert(_ record: JournalRecord, labels: [String: JournalLabel]? = nil, _ db: EncryptedDatabase) throws {
         try db.execute("""
-            INSERT INTO journal_entry(id, created_at, payload) VALUES(?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET created_at=excluded.created_at, payload=excluded.payload
-            """, [.text(record.id), .integer(record.createdAt), .blob(try encoder.encode(record))])
+            INSERT INTO journal_entry(id, created_at, payload, mood, has_photos, is_favorite) VALUES(?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET created_at=excluded.created_at, payload=excluded.payload,
+                mood=excluded.mood, has_photos=excluded.has_photos, is_favorite=excluded.is_favorite
+            """, [.text(record.id), .integer(record.createdAt), .blob(try encoder.encode(record)),
+                  .text(record.mood.rawValue), .integer(record.imageFileNames.isEmpty ? 0 : 1), .integer(record.isFavorite ? 1 : 0)])
+        let definitions = try labels ?? Dictionary(uniqueKeysWithValues: labelCatalog(db).map { ($0.id, $0) })
+        try index(record, labels: definitions, db)
     }
 
-    private func replaceEntries(_ records: [JournalRecord], _ db: EncryptedDatabase) throws {
+    private func index(_ record: JournalRecord, labels: [String: JournalLabel], _ db: EncryptedDatabase) throws {
+        try db.execute("DELETE FROM journal_search WHERE docid=(SELECT rowid FROM journal_entry WHERE id=?)", [.text(record.id)])
+        try db.execute("INSERT INTO journal_search(docid, searchable_text) SELECT rowid, ? FROM journal_entry WHERE id=?",
+                       [.text(JournalSearch.document(record, labels: labels)), .text(record.id)])
+    }
+
+    private func replaceEntries(_ records: [JournalRecord], catalog: [JournalLabel], _ db: EncryptedDatabase) throws {
         try db.execute("DELETE FROM journal_entry")
-        for record in records { try upsert(record, db) }
+        try db.execute("DELETE FROM journal_search")
+        let labels = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+        for record in records { try upsert(record, labels: labels, db) }
     }
 
     private func state<T: Decodable>(_ type: T.Type, _ name: String, _ db: EncryptedDatabase) throws -> T? {
@@ -433,16 +611,21 @@ actor JournalStore {
     }
 
     private func prune(_ db: EncryptedDatabase, media: MediaDirectory) throws {
-        var references = try contents(db).files.union(pendingFiles)
-        if let previous = try state(JournalContents.self, "restore-undo", db) { references.formUnion(previous.files) }
-        for key in ["draft", "edit"] {
-            if let draft = try state(JournalDraft.self, key, db) { references.formUnion(draft.files) }
-        }
+        var references = pendingFiles
         if let deleted = try state(DeletedRecord.self, "delete-undo", db) {
             if deleted.until > .now { references.formUnion(deleted.record.attachments.keys) }
             else { try removeState("delete-undo", db) }
         }
         let names = try FileManager.default.contentsOfDirectory(atPath: media.root.path)
+        if names.isEmpty { return }
+        try db.forEachRow("SELECT payload FROM journal_entry") { row in
+            let record = try decoder.decode(JournalRecord.self, from: EncryptedDatabase.data(row))
+            references.formUnion(record.attachments.keys)
+        }
+        if let previous = try state(JournalContents.self, "restore-undo", db) { references.formUnion(previous.files) }
+        for key in ["draft", "edit"] {
+            if let draft = try state(JournalDraft.self, key, db) { references.formUnion(draft.files) }
+        }
         for name in names where !references.contains(name) { media.remove(name) }
     }
 
@@ -486,6 +669,11 @@ actor JournalStore {
             let pieces = id.split(separator: ":", omittingEmptySubsequences: false)
             if pieces.count == 4 { versions[String(pieces[1]), default: []].append(id) }
         }
+        let legacyCandidates = Dictionary(grouping: local.filter {
+            guard let id = UUID(uuidString: $0.id) else { return false }
+            return id.uuid.6 >> 4 == 3
+        }, by: LegacyConflictGroup.init)
+        var legacyProbeBudget = 1_000_000
         func key(_ entry: JournalRecord) throws -> String {
             if let known = contentKeys[entry.id] { return known }
             let value = try digest(entry, media: localMedia, cache: &localDigests)
@@ -497,6 +685,21 @@ actor JournalStore {
                 known[id]?.isFavorite = true
                 if originalIds.contains(id) { result.favorites += 1 }
             }
+        }
+        func legacyMatch(_ entry: JournalRecord, contentKey: String) throws -> String? {
+            let candidates = try (legacyCandidates[LegacyConflictGroup(entry)] ?? []).filter { try key($0) == contentKey }
+            if candidates.isEmpty { return nil }
+            let ids = Set(candidates.map(\.id))
+            // Old Android versions allocated UUID v3 slots within the 16 MiB manifest limit.
+            let lastSlot = Int(JournalBackup.manifestLimit / 36)
+            for slot in 0...lastSlot {
+                guard legacyProbeBudget > 0 else { throw JournalError.limit }
+                legacyProbeBudget -= 1
+                if slot.isMultiple(of: 1_024) { try Task.checkCancellation() }
+                let id = nameUUID("xike-restore-conflict:\(entry.id):\(contentKey):\(slot)")
+                if ids.contains(id) { return id }
+            }
+            return nil
         }
         for record in incoming {
             try Task.checkCancellation()
@@ -513,6 +716,10 @@ actor JournalStore {
                 mergeFavorite(matching, from: record)
                 continue
             }
+            if let matching = try legacyMatch(record, contentKey: incomingKey) {
+                mergeFavorite(matching, from: record)
+                continue
+            }
             var copy = record
             if known[copy.id] != nil {
                 var slot = 0
@@ -520,11 +727,14 @@ actor JournalStore {
                     copy.id = "\(marker)\(origin):\(incomingKey):\(slot)"
                     slot += 1
                 } while known[copy.id] != nil
-                versions[origin, default: []].append(copy.id)
                 result.conflicts += 1
             }
             known[copy.id] = copy
             contentKeys[copy.id] = incomingKey
+            if copy.id.hasPrefix(marker) {
+                let pieces = copy.id.split(separator: ":", omittingEmptySubsequences: false)
+                if pieces.count == 4 { versions[String(pieces[1]), default: []].append(copy.id) }
+            }
             result.additions += 1
         }
         result.changed = result.additions > 0 || result.favorites > 0

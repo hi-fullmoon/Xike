@@ -318,6 +318,11 @@ struct JournalDraft: Codable, Equatable, Identifiable {
     var outdoor: OutdoorSnapshot?
     var feelings: [String] = []
 
+    var isEmpty: Bool {
+        date == nil && mood == nil && note.isEmpty && photos.isEmpty && audio == nil && video == nil
+            && outdoor == nil && feelings.isEmpty
+    }
+
     init() {}
 
     init(_ record: JournalRecord) {

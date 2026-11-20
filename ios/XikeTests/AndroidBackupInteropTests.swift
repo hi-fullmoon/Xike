@@ -16,7 +16,8 @@ final class AndroidBackupInteropTests: XCTestCase {
         }
 
         let store = XikeServices.store
-        let before = try await store.open()
+        _ = try await store.open()
+        let before = try await store.entries()
         do {
             _ = try await store.prepareBackup(source, password: password + "-incorrect")
             XCTFail("An incorrect password was accepted.")
@@ -38,8 +39,8 @@ final class AndroidBackupInteropTests: XCTestCase {
         } catch let error as JournalError {
             XCTAssertTrue(error == .password || error == .invalidBackup)
         }
-        let unchanged = try await store.current()
-        XCTAssertTrue(unchanged.records == before.records)
+        let unchanged = try await store.entries()
+        XCTAssertTrue(unchanged == before)
 
         let inspected = try await store.prepareBackup(source, password: password)
         XCTAssertFalse(inspected.contents.entries.isEmpty)
@@ -51,28 +52,34 @@ final class AndroidBackupInteropTests: XCTestCase {
                 XCTAssertGreaterThan(thumbnail.size.width, 0)
             }
         }
+        let preview = try await store.previewMerge(inspected)
         let restore = try await store.restore(inspected, mode: .merge)
+        XCTAssertEqual(preview.additions, restore.additions)
+        XCTAssertEqual(preview.conflicts, restore.conflicts)
+        XCTAssertEqual(preview.favorites, restore.favorites)
         XCTAssertTrue(restore.changed, "Use a dedicated validation device with the fixture not yet imported.")
-        let loaded = try await store.current()
-        XCTAssertTrue(loaded.canUndoRestore)
-        XCTAssertGreaterThanOrEqual(loaded.records.count, inspected.contents.entries.count)
+        let loaded = try await store.entries()
+        let library = try await store.libraryStatus(today: .now)
+        XCTAssertTrue(library.canUndoRestore)
+        XCTAssertGreaterThanOrEqual(loaded.count, inspected.contents.entries.count)
 
         let duplicate = try await store.prepareBackup(source, password: password)
         let repeated = try await store.restore(duplicate, mode: .merge)
         XCTAssertFalse(repeated.changed)
-        let afterRepeat = try await store.current()
-        XCTAssertTrue(afterRepeat.canUndoRestore)
-        XCTAssertTrue(loaded.records == afterRepeat.records)
+        let afterRepeat = try await store.entries()
+        let repeatedLibrary = try await store.libraryStatus(today: .now)
+        XCTAssertTrue(repeatedLibrary.canUndoRestore)
+        XCTAssertTrue(loaded == afterRepeat)
 
-        let output = try await store.export(password: password, language: .chinese)
+        let output = try await store.export(password: password, language: .chinese, verify: true)
         defer { try? FileManager.default.removeItem(at: output.deletingLastPathComponent()) }
         let exchange = documents.appending(path: "iOSInterop.xike")
         if FileManager.default.fileExists(atPath: exchange.path) { try FileManager.default.removeItem(at: exchange) }
         try FileManager.default.copyItem(at: output, to: exchange)
 
         let roundTrip = try await store.prepareBackup(output, password: password)
-        XCTAssertEqual(roundTrip.contents.entries.count, loaded.records.count)
-        XCTAssertEqual(roundTrip.contents.entries.filter(\.isFavorite).count, loaded.records.filter(\.isFavorite).count)
+        XCTAssertEqual(roundTrip.contents.entries.count, loaded.count)
+        XCTAssertEqual(roundTrip.contents.entries.filter(\.isFavorite).count, loaded.filter(\.isFavorite).count)
         let repeatedRoundTrip = try await store.restore(roundTrip, mode: .merge)
         XCTAssertFalse(repeatedRoundTrip.changed)
 
@@ -80,6 +87,26 @@ final class AndroidBackupInteropTests: XCTestCase {
         let unicodeArchive = try await store.export(password: unicodePassword, language: .chinese)
         defer { try? FileManager.default.removeItem(at: unicodeArchive.deletingLastPathComponent()) }
         let unicodeRoundTrip = try await store.prepareBackup(unicodeArchive, password: unicodePassword)
-        XCTAssertEqual(unicodeRoundTrip.contents.entries.count, loaded.records.count)
+        XCTAssertEqual(unicodeRoundTrip.contents.entries.count, loaded.count)
+
+        let incoming = try XCTUnwrap(inspected.contents.entries.first)
+        let local = try await store.entry(incoming.id)
+        var edit = JournalDraft(try XCTUnwrap(local))
+        edit.note += "\n\nReviewed after migration."
+        _ = try await store.save(edit, revision: 1, editing: true)
+        let conflict = try await store.prepareBackup(source, password: password)
+        let estimate = try await store.previewMerge(conflict)
+        XCTAssertEqual(estimate.additions, 1)
+        XCTAssertEqual(estimate.conflicts, 1)
+        let merged = try await store.restore(conflict, mode: .merge)
+        XCTAssertEqual(merged.additions, estimate.additions)
+        XCTAssertEqual(merged.conflicts, estimate.conflicts)
+        let repeatConflict = try await store.prepareBackup(source, password: password)
+        let duplicateConflict = try await store.restore(repeatConflict, mode: .merge)
+        XCTAssertFalse(duplicateConflict.changed)
+        try await store.undoRestore()
+        let afterUndo = try await store.entries()
+        XCTAssertEqual(afterUndo.count, loaded.count)
+        XCTAssertTrue(afterUndo.first { $0.id == incoming.id }?.note == edit.note)
     }
 }

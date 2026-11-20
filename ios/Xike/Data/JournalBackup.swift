@@ -39,7 +39,7 @@ final class PreparedBackup: Identifiable, @unchecked Sendable {
 enum RestoreMode { case merge, replace }
 
 enum JournalBackup {
-    private static let manifestLimit: Int64 = 16 * 1_048_576
+    static let manifestLimit: Int64 = 16 * 1_048_576
     private static let htmlLimit: Int64 = 64 * 1_048_576
     private static let legacyLimit: Int64 = 320 * 1_048_576
     private static let marker = Data("XIKE_BACKUP_COMPLETE".utf8)
@@ -105,7 +105,7 @@ enum JournalBackup {
     }
 
     static func write(_ contents: JournalContents, media: MediaDirectory, destination: URL,
-                      password: String?, language: XikeLanguage) throws {
+                      password: String?, language: XikeLanguage, verify: Bool) throws {
         if let password, password.utf16.count < 8 { throw JournalError.password }
         let manifest = ArchiveManifest(entries: contents.entries, labelCatalog: contents.labelCatalog)
         let manifestData = try JSONEncoder().encode(manifest)
@@ -117,6 +117,7 @@ enum JournalBackup {
         try archive.add("manifest.json", data: manifestData)
         try archive.add("index.html", data: html)
         var total: [AttachmentKind: Int64] = [:]
+        var written: [(name: String, size: Int64)] = []
         for (name, reference) in refs.sorted(by: { ($0.value.kind.rawValue, $0.key) < ($1.value.kind.rawValue, $1.key) }) {
             let source = try media.reader(name)
             total[reference.kind, default: 0] += source.size
@@ -124,10 +125,34 @@ enum JournalBackup {
             guard source.size <= reference.limit, total[reference.kind, default: 0] <= groupLimit,
                   reference.expectedSize == nil || source.size == reference.expectedSize
             else { throw JournalError.limit }
-            try archive.add("\(reference.kind.rawValue)/\(name)", size: source.size, writeContents: source.copy)
+            let path = "\(reference.kind.rawValue)/\(name)"
+            try archive.add(path, size: source.size, writeContents: source.copy)
+            if verify { written.append((path, source.size)) }
         }
         try archive.add("complete.txt", data: marker)
         try archive.finish()
+        if verify {
+            try verifyExport(destination, password: password ?? "", manifest: manifestData,
+                             htmlSize: Int64(html.count), files: written)
+        }
+    }
+
+    private static func verifyExport(_ url: URL, password: String, manifest: Data, htmlSize: Int64,
+                                     files: [(name: String, size: Int64)]) throws {
+        let archive = try ArchiveReader(url, password: password)
+        guard try archive.next() == "manifest.json", try archive.data(limit: manifestLimit) == manifest,
+              try archive.next() == "index.html", try archive.copy(limit: htmlSize, to: { _ in }) == htmlSize else {
+            throw JournalError.invalidBackup
+        }
+        for (name, size) in files {
+            guard try archive.next() == name, try archive.copy(limit: size, to: { _ in }) == size else {
+                throw JournalError.invalidBackup
+            }
+        }
+        guard try archive.next() == "complete.txt", try archive.data(limit: 64) == marker, try archive.next() == nil else {
+            throw JournalError.invalidBackup
+        }
+        try archive.verifyEnd()
     }
 
     private struct Reference: Equatable {

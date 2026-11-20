@@ -123,6 +123,7 @@ struct AttachmentImage: View {
 }
 
 struct PlaybackPanel: View {
+    @Environment(\.scenePhase) private var phase
     @Environment(\.palette) private var palette
     @Environment(\.xikeLanguage) private var language
     let file: String
@@ -185,6 +186,12 @@ struct PlaybackPanel: View {
             if !seeking && player.currentTime().seconds.isFinite { position = player.currentTime().seconds }
             if playing && position >= Double(duration) / 1000 - 0.15 && player.timeControlStatus == .paused { playing = false }
         }
+        .onChange(of: phase) { _, phase in
+            if phase != .active {
+                player?.pause()
+                playing = false
+            }
+        }
         .onDisappear {
             player?.pause()
             player = nil
@@ -232,10 +239,13 @@ final class VoiceCapture {
     private(set) var elapsed = 0.0
     private(set) var isPaused = false
     private(set) var finished = false
+    private(set) var samples: [CGFloat] = []
+    static let sampleCount = 40
     var preview: AVAudioPlayer?
 
     func begin(in folder: URL) async throws {
         guard await AVAudioApplication.requestRecordPermission() else { throw JournalError.unavailable }
+        try Task.checkCancellation()
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
         try session.setActive(true)
@@ -245,6 +255,7 @@ final class VoiceCapture {
                 AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44_100,
                 AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 96_000,
             ])
+            recording.isMeteringEnabled = true
             guard recording.record(forDuration: 300) else { throw JournalError.io }
             file = url
             recorder = recording
@@ -257,8 +268,13 @@ final class VoiceCapture {
 
     func tick() {
         guard let recorder, !isPaused, !finished else { return }
-        if recorder.isRecording { elapsed = max(elapsed, recorder.currentTime) }
-        else if elapsed > 0 { finish() }
+        if recorder.isRecording {
+            elapsed = max(elapsed, recorder.currentTime)
+            recorder.updateMeters()
+            let level = CGFloat(recorder.peakPower(forChannel: 0))
+            if samples.count >= Self.sampleCount { samples.removeFirst() }
+            samples.append(level.isFinite ? min(1, max(0, (level + 50) / 50)) : 0)
+        } else if elapsed > 0 { finish() }
     }
 
     func pause() {
@@ -305,17 +321,18 @@ struct VoiceCapturePanel: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.xikeLanguage) private var language
     @Environment(\.palette) private var palette
+    @Environment(\.scenePhase) private var phase
     let folder: URL
     let apply: (URL, Int64) async -> Bool
     @State private var capture = VoiceCapture()
     @State private var error = false
     @State private var saving = false
-    private let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 0.075, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
-                Image(systemName: "waveform").font(.system(size: 40)).foregroundStyle(palette.primary)
+                waveform
                 Text(mediaTime(capture.elapsed)).font(.largeTitle.monospacedDigit())
                 if error {
                     Text(language.text("无法录音，请检查麦克风权限。", "Check microphone permission and try again."))
@@ -348,12 +365,32 @@ struct VoiceCapturePanel: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button(language.text("取消", "Cancel")) { dismiss() }.disabled(saving) } }
         }
-        .task { do { try await capture.begin(in: folder) } catch { self.error = true } }
+        .task { do { try await capture.begin(in: folder) } catch { if !Task.isCancelled { self.error = true } } }
         .onReceive(timer) { _ in capture.tick() }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
             if capture.recorder != nil && !capture.finished { capture.finish() }
         }
+        .onChange(of: phase) { _, phase in
+            if phase == .background && capture.recorder != nil && !capture.finished { capture.finish() }
+        }
         .interactiveDismissDisabled(saving)
         .onDisappear { capture.clear() }
+    }
+
+    private var waveform: some View {
+        let samples = capture.samples
+        let count = VoiceCapture.sampleCount
+        let color = palette.primary
+        return Canvas { context, size in
+            let step = size.width / CGFloat(count)
+            let width = max(1, step * 0.55)
+            for index in 0..<count {
+                let level = index < count - samples.count ? 0 : samples[index - (count - samples.count)]
+                let height = max(3, level * size.height)
+                let bar = CGRect(x: CGFloat(index) * step + (step - width) / 2,
+                                 y: (size.height - height) / 2, width: width, height: height)
+                context.fill(Path(roundedRect: bar, cornerRadius: width / 2), with: .color(color))
+            }
+        }.frame(height: 56).accessibilityHidden(true)
     }
 }

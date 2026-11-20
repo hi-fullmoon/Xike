@@ -34,34 +34,39 @@ struct DisplayNotice: Identifiable {
 final class JournalAppModel {
     let store: JournalStore
     let automaticBackup: AutomaticBackup
-    let reminders = JournalReminders()
+    let reminders = XikeServices.reminders
     var preferences: LocalPreferences {
         didSet { preferences.save() }
     }
     var tab = XikeTab.moment
-    var records: [JournalRecord] = []
+    private(set) var library = JournalLibraryStatus()
+    private(set) var libraryRevision = 0
+    private(set) var today = Calendar.xike.startOfDay(for: .now)
     var draft = JournalDraft()
     var editDraft: JournalDraft?
     var media: MediaDirectory?
     var captureDirectory: URL?
-    var canUndoRestore = false
     var notice: DisplayNotice?
     var errorMessage: String?
     var blocked: String?
     var isLoaded = false
+    private var isLoading = false
     var isLocked: Bool
     var isAuthenticating = false
+    private var autoUnlockPending: Bool
+    private var authenticationGeneration = 0
     var busy = false
-    var sceneIsActive = true
+    private(set) var sceneIsActive = false
     var archiveFilter = ArchiveFilter()
     var calendarMode = false
     var insightsPeriod = InsightsPeriod.days30
-    private var awaySince: Date?
+    private var awaySince: ContinuousClock.Instant?
     private var draftRevision = 0
     private var editRevision = 0
     private var noticeTask: Task<Void, Never>?
 
     var language: XikeLanguage { preferences.language }
+    var canUndoRestore: Bool { library.canUndoRestore }
 
     init(store: JournalStore) {
         self.store = store
@@ -69,19 +74,21 @@ final class JournalAppModel {
         let initial = LocalPreferences.read()
         preferences = initial
         isLocked = initial.lock
+        autoUnlockPending = initial.lock
     }
 
     func start() async {
-        guard !isLoaded else { return }
+        guard sceneIsActive, !isLocked, !isLoaded, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
         blocked = nil
         do {
-            let initial = try await store.open()
-            records = initial.records
+            let initial = try await store.open(today: today)
+            library = initial.library
             draft = initial.draft ?? JournalDraft()
             editDraft = initial.editDraft
             media = initial.media
             captureDirectory = initial.captureDirectory
-            canUndoRestore = initial.canUndoRestore
             isLoaded = true
         } catch {
             blocked = message(for: error)
@@ -106,48 +113,83 @@ final class JournalAppModel {
         if !Task.isCancelled && !(error is CancellationError) { errorMessage = message(for: error) }
     }
 
-    func phaseChanged(_ phase: ScenePhase) async {
+    func phaseChanged(_ phase: ScenePhase) {
         sceneIsActive = phase == .active
         switch phase {
         case .background:
-            if awaySince == nil { awaySince = .now }
+            if awaySince == nil {
+                awaySince = .now
+                authenticationGeneration &+= 1
+            }
         case .active:
-            if let awaySince, preferences.lock,
-               Date.now.timeIntervalSince(awaySince) >= Double(preferences.lockDelay) {
-                isLocked = true
-                notice = nil
-            }
+            let expired = awaySince.map { $0.duration(to: .now) >= .seconds(preferences.lockDelay) } ?? false
             awaySince = nil
-            if isLoaded {
-                if preferences.reminder.enabled, preferences.reminder.pausedUntil.map({ $0 <= .now }) == true {
-                    preferences.reminder.pausedUntil = nil
-                    try? await reminders.apply(preferences.reminder, language: language, requestPermission: false)
-                }
-                _ = await automaticBackup.runIfDue()
-            }
+            if preferences.lock && expired { lockNow() }
         default: break
         }
     }
 
+    func refreshForeground() async {
+        guard sceneIsActive else { return }
+        await refreshDay()
+        await promptForUnlockIfNeeded()
+        await start()
+        if sceneIsActive { _ = await reminders.reconcile() }
+        if sceneIsActive && isLoaded && !isLocked { _ = await automaticBackup.runIfDue() }
+    }
+
     func unlock() async {
-        guard !isAuthenticating else { return }
+        guard sceneIsActive, isLocked, !isAuthenticating else { return }
+        let generation = authenticationGeneration
+        autoUnlockPending = false
         isAuthenticating = true
         defer { isAuthenticating = false }
         do {
             try await ApplicationLock.authenticate(language)
+            guard generation == authenticationGeneration else { return }
             isLocked = false
+            if isLoaded { try await refresh() }
+            else { await start() }
         } catch {
             if (error as? JournalError) == .unavailable { report(error) }
         }
     }
 
     func setLock(_ enabled: Bool) async {
+        guard sceneIsActive, !isAuthenticating, enabled != preferences.lock else { return }
+        let generation = authenticationGeneration
+        isAuthenticating = true
+        defer { isAuthenticating = false }
         do {
             try await ApplicationLock.authenticate(language)
+            guard generation == authenticationGeneration else { return }
             preferences.lock = enabled
             isLocked = false
         } catch {
             if (error as? JournalError) == .unavailable { report(error) }
+        }
+    }
+
+    func lockNow() {
+        authenticationGeneration &+= 1
+        guard preferences.lock else { return }
+        isLocked = true
+        autoUnlockPending = true
+        noticeTask?.cancel()
+        notice = nil
+        errorMessage = nil
+    }
+
+    func promptForUnlockIfNeeded() async {
+        if sceneIsActive && autoUnlockPending { await unlock() }
+    }
+
+    func refreshDay() async {
+        let date = Calendar.xike.startOfDay(for: .now)
+        guard today != date else { return }
+        today = date
+        if isLoaded && !isLocked {
+            do { try await refresh() } catch { report(error) }
         }
     }
 
@@ -169,13 +211,19 @@ final class JournalAppModel {
         setDraft(JournalDraft(record), editing: true)
     }
 
-    func discardEdit() async {
-        let revision = nextRevision(true)
+    func discardDraft(editing: Bool) async -> Bool {
+        guard !busy else { return false }
+        busy = true
+        defer { busy = false }
         do {
-            try await store.saveDraft(nil, revision: revision, editing: true)
-            editDraft = nil
+            try await store.saveDraft(nil, revision: nextRevision(editing), editing: editing)
+            if editing { editDraft = nil } else { draft = JournalDraft() }
             await store.tidyAttachments()
-        } catch { report(error) }
+            return true
+        } catch {
+            report(error)
+            return false
+        }
     }
 
     func save(editing: Bool) async -> Bool {
@@ -253,22 +301,22 @@ final class JournalAppModel {
         try await persistMediaDraft(value, editing: editing)
     }
 
-    func applyBackup(_ backup: PreparedBackup, mode: RestoreMode) async {
-        guard !busy else { return }
+    func applyBackup(_ backup: PreparedBackup, mode: RestoreMode) async throws {
+        guard !busy else { throw JournalError.changed }
         busy = true
         defer { busy = false }
+        let result = try await store.restore(backup, mode: mode)
+        if mode == .replace { editDraft = nil }
         do {
-            let result = try await store.restore(backup, mode: mode)
             try await refresh()
-            if mode == .replace { editDraft = nil }
-            if result.changed {
-                show(language.text("已恢复备份", "Backup restored"), action: language.text("撤销", "Undo")) { [weak self] in
-                    Task { await self?.undoRestore() }
-                }
-            } else {
-                show(language.text("备份中的记录已在本机", "The backup is already on this device"))
-            }
         } catch { report(error) }
+        if result.changed {
+            show(language.text("已恢复备份", "Backup restored"), action: language.text("撤销", "Undo")) { [weak self] in
+                Task { await self?.undoRestore() }
+            }
+        } else {
+            show(language.text("备份中的记录已在本机", "The backup is already on this device"))
+        }
     }
 
     func undoRestore() async {
@@ -283,11 +331,16 @@ final class JournalAppModel {
         } catch { report(error) }
     }
 
-    func updateReminders(_ options: ReminderOptions, requestPermission: Bool = false) async {
+    @discardableResult
+    func updateReminders(_ options: ReminderOptions, requestPermission: Bool = false) async -> Bool {
         do {
             try await reminders.apply(options, language: language, requestPermission: requestPermission)
             preferences.reminder = options
-        } catch { report(error) }
+            return true
+        } catch {
+            report(error)
+            return false
+        }
     }
 
     private func persistMediaDraft(_ value: JournalDraft, editing: Bool) async throws {
@@ -297,9 +350,8 @@ final class JournalAppModel {
     }
 
     private func refresh() async throws {
-        let latest = try await store.current()
-        records = latest.records
-        canUndoRestore = latest.canUndoRestore
+        library = try await store.libraryStatus(today: today)
+        libraryRevision &+= 1
     }
 
     private func nextRevision(_ editing: Bool) -> Int {

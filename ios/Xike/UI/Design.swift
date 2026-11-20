@@ -132,6 +132,37 @@ struct XikeTitle: View {
     }
 }
 
+struct HiddenSettingsTitle: View {
+    let title: String
+    var large = true
+    let action: () -> Void
+    @State private var firstTap: ContinuousClock.Instant?
+    @State private var taps = 0
+
+    var body: some View {
+        Button {
+            let now = ContinuousClock.now
+            if let firstTap, firstTap.duration(to: now) <= .seconds(2) {
+                taps += 1
+            } else {
+                firstTap = now
+                taps = 1
+            }
+            if taps == 3 { open() }
+        } label: {
+            XikeTitle(title: title, large: large)
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture(count: 3).onEnded { open() })
+    }
+
+    private func open() {
+        firstTap = nil
+        taps = 0
+        action()
+    }
+}
+
 struct XikeAction: View {
     @Environment(\.palette) private var palette
     var title: String

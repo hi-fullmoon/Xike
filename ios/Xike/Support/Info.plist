@@ -43,9 +43,9 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>在你添加窗外信息时查询附近的天气。 Get local weather when you request it.</string>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
-    <array><string>com.xike.app.backup</string></array>
+    <array><string>com.xike.app.backup</string><string>com.xike.app.reminders</string></array>
     <key>UIBackgroundModes</key>
-    <array><string>processing</string></array>
+    <array><string>processing</string><string>fetch</string></array>
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
