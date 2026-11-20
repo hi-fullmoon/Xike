@@ -81,7 +81,10 @@ class AiReviewHeightUiTest {
                 rule.waitUntil(15_000) { runCatching { notes.assertIsOff() }.isSuccess }
                 val initialWindow = rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
                 val initialClose =
-                    rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
+                    rule
+                        .onNodeWithContentDescription(tr("关闭", "Close"))
+                        .fetchSemanticsNode()
+                        .boundsInWindow
                 capture("empty-settings")
                 notes.performScrollTo().performClick().assertIsOn()
                 assertStableBounds(initialWindow, initialClose)
@@ -90,7 +93,7 @@ class AiReviewHeightUiTest {
 
                 // Use real settings controls, without credentials, journal records or network
                 // calls.
-                rule.onNodeWithText(tr("配置", "Settings")).performClick()
+                rule.onNodeWithContentDescription(tr("配置", "Settings")).performClick()
                 rule.onNodeWithTag("ai-address").performScrollTo()
                 awaitEnabled(rule.onNodeWithTag("ai-address"))
                 rule
@@ -129,22 +132,27 @@ class AiReviewHeightUiTest {
         assertEquals(window, rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow)
         assertEquals(
             close,
-            rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow,
+            rule
+                .onNodeWithContentDescription(tr("关闭", "Close"))
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInWindow,
         )
-        listOf(tr("关闭", "Close"), tr("配置", "Settings"), tr("预览发送内容", "Preview content")).forEach {
-            label ->
-            val node = rule.onNodeWithText(label).assertIsDisplayed().fetchSemanticsNode()
-            val layouts = mutableListOf<TextLayoutResult>()
-            assertTrue(
-                requireNotNull(node.config[SemanticsActions.GetTextLayoutResult].action)
-                    .invoke(layouts)
-            )
-            val layout = layouts.single()
-            assertFalse(layout.didOverflowHeight)
-            repeat(layout.lineCount) { assertFalse(layout.isLineEllipsized(it)) }
-            assertTrue(window.contains(node.boundsInWindow.topLeft))
-            assertTrue(node.boundsInWindow.bottom <= window.bottom)
-        }
+        rule.onNodeWithContentDescription(tr("配置", "Settings")).assertIsDisplayed()
+        val node =
+            rule
+                .onNodeWithText(tr("预览发送内容", "Preview content"))
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        assertTrue(
+            requireNotNull(node.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
+        )
+        val layout = layouts.single()
+        assertFalse(layout.didOverflowHeight)
+        repeat(layout.lineCount) { assertFalse(layout.isLineEllipsized(it)) }
+        assertTrue(window.contains(node.boundsInWindow.topLeft))
+        assertTrue(node.boundsInWindow.bottom <= window.bottom)
     }
 
     private fun awaitEnabled(node: SemanticsNodeInteraction) {

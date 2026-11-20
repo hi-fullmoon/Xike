@@ -98,7 +98,7 @@ class AiReviewLocalPreviewUiTest {
                     }
                 }
                 val preview = rule.onNodeWithText(tr("预览发送内容", "Preview content"))
-                val settings = rule.onNodeWithText(tr("配置", "Settings"))
+                val settings = rule.onNodeWithContentDescription(tr("配置", "Settings"))
                 val save = rule.onNodeWithText(tr("保存", "Save"))
                 val confirmation = rule.onNodeWithTag("ai-preview-heading")
                 val reason = rule.onNodeWithTag("ai-send-disabled")
@@ -116,43 +116,41 @@ class AiReviewLocalPreviewUiTest {
                 rule.waitUntil(15_000) { runCatching { preview.assertIsEnabled() }.isSuccess }
                 val window = rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
                 val close =
-                    rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
+                    rule
+                        .onNodeWithContentDescription(tr("关闭", "Close"))
+                        .fetchSemanticsNode()
+                        .boundsInWindow
                 capture("before")
                 preparePreview()
                 rule
                     .onNodeWithTag("ai-review-endpoint")
                     .assertIsDisplayed()
-                    .assertTextEquals(
-                        tr(
-                            "接收地址：https://api.deepseek.com/v1/chat/completions",
-                            "Destination: https://api.deepseek.com/v1/chat/completions",
-                        )
-                    )
-                val period = summary.dateRangeLabel()
-                rule.onNodeWithText(tr("周期：$period", "Period: $period")).assertIsDisplayed()
+                    .assertTextEquals("https://api.deepseek.com/v1/chat/completions")
+                rule.onNodeWithText(summary.dateRangeLabel()).performScrollTo().assertIsDisplayed()
                 rule
                     .onNodeWithText(
                         tr(
                             "${summary.entryCount} 条记录 · 不含日记原文",
-                            "Entries: ${summary.entryCount} · Journal notes excluded",
+                            "${summary.entryCount} entries · Journal notes excluded",
                         )
                     )
+                    .performScrollTo()
                     .assertIsDisplayed()
                 reason
                     .assertIsDisplayed()
                     .assertTextEquals(tr("请在配置中填写 API Key。", "Add an API Key in Settings."))
-                expand.assertIsDisplayed()
+                expand.performScrollTo().assertIsDisplayed()
                 fullRequest.assertDoesNotExist()
                 assertStable(window, close)
                 capture("confirmation")
 
                 settings.performClick()
                 rule.onNodeWithText(tr("取消", "Cancel")).performClick()
-                confirmation.assertIsDisplayed()
+                confirmation.performScrollTo().assertIsDisplayed()
                 fullRequest.assertDoesNotExist()
                 settings.performClick()
                 saveSettings()
-                confirmation.assertIsDisplayed()
+                confirmation.performScrollTo().assertIsDisplayed()
                 fullRequest.assertDoesNotExist()
                 assertStable(window, close)
 
@@ -184,16 +182,19 @@ class AiReviewLocalPreviewUiTest {
                 fullRequest.assertDoesNotExist()
                 assertFalse(operations.load().canUse)
                 assertEquals("", operations.load().apiKey)
-                rule.onNodeWithTag("ai-include-notes").performScrollTo().performClick()
+                rule.onNodeWithText(tr("返回", "Back")).performClick()
                 confirmation.assertDoesNotExist()
+                rule.onNodeWithTag("ai-send").assertDoesNotExist()
+                rule.onNodeWithTag("ai-include-notes").performScrollTo().performClick()
                 preparePreview()
                 rule
                     .onNodeWithText(
                         tr(
                             "${summary.entryCount} 条记录 · 包含日记原文",
-                            "Entries: ${summary.entryCount} · Journal notes included",
+                            "${summary.entryCount} entries · Journal notes included",
                         )
                     )
+                    .performScrollTo()
                     .assertIsDisplayed()
                 fullRequest.assertDoesNotExist()
                 expand.performScrollTo().performClick()
@@ -221,8 +222,14 @@ class AiReviewLocalPreviewUiTest {
                 settings.performClick()
                 rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
                 rule.onNodeWithTag("ai-consent").performScrollTo().performClick().assertIsOn()
+                rule
+                    .onNodeWithTag("ai-enabled")
+                    .performScrollTo()
+                    .assertIsOn()
+                    .performClick()
+                    .assertIsOff()
                 saveSettings()
-                preparePreview()
+                confirmation.performScrollTo().assertIsDisplayed()
                 reason
                     .assertIsDisplayed()
                     .assertTextEquals(tr("请在配置中启用 AI 回顾。", "Enable AI review in Settings."))
@@ -232,7 +239,7 @@ class AiReviewLocalPreviewUiTest {
                 rule.waitUntil(5_000) { runCatching { save.assertIsEnabled() }.isSuccess }
                 rule.onNodeWithTag("ai-enabled").performScrollTo().performClick().assertIsOn()
                 saveSettings()
-                preparePreview()
+                confirmation.performScrollTo().assertIsDisplayed()
                 rule.onNodeWithTag("ai-send").assertIsEnabled()
                 reason.assertDoesNotExist()
             }
@@ -254,10 +261,10 @@ class AiReviewLocalPreviewUiTest {
         rule.waitForIdle()
         assertEquals(window, rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow)
         val currentClose =
-            rule.onNodeWithText(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
+            rule.onNodeWithContentDescription(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
         assertEquals(close.top, currentClose.top, 1f)
         assertEquals(close.bottom, currentClose.bottom, 1f)
-        rule.onNodeWithText(tr("配置", "Settings")).assertIsDisplayed()
+        rule.onNodeWithContentDescription(tr("配置", "Settings")).assertIsDisplayed()
         rule.onNodeWithTag("ai-send").assertIsDisplayed().assertIsNotEnabled()
     }
 

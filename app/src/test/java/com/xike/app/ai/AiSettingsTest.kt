@@ -136,4 +136,123 @@ class AiSettingsTest {
             assertTrue(runCatching { parseAiReview(content, empty) }.isFailure)
         }
     }
+
+    private val twoSources =
+        AiReviewInput("", listOf(AiSource(1, "a", "2026-11-01"), AiSource(2, "b", "2026-11-02")))
+
+    private fun observation(title: Any, text: Any, vararg references: Any) =
+        JSONObject()
+            .put("title", title)
+            .put("text", text)
+            .put("references", org.json.JSONArray(references.toList()))
+
+    @Test
+    fun `one malformed observation does not discard the grounded ones`() {
+        val response =
+            JSONObject()
+                .put(
+                    "observations",
+                    org.json
+                        .JSONArray()
+                        .put(observation("Kept", "Grounded", 1, 99, 1))
+                        .put(observation("Unknown citation", "Dropped", 99))
+                        .put(observation(7, "Non-string title is dropped", 2))
+                        .put(observation("x".repeat(121), "Overlong title is dropped", 2))
+                        .put(observation("Second", "Also kept", 2.0, 1.5)),
+                )
+                .put("questions", org.json.JSONArray().put("Q1").put(JSONObject.NULL).put(" "))
+        val review = parseAiReview(response.toString(), twoSources)
+        assertEquals(listOf("Kept", "Second"), review.observations.map { it.title })
+        assertEquals(listOf(1), review.observations[0].references)
+        assertEquals(listOf(2), review.observations[1].references)
+        assertEquals(listOf("Q1"), review.questions)
+    }
+
+    @Test
+    fun `extra items are capped and missing questions are allowed`() {
+        val observations = org.json.JSONArray()
+        repeat(6) { observations.put(observation("T$it", "Text", 1, 2, 1, 2, 1, 2)) }
+        val questions = org.json.JSONArray()
+        repeat(5) { questions.put("Q$it") }
+        val review =
+            parseAiReview(
+                JSONObject()
+                    .put("observations", observations)
+                    .put("questions", questions)
+                    .toString(),
+                twoSources,
+            )
+        assertEquals(AI_MAX_OBSERVATIONS, review.observations.size)
+        assertEquals(listOf(1, 2), review.observations.first().references)
+        assertEquals(AI_MAX_QUESTIONS, review.questions.size)
+
+        val withoutQuestions =
+            parseAiReview(
+                JSONObject()
+                    .put("observations", org.json.JSONArray().put(observation("T", "Text", 1)))
+                    .toString(),
+                twoSources,
+            )
+        assertTrue(withoutQuestions.questions.isEmpty())
+    }
+
+    @Test
+    fun `review without any grounded observation is rejected`() {
+        val response =
+            JSONObject()
+                .put("observations", org.json.JSONArray().put(observation("T", "Text", 3)))
+                .put("questions", org.json.JSONArray().put("Q"))
+        assertThrows(IllegalArgumentException::class.java) {
+            parseAiReview(response.toString(), twoSources)
+        }
+    }
+
+    @Test
+    fun `requests ask for JSON output including the connection test`() {
+        val settings =
+            AiSettings("https://api.deepseek.com", UUID.randomUUID().toString(), "deepseek-flash")
+        val body = JSONObject(aiRequest(settings, null))
+        assertEquals("json_object", body.getJSONObject("response_format").getString("type"))
+        val system = body.getJSONArray("messages").getJSONObject(0).getString("content")
+        assertTrue(system.contains("JSON"))
+    }
+
+    private fun completion(finishReason: Any?, content: Any?) =
+        JSONObject()
+            .put(
+                "choices",
+                org.json
+                    .JSONArray()
+                    .put(
+                        JSONObject()
+                            .put("finish_reason", finishReason ?: JSONObject.NULL)
+                            .put("message", JSONObject().put("content", content ?: JSONObject.NULL))
+                    ),
+            )
+            .toString()
+
+    @Test
+    fun `completion content rejects only truncation filtering and invalid shapes`() {
+        assertEquals("{}", aiCompletionContent(completion("stop", "{}")))
+        assertEquals("{}", aiCompletionContent(completion(null, "{}")))
+        assertEquals("{}", aiCompletionContent(completion("eos", "{}")))
+        listOf(
+                completion("length", "{}"),
+                completion("content_filter", "{}"),
+                completion("stop", null),
+                completion("stop", " "),
+                completion("stop", 1),
+                "{}",
+                "not JSON",
+            )
+            .forEach { raw ->
+                assertThrows(AiServiceException::class.java) { aiCompletionContent(raw) }
+            }
+    }
+
+    @Test
+    fun `payload too large maps to shortening the request`() {
+        assertNotEquals(aiHttpError(500), aiHttpError(413))
+        assertNotEquals(aiHttpError(400), aiHttpError(413))
+    }
 }

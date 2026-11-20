@@ -6,12 +6,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -81,7 +85,7 @@ class AiSettingsSubmissionTest {
     }
 
     @Test
-    fun settingsDismissOnBackgroundAndLockWhileCompositionIsRetained() {
+    fun settingsStayOpenInBackgroundAndDismissOnLock() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "xike-ai-lifecycle-${UUID.randomUUID()}"
         val operations = AiReviewOperations(AiSettingsStore(context, name))
@@ -111,12 +115,61 @@ class AiSettingsSubmissionTest {
                     }
                         .isSuccess
                 }
+                // Typed input survives a trip to another app, for example to copy a Key.
+                rule.onNodeWithTag("ai-model").performTextReplacement("deepseek-flash")
                 scenario.moveToState(Lifecycle.State.CREATED)
-                assertEquals(1, dismissed.get())
                 scenario.moveToState(Lifecycle.State.RESUMED)
+                rule.onNodeWithTag("ai-model").assertTextContains("deepseek-flash")
+                assertEquals(0, dismissed.get())
                 rule.runOnIdle { locked.value = true }
-                rule.waitUntil(5_000) { dismissed.get() == 2 }
+                rule.waitUntil(5_000) { dismissed.get() == 1 }
                 assertEquals(AiSettings(), runBlocking { operations.load() })
+            }
+        } finally {
+            context.deleteSharedPreferences(name)
+        }
+    }
+
+    @Test
+    fun consentEnablesCompleteConfigurationAndTestNeedsNoConsent() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "xike-ai-consent-${UUID.randomUUID()}"
+        val store = AiSettingsStore(context, name)
+        val operations = AiReviewOperations(store)
+        val initial = AiSettings(address = "https://api.deepseek.com/v1", model = "deepseek-flash")
+        val saved = AtomicInteger()
+        try {
+            runBlocking { assertTrue(operations.save(initial).isSuccess) }
+            ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.setContent {
+                        CompositionLocalProvider(LocalAiReviewOperations provides operations) {
+                            XikeTheme(AppTheme.PINE, AppStyle.BREATHE) {
+                                AiSettingsDialog(
+                                    onDismiss = {},
+                                    onSaved = { saved.incrementAndGet() },
+                                )
+                            }
+                        }
+                    }
+                }
+                rule.waitUntil(15_000) {
+                    runCatching { rule.onNodeWithTag("ai-key").assertIsEnabled() }.isSuccess
+                }
+                // Local, random value; the test never presses "Test connection".
+                rule.onNodeWithTag("ai-key").performTextReplacement(UUID.randomUUID().toString())
+                rule
+                    .onNodeWithText(tr("测试连接", "Test connection"))
+                    .performScrollTo()
+                    .assertIsEnabled()
+                rule.onNodeWithTag("ai-enabled").performScrollTo().assertIsOff()
+                rule.onNodeWithTag("ai-consent").performScrollTo().performClick().assertIsOn()
+                rule.onNodeWithTag("ai-enabled").performScrollTo().assertIsOn()
+                rule.onNodeWithText(tr("保存", "Save")).performClick()
+                rule.waitUntil(15_000) { saved.get() == 1 }
+                assertTrue(store.read().canUse)
+                rule.onNodeWithTag("ai-consent").performScrollTo().performClick().assertIsOff()
+                rule.onNodeWithTag("ai-enabled").performScrollTo().assertIsOff()
             }
         } finally {
             context.deleteSharedPreferences(name)

@@ -8,7 +8,9 @@ import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
@@ -53,9 +55,10 @@ class AiReviewPayloadTest {
         }
         observation.put("text", source.date)
         questions.put(0, JSONObject.NULL)
-        assertThrows(IllegalArgumentException::class.java) {
-            parseAiReview(response.toString(), input)
-        }
+        // An invalid question is dropped without discarding the grounded observation.
+        val review = parseAiReview(response.toString(), input)
+        assertEquals(1, review.observations.size)
+        assertTrue(review.questions.isEmpty())
         Unit
     }
 }

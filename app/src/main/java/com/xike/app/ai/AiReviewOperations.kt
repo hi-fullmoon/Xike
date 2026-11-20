@@ -20,6 +20,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.json.JSONException
 import org.json.JSONObject
 
 internal val LocalAiReviewOperations = staticCompositionLocalOf<AiReviewOperations?> { null }
@@ -51,8 +52,9 @@ internal class AiReviewOperations(private val store: AiSettingsStore) {
         safe { withContext(Dispatchers.IO) { store.save(settings) } }
     }
 
+    /** Sends only fixed test text, so it needs a complete connection but not journal consent. */
     suspend fun test(settings: AiSettings): Result<Unit> = safe {
-        require(settings.configured && settings.consent)
+        require(settings.configured)
         completion(settings, aiRequest(settings, null))
         Unit
     }
@@ -158,34 +160,49 @@ internal class AiReviewOperations(private val store: AiSettingsStore) {
                     }
                 )
             }
-        return withContext(Dispatchers.Default) {
-            try {
-                val choice = JSONObject(raw).getJSONArray("choices").getJSONObject(0)
-                if (choice.optString("finish_reason") != "stop")
-                    throw AiServiceException(
-                        tr(
-                            "服务未返回完整结果，请缩短周期或检查模型配置。",
-                            "The result is incomplete. Shorten the period or check the model.",
-                        )
-                    )
-                val content = choice.getJSONObject("message").get("content")
-                require(content is String && content.isNotBlank())
-                content
-            } catch (error: AiServiceException) {
-                throw error
-            } catch (_: Exception) {
-                throw AiServiceException(
-                    tr(
-                        "接口响应无效，请使用兼容 Chat Completions 的接口。",
-                        "Invalid response. Use a Chat Completions compatible endpoint.",
-                    )
-                )
-            }
-        }
+        return withContext(Dispatchers.Default) { aiCompletionContent(raw) }
     }
 }
 
 internal class AiServiceException(message: String) : IllegalStateException(message)
+
+/**
+ * Reads the first Chat Completions choice. Only explicit truncation or filtering is rejected;
+ * compatible services differ in other finish_reason values, and the content is validated later.
+ */
+internal fun aiCompletionContent(raw: String): String {
+    val choice =
+        try {
+            JSONObject(raw).getJSONArray("choices").getJSONObject(0)
+        } catch (_: JSONException) {
+            throw AiServiceException(aiInvalidResponse())
+        }
+    when (choice.opt("finish_reason")) {
+        "length" ->
+            throw AiServiceException(
+                tr(
+                    "服务未返回完整结果，请缩短周期或检查模型配置。",
+                    "The result is incomplete. Shorten the period or check the model.",
+                )
+            )
+        "content_filter" ->
+            throw AiServiceException(
+                tr(
+                    "服务的内容过滤拦截了本次结果，可关闭日记文字后重试。",
+                    "The service's content filter blocked the result. Try again without journal notes.",
+                )
+            )
+    }
+    val content = choice.optJSONObject("message")?.opt("content")
+    if (content !is String || content.isBlank()) throw AiServiceException(aiInvalidResponse())
+    return content
+}
+
+private fun aiInvalidResponse() =
+    tr(
+        "接口响应无效，请使用兼容 Chat Completions 的接口。",
+        "Invalid response. Use a Chat Completions compatible endpoint.",
+    )
 
 internal fun aiHttpError(code: Int): String =
     when (code) {
@@ -196,12 +213,17 @@ internal fun aiHttpError(code: Int): String =
             tr("额度不足或请求过于频繁，请稍后手动重试。", "Insufficient quota or rate limited. Retry manually later.")
         in 300..399 ->
             tr("接口返回重定向，请填写最终 HTTPS 地址。", "The endpoint redirected. Enter the final HTTPS address.")
+        413 ->
+            tr(
+                "请求内容超过服务限制，请缩短周期或关闭日记文字。",
+                "The request exceeds the service limit. Shorten the period or exclude notes.",
+            )
         400,
         404,
         422 ->
             tr(
-                "接口地址、模型或请求范围不被支持，请检查配置或缩短周期。",
-                "Unsupported endpoint, model, or request size. Check settings or shorten the period.",
+                "接口地址、模型、JSON 输出格式或请求范围不被支持，请检查配置或缩短周期。",
+                "Unsupported endpoint, model, JSON output mode, or request size. Check settings or shorten the period.",
             )
         else ->
             tr(

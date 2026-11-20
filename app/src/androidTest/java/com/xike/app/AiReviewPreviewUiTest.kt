@@ -62,7 +62,7 @@ class AiReviewPreviewUiTest {
                 val settingsClick =
                     requireNotNull(
                         rule
-                            .onNodeWithText(tr("配置", "Settings"))
+                            .onNodeWithContentDescription(tr("配置", "Settings"))
                             .fetchSemanticsNode()
                             .config[SemanticsActions.OnClick]
                             .action

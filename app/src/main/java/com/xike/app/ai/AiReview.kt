@@ -98,7 +98,9 @@ internal fun aiInputTooLarge() =
 internal fun aiRequest(settings: AiSettings, input: AiReviewInput?): String {
     val instruction =
         if (input == null) {
-            "This is a connection test. Reply with OK. No journal data is included."
+            // Uses the same JSON output mode as a review, so the test also confirms that the
+            // service accepts it.
+            "This is a connection test. No journal data is included. Reply with the JSON object {\"ok\":true}."
         } else {
             """
         Help the reader look back on how they felt during the selected period. Write all titles,
@@ -142,47 +144,57 @@ internal fun aiRequest(settings: AiSettings, input: AiReviewInput?): String {
             .put("model", settings.model)
             .put("messages", messages)
             .put("stream", false)
+            .put("response_format", JSONObject().put("type", "json_object"))
             .toString(2)
     require(request.toByteArray(Charsets.UTF_8).size <= AI_MAX_REQUEST_BYTES) { aiInputTooLarge() }
     return request
 }
 
-/** Strict JSON parsing; unrecognized citations never become links to arbitrary local entries. */
+internal const val AI_MAX_OBSERVATIONS = 4
+internal const val AI_MAX_OBSERVATION_REFERENCES = 5
+internal const val AI_MAX_QUESTIONS = 3
+
+/**
+ * Strict JSON object parsing with per-item degradation: an observation without valid text or at
+ * least one supplied citation is dropped, and extra items are ignored, so one malformed item does
+ * not discard an otherwise grounded (and already billed) review. Unrecognized citations never
+ * become links to arbitrary local entries. At least one grounded observation is required.
+ */
 internal fun parseAiReview(content: String, input: AiReviewInput): AiReviewResult {
     val root = JSONObject(content)
     val allowed = input.sources.map { it.reference }.toSet()
     val observations = root.getJSONArray("observations")
-    require(observations.length() in 1..4)
     val parsed =
-        (0 until observations.length()).map { index ->
-            val row = observations.getJSONObject(index)
-            val references = row.getJSONArray("references")
-            require(references.length() in 1..5)
-            val valid =
-                (0 until references.length())
-                    .mapNotNull { i ->
-                        val raw = references.get(i)
-                        (raw as? Number)?.toInt()?.takeIf {
-                            raw.toDouble() == it.toDouble() && it in allowed
+        (0 until observations.length())
+            .mapNotNull { index ->
+                val row = observations.optJSONObject(index) ?: return@mapNotNull null
+                val references = row.optJSONArray("references") ?: return@mapNotNull null
+                val valid =
+                    (0 until references.length())
+                        .mapNotNull { i ->
+                            val raw = references.get(i)
+                            (raw as? Number)?.toInt()?.takeIf {
+                                raw.toDouble() == it.toDouble() && it in allowed
+                            }
                         }
-                    }
-                    .distinct()
-            require(valid.isNotEmpty())
-            AiObservation(
-                reviewText(row.get("title"), maxLength = 120),
-                reviewText(row.get("text"), maxLength = 4000),
-                valid,
-            )
-        }
-    val questions = root.getJSONArray("questions")
-    require(questions.length() in 1..3)
-    return AiReviewResult(
-        parsed,
-        (0 until questions.length()).map { reviewText(questions.get(it), maxLength = 1000) },
-    )
+                        .distinct()
+                        .take(AI_MAX_OBSERVATION_REFERENCES)
+                val title = reviewText(row.opt("title"), maxLength = 120)
+                val text = reviewText(row.opt("text"), maxLength = 4000)
+                if (valid.isEmpty() || title == null || text == null) null
+                else AiObservation(title, text, valid)
+            }
+            .take(AI_MAX_OBSERVATIONS)
+    require(parsed.isNotEmpty())
+    val questions = root.optJSONArray("questions")
+    val parsedQuestions =
+        if (questions == null) emptyList()
+        else
+            (0 until questions.length())
+                .mapNotNull { reviewText(questions.get(it), maxLength = 1000) }
+                .take(AI_MAX_QUESTIONS)
+    return AiReviewResult(parsed, parsedQuestions)
 }
 
-private fun reviewText(value: Any, maxLength: Int): String {
-    require(value is String && value.isNotBlank() && value.length <= maxLength)
-    return value
-}
+private fun reviewText(value: Any?, maxLength: Int): String? =
+    (value as? String)?.takeIf { it.isNotBlank() && it.length <= maxLength }

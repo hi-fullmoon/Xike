@@ -181,11 +181,22 @@ class AiReviewUiTest {
                 if (Build.VERSION.SDK_INT >= 30 && args.getString("keyboard") == "true") {
                     assertButtonsAboveKeyboard()
                 }
+                androidx.test.espresso.Espresso.closeSoftKeyboard()
+                rule.onNodeWithTag("ai-address").performScrollTo()
+                rule.waitForIdle()
                 val configuration = context.resources.configuration
                 captureAiDialogWindow(
                     File(
                         context.getExternalFilesDir(null),
                         "ai-settings-${language.name}-${style.name}-${configuration.uiMode}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
+                    )
+                )
+                rule.onNodeWithTag("ai-enabled").performScrollTo()
+                rule.waitForIdle()
+                captureAiDialogWindow(
+                    File(
+                        context.getExternalFilesDir(null),
+                        "ai-settings-lower-${language.name}-${style.name}-${configuration.uiMode}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
                     )
                 )
                 rule.onNodeWithText(tr("保存", "Save")).performClick()
@@ -195,6 +206,18 @@ class AiReviewUiTest {
                 assertEquals("", store.read().apiKey)
                 rule.onNodeWithText(tr("预览发送内容", "Preview content")).assertIsNotEnabled()
                 assertReviewEndpointIsReadable()
+                rule.onNodeWithTag("ai-review-setup-hint").performScrollTo().assertIsDisplayed()
+                rule
+                    .onNodeWithText(tr("前往配置", "Open settings"))
+                    .performScrollTo()
+                    .assertIsDisplayed()
+                rule.waitForIdle()
+                captureAiDialogWindow(
+                    File(
+                        context.getExternalFilesDir(null),
+                        "ai-review-service-${language.name}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
+                    )
+                )
                 assertReviewNotesAlignment()
                 captureAiDialogWindow(
                     File(
@@ -202,7 +225,7 @@ class AiReviewUiTest {
                         "ai-review-notes-${language.name}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
                     )
                 )
-                rule.onNodeWithText(tr("关闭", "Close")).performClick()
+                rule.onNodeWithContentDescription(tr("关闭", "Close")).performClick()
                 title.performClick().performClick()
                 rule.onNodeWithText(configTitle).assertDoesNotExist()
                 title.performClick()
@@ -213,16 +236,19 @@ class AiReviewUiTest {
                 }
                 rule.waitUntil(10_000) {
                     runCatching {
-                        rule.onNodeWithText(tr("配置", "Settings")).assertIsEnabled()
+                        rule.onNodeWithContentDescription(tr("配置", "Settings")).assertIsEnabled()
                     }
                         .isSuccess
                 }
-                rule.onNodeWithText(tr("配置", "Settings")).performClick()
+                rule.onNodeWithContentDescription(tr("配置", "Settings")).performClick()
                 rule.onNodeWithText(configTitle).assertIsDisplayed()
                 rule.onNodeWithText(tr("取消", "Cancel")).performClick()
                 rule.onNodeWithText(tr("AI 回顾", "AI review")).assertIsDisplayed()
+                // Going to the background keeps the review; only locking or closing dismisses it.
                 scenario.moveToState(Lifecycle.State.CREATED)
                 scenario.moveToState(Lifecycle.State.RESUMED)
+                rule.onNodeWithText(tr("AI 回顾", "AI review")).assertIsDisplayed()
+                rule.onNodeWithContentDescription(tr("关闭", "Close")).performClick()
                 rule.onNodeWithText(tr("AI 回顾", "AI review")).assertDoesNotExist()
                 rule.onNodeWithTag("ai-review-entry").assertIsDisplayed()
             }
@@ -310,11 +336,7 @@ class AiReviewUiTest {
     }
 
     private fun assertReviewEndpointIsReadable() {
-        val address =
-            tr(
-                "接收地址：https://api.deepseek.com/v1/chat/completions",
-                "Destination: https://api.deepseek.com/v1/chat/completions",
-            )
+        val address = "https://api.deepseek.com/v1/chat/completions"
         rule.onNodeWithTag("ai-review-endpoint").performScrollTo().assertTextEquals(address)
         assertCompleteText(address, checkWidth = true)
     }
@@ -356,8 +378,8 @@ class AiReviewUiTest {
             .onNodeWithTag("ai-review-scope")
             .assertTextEquals(
                 tr(
-                    "将发送日期、心情、感受和日记文字。",
-                    "Dates, moods, feelings and notes will be sent.",
+                    "将发送日期、时区、心情、感受、本机统计和日记文字。",
+                    "Includes dates, time zone, moods, feelings, local statistics and journal notes.",
                 )
             )
         checkAlignment()
