@@ -10,6 +10,7 @@ import shlex
 import xml.etree.ElementTree as ET
 
 SERIAL = os.environ["XIKE_DEVICE_SERIAL"]
+ANDROID_PROJECT_DIR = pathlib.Path(__file__).resolve().parents[1]
 SDK = pathlib.Path(os.environ.get("ANDROID_HOME", str(pathlib.Path.home() / "Library/Android/sdk")))
 ADB = [str(SDK / "platform-tools/adb"), "-s", SERIAL]
 JDB = pathlib.Path(os.environ["JAVA_HOME"]) / "bin/jdb"
@@ -108,7 +109,8 @@ def command(process, text):
 name = adb("emu", "avd", "name")
 if name.splitlines()[0] not in {"xike_reminder_crash", "xike_reminder_crash_post"}:
     raise RuntimeError("Only the task's disposable xike_reminder_crash AVD is allowed")
-source = pathlib.Path("app/src/main/java/com/xike/app/ReminderScheduler.kt").read_text().splitlines()
+source_path = ANDROID_PROJECT_DIR / "app/src/main/java/com/xike/app/ReminderScheduler.kt"
+source = source_path.read_text().splitlines()
 after_notify = next(i + 2 for i, line in enumerate(source) if "manager.notify(deliveryId," in line)
 confirmation = next(i for i, line in enumerate(source) if '.remove("delivery-id")' in line)
 after_commit = next(i + 1 for i, line in enumerate(source) if "alarmManager.setAndAllowWhileIdle(" in line and i > confirmation)

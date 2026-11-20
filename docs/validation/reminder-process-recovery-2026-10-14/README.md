@@ -33,14 +33,14 @@
 
 ## 重跑入口
 
-测试代码为 `app/src/androidTest/java/com/xike/app/ReminderProcessRecoveryTest.kt`，主机脚本为 `scripts/test-reminder-process-recovery.py`。脚本只允许操作名为 `xike_reminder_crash` 的专用模拟器；设备端测试会调整提醒设置并清除该专用设备的应用通知，禁止在用户设备上运行。
+测试代码为 `android/app/src/androidTest/java/com/xike/app/ReminderProcessRecoveryTest.kt`，主机脚本为 `android/scripts/test-reminder-process-recovery.py`。脚本只允许操作名为 `xike_reminder_crash` 的专用模拟器；设备端测试会调整提醒设置并清除该专用设备的应用通知，禁止在用户设备上运行。
 
-先创建该名称的独立模拟器，核对设备序列号，设置 `JAVA_HOME` 为 JDK 17，执行环境自检及构建，然后显式安装同一次构建的应用和测试 APK，并授予通知权限。确认设备后执行：
+先创建该名称的独立模拟器，核对设备序列号，设置 `JAVA_HOME` 为 JDK 17，执行环境自检及构建，然后显式安装同一次构建的应用和测试 APK，并授予通知权限。确认设备后从仓库根目录执行：
 
 ```bash
 export XIKE_DEVICE_SERIAL=emulator-5590
 export XIKE_REMINDER_REPORT_DIR=/tmp/xike-reminder-crash-report
-python3 scripts/test-reminder-process-recovery.py
+python3 android/scripts/test-reminder-process-recovery.py
 ```
 
 `emulator-5590` 是本次设备序列号；重跑时应填写实际核对过的独立设备序列号。

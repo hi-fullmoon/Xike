@@ -29,6 +29,7 @@ jobs:
     outputs:
       version_name: ${{ steps.metadata.outputs.version_name }}
       version_code: ${{ steps.metadata.outputs.version_code }}
+      android_project_dir: ${{ steps.metadata.outputs.android_project_dir }}
     steps:
       - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -60,8 +61,17 @@ jobs:
           version_name="${RELEASE_TAG#v}"
           version_code=$((major * 1000000 + minor * 1000 + patch + 1))
 
-          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
-          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          if [[ -f android/gradlew && -f android/settings.gradle.kts ]]; then
+            android_project_dir=android
+          elif [[ -f gradlew && -f settings.gradle.kts ]]; then
+            android_project_dir=.
+          else
+            echo "The release tag does not contain the Android Gradle project." >&2
+            exit 1
+          fi
+
+          printf 'version_name=%s\nversion_code=%s\nandroid_project_dir=%s\n' \
+            "$version_name" "$version_code" "$android_project_dir" >> "$GITHUB_OUTPUT"
           echo "Building Xike $version_name (versionCode $version_code)"
 
   verify:
@@ -80,6 +90,7 @@ jobs:
           persist-credentials: false
 
       - name: Make Gradle wrapper executable
+        working-directory: ${{ needs.metadata.outputs.android_project_dir }}
         run: chmod +x gradlew
 
       - name: Set up Java 17
@@ -92,6 +103,7 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       - name: Run unit tests and lint
+        working-directory: ${{ needs.metadata.outputs.android_project_dir }}
         run: ./gradlew spotlessCheck test lint --stacktrace
 
   build:
@@ -112,6 +124,7 @@ jobs:
           persist-credentials: false
 
       - name: Make Gradle wrapper executable
+        working-directory: ${{ needs.metadata.outputs.android_project_dir }}
         run: chmod +x gradlew
 
       - name: Set up Java 17
@@ -154,6 +167,7 @@ jobs:
           echo "XIKE_KEYSTORE_FILE=$XIKE_KEYSTORE_FILE" >> "$GITHUB_ENV"
 
       - name: Build signed APK and App Bundle
+        working-directory: ${{ needs.metadata.outputs.android_project_dir }}
         env:
           XIKE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           XIKE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -162,11 +176,13 @@ jobs:
 
       - name: Verify and package release assets
         shell: bash
+        env:
+          ANDROID_PROJECT_DIR: ${{ needs.metadata.outputs.android_project_dir }}
         run: |
           set -euo pipefail
 
-          source_apk="app/build/outputs/apk/release/app-release.apk"
-          source_aab="app/build/outputs/bundle/release/app-release.aab"
+          source_apk="$ANDROID_PROJECT_DIR/app/build/outputs/apk/release/app-release.apk"
+          source_aab="$ANDROID_PROJECT_DIR/app/build/outputs/bundle/release/app-release.aab"
           apk_name="Xike-${XIKE_VERSION_NAME}.apk"
           aab_name="Xike-${XIKE_VERSION_NAME}.aab"
 

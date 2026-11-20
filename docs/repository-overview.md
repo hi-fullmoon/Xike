@@ -1,6 +1,10 @@
 # 息刻（Xike）仓库说明
 
-> 文档依据：仓库在 2026-08-27 的代码与配置状态。
+| 平台 | 工程入口 | 开发说明 |
+| --- | --- | --- |
+| Android | [`android/` 的 Gradle 工程](../android/)，应用模块为 [`android/app/`](../android/app/) | [Android 本地开发环境](local-development.md) |
+
+> 下文是 Android 架构说明，基于 2026-08-27 的代码与配置状态。
 
 ## 1. 项目概述
 
@@ -8,7 +12,7 @@
 
 应用不要求账号，也没有自建服务端。日记正文、主题、搜索索引、图片和语音附件默认保存在设备本地并加密；仅当用户主动添加“此刻窗外”时，应用才会请求一次前台位置并调用 Open-Meteo 获取当前天气，支持精确定位并兼容粗略定位。提醒、每日一问和分析均在设备本地完成。
 
-当前仓库是一个单模块 Android 工程，应用包名为 `com.xike.app`，最低支持 Android 8.0（API 26），目标版本为 API 36。
+Android 工程使用单个 Gradle 应用模块，应用包名为 `com.xike.app`，最低支持 Android 8.0（API 26），目标版本为 API 36。
 
 ## 2. 一句话定位
 
@@ -80,7 +84,7 @@
 | 测试 | JUnit 4、Room Testing、AndroidX Test、Compose UI Test |
 | 持续集成 | GitHub Actions |
 
-版本配置以 [`app/build.gradle.kts`](../app/build.gradle.kts) 为准。CI 发布时通过 `XIKE_VERSION_NAME` 和 `XIKE_VERSION_CODE` 注入版本；未注入时本地构建默认使用 `0.1.0` 和 `1`。
+版本配置以 [`android/app/build.gradle.kts`](../android/app/build.gradle.kts) 为准。CI 发布时通过 `XIKE_VERSION_NAME` 和 `XIKE_VERSION_CODE` 注入版本；未注入时本地构建默认使用 `0.1.0` 和 `1`。
 
 ## 5. 架构概览
 
@@ -115,60 +119,60 @@ flowchart TD
 
 | 文件 | 职责 |
 | --- | --- |
-| [`MainActivity.kt`](../app/src/main/java/com/xike/app/MainActivity.kt) | 系统入口；处理权限、生物识别、应用生命周期及系统结果回调协调。 |
-| [`XikeApp.kt`](../app/src/main/java/com/xike/app/XikeApp.kt)、[`XikeBackupFlow.kt`](../app/src/main/java/com/xike/app/XikeBackupFlow.kt) | 应用组合入口、底部导航与页面状态；备份选择、确认与恢复反馈独立协调。 |
-| [`AppLockSessionState.kt`](../app/src/main/java/com/xike/app/feature/lock/AppLockSessionState.kt) | 应用锁会话状态、后台时间与系统 Activity 监控状态。 |
-| [`AppLockUi.kt`](../app/src/main/java/com/xike/app/feature/lock/AppLockUi.kt) | 冷启动锁定页与会话锁定层。 |
-| [`BackupDialogs.kt`](../app/src/main/java/com/xike/app/feature/settings/BackupDialogs.kt) | 导出、密码与恢复确认弹窗，及已有导出请求状态。 |
-| [`AppOperationDialogs.kt`](../app/src/main/java/com/xike/app/ui/components/AppOperationDialogs.kt) | 加载处理和数据错误弹窗。 |
-| [`JournalViewModel.kt`](../app/src/main/java/com/xike/app/JournalViewModel.kt) | 连接 UI 与数据层；编排初始化、草稿、增删改查、天气、备份和恢复。 |
-| [`JournalBackupOperations.kt`](../app/src/main/java/com/xike/app/JournalBackupOperations.kt)、[`JournalDraftMediaOperations.kt`](../app/src/main/java/com/xike/app/JournalDraftMediaOperations.kt) | 使用 ViewModel 作用域协调备份和草稿媒体；保留异步待处理状态，将持久化与操作反馈交回 ViewModel。 |
-| [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储统一入口；负责数据库访问、旧数据迁移、删除撤销、恢复安装、撤销快照及媒体引用清理。 |
-| [`JournalAttachmentStore.kt`](../app/src/main/java/com/xike/app/media/JournalAttachmentStore.kt) | 照片与录音文件的加密导入、读取、校验和有界写入。 |
-| [`JournalBackupStorage.kt`](../app/src/main/java/com/xike/app/data/backup/JournalBackupStorage.kt) | 原有备份格式的导出、解码、内容校验及加密暂存，不执行数据库替换。 |
-| [`JournalModels.kt`](../app/src/main/java/com/xike/app/data/JournalModels.kt) | 心情、日记、录音、快照及数据异常模型，保持原有序列化标识。 |
-| [`JournalBackupModels.kt`](../app/src/main/java/com/xike/app/data/JournalBackupModels.kt) | 备份摘要与原有恢复数据归一化。 |
-| [`JournalBackupCodec.kt`](../app/src/main/java/com/xike/app/data/JournalBackupCodec.kt) | 原有 JSON 条目解析、有界流读取、校验与备份加解密辅助实现。 |
-| [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
-| [`JournalDraft.kt`](../app/src/main/java/com/xike/app/data/model/JournalDraft.kt) | 草稿模型、规范化和原有 JSON 序列化。 |
-| [`JournalDraftStore.kt`](../app/src/main/java/com/xike/app/data/draft/JournalDraftStore.kt) | 加密草稿持久化与顺序写入协调。 |
-| [`JournalVideo.kt`](../app/src/main/java/com/xike/app/data/model/JournalVideo.kt)、[`JournalVideoStore.kt`](../app/src/main/java/com/xike/app/media/JournalVideoStore.kt) | 视频模型与加密视频存储、导入及可寻址解密。 |
-| [`JournalSearch.kt`](../app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
-| [`JournalAnalytics.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度与工作日/周末分析。 |
-| [`SystemActivityCallbacks.kt`](../app/src/main/java/com/xike/app/SystemActivityCallbacks.kt) | 系统 Activity 结果协调的 CompositionLocal 声明。 |
-| [`JournalInputComponents.kt`](../app/src/main/java/com/xike/app/ui/components/JournalInputComponents.kt) | 此刻与编辑共用的注脚、工具栏和媒体操作组件。 |
-| [`RecordedAtPicker.kt`](../app/src/main/java/com/xike/app/ui/components/RecordedAtPicker.kt) | 原生日期和时间选择，保留未来时间校验及弹窗协调。 |
-| [`MoodPicker.kt`](../app/src/main/java/com/xike/app/ui/components/MoodPicker.kt) | 心情选择、说明及私有视觉规则。 |
-| [`JournalTopicPicker.kt`](../app/src/main/java/com/xike/app/ui/components/JournalTopicPicker.kt) | 主题目录、选择组件和计数说明。 |
-| [`JournalEntryCard.kt`](../app/src/main/java/com/xike/app/ui/components/JournalEntryCard.kt) | 回望与轨迹复用的记录卡片及私有时间格式。 |
-| [`JournalPhotoUi.kt`](../app/src/main/java/com/xike/app/ui/components/JournalPhotoUi.kt) | 照片添加入口、缩略图、拼图、图库和预览位图加载。 |
-| [`XikePageComponents.kt`](../app/src/main/java/com/xike/app/ui/components/XikePageComponents.kt) | 跨页面复用的页头和内容卡片。 |
-| [`MomentScreen.kt`](../app/src/main/java/com/xike/app/feature/moment/MomentScreen.kt) | 此刻页面、草稿与媒体交互及专用辅助组件。 |
-| [`OutdoorContextUi.kt`](../app/src/main/java/com/xike/app/feature/moment/OutdoorContextUi.kt)、[`OutdoorContextCard.kt`](../app/src/main/java/com/xike/app/ui/components/journal/OutdoorContextCard.kt) | 城市选择弹窗，以及此刻与编辑共用的窗外信息组件。 |
-| [`SettingsScreen.kt`](../app/src/main/java/com/xike/app/feature/settings/SettingsScreen.kt) | 设置页面、专用弹窗、风格预览和辅助组件。 |
-| [`XikeTheme.kt`](../app/src/main/java/com/xike/app/ui/theme/XikeTheme.kt) | 六种主色、三种风格、字体、尺寸规则和共享访问接口。 |
-| [`XikeNavigationBar.kt`](../app/src/main/java/com/xike/app/ui/components/XikeNavigationBar.kt) | 页面导航标识、底部导航及选中状态展示。 |
-| [`JournalEntryDetailDialog.kt`](../app/src/main/java/com/xike/app/ui/components/journal/JournalEntryDetailDialog.kt) | 回望与轨迹共用的日记详情及专用展示组件。 |
-| [`JournalEntryEditDialog.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalEntryEditDialog.kt) | 编辑弹窗、专用照片组件及编辑状态与操作协调。 |
-| [`JournalArchiveUi.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt) | 回望页面与搜索协调、页面状态、详情及删除。 |
-| [`JournalArchiveControls.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveControls.kt)、[`JournalArchiveFilters.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalArchiveFilters.kt)、[`JournalMonthCalendar.kt`](../app/src/main/java/com/xike/app/feature/archive/JournalMonthCalendar.kt) | 搜索与模式控件、组合筛选和日期规则，以及月历展示。 |
-| [`JournalInsightsUi.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsUi.kt) | 轨迹页面、周期选择、计算状态与下钻跳转协调。 |
-| [`JournalInsightsCards.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCards.kt) | 轨迹概况、周期比较、日期类型及本地回顾入口卡片。 |
-| [`JournalInsightsCharts.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |
-| [`JournalInsightsSection.kt`](../app/src/main/java/com/xike/app/feature/insights/JournalInsightsSection.kt) | 轨迹组件共用的分节卡片、比例条与样本说明。 |
-| [`LocalReviewDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/LocalReviewDialog.kt)、[`InsightDrilldownDialog.kt`](../app/src/main/java/com/xike/app/feature/insights/InsightDrilldownDialog.kt) | 本地回顾与原始记录弹窗，继续复用共享日记详情。 |
-| [`OutdoorSnapshot.kt`](../app/src/main/java/com/xike/app/data/model/OutdoorSnapshot.kt)、[`OutdoorContextRepository.kt`](../app/src/main/java/com/xike/app/outdoor/OutdoorContextRepository.kt) | 天气快照规范化与一次前台定位、区与街道查询、城市检索和天气请求。 |
-| [`OutdoorContext.kt`](../app/src/main/java/com/xike/app/OutdoorContext.kt) | 天气显示文案的本地化映射。 |
-| [`PhotoCapture.kt`](../app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
-| [`XikeAudioRecorder.kt`](../app/src/main/java/com/xike/app/XikeAudioRecorder.kt) | 既有麦克风录音器、录音文件生成及释放。 |
-| [`VoiceCaptureUi.kt`](../app/src/main/java/com/xike/app/ui/components/VoiceCaptureUi.kt) | 录音手势、返回处理、波形及待保存录音界面。 |
-| [`VoicePlaybackUi.kt`](../app/src/main/java/com/xike/app/ui/components/VoicePlaybackUi.kt) | 播放与互斥协调、进度控件、时长显示与临时播放文件清理。 |
-| [`AudioEditServices.kt`](../app/src/main/java/com/xike/app/AudioEditServices.kt) | 既有录音编辑导入与释放接口。 |
-| [`ReminderScheduler.kt`](../app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
-| [`HabitPreferences.kt`](../app/src/main/java/com/xike/app/HabitPreferences.kt) | 提醒、勿扰、暂停和每日一问设置。 |
-| [`AppearancePreferences.kt`](../app/src/main/java/com/xike/app/AppearancePreferences.kt) | 保存非敏感的界面风格与主色镜像，使锁定页在数据库打开前也能保持用户外观。 |
-| [`AppLockPreferences.kt`](../app/src/main/java/com/xike/app/feature/lock/AppLockPreferences.kt) | 应用锁开关和自动锁定时间设置。 |
-| [`DatabaseKeyManager.kt`](../app/src/main/java/com/xike/app/DatabaseKeyManager.kt) | 创建随机 SQLCipher 口令，并使用 Android Keystore AES-256-GCM 密钥封装。 |
+| [`MainActivity.kt`](../android/app/src/main/java/com/xike/app/MainActivity.kt) | 系统入口；处理权限、生物识别、应用生命周期及系统结果回调协调。 |
+| [`XikeApp.kt`](../android/app/src/main/java/com/xike/app/XikeApp.kt)、[`XikeBackupFlow.kt`](../android/app/src/main/java/com/xike/app/XikeBackupFlow.kt) | 应用组合入口、底部导航与页面状态；备份选择、确认与恢复反馈独立协调。 |
+| [`AppLockSessionState.kt`](../android/app/src/main/java/com/xike/app/feature/lock/AppLockSessionState.kt) | 应用锁会话状态、后台时间与系统 Activity 监控状态。 |
+| [`AppLockUi.kt`](../android/app/src/main/java/com/xike/app/feature/lock/AppLockUi.kt) | 冷启动锁定页与会话锁定层。 |
+| [`BackupDialogs.kt`](../android/app/src/main/java/com/xike/app/feature/settings/BackupDialogs.kt) | 导出、密码与恢复确认弹窗，及已有导出请求状态。 |
+| [`AppOperationDialogs.kt`](../android/app/src/main/java/com/xike/app/ui/components/AppOperationDialogs.kt) | 加载处理和数据错误弹窗。 |
+| [`JournalViewModel.kt`](../android/app/src/main/java/com/xike/app/JournalViewModel.kt) | 连接 UI 与数据层；编排初始化、草稿、增删改查、天气、备份和恢复。 |
+| [`JournalBackupOperations.kt`](../android/app/src/main/java/com/xike/app/JournalBackupOperations.kt)、[`JournalDraftMediaOperations.kt`](../android/app/src/main/java/com/xike/app/JournalDraftMediaOperations.kt) | 使用 ViewModel 作用域协调备份和草稿媒体；保留异步待处理状态，将持久化与操作反馈交回 ViewModel。 |
+| [`JournalStore.kt`](../android/app/src/main/java/com/xike/app/JournalStore.kt) | 日记仓储统一入口；负责数据库访问、旧数据迁移、删除撤销、恢复安装、撤销快照及媒体引用清理。 |
+| [`JournalAttachmentStore.kt`](../android/app/src/main/java/com/xike/app/media/JournalAttachmentStore.kt) | 照片与录音文件的加密导入、读取、校验和有界写入。 |
+| [`JournalBackupStorage.kt`](../android/app/src/main/java/com/xike/app/data/backup/JournalBackupStorage.kt) | 原有备份格式的导出、解码、内容校验及加密暂存，不执行数据库替换。 |
+| [`JournalModels.kt`](../android/app/src/main/java/com/xike/app/data/JournalModels.kt) | 心情、日记、录音、快照及数据异常模型，保持原有序列化标识。 |
+| [`JournalBackupModels.kt`](../android/app/src/main/java/com/xike/app/data/JournalBackupModels.kt) | 备份摘要与原有恢复数据归一化。 |
+| [`JournalBackupCodec.kt`](../android/app/src/main/java/com/xike/app/data/JournalBackupCodec.kt) | 原有 JSON 条目解析、有界流读取、校验与备份加解密辅助实现。 |
+| [`JournalDatabase.kt`](../android/app/src/main/java/com/xike/app/JournalDatabase.kt) | Room 实体、DAO、事务、FTS4 搜索表、SQLCipher 初始化和数据库迁移。 |
+| [`JournalDraft.kt`](../android/app/src/main/java/com/xike/app/data/model/JournalDraft.kt) | 草稿模型、规范化和原有 JSON 序列化。 |
+| [`JournalDraftStore.kt`](../android/app/src/main/java/com/xike/app/data/draft/JournalDraftStore.kt) | 加密草稿持久化与顺序写入协调。 |
+| [`JournalVideo.kt`](../android/app/src/main/java/com/xike/app/data/model/JournalVideo.kt)、[`JournalVideoStore.kt`](../android/app/src/main/java/com/xike/app/media/JournalVideoStore.kt) | 视频模型与加密视频存储、导入及可寻址解密。 |
+| [`JournalSearch.kt`](../android/app/src/main/java/com/xike/app/JournalSearch.kt) | 搜索条件、分页结果、内存筛选工具和月历日期计算。 |
+| [`JournalAnalytics.kt`](../android/app/src/main/java/com/xike/app/feature/insights/JournalAnalytics.kt) | 纯 Kotlin 的周期统计、心情分布、覆盖度与工作日/周末分析。 |
+| [`SystemActivityCallbacks.kt`](../android/app/src/main/java/com/xike/app/SystemActivityCallbacks.kt) | 系统 Activity 结果协调的 CompositionLocal 声明。 |
+| [`JournalInputComponents.kt`](../android/app/src/main/java/com/xike/app/ui/components/JournalInputComponents.kt) | 此刻与编辑共用的注脚、工具栏和媒体操作组件。 |
+| [`RecordedAtPicker.kt`](../android/app/src/main/java/com/xike/app/ui/components/RecordedAtPicker.kt) | 原生日期和时间选择，保留未来时间校验及弹窗协调。 |
+| [`MoodPicker.kt`](../android/app/src/main/java/com/xike/app/ui/components/MoodPicker.kt) | 心情选择、说明及私有视觉规则。 |
+| [`JournalTopicPicker.kt`](../android/app/src/main/java/com/xike/app/ui/components/JournalTopicPicker.kt) | 主题目录、选择组件和计数说明。 |
+| [`JournalEntryCard.kt`](../android/app/src/main/java/com/xike/app/ui/components/JournalEntryCard.kt) | 回望与轨迹复用的记录卡片及私有时间格式。 |
+| [`JournalPhotoUi.kt`](../android/app/src/main/java/com/xike/app/ui/components/JournalPhotoUi.kt) | 照片添加入口、缩略图、拼图、图库和预览位图加载。 |
+| [`XikePageComponents.kt`](../android/app/src/main/java/com/xike/app/ui/components/XikePageComponents.kt) | 跨页面复用的页头和内容卡片。 |
+| [`MomentScreen.kt`](../android/app/src/main/java/com/xike/app/feature/moment/MomentScreen.kt) | 此刻页面、草稿与媒体交互及专用辅助组件。 |
+| [`OutdoorContextUi.kt`](../android/app/src/main/java/com/xike/app/feature/moment/OutdoorContextUi.kt)、[`OutdoorContextCard.kt`](../android/app/src/main/java/com/xike/app/ui/components/journal/OutdoorContextCard.kt) | 城市选择弹窗，以及此刻与编辑共用的窗外信息组件。 |
+| [`SettingsScreen.kt`](../android/app/src/main/java/com/xike/app/feature/settings/SettingsScreen.kt) | 设置页面、专用弹窗、风格预览和辅助组件。 |
+| [`XikeTheme.kt`](../android/app/src/main/java/com/xike/app/ui/theme/XikeTheme.kt) | 六种主色、三种风格、字体、尺寸规则和共享访问接口。 |
+| [`XikeNavigationBar.kt`](../android/app/src/main/java/com/xike/app/ui/components/XikeNavigationBar.kt) | 页面导航标识、底部导航及选中状态展示。 |
+| [`JournalEntryDetailDialog.kt`](../android/app/src/main/java/com/xike/app/ui/components/journal/JournalEntryDetailDialog.kt) | 回望与轨迹共用的日记详情及专用展示组件。 |
+| [`JournalEntryEditDialog.kt`](../android/app/src/main/java/com/xike/app/feature/archive/JournalEntryEditDialog.kt) | 编辑弹窗、专用照片组件及编辑状态与操作协调。 |
+| [`JournalArchiveUi.kt`](../android/app/src/main/java/com/xike/app/feature/archive/JournalArchiveUi.kt) | 回望页面与搜索协调、页面状态、详情及删除。 |
+| [`JournalArchiveControls.kt`](../android/app/src/main/java/com/xike/app/feature/archive/JournalArchiveControls.kt)、[`JournalArchiveFilters.kt`](../android/app/src/main/java/com/xike/app/feature/archive/JournalArchiveFilters.kt)、[`JournalMonthCalendar.kt`](../android/app/src/main/java/com/xike/app/feature/archive/JournalMonthCalendar.kt) | 搜索与模式控件、组合筛选和日期规则，以及月历展示。 |
+| [`JournalInsightsUi.kt`](../android/app/src/main/java/com/xike/app/feature/insights/JournalInsightsUi.kt) | 轨迹页面、周期选择、计算状态与下钻跳转协调。 |
+| [`JournalInsightsCards.kt`](../android/app/src/main/java/com/xike/app/feature/insights/JournalInsightsCards.kt) | 轨迹概况、周期比较、日期类型及本地回顾入口卡片。 |
+| [`JournalInsightsCharts.kt`](../android/app/src/main/java/com/xike/app/feature/insights/JournalInsightsCharts.kt) | 趋势图、分布图及图表滚动与绘制。 |
+| [`JournalInsightsSection.kt`](../android/app/src/main/java/com/xike/app/feature/insights/JournalInsightsSection.kt) | 轨迹组件共用的分节卡片、比例条与样本说明。 |
+| [`LocalReviewDialog.kt`](../android/app/src/main/java/com/xike/app/feature/insights/LocalReviewDialog.kt)、[`InsightDrilldownDialog.kt`](../android/app/src/main/java/com/xike/app/feature/insights/InsightDrilldownDialog.kt) | 本地回顾与原始记录弹窗，继续复用共享日记详情。 |
+| [`OutdoorSnapshot.kt`](../android/app/src/main/java/com/xike/app/data/model/OutdoorSnapshot.kt)、[`OutdoorContextRepository.kt`](../android/app/src/main/java/com/xike/app/outdoor/OutdoorContextRepository.kt) | 天气快照规范化与一次前台定位、区与街道查询、城市检索和天气请求。 |
+| [`OutdoorContext.kt`](../android/app/src/main/java/com/xike/app/OutdoorContext.kt) | 天气显示文案的本地化映射。 |
+| [`PhotoCapture.kt`](../android/app/src/main/java/com/xike/app/PhotoCapture.kt) | 系统相机拍摄、相册写入、未完成拍摄清理和照片来源 UI。 |
+| [`XikeAudioRecorder.kt`](../android/app/src/main/java/com/xike/app/XikeAudioRecorder.kt) | 既有麦克风录音器、录音文件生成及释放。 |
+| [`VoiceCaptureUi.kt`](../android/app/src/main/java/com/xike/app/ui/components/VoiceCaptureUi.kt) | 录音手势、返回处理、波形及待保存录音界面。 |
+| [`VoicePlaybackUi.kt`](../android/app/src/main/java/com/xike/app/ui/components/VoicePlaybackUi.kt) | 播放与互斥协调、进度控件、时长显示与临时播放文件清理。 |
+| [`AudioEditServices.kt`](../android/app/src/main/java/com/xike/app/AudioEditServices.kt) | 既有录音编辑导入与释放接口。 |
+| [`ReminderScheduler.kt`](../android/app/src/main/java/com/xike/app/ReminderScheduler.kt) | 本地闹钟、通知、开机/时区变化后的提醒重排。 |
+| [`HabitPreferences.kt`](../android/app/src/main/java/com/xike/app/HabitPreferences.kt) | 提醒、勿扰、暂停和每日一问设置。 |
+| [`AppearancePreferences.kt`](../android/app/src/main/java/com/xike/app/AppearancePreferences.kt) | 保存非敏感的界面风格与主色镜像，使锁定页在数据库打开前也能保持用户外观。 |
+| [`AppLockPreferences.kt`](../android/app/src/main/java/com/xike/app/feature/lock/AppLockPreferences.kt) | 应用锁开关和自动锁定时间设置。 |
+| [`DatabaseKeyManager.kt`](../android/app/src/main/java/com/xike/app/DatabaseKeyManager.kt) | 创建随机 SQLCipher 口令，并使用 Android Keystore AES-256-GCM 密钥封装。 |
 
 ## 7. 数据模型与持久化
 
@@ -210,28 +214,13 @@ flowchart TD
 
 ## 9. 目录结构
 
-```text
-Xike/
-├── app/
-│   ├── build.gradle.kts              # Android 应用模块配置
-│   ├── schemas/                      # 导出的 Room schema 1–3
-│   └── src/
-│       ├── main/                     # 应用代码、Manifest 与资源
-│       ├── test/                     # JVM 单元测试
-│       └── androidTest/              # 数据库、迁移与 Compose 仪器测试
-├── docs/
-│   ├── repository-overview.md        # 本文档
-│   ├── local-development.md          # 本地开发环境
-│   ├── app-lock-design.md            # 应用锁设计
-│   ├── release-checklist.md          # 发布前检查清单
-│   └── github-release-pipeline.md    # 发布流水线说明
-├── scripts/check-jdk17.sh            # JDK 17 环境自检
-├── .github/workflows/ci.yml          # PR 验证
-├── .github/workflows/release.yml     # 标签触发发布
-├── build.gradle.kts                  # 根构建插件版本
-├── settings.gradle.kts               # 仓库与模块声明
-└── README.md                         # 面向使用者的项目首页
-```
+| 路径 | 说明 |
+| --- | --- |
+| [`android/`](../android/) | Android Gradle 工程、Wrapper 和设备验证脚本 |
+| [`android/app/`](../android/app/) | Android 应用代码、资源、Room schema、JVM 测试和设备端测试 |
+| [`docs/`](./) | 备份格式、开发指南、截图和验收记录 |
+| [`.github/workflows/`](../.github/workflows/) | Android 验证及发布流程 |
+| [`README.md`](../README.md) | 项目首页 |
 
 ## 10. 本地开发
 
@@ -242,7 +231,7 @@ Xike/
 - Android SDK Build Tools 36.1.0。
 - Android Studio，或可执行 Android Gradle 任务的命令行环境。
 
-macOS 或 Linux 可先运行：
+在 `android/` 目录执行以下命令。macOS 或 Linux 可先自检：
 
 ```bash
 ./scripts/check-jdk17.sh
@@ -251,16 +240,10 @@ macOS 或 Linux 可先运行：
 执行与 PR CI 一致的主要验证：
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+./gradlew spotlessCheck testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-连接 API 26 以上的真机或模拟器后运行设备测试：
-
-```bash
-./gradlew connectedDebugAndroidTest
-```
-
-更详细的环境说明见 [`docs/local-development.md`](local-development.md)。
+设备端验证使用已核对的独立测试设备。安装调试 APK 和测试 APK 的命令见 [Android 本地开发环境](local-development.md)。
 
 ## 11. 测试与质量保障
 
@@ -310,8 +293,8 @@ PR 工作流运行单元测试、Lint、Debug APK 构建和 Android 测试 APK �
 
 1. 先读根目录 [`README.md`](../README.md)，理解产品定位和用户能力。
 2. 阅读本文档，建立代码、数据和发布的整体认识。
-3. 从 [`MainActivity.kt`](../app/src/main/java/com/xike/app/MainActivity.kt) 和 [`JournalViewModel.kt`](../app/src/main/java/com/xike/app/JournalViewModel.kt) 跟踪主流程。
-4. 阅读 [`JournalStore.kt`](../app/src/main/java/com/xike/app/JournalStore.kt) 与 [`JournalDatabase.kt`](../app/src/main/java/com/xike/app/JournalDatabase.kt)，理解数据安全边界。
+3. 从 [`MainActivity.kt`](../android/app/src/main/java/com/xike/app/MainActivity.kt) 和 [`JournalViewModel.kt`](../android/app/src/main/java/com/xike/app/JournalViewModel.kt) 跟踪主流程。
+4. 阅读 [`JournalStore.kt`](../android/app/src/main/java/com/xike/app/JournalStore.kt) 与 [`JournalDatabase.kt`](../android/app/src/main/java/com/xike/app/JournalDatabase.kt)，理解数据安全边界。
 5. 根据任务进入记录、回望、轨迹、天气或提醒的具体文件。
 6. 修改 schema、备份或图片链路前，先查看相关迁移测试和 [`docs/release-checklist.md`](release-checklist.md)。
 

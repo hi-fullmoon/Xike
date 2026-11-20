@@ -20,15 +20,16 @@
 
 ## 产品与技术边界
 
-- 息刻是离线优先的 Android 个人感受日记，无需账号，记录默认保存在本机。
-- 项目使用 Kotlin、Jetpack Compose、Material 3、Room／SQLCipher 和 Android Keystore。当前最低支持 API 26，编译与目标 SDK 为 36，Java／Kotlin 编译工具链为 17。
-- 构建、依赖和版本配置以 [app/build.gradle.kts](app/build.gradle.kts)、[build.gradle.kts](build.gradle.kts) 和 CI 配置为准，不在本文件重复维护依赖版本列表。
+- 息刻是离线优先的个人感受日记，无需账号，记录默认保存在本机。
+- Android 的 Gradle 工程位于 [android/](android/)。
+- Android 使用 Kotlin、Jetpack Compose、Material 3、Room／SQLCipher 和 Android Keystore。当前最低支持 API 26，编译与目标 SDK 为 36，Java／Kotlin 编译工具链为 17。
+- Android 构建、依赖和版本配置以 [android/app/build.gradle.kts](android/app/build.gradle.kts)、[android/build.gradle.kts](android/build.gradle.kts) 和 CI 配置为准。
 - 天气查询仅由用户主动触发；只获取一次前台位置，支持精确定位并兼容粗略权限。地点可显示到区、街道，只保存地点文字，坐标不落盘，不进行后台定位。
 - 用户日记、照片、录音、草稿、密码和密钥不得进入日志、提交内容、公开截图或测试报告。
 
-## 主要代码入口
+## Android 主要代码入口
 
-源代码根目录为 `app/src/main/java/com/xike/app/`。
+源代码根目录为 `android/app/src/main/java/com/xike/app/`。
 
 | 文件或目录 | 主要职责 |
 | --- | --- |
@@ -69,8 +70,8 @@
 | `LocalizedStrings.kt`、`JournalTopics.kt` | 本地化映射与主题标识规范化 |
 | `ui/components/PreviewBitmapCache.kt`、`ui/components/GalleryImageLoader.kt` | 图片预览缓存与图库加载 |
 | `ui/components/XikeIcons.kt`、`ui/components/MoodEmoji.kt`、`ui/components/XikeNotice.kt`、`ui/components/DestructiveConfirmationDialog.kt` | 共享图标、心情绘制、提示及确认弹窗 |
-| `app/src/test/`、`app/src/androidTest/` | JVM 测试与设备端测试 |
-| `app/schemas/` | Room 数据库 schema |
+| `android/app/src/test/`、`android/app/src/androidTest/` | JVM 测试与设备端测试 |
+| `android/app/schemas/` | Room 数据库 schema |
 | `docs/`、`.github/workflows/` | 项目说明、验收与发布流程 |
 
 修改前先追踪真实调用路径，确认当前页面和功能实际使用哪个实现；不得根据文件名猜测，或修改已经不在使用的实现来宣称问题已修复。
@@ -109,9 +110,9 @@
 - 布局与样式变更检查实际显示：相关页面、选中与未选中状态、浅深色、中英文、窄屏、大字体及必要的键盘状态。共享改动检查对应风格的使用范围。
 - 确认文字绘制、点击区域和图标对齐，不仅检查某个尺寸值；检查长文字、计数提示、滚动与弹窗操作按钮是否被截断。
 
-## 构建与验证
+## Android 构建与验证
 
-优先使用 JDK 17；检查实际 Java 版本，不假定 Android Studio 自带的 JBR 一定是 17。环境与构建说明见 [本地开发环境](docs/local-development.md)。
+以下命令在 `android/` 目录执行。优先使用 JDK 17，检查实际 Java 版本。环境与构建说明见 [Android 本地开发环境](docs/local-development.md)。
 
 标准 JDK 17 环境先执行自检：
 

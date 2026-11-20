@@ -52,16 +52,17 @@
 
 ## 开发与运行
 
-使用 Android Studio 打开本目录，准备 Android SDK Platform 36、Build Tools 36.1.0 和 JDK 17（Android Studio 自带的 JBR 也可以）。最低支持 Android 8.0（API 26）。
+使用 Android Studio 打开 [`android/`](android/)，应用模块位于 [`android/app/`](android/app/)。准备 Android SDK Platform 36、Build Tools 36.1.0 和 JDK 17，具体见 [Android 本地开发环境](docs/local-development.md)。
 
-在 macOS／Linux 上构建并安装到已连接的设备或模拟器：
+在 macOS／Linux 上，从仓库根目录执行以下命令。安装前用 `adb devices -l` 核对目标设备，并将序列号设为 `XIKE_DEVICE_SERIAL`。
 
 ```bash
+cd android
 ./gradlew :app:assembleDebug
-./gradlew :app:installDebug
+adb -s "${XIKE_DEVICE_SERIAL:?请先设置目标序列号}" install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Windows 使用 `gradlew.bat` 执行相同任务；也可以在 Android Studio 中运行 `app` 配置。调试 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
+Windows 在 `android/` 目录使用 `gradlew.bat :app:assembleDebug`，也可以在 Android Studio 中选择设备并运行 `app` 配置。调试 APK 位于 `android/app/build/outputs/apk/debug/app-debug.apk`。
 
 ## 数据与隐私
 

@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackupStreamingCipherTest {
-    private val source = File("../docs/screenshots/moment.png")
+    private val source = checkNotNull(javaClass.getResource("/moment.png"))
     private val password = "Xike-streaming-regression"
 
     @Test
@@ -24,14 +24,14 @@ class BackupStreamingCipherTest {
         val encrypted = File.createTempFile("xike-streaming-", ".xike")
         try {
             BackupCipher.encryptingStream(encrypted.outputStream(), password).use { output ->
-                source.inputStream().use { it.copyTo(output) }
+                source.openStream().use { it.copyTo(output) }
                 output.flush()
                 assertTrue(
                     "Encrypted media must leave memory before close",
                     encrypted.length() > 64 * 1024,
                 )
             }
-            assertArrayEquals(digest(source), decryptDigest(encrypted))
+            assertArrayEquals(source.openStream().use(::digest), decryptDigest(encrypted))
             assertThrows(Exception::class.java) { decryptDigest(encrypted, "wrong-password") }
         } finally {
             encrypted.delete()
@@ -43,7 +43,7 @@ class BackupStreamingCipherTest {
         val encrypted = File.createTempFile("xike-streaming-", ".xike")
         try {
             BackupCipher.encryptingStream(encrypted.outputStream(), password).use { output ->
-                source.inputStream().use { it.copyTo(output) }
+                source.openStream().use { it.copyTo(output) }
             }
             java.io.RandomAccessFile(encrypted, "rw").use {
                 it.seek(it.length() - 1)
@@ -78,10 +78,10 @@ class BackupStreamingCipherTest {
                 output.write(salt)
                 output.write(nonce)
                 CipherOutputStream(output, cipher).use { destination ->
-                    source.inputStream().use { it.copyTo(destination) }
+                    source.openStream().use { it.copyTo(destination) }
                 }
             }
-            assertArrayEquals(digest(source), decryptDigest(encrypted))
+            assertArrayEquals(source.openStream().use(::digest), decryptDigest(encrypted))
         } finally {
             encrypted.delete()
         }
@@ -94,8 +94,6 @@ class BackupStreamingCipherTest {
             check(BackupCipher.hasStreamingMagic(header))
             BackupCipher.decryptingStream(it, secret, header).use(::digest)
         }
-
-    private fun digest(file: File): ByteArray = file.inputStream().use(::digest)
 
     private fun digest(input: java.io.InputStream): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")

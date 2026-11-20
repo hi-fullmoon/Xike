@@ -51,7 +51,7 @@
 export XIKE_DEVICE_SERIAL=emulator-5590
 export XIKE_REMINDER_REPORT_DIR=/tmp/xike-reminder-natural-before-submit
 export XIKE_REMINDER_NATURAL=before-submit
-python3 scripts/test-reminder-process-recovery.py
+python3 android/scripts/test-reminder-process-recovery.py
 ```
 
 另一场景使用独立设备并设置 `XIKE_REMINDER_NATURAL=after-submit`。测试脚本自行绑定仅存在于测试 APK 的观察服务；杀掉普通应用进程后不再启动目标应用。主机观察器需要重连时，可在保留原报告目录的前提下设置 `XIKE_REMINDER_RESUME_NATURAL=yes`，只恢复只读观察，不重新执行设置或启动应用。

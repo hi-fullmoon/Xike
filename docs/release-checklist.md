@@ -1,10 +1,10 @@
-# 最小发布检查清单
+# Android 最小发布检查清单
 
 每次候选版本在创建标签前完成本清单。自动化结果需要链接到对应的 GitHub Actions 运行记录，手工烟测需要记录设备、Android 版本、安装包 SHA-256 和测试人。
 
 ## 自动化门禁
 
-- [ ] `./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest` 通过。
+- [ ] 在 `android/` 目录运行 `./gradlew spotlessCheck testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest` 并通过检查。
 - [ ] 数据库 schema 已导出，迁移测试覆盖当前公开版本到候选版本。
 - [ ] 工作区无意外生成文件，候选提交与准备打标签的提交一致。
 

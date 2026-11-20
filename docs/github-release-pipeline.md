@@ -1,23 +1,13 @@
-# GitHub Release 流水线
+# Android GitHub Release 流水线
 
 ## 发布模型
 
-流水线文件位于 `.github/workflows/release.yml`，整体沿用 Athena 项目的发布模型，只发布已经存在的 Git 标签：
+[`Release Android app`](../.github/workflows/release.yml) 按已推送的 Git 标签构建与发布。
 
-```text
-v0.2.0 标签
-   │
-   ├─ 校验标签并计算 Android 版本号
-   │
-   ├─ 单元测试 + Android Lint（不读取签名密钥）
-   │
-   ├─ 只读签名任务
-   │    ├─ 恢复并校验临时签名文件
-   │    ├─ 构建签名 APK + AAB
-   │    └─ 验证签名并生成 SHA256SUMS.txt
-   └─ 独立发布任务（不接收签名密钥）
-        └─ 创建或更新 GitHub Release + 自动发布说明
-```
+1. 检出标签，识别 Android Gradle 工程的位置并计算版本号。
+2. 运行格式检查、单元测试和 Android Lint。
+3. 在签名任务中恢复临时签名文件，构建并验证 APK 和 AAB，再生成 `SHA256SUMS.txt` 与构建信息。
+4. 由独立的发布任务使用校验后的产物创建或更新 GitHub Release。
 
 版本标签严格使用 `vMAJOR.MINOR.PATCH`，例如 `v0.2.0`。
 
@@ -54,7 +44,7 @@ $keystoreBase64 = [Convert]::ToBase64String(
 $keystoreBase64 | Set-Clipboard
 ```
 
-进入仓库 `Settings → Secrets and variables → Actions`，添加与 Athena 相同命名的四个 Repository secrets：
+进入仓库 `Settings → Secrets and variables → Actions`，添加以下四个 Repository secrets。
 
 | Secret | 内容 |
 | --- | --- |
@@ -76,16 +66,16 @@ git tag -a v0.2.0 -m "息刻 0.2.0"
 git push origin v0.2.0
 ```
 
-推送后，进入仓库 `Actions → Publish GitHub Release` 查看执行情况。如果 `release` Environment 配置了审批，质量门禁通过后任务会等待批准。
+推送后，进入仓库 `Actions → Release Android app` 查看执行情况。
 
-也可以在 Actions 页面手动运行工作流，但输入的标签必须已经存在；手动运行不会替你创建标签。
+也可以在 Actions 页面手动运行工作流，输入已有标签。工作流检出该标签，再从其中的 `android/` 或早期标签的仓库根目录运行 Gradle。
 
 ## Release 产物
 
-- `xike-VERSION.apk`：用户可直接安装的签名 APK。
-- `xike-VERSION.aab`：用于应用商店的签名 Android App Bundle。
+- `Xike-VERSION.apk`：用户可直接安装的签名 APK。
+- `Xike-VERSION.aab`：用于应用商店的签名 Android App Bundle。
 - `SHA256SUMS.txt`：下载文件完整性校验值。
-- `build-info.txt`：标签、版本号、提交 SHA 和仓库信息。
+- `build-info.txt`：标签、版本号、GitHub 工作流上下文中的提交 SHA 和仓库信息。
 
 相同内容还会保留为 7 天的 GitHub Actions artifact，便于发布 API 临时失败时排查。
 
@@ -100,6 +90,6 @@ git push origin v0.2.0
 
 ## 设计依据
 
-- GitHub Environment 将签名 secrets 延迟到受保护的发布任务，并可增加人工审批。
+- 签名任务从 Repository secrets 获取密钥和密码，发布任务使用已验证的产物。
 - `gh release create --verify-tag` 保证 Release 绑定到已经推送的标签；自动生成发布说明并在附件上传完成后发布。
 - Gradle Wrapper 与 `gradle/actions/setup-gradle` 提供可重复的 Gradle 版本和依赖缓存。

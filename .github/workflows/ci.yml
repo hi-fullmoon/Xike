@@ -32,4 +32,5 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       - name: Run verification
+        working-directory: android
         run: ./gradlew spotlessCheck testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --stacktrace

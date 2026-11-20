@@ -24,7 +24,7 @@
 
 ## 执行示例
 
-先用同一次构建的调试 APK 和测试 APK 覆盖安装到已核对的隔离目标，然后逐次执行，每条命令都启动独立仪器测试进程：
+在 `android/` 目录执行。先用同一次构建的调试 APK 和测试 APK 覆盖安装到已核对的隔离目标，再逐次启动独立仪器测试进程：
 
 ```bash
 adb -s "${XIKE_DEVICE_SERIAL:?请先核对隔离设备}" install -r app/build/outputs/apk/debug/app-debug.apk

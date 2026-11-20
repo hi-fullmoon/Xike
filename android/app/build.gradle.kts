@@ -87,8 +87,10 @@ android {
     }
 
     sourceSets {
+        val screenshots = rootProject.file("../docs/screenshots")
+        getByName("test").resources.srcDir(screenshots)
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
-        getByName("androidTest").assets.srcDir("$rootDir/docs/screenshots")
+        getByName("androidTest").assets.srcDir(screenshots)
     }
 
     compileOptions {
