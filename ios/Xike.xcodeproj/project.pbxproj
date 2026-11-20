@@ -1,0 +1,319 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 77;
+	objects = {
+		27A000000000000000000001 = {
+			isa = PBXProject;
+			attributes = { LastSwiftUpdateCheck = 2720; LastUpgradeCheck = 2720; };
+			buildConfigurationList = 27A000000000000000000020;
+			developmentRegion = "zh-Hans";
+			knownRegions = ( "zh-Hans", en, Base );
+			mainGroup = 27A000000000000000000002;
+			packageReferences = ( 27A00000000000000000000A );
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 27A000000000000000000003;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = ( 27A000000000000000000006, 27A000000000000000000031, 27A000000000000000000041 );
+		};
+		27A000000000000000000002 = {
+			isa = PBXGroup;
+			children = ( 27A000000000000000000004, 27A000000000000000000030, 27A000000000000000000040,
+				27A00000000000000000000C,
+				27A00000000000000000000E, 27A000000000000000000003 );
+			sourceTree = "<group>";
+		};
+		27A000000000000000000003 = {
+			isa = PBXGroup;
+			children = ( 27A000000000000000000005, 27A000000000000000000032, 27A000000000000000000042 );
+			name = Products;
+			sourceTree = "<group>";
+		};
+		27A000000000000000000004 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = ( 27A00000000000000000000F );
+			path = Xike;
+			sourceTree = "<group>";
+		};
+		27A000000000000000000005 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			path = Xike.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		27A000000000000000000006 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 27A000000000000000000021;
+			buildPhases = ( 27A000000000000000000007, 27A000000000000000000008,
+				27A000000000000000000009, 27A000000000000000000010 );
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = ( 27A000000000000000000004 );
+			name = Xike;
+			packageProductDependencies = ( 27A00000000000000000000B );
+			productName = Xike;
+			productReference = 27A000000000000000000005;
+			productType = "com.apple.product-type.application";
+		};
+		27A000000000000000000007 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A000000000000000000008 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( 27A00000000000000000000D );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A000000000000000000009 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ( 27A000000000000000000011, 27A000000000000000000012 );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A00000000000000000000A = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sqlcipher/SQLCipher.swift.git";
+			requirement = { kind = exactVersion; version = 4.20.0; };
+		};
+		27A00000000000000000000B = {
+			isa = XCSwiftPackageProductDependency;
+			package = 27A00000000000000000000A;
+			productName = SQLCipher;
+		};
+		27A00000000000000000000C = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder;
+			name = "Mood Artwork";
+			path = "../android/app/src/main/res/drawable-nodpi";
+			sourceTree = "<group>";
+		};
+		27A00000000000000000000D = { isa = PBXBuildFile; productRef = 27A00000000000000000000B; };
+		27A00000000000000000000E = {
+			isa = PBXFileReference;
+			lastKnownFileType = text;
+			path = "../android/app/src/main/assets/licenses/fluent-emoji-MIT.txt";
+			sourceTree = "<group>";
+		};
+		27A00000000000000000000F = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = ( Support/Info.plist, Support/Bridging.h, Support/Xike.xcconfig );
+			target = 27A000000000000000000006;
+		};
+		27A000000000000000000010 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ( "$(XIKE_NATIVE_DIR)/XikeNative.framework/XikeNative" );
+			name = "Embed XikeNative";
+			outputPaths = ( "$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/XikeNative.framework/XikeNative" );
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\ndestination=\"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/XikeNative.framework\"\n/usr/bin/ditto \"$XIKE_NATIVE_DIR/XikeNative.framework\" \"$destination\"\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == YES ]]; then\n    /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" \"$destination\"\nfi\nif [[ \"$PLATFORM_NAME\" == iphoneos ]]; then\n    /usr/bin/ditto \"$PROJECT_DIR/build/amap/AMapLocationKit.framework/AMapLocation.bundle\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AMapLocation.bundle\"\nfi\n";
+		};
+		27A000000000000000000011 = { isa = PBXBuildFile; fileRef = 27A00000000000000000000C; };
+		27A000000000000000000012 = { isa = PBXBuildFile; fileRef = 27A00000000000000000000E; };
+		27A000000000000000000020 = {
+			isa = XCConfigurationList;
+			buildConfigurations = ( 27A000000000000000000022, 27A000000000000000000023 );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		27A000000000000000000021 = {
+			isa = XCConfigurationList;
+			buildConfigurations = ( 27A000000000000000000024, 27A000000000000000000025 );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		27A000000000000000000022 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; };
+			name = Debug;
+		};
+		27A000000000000000000023 = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; };
+			name = Release;
+		};
+		27A000000000000000000024 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 27A000000000000000000026;
+			buildSettings = {
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		27A000000000000000000025 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 27A000000000000000000026;
+			buildSettings = {
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		27A000000000000000000026 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xcconfig;
+			path = Xike/Support/Xike.xcconfig;
+			sourceTree = SOURCE_ROOT;
+		};
+		27A000000000000000000030 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = XikeTests;
+			sourceTree = "<group>";
+		};
+		27A000000000000000000031 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 27A000000000000000000037;
+			buildPhases = ( 27A000000000000000000033, 27A000000000000000000034 );
+			buildRules = ();
+			dependencies = ( 27A000000000000000000035 );
+			fileSystemSynchronizedGroups = ( 27A000000000000000000030 );
+			name = XikeTests;
+			productName = XikeTests;
+			productReference = 27A000000000000000000032;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		27A000000000000000000032 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.cfbundle;
+			path = XikeTests.xctest;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		27A000000000000000000033 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A000000000000000000034 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A000000000000000000035 = {
+			isa = PBXTargetDependency;
+			target = 27A000000000000000000006;
+			targetProxy = 27A000000000000000000036;
+		};
+		27A000000000000000000036 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 27A000000000000000000001;
+			proxyType = 1;
+			remoteGlobalIDString = 27A000000000000000000006;
+			remoteInfo = Xike;
+		};
+		27A000000000000000000037 = {
+			isa = XCConfigurationList;
+			buildConfigurations = ( 27A000000000000000000038, 27A000000000000000000039 );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		27A000000000000000000038 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(PROJECT_DIR)/build/native-simulator";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(PROJECT_DIR)/build/native-device";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xike.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Xike.app/Xike";
+			};
+			name = Debug;
+		};
+		27A000000000000000000039 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(PROJECT_DIR)/build/native-simulator";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(PROJECT_DIR)/build/native-device";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xike.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Xike.app/Xike";
+			};
+			name = Release;
+		};
+		27A000000000000000000040 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = XikeUITests;
+			sourceTree = "<group>";
+		};
+		27A000000000000000000041 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 27A000000000000000000046;
+			buildPhases = ( 27A000000000000000000043 );
+			buildRules = ();
+			dependencies = ( 27A000000000000000000044 );
+			fileSystemSynchronizedGroups = ( 27A000000000000000000040 );
+			name = XikeUITests;
+			productName = XikeUITests;
+			productReference = 27A000000000000000000042;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		27A000000000000000000042 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.cfbundle;
+			path = XikeUITests.xctest;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		27A000000000000000000043 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27A000000000000000000044 = {
+			isa = PBXTargetDependency;
+			target = 27A000000000000000000006;
+			targetProxy = 27A000000000000000000036;
+		};
+		27A000000000000000000046 = {
+			isa = XCConfigurationList;
+			buildConfigurations = ( 27A000000000000000000047, 27A000000000000000000048 );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		27A000000000000000000047 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xike.app.ui-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Xike;
+			};
+			name = Debug;
+		};
+		27A000000000000000000048 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xike.app.ui-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Xike;
+			};
+			name = Release;
+		};
+	};
+	rootObject = 27A000000000000000000001;
+}

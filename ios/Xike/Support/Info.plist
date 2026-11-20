@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh-Hans</string>
+    <key>CFBundleLocalizations</key>
+    <array><string>zh-Hans</string><string>en</string></array>
+    <key>CFBundleDisplayName</key>
+    <string>息刻</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UIAppFonts</key>
+    <array><string>NotoSerifCJKsc-Regular.otf</string></array>
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array><string>UIInterfaceOrientationPortrait</string></array>
+    <key>NSFaceIDUsageDescription</key>
+    <string>用面容 ID 解锁息刻。 Use Face ID to unlock Xike.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>为日记拍摄照片或视频。 Take a photo or video for a journal entry.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>为日记录制声音。 Record audio for a journal entry.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>将拍摄的照片或视频保存到系统相册。 Save captured media to Photos.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>在你添加窗外信息时查询附近的天气。 Get local weather when you request it.</string>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array><string>com.xike.app.backup</string></array>
+    <key>UIBackgroundModes</key>
+    <array><string>processing</string></array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.xike.backup</string>
+            <key>UTTypeDescription</key><string>Xike encrypted backup</string>
+            <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>xike</string></array></dict>
+        </dict>
+    </array>
+</dict>
+</plist>
