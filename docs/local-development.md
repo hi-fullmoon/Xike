@@ -2,7 +2,9 @@
 
 用 Android Studio 打开 [`android/`](../android/)。应用模块为 [`android/app/`](../android/app/)，构建使用 JDK 17、Android SDK Platform 36 和 Build Tools 36.1.0。以下命令在 `android/` 目录执行。
 
-在 macOS 或 Linux 上，先执行环境自检：
+## 环境自检
+
+macOS 或 Linux 可使用仓库里的自检脚本。
 
 ```bash
 ./scripts/check-jdk17.sh
@@ -14,6 +16,24 @@
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export PATH="$JAVA_HOME/bin:$PATH"
 ```
+
+## 调试构建与安装
+
+在 macOS 或 Linux 上构建调试 APK。
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+在 Windows 上使用 `gradlew.bat :app:assembleDebug`。也可以在 Android Studio 中选择设备并运行 `app` 配置。
+
+用 `adb devices -l` 核对已连接的设备，将选定序列号设为 `XIKE_DEVICE_SERIAL`，再安装构建生成的 APK。
+
+```bash
+adb -s "${XIKE_DEVICE_SERIAL:?请先设置目标序列号}" install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+## 格式化与本地检查
 
 Kotlin 源码、单元测试、设备测试和 Gradle Kotlin 脚本统一使用 Spotless + ktfmt，版本固定在 [`android/build.gradle.kts`](../android/build.gradle.kts)，采用四空格缩进的 Kotlin 风格。生成代码不参与格式化。
 
@@ -38,6 +58,8 @@ Windows 可在 JDK 17 已加入环境变量后执行：
 ```powershell
 gradlew.bat spotlessCheck testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
+
+## 设备端测试
 
 连接 API 26 及以上的独立测试设备。先用 `adb devices -l` 核对设备并设置 `XIKE_DEVICE_SERIAL`，再安装同一次构建生成的两个 APK 并运行设备端测试：
 

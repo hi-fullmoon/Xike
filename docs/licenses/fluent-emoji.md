@@ -4,7 +4,7 @@
 
 固定来源提交：`1ffb34c752ecf5d402f04cfb4b392c77f57c54bc`。
 
-使用 `assets/` 下的 Flat SVG 原色素材，通过 librsvg 转为 136 × 136 透明 PNG，作为离线资源存放在 `android/app/src/main/res/drawable-nodpi/`，未修改图案或配色。
+使用 `assets/` 下的 Flat SVG 原色素材，通过 librsvg 转为 136 × 136 透明 PNG。Android 将这些离线资源存放在 `android/app/src/main/res/drawable-nodpi/`，iOS 工程也从该目录打包心情图。
 
 | 资源 | 原始路径 |
 | --- | --- |

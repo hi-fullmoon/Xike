@@ -21,9 +21,9 @@
 ## 产品与技术边界
 
 - 息刻是离线优先的个人感受日记，无需账号，记录默认保存在本机。
-- Android 的 Gradle 工程位于 [android/](android/)。
+- Android 的 Gradle 工程位于 [android/](android/)，iOS 的 Xcode 工程位于 [ios/](ios/)，两端使用共同的[备份格式说明](docs/backup-format.md)。
 - Android 使用 Kotlin、Jetpack Compose、Material 3、Room／SQLCipher 和 Android Keystore。当前最低支持 API 26，编译与目标 SDK 为 36，Java／Kotlin 编译工具链为 17。
-- Android 构建、依赖和版本配置以 [android/app/build.gradle.kts](android/app/build.gradle.kts)、[android/build.gradle.kts](android/build.gradle.kts) 和 CI 配置为准。
+- Android 构建、依赖和版本配置以 [android/app/build.gradle.kts](android/app/build.gradle.kts)、[android/build.gradle.kts](android/build.gradle.kts) 和 CI 配置为准。iOS 构建与验证见 [iOS 工程说明](ios/README.md)。
 - 天气查询仅由用户主动触发；只获取一次前台位置，支持精确定位并兼容粗略权限。地点可显示到区、街道，只保存地点文字，坐标不落盘，不进行后台定位。
 - 用户日记、照片、录音、草稿、密码和密钥不得进入日志、提交内容、公开截图或测试报告。
 
