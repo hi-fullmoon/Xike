@@ -337,7 +337,7 @@ internal fun ArchiveControls(
                     activeFilterCount,
                     showFilters,
                     onToggleFilters,
-                    Modifier.heightIn(min = matchedHeight),
+                    Modifier.sizeIn(minWidth = matchedHeight, minHeight = matchedHeight),
                 )
             }
         }
@@ -366,7 +366,7 @@ private fun ArchiveModeGroup(
             Row(
                 Modifier.horizontalScroll(rememberScrollState())
                     .width(maxOf(maxWidth, minimumWidth))
-                    .padding(4.dp)
+                    .padding(horizontal = 4.dp)
                     .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
@@ -460,7 +460,7 @@ private fun ArchiveModeButton(
     onClick: () -> Unit,
 ) {
     val labelStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-    Surface(
+    Box(
         modifier =
             modifier
                 .sizeIn(minHeight = 48.dp)
@@ -468,24 +468,30 @@ private fun ArchiveModeButton(
                     selected = selected,
                     role = Role.Tab,
                     onClick = onClick,
-                ),
-        shape = XikeShapes.button,
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                )
+                .padding(vertical = 4.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
-            contentAlignment = Alignment.Center,
+        Surface(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+            shape = XikeShapes.button,
+            color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         ) {
-            Text(
-                label,
-                style = labelStyle,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                softWrap = false,
-                color =
-                    if (selected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Box(
+                Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = labelStyle,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    color =
+                        if (selected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
