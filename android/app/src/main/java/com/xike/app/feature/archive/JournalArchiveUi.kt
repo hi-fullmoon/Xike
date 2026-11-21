@@ -249,9 +249,24 @@ fun JournalArchiveScreen(
     var resultKey by remember { mutableStateOf<Any?>(null) }
     val viewMode =
         ArchiveViewMode.entries.firstOrNull { it.name == viewModeName } ?: ArchiveViewMode.CALENDAR
-    // 往日入口归入工具箱；结果状态之前还可能有筛选面板与月历。
+    var memoriesDays by remember { mutableStateOf<List<MemoryDay>>(emptyList()) }
+    LaunchedEffect(readRepository, libraryState.revision, today) {
+        val repository = readRepository
+        if (repository == null) {
+            memoriesDays = emptyList()
+        } else {
+            journalReadResult { repository.memories(today, ZoneId.systemDefault()) }
+                .onSuccess { memoriesDays = it.days }
+        }
+    }
+    val showMemoriesCard =
+        readRepository != null && searchQuery.isEmpty && memoriesDays.isNotEmpty()
+    // 结果状态之前依次可能有筛选面板、月历与动态往日回忆卡片。
     val resultStatusIndex =
-        2 + (if (showFilters) 1 else 0) + (if (viewMode == ArchiveViewMode.CALENDAR) 1 else 0)
+        2 +
+            (if (showFilters) 1 else 0) +
+            (if (viewMode == ArchiveViewMode.CALENDAR) 1 else 0) +
+            (if (showMemoriesCard) 1 else 0)
     val currentResultStatusIndex by androidx.compose.runtime.rememberUpdatedState(resultStatusIndex)
 
     LaunchedEffect(pagedEntries?.loadState) {
@@ -388,21 +403,16 @@ fun JournalArchiveScreen(
             }
 
             item(key = "archive-toolbox") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (readRepository != null) {
-                        ArchiveMemoriesEntry { showMemories = true }
-                    }
-                    ArchiveToolbox(
-                        queryText = queryText,
-                        viewMode = viewMode,
-                        activeFilterCount = searchQuery.activeFilterCount,
-                        showFilters = showFilters,
-                        onQueryChange = { queryText = it.take(80) },
-                        onClearQuery = { queryText = "" },
-                        onViewModeChange = { viewModeName = it.name },
-                        onToggleFilters = { showFilters = !showFilters },
-                    )
-                }
+                ArchiveToolbox(
+                    queryText = queryText,
+                    viewMode = viewMode,
+                    activeFilterCount = searchQuery.activeFilterCount,
+                    showFilters = showFilters,
+                    onQueryChange = { queryText = it.take(80) },
+                    onClearQuery = { queryText = "" },
+                    onViewModeChange = { viewModeName = it.name },
+                    onToggleFilters = { showFilters = !showFilters },
+                )
             }
 
             if (filtersVisible) {
@@ -454,6 +464,16 @@ fun JournalArchiveScreen(
                             selectedDateValue = if (selectedDate == date) null else date.toString()
                             datePresetName = ArchiveDatePreset.ALL.name
                         },
+                    )
+                }
+            }
+
+            if (showMemoriesCard) {
+                item(key = "archive-memories-card") {
+                    ArchiveMemoriesCard(
+                        today = today,
+                        days = memoriesDays,
+                        onClick = { showMemories = true },
                     )
                 }
             }

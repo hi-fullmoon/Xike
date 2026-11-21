@@ -23,6 +23,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,9 +33,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +43,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -69,6 +70,7 @@ import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeShapes
+import java.time.LocalDate
 
 internal enum class ArchiveViewMode {
     CALENDAR,
@@ -103,60 +105,79 @@ internal fun ArchiveToolbox(
 }
 
 @Composable
-internal fun ArchiveMemoriesEntry(onClick: () -> Unit) {
+internal fun ArchiveMemoriesCard(
+    today: LocalDate,
+    days: List<MemoryDay>,
+    onClick: () -> Unit,
+) {
+    val totalCount = days.sumOf { it.count }
+    val hasMonthAgo = days.any { it.kind == MemoryKind.MONTH_AGO }
+    val previousYears = days.filter { it.kind == MemoryKind.PREVIOUS_YEAR }
     val title = tr("往日回望", "Past moments")
-    val hint = tr("（一个月前 · 往年今天）", "(One month ago · On this day)")
-    val titleStyle = MaterialTheme.typography.labelLarge
-    val hintStyle = MaterialTheme.typography.labelSmall
-    val measurer = rememberTextMeasurer()
-    val textWidth =
-        with(LocalDensity.current) {
-            (measurer.measure(title, titleStyle, softWrap = false).size.width +
-                    measurer.measure(hint, hintStyle, softWrap = false).size.width)
-                .toDp()
+    val summary =
+        when {
+            hasMonthAgo && previousYears.isNotEmpty() ->
+                tr(
+                    "一个月前与往年今天 · 共 $totalCount 条",
+                    "One month ago & past years · $totalCount entries",
+                )
+            hasMonthAgo -> tr("一个月前的今天 · 共 $totalCount 条", "One month ago · $totalCount entries")
+            previousYears.size == 1 && previousYears.first().date.year == today.year - 1 ->
+                tr("去年的今天 · 共 $totalCount 条", "One year ago · $totalCount entries")
+            else -> tr("往年的今天 · 共 $totalCount 条", "On this day in past years · $totalCount entries")
         }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val fixedWidth = XikeCardPadding * 2 + 20.dp * 2 + 8.dp * 3
-        // Allow for pixel rounding when deciding whether both labels fit.
-        val showHint = textWidth + fixedWidth + 1.dp <= maxWidth
-        FilledTonalButton(
-            onClick = onClick,
+    Surface(
+        modifier =
+            Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("archive-memories-entry")
+                .clickable(role = Role.Button, onClick = onClick),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+    ) {
+        Row(
             modifier =
-                Modifier.fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .testTag("archive-memories-entry")
-                    .semantics {
-                        if (!showHint) contentDescription = tr("$title，$hint", "$title, $hint")
-                    },
-            shape = XikeShapes.button,
-            colors =
-                ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-            contentPadding = PaddingValues(horizontal = XikeCardPadding, vertical = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = XikeCardPadding, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Outlined.History, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                title,
-                if (showHint) Modifier else Modifier.weight(1f),
-                style = titleStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (showHint) {
-                Spacer(Modifier.width(8.dp))
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    hint,
-                    Modifier.weight(1f),
-                    style = hintStyle,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp))
+            Icon(
+                Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
         }
     }
 }
@@ -300,12 +321,24 @@ internal fun ArchiveControls(
                 )
             }
         } else {
+            var modeGroupHeightPx by remember { mutableIntStateOf(0) }
+            val matchedHeight = maxOf(48.dp, with(density) { modeGroupHeightPx.toDp() })
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ArchiveModeGroup(viewMode, minimumModesWidth, onViewModeChange, Modifier.weight(1f))
-                ArchiveFilterToggle(activeFilterCount, showFilters, onToggleFilters)
+                ArchiveModeGroup(
+                    viewMode,
+                    minimumModesWidth,
+                    onViewModeChange,
+                    Modifier.weight(1f).onSizeChanged { modeGroupHeightPx = it.height },
+                )
+                ArchiveFilterToggle(
+                    activeFilterCount,
+                    showFilters,
+                    onToggleFilters,
+                    Modifier.heightIn(min = matchedHeight),
+                )
             }
         }
     }

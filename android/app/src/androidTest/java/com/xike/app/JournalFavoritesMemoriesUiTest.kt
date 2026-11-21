@@ -217,27 +217,33 @@ class JournalFavoritesMemoriesUiTest {
             scenario.onActivity { model = ViewModelProvider(it)[JournalViewModel::class.java] }
             rule.waitUntil(20_000) { model?.systemActivityResultsReady == true }
             rule.onNodeWithText(localizedText("回望")).performClick()
+            rule.waitForIdle()
+            assertTrue(
+                rule.onAllNodesWithTag("archive-memories-entry").fetchSemanticsNodes().isEmpty()
+            )
+            capture(context, "entry-empty-quiet")
+
+            rule.onNodeWithText(localizedText("此刻")).performClick()
+            createAt(
+                LocalDate.now().minusMonths(1),
+                moodLabel = if (english) "Pretty good" else "还不错",
+            )
+            rule.onNodeWithText(localizedText("回望")).performClick()
             val entry = rule.onNodeWithTag("archive-memories-entry")
+            rule.waitUntil(10_000) {
+                rule.onAllNodesWithTag("archive-memories-entry").fetchSemanticsNodes().isNotEmpty()
+            }
             entry.assertIsDisplayed().assertHasClickAction()
             val full = entry.getUnclippedBoundsInRoot()
             val visible = entry.getBoundsInRoot()
             assertTrue(full.bottom.value - full.top.value >= 48f)
-            val searchTop =
-                rule.onNodeWithTag("archive-search").getUnclippedBoundsInRoot().top.value
-            assertEquals(8f, searchTop - full.bottom.value, 0.5f)
+            val searchBottom =
+                rule.onNodeWithTag("archive-search").getUnclippedBoundsInRoot().bottom.value
+            assertTrue(full.top.value >= searchBottom - 0.5f)
             assertTrue(
                 full.top.value >= visible.top.value - 0.5f &&
                     full.bottom.value <= visible.bottom.value + 0.5f
             )
-            val hint = if (english) "(One month ago · On this day)" else "（一个月前 · 往年今天）"
-            if (
-                args.getString("expectMemoryHint") == "true" ||
-                    rule.onAllNodesWithText(hint).fetchSemanticsNodes().isNotEmpty()
-            ) {
-                rule.onNodeWithText(hint).assertIsDisplayed()
-            } else {
-                entry.assert(hasContentDescription(hint, substring = true))
-            }
             val titleLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             rule
                 .onNodeWithText(if (english) "Past moments" else "往日回望", useUnmergedTree = true)
@@ -253,9 +259,7 @@ class JournalFavoritesMemoriesUiTest {
             val close = if (english) "Close memories" else "关闭往日回望"
             rule.waitUntil(10_000) {
                 rule
-                    .onAllNodesWithText(
-                        if (english) "No entries from these dates yet" else "这些日子还没有留下记录"
-                    )
+                    .onAllNodesWithText(if (english) "One month ago" else "一个月前")
                     .fetchSemanticsNodes()
                     .isNotEmpty()
             }
@@ -269,17 +273,14 @@ class JournalFavoritesMemoriesUiTest {
             val favorites = if (english) "Favorites only" else "仅看收藏"
             rule.onNodeWithTag("archive-list").performScrollToNode(hasText(favorites))
             rule.onNodeWithText(favorites).performClick()
-            rule
-                .onNodeWithTag("archive-list")
-                .performScrollToNode(hasTestTag("archive-memories-entry"))
-            val before = entry.getBoundsInRoot().top.value
-            entry.performClick()
-            rule.onNodeWithContentDescription(close).performClick()
-            assertEquals(before, entry.getBoundsInRoot().top.value, 0.5f)
-            rule.onNodeWithTag("archive-list").performScrollToNode(hasText(favorites))
-            rule.onNodeWithText(favorites).assertIsSelected()
+            rule.waitUntil(5_000) {
+                rule.onAllNodesWithTag("archive-memories-entry").fetchSemanticsNodes().isEmpty()
+            }
+            rule.onNodeWithText(favorites).performClick()
+            rule.waitUntil(5_000) {
+                rule.onAllNodesWithTag("archive-memories-entry").fetchSemanticsNodes().isNotEmpty()
+            }
             capture(context, "archive-mood-filter")
-            assertTrue(store.entries().isEmpty())
         }
     }
 

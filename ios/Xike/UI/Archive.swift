@@ -14,6 +14,7 @@ struct ArchiveScreen: View {
     @Bindable var model: JournalAppModel
     @State private var showFilter = false
     @State private var showMemories = false
+    @State private var memoryDays: [MemoryDay] = []
     @State private var selected: RecordLink?
     @State private var month = Date.now
     @State private var page: ArchivePage?
@@ -37,27 +38,15 @@ struct ArchiveScreen: View {
         return ArchiveRequest(filter: filter, date: month, calendar: .xike, revision: model.libraryRevision, retry: retry)
     }
 
+    private var showMemoriesCard: Bool {
+        !model.archiveFilter.hasSearchText && model.archiveFilter.extraCount == 0 && !memoryDays.isEmpty
+    }
+
     var body: some View {
         let query = request
         let monthQuery = monthRequest
         PageScroll {
             archiveHeader
-            Button {
-                showMemories = true
-            } label: {
-                Label {
-                    ViewThatFits {
-                        HStack(spacing: 5) {
-                            Text(language.text("往日回望", "Past moments")).fontWeight(.medium)
-                            Text(language.text("（一个月前 · 往年今天）", "(One month ago · On this day)"))
-                                .font(.caption).foregroundStyle(palette.muted)
-                        }
-                        Text(language.text("往日回望", "Past moments")).fontWeight(.medium)
-                    }
-                } icon: { Image(systemName: "clock.arrow.circlepath") }
-                .frame(maxWidth: .infinity, minHeight: 46)
-                .background(palette.accentSurface, in: RoundedRectangle(cornerRadius: palette.buttonRadius))
-            }.buttonStyle(.plain).foregroundStyle(palette.primary)
             searchControls
             HStack {
                 Picker(language.text("回望方式", "View"), selection: $model.calendarMode) {
@@ -83,6 +72,9 @@ struct ArchiveScreen: View {
                     model.archiveFilter.datePreset = .all
                 }
             }
+            if showMemoriesCard {
+                memoriesCard
+            }
             if query != loadedRequest {
                 ProgressView(language.text("正在读取记录…", "Loading entries…"))
             } else {
@@ -93,6 +85,11 @@ struct ArchiveScreen: View {
         }
         .accessibilityIdentifier("archive-page")
         .task(id: query) { await load(query, offset: 0) }
+        .task(id: [model.libraryRevision, Int(Calendar.xike.startOfDay(for: model.today).timeIntervalSince1970)]) {
+            if let result = try? await model.store.memoryDays(today: model.today, calendar: .xike), !Task.isCancelled {
+                memoryDays = result
+            }
+        }
         .task(id: monthQuery) {
             counts = [:]
             calendarError = nil
@@ -138,6 +135,62 @@ struct ArchiveScreen: View {
             Text(message).font(.footnote).foregroundStyle(palette.muted)
             Button(language.text("重试", "Retry")) { retry += 1 }
         }
+    }
+
+    private var memoriesSummary: String {
+        let total = memoryDays.reduce(0) { $0 + $1.count }
+        let hasMonthAgo = memoryDays.contains { $0.isMonthAgo }
+        let previousYears = memoryDays.filter { !$0.isMonthAgo }
+        let currentYear = Calendar.xike.component(.year, from: model.today)
+        if hasMonthAgo && !previousYears.isEmpty {
+            return language.text("一个月前与往年今天 · 共 \(total) 条", "One month ago & past years · \(total) entries")
+        }
+        if hasMonthAgo {
+            return language.text("一个月前的今天 · 共 \(total) 条", "One month ago · \(total) entries")
+        }
+        if previousYears.count == 1,
+           let first = previousYears.first,
+           Calendar.xike.component(.year, from: first.date) == currentYear - 1 {
+            return language.text("去年的今天 · 共 \(total) 条", "One year ago · \(total) entries")
+        }
+        return language.text("往年的今天 · 共 \(total) 条", "On this day in past years · \(total) entries")
+    }
+
+    private var memoriesCard: some View {
+        Button {
+            showMemories = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.footnote)
+                    .foregroundStyle(palette.primary)
+                    .frame(width: 32, height: 32)
+                    .background(palette.accentSurface, in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(language.text("往日回望", "Past moments"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                    Text(memoriesSummary)
+                        .font(.caption)
+                        .foregroundStyle(palette.muted)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.muted)
+            }
+            .padding(.horizontal, palette.inset).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .background(palette.surface, in: RoundedRectangle(cornerRadius: palette.radius))
+            .overlay(
+                RoundedRectangle(cornerRadius: palette.radius)
+                    .stroke(palette.primary.opacity(0.16), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("archive-memories-entry")
     }
 
     private var searchControls: some View {
