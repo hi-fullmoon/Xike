@@ -114,7 +114,8 @@ class AiReviewLocalPreviewUiTest {
                     save.performClick()
                 }
                 rule.waitUntil(15_000) { runCatching { preview.assertIsEnabled() }.isSuccess }
-                val window = rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
+                val window =
+                    rule.onNodeWithTag("ai-review-page").fetchSemanticsNode().boundsInWindow
                 val close =
                     rule
                         .onNodeWithContentDescription(tr("关闭", "Close"))
@@ -259,7 +260,10 @@ class AiReviewLocalPreviewUiTest {
 
     private fun assertStable(window: Rect, close: Rect) {
         rule.waitForIdle()
-        assertEquals(window, rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow)
+        assertEquals(
+            window,
+            rule.onNodeWithTag("ai-review-page").fetchSemanticsNode().boundsInWindow,
+        )
         val currentClose =
             rule.onNodeWithContentDescription(tr("关闭", "Close")).fetchSemanticsNode().boundsInWindow
         assertEquals(close.top, currentClose.top, 1f)
@@ -288,7 +292,7 @@ class AiReviewLocalPreviewUiTest {
     private fun capture(state: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val config = context.resources.configuration
-        captureAiDialogWindow(
+        captureAiPageWindow(
             File(
                 context.getExternalFilesDir(null),
                 "ai-local-preview-${config.screenWidthDp}-${config.fontScale}-$state.png",

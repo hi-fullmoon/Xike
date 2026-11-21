@@ -1,16 +1,31 @@
 package com.xike.app.feature.insights
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,10 +38,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xike.app.JournalReadRepository
@@ -41,12 +60,14 @@ import com.xike.app.ai.aiRequest
 import com.xike.app.ai.aiReviewInput
 import com.xike.app.data.JournalDataException
 import com.xike.app.data.JournalEntry
-import com.xike.app.feature.ai.AiPanel
 import com.xike.app.feature.settings.AiSettingsDialog
 import com.xike.app.tr
 import com.xike.app.ui.components.DestructiveConfirmationDialog
-import com.xike.app.ui.components.SecondaryPageHeader
+import com.xike.app.ui.theme.XikeContentGap
+import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeDialogCompactGap
+import com.xike.app.ui.theme.XikeScreenHorizontalPadding
+import com.xike.app.ui.theme.XikeScreenVerticalPadding
 import com.xike.app.ui.theme.XikeShapes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -115,11 +136,376 @@ internal fun AiReviewDialog(
     // A new stage starts at the top. Visiting settings or a citation preserves scroll position.
     val scroll = remember(report, prepared, busy) { ScrollState(0) }
     if (config == null && error == null) return
-    if (settingsEntry != null) {
+
+    BackHandler(enabled = !sourceOpen && settingsEntry == null && !confirmDiscard) {
+        if (prepared != null && report == null && !busy) {
+            preview = null
+            error = null
+        } else {
+            dismiss()
+        }
+    }
+
+    if (settingsEntry == AiSettingsEntry.INITIAL) {
         AiSettingsDialog(
-            onDismiss = {
-                if (settingsEntry == AiSettingsEntry.INITIAL) dismiss() else settingsEntry = null
+            onDismiss = dismiss,
+            onSaved = { saved ->
+                val previous = settings
+                if (previous?.endpoint() != saved.endpoint() || previous?.model != saved.model) {
+                    preview = null
+                    result = null
+                }
+                if (previous != saved) error = null
+                settings = saved
+                settingsEntry = null
             },
+        )
+        return
+    }
+
+    val canPrepare = config?.canPreview == true && summary.entryCount in 1..AI_MAX_ENTRIES
+    val sendDisabledReason =
+        if (prepared != null && report == null && !busy) config?.sendDisabledReason() else null
+    val activeStep =
+        when {
+            report != null -> 3
+            busy && prepared != null -> 2
+            prepared != null -> 1
+            else -> 0
+        }
+
+    Surface(
+        modifier = Modifier.fillMaxSize().testTag("ai-review-page"),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+            // Top page bar
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Row(
+                    modifier =
+                        Modifier.widthIn(max = XikeContentMaxWidth)
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = dismiss) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = tr("关闭", "Close"),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                        Text(
+                            if (report != null) tr("AI 回顾 · 特刊", "AI review · Edition")
+                            else tr("AI 回顾", "AI review"),
+                            modifier = Modifier.semantics { heading() },
+                            style =
+                                if (report != null) MaterialTheme.typography.titleMedium
+                                else MaterialTheme.typography.titleLarge,
+                            color =
+                                if (report != null) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    IconButton(
+                        enabled = config != null && !busy,
+                        onClick = {
+                            if (!busy && settingsEntry == null && settings != null) {
+                                settingsEntry = AiSettingsEntry.REVIEW
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Outlined.Settings, contentDescription = tr("配置", "Settings"))
+                    }
+                }
+            }
+
+            if (report == null) {
+                AiReviewStepBar(activeStep = activeStep)
+            }
+
+            // Scrollable page body
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    modifier =
+                        Modifier.widthIn(max = XikeContentMaxWidth)
+                            .fillMaxSize()
+                            .clipToBounds()
+                            .verticalScroll(scroll)
+                            .testTag("ai-review-content")
+                            .padding(
+                                horizontal = XikeScreenHorizontalPadding,
+                                vertical = XikeScreenVerticalPadding,
+                            ),
+                    verticalArrangement = Arrangement.spacedBy(XikeContentGap),
+                ) {
+                    error?.let {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = XikeShapes.inner,
+                            color = MaterialTheme.colorScheme.errorContainer,
+                        ) {
+                            Text(
+                                it,
+                                modifier =
+                                    Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                                        .semantics { liveRegion = LiveRegionMode.Polite },
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    when {
+                        report != null && prepared != null ->
+                            AiReviewReport(summary, report, prepared.input.sources, onOpenSource)
+                        busy -> AiReviewProgress(entryCount = prepared?.input?.sources?.size)
+                        prepared != null && config != null ->
+                            AiReviewConfirmation(
+                                summary = summary,
+                                config = config,
+                                count = prepared.input.sources.size,
+                                includeNotes = includeNotes,
+                                requestBody = prepared.body,
+                                requestExpanded = requestExpanded,
+                                onToggleRequest = { requestExpanded = !requestExpanded },
+                            )
+                        config != null ->
+                            AiReviewPreparation(
+                                summary = summary,
+                                config = config,
+                                includeNotes = includeNotes,
+                                onIncludeNotesChange = {
+                                    if (
+                                        !busy &&
+                                            settingsEntry == null &&
+                                            preview == null &&
+                                            result == null
+                                    ) {
+                                        includeNotes = it
+                                        error = null
+                                    }
+                                },
+                                onOpenSettings = {
+                                    if (!busy && settingsEntry == null && settings != null) {
+                                        settingsEntry = AiSettingsEntry.REVIEW
+                                    }
+                                },
+                            )
+                    }
+                }
+            }
+
+            // Pinned bottom action bar
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier =
+                        Modifier.widthIn(max = XikeContentMaxWidth)
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = XikeScreenHorizontalPadding,
+                                vertical = 12.dp,
+                            ),
+                    verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
+                ) {
+                    if (sendDisabledReason != null) {
+                        Text(
+                            sendDisabledReason,
+                            modifier = Modifier.testTag("ai-send-disabled"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        when {
+                            busy ->
+                                OutlinedButton(
+                                    onClick = { job?.cancel() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = XikeShapes.button,
+                                ) {
+                                    Text(
+                                        if (prepared == null) tr("取消准备", "Cancel preview")
+                                        else tr("取消请求", "Cancel request")
+                                    )
+                                }
+                            report != null ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        summary.period.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    TextButton(
+                                        onClick = {
+                                            if (
+                                                !busy && settingsEntry == null && result === report
+                                            ) {
+                                                confirmDiscard = true
+                                            }
+                                        },
+                                        shape = XikeShapes.button,
+                                    ) {
+                                        Text(tr("重新准备", "Prepare again"))
+                                    }
+                                }
+                            prepared != null && config != null -> {
+                                TextButton(
+                                    onClick = {
+                                        if (
+                                            !busy &&
+                                                settingsEntry == null &&
+                                                result == null &&
+                                                preview === prepared
+                                        ) {
+                                            preview = null
+                                            error = null
+                                        }
+                                    },
+                                    shape = XikeShapes.button,
+                                ) {
+                                    Text(tr("返回", "Back"))
+                                }
+                                Button(
+                                    enabled = config.canUse,
+                                    onClick = {
+                                        if (
+                                            busy ||
+                                                settingsEntry != null ||
+                                                result != null ||
+                                                !config.canUse ||
+                                                settings != config ||
+                                                preview !== prepared ||
+                                                !callbacks.canHandleResult()
+                                        )
+                                            return@Button
+
+                                        busy = true
+                                        job =
+                                            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                                error = null
+                                                try {
+                                                    val response =
+                                                        operations.analyze(
+                                                            config,
+                                                            prepared.input,
+                                                            prepared.body,
+                                                        )
+                                                    ensureActive()
+                                                    if (callbacks.canHandleResult()) {
+                                                        response
+                                                            .onSuccess { result = it }
+                                                            .onFailure { error = it.message }
+                                                    } else {
+                                                        error =
+                                                            tr(
+                                                                "结果返回时应用无法显示（例如设备已锁屏），未予保留。可手动重新发送。",
+                                                                "The result arrived when it could not be shown (for example, while the device was locked) and was not kept. You can send again.",
+                                                            )
+                                                    }
+                                                } finally {
+                                                    busy = false
+                                                }
+                                            }
+                                    },
+                                    modifier = Modifier.testTag("ai-send"),
+                                    shape = XikeShapes.button,
+                                ) {
+                                    Text(
+                                        if (error == null) tr("发送并分析", "Send and analyze")
+                                        else tr("重新发送", "Send again"),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
+                            config != null ->
+                                Button(
+                                    enabled = canPrepare,
+                                    onClick = {
+                                        if (
+                                            busy ||
+                                                settingsEntry != null ||
+                                                result != null ||
+                                                preview != null ||
+                                                !canPrepare ||
+                                                settings != config ||
+                                                !callbacks.canHandleResult()
+                                        )
+                                            return@Button
+
+                                        val previewIncludeNotes = includeNotes
+                                        busy = true
+                                        job =
+                                            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                                error = null
+                                                try {
+                                                    val scoped =
+                                                        readRepository?.aiReviewEntries(
+                                                            summary.startDate,
+                                                            summary.endDate,
+                                                        )
+                                                            ?: entries.filter {
+                                                                it.id in summary.entryIds
+                                                            }
+                                                    val preparedReview =
+                                                        withContext(Dispatchers.Default) {
+                                                            val input =
+                                                                aiReviewInput(
+                                                                    scoped,
+                                                                    summary,
+                                                                    previewIncludeNotes,
+                                                                )
+                                                            PreparedAiReview(
+                                                                input,
+                                                                aiRequest(config, input),
+                                                            )
+                                                        }
+                                                    ensureActive()
+                                                    preview = preparedReview
+                                                } catch (failure: CancellationException) {
+                                                    throw failure
+                                                } catch (failure: JournalDataException) {
+                                                    error = failure.message
+                                                    onReadError(requireNotNull(error))
+                                                } catch (failure: IllegalArgumentException) {
+                                                    error = failure.message
+                                                } catch (_: Exception) {
+                                                    error =
+                                                        tr(
+                                                            "无法准备记录，请重试。",
+                                                            "Unable to prepare entries. Try again.",
+                                                        )
+                                                } finally {
+                                                    busy = false
+                                                }
+                                            }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = XikeShapes.button,
+                                ) {
+                                    Text(
+                                        tr("预览发送内容", "Preview content"),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (settingsEntry == AiSettingsEntry.REVIEW) {
+        AiSettingsDialog(
+            onDismiss = { settingsEntry = null },
             onSaved = { saved ->
                 val previous = settings
                 // The request body depends only on the model and the destination on the address;
@@ -133,257 +519,8 @@ internal fun AiReviewDialog(
                 settingsEntry = null
             },
         )
-        return
     }
-    if (sourceOpen) return
 
-    val canPrepare = config?.canPreview == true && summary.entryCount in 1..AI_MAX_ENTRIES
-    val sendDisabledReason =
-        if (prepared != null && report == null && !busy) config?.sendDisabledReason() else null
-
-    AiPanel(
-        onDismiss = dismiss,
-        scrollState = scroll,
-        contentModifier = Modifier.testTag("ai-review-content"),
-        dismissOnOutsideTap = !busy && report == null,
-        header = {
-            SecondaryPageHeader(
-                title = tr("AI 回顾", "AI review"),
-                closeDescription = tr("关闭", "Close"),
-                onClose = dismiss,
-                actions = {
-                    IconButton(
-                        enabled = config != null && !busy,
-                        onClick = {
-                            if (!busy && settingsEntry == null && settings != null) {
-                                settingsEntry = AiSettingsEntry.REVIEW
-                            }
-                        },
-                    ) {
-                        Icon(Icons.Outlined.Settings, contentDescription = tr("配置", "Settings"))
-                    }
-                },
-            )
-        },
-        actions = {
-            Column(
-                Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(XikeDialogCompactGap),
-            ) {
-                if (sendDisabledReason != null) {
-                    Text(
-                        sendDisabledReason,
-                        modifier = Modifier.testTag("ai-send-disabled"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    when {
-                        busy ->
-                            TextButton(onClick = { job?.cancel() }, shape = XikeShapes.button) {
-                                Text(
-                                    if (prepared == null) tr("取消准备", "Cancel preview")
-                                    else tr("取消请求", "Cancel request")
-                                )
-                            }
-                        report != null ->
-                            TextButton(
-                                onClick = {
-                                    if (!busy && settingsEntry == null && result === report) {
-                                        confirmDiscard = true
-                                    }
-                                },
-                                shape = XikeShapes.button,
-                            ) {
-                                Text(tr("重新准备", "Prepare again"))
-                            }
-                        prepared != null && config != null -> {
-                            TextButton(
-                                onClick = {
-                                    if (
-                                        !busy &&
-                                            settingsEntry == null &&
-                                            result == null &&
-                                            preview === prepared
-                                    ) {
-                                        preview = null
-                                        error = null
-                                    }
-                                },
-                                shape = XikeShapes.button,
-                            ) {
-                                Text(tr("返回", "Back"))
-                            }
-                            Button(
-                                enabled = config.canUse,
-                                onClick = {
-                                    if (
-                                        busy ||
-                                            settingsEntry != null ||
-                                            result != null ||
-                                            !config.canUse ||
-                                            settings != config ||
-                                            preview !== prepared ||
-                                            !callbacks.canHandleResult()
-                                    )
-                                        return@Button
-
-                                    busy = true
-                                    job =
-                                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                                            error = null
-                                            try {
-                                                val response =
-                                                    operations.analyze(
-                                                        config,
-                                                        prepared.input,
-                                                        prepared.body,
-                                                    )
-                                                ensureActive()
-                                                if (callbacks.canHandleResult()) {
-                                                    response
-                                                        .onSuccess { result = it }
-                                                        .onFailure { error = it.message }
-                                                } else {
-                                                    error =
-                                                        tr(
-                                                            "结果返回时应用无法显示（例如设备已锁屏），未予保留。可手动重新发送。",
-                                                            "The result arrived when it could not be shown (for example, while the device was locked) and was not kept. You can send again.",
-                                                        )
-                                                }
-                                            } finally {
-                                                busy = false
-                                            }
-                                        }
-                                },
-                                modifier = Modifier.testTag("ai-send"),
-                                shape = XikeShapes.button,
-                            ) {
-                                Text(
-                                    if (error == null) tr("发送并分析", "Send and analyze")
-                                    else tr("重新发送", "Send again"),
-                                    textAlign = TextAlign.Center,
-                                )
-                            }
-                        }
-                        config != null ->
-                            Button(
-                                enabled = canPrepare,
-                                onClick = {
-                                    if (
-                                        busy ||
-                                            settingsEntry != null ||
-                                            result != null ||
-                                            preview != null ||
-                                            !canPrepare ||
-                                            settings != config ||
-                                            !callbacks.canHandleResult()
-                                    )
-                                        return@Button
-
-                                    val previewIncludeNotes = includeNotes
-                                    busy = true
-                                    job =
-                                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                                            error = null
-                                            try {
-                                                val scoped =
-                                                    readRepository?.aiReviewEntries(
-                                                        summary.startDate,
-                                                        summary.endDate,
-                                                    )
-                                                        ?: entries.filter {
-                                                            it.id in summary.entryIds
-                                                        }
-                                                val preparedReview =
-                                                    withContext(Dispatchers.Default) {
-                                                        val input =
-                                                            aiReviewInput(
-                                                                scoped,
-                                                                summary,
-                                                                previewIncludeNotes,
-                                                            )
-                                                        PreparedAiReview(
-                                                            input,
-                                                            aiRequest(config, input),
-                                                        )
-                                                    }
-                                                ensureActive()
-                                                preview = preparedReview
-                                            } catch (failure: CancellationException) {
-                                                throw failure
-                                            } catch (failure: JournalDataException) {
-                                                error = failure.message
-                                                onReadError(requireNotNull(error))
-                                            } catch (failure: IllegalArgumentException) {
-                                                error = failure.message
-                                            } catch (_: Exception) {
-                                                error =
-                                                    tr(
-                                                        "无法准备记录，请重试。",
-                                                        "Unable to prepare entries. Try again.",
-                                                    )
-                                            } finally {
-                                                busy = false
-                                            }
-                                        }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = XikeShapes.button,
-                            ) {
-                                Text(tr("预览发送内容", "Preview content"), textAlign = TextAlign.Center)
-                            }
-                    }
-                }
-            }
-        },
-    ) {
-        error?.let {
-            Text(
-                it,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        when {
-            report != null && prepared != null ->
-                AiReviewReport(summary, report, prepared.input.sources, onOpenSource)
-            busy -> AiReviewProgress(entryCount = prepared?.input?.sources?.size)
-            prepared != null && config != null ->
-                AiReviewConfirmation(
-                    summary = summary,
-                    config = config,
-                    count = prepared.input.sources.size,
-                    includeNotes = includeNotes,
-                    requestBody = prepared.body,
-                    requestExpanded = requestExpanded,
-                    onToggleRequest = { requestExpanded = !requestExpanded },
-                )
-            config != null ->
-                AiReviewPreparation(
-                    summary = summary,
-                    config = config,
-                    includeNotes = includeNotes,
-                    onIncludeNotesChange = {
-                        if (!busy && settingsEntry == null && preview == null && result == null) {
-                            includeNotes = it
-                            error = null
-                        }
-                    },
-                    onOpenSettings = {
-                        if (!busy && settingsEntry == null && settings != null) {
-                            settingsEntry = AiSettingsEntry.REVIEW
-                        }
-                    },
-                )
-        }
-    }
     if (confirmDiscard && report != null) {
         DestructiveConfirmationDialog(
             title = tr("清除本次回顾？", "Clear this review?"),
@@ -405,6 +542,54 @@ internal fun AiReviewDialog(
                     "The review is not saved. Sending again makes a new request and may incur fees.",
                 )
             )
+        }
+    }
+}
+
+@Composable
+private fun AiReviewStepBar(activeStep: Int) {
+    val steps =
+        listOf(
+            tr("01 范围", "01 Scope"),
+            tr("02 确认", "02 Confirm"),
+            tr("03 生成", "03 Analyze"),
+        )
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(
+            modifier =
+                Modifier.widthIn(max = XikeContentMaxWidth)
+                    .fillMaxWidth()
+                    .padding(horizontal = XikeScreenHorizontalPadding, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            steps.forEachIndexed { index, label ->
+                val reached = index <= activeStep
+                val current = index == activeStep
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .height(3.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (reached) MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                )
+                    )
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                        color =
+                            if (current) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

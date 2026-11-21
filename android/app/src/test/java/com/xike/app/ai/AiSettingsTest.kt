@@ -194,6 +194,64 @@ class AiSettingsTest {
                 twoSources,
             )
         assertTrue(withoutQuestions.questions.isEmpty())
+        assertNull(withoutQuestions.headline)
+        assertNull(withoutQuestions.summary)
+        assertTrue(withoutQuestions.keywords.isEmpty())
+        assertNull(withoutQuestions.observations.single().tag)
+    }
+
+    @Test
+    fun `editorial fields parse and degrade gracefully when malformed`() {
+        val rich =
+            parseAiReview(
+                JSONObject()
+                    .put("headline", "在忙碌里留住片刻安静")
+                    .put("summary", "这周记录集中在晚间，整体节奏偏平稳。")
+                    .put(
+                        "keywords",
+                        org.json
+                            .JSONArray()
+                            .put("晚间复盘")
+                            .put("晚间复盘")
+                            .put("慢下来")
+                            .put("清晰")
+                            .put("喘息")
+                            .put("多余标签"),
+                    )
+                    .put(
+                        "observations",
+                        org.json
+                            .JSONArray()
+                            .put(observation("晚间更易平静", "两次都在睡前写下。", 1).put("tag", "情绪节奏")),
+                    )
+                    .toString(),
+                twoSources,
+            )
+        assertEquals("在忙碌里留住片刻安静", rich.headline)
+        assertEquals("这周记录集中在晚间，整体节奏偏平稳。", rich.summary)
+        assertEquals(listOf("晚间复盘", "慢下来", "清晰", "喘息"), rich.keywords)
+        assertEquals("情绪节奏", rich.observations.single().tag)
+
+        val degraded =
+            parseAiReview(
+                JSONObject()
+                    .put("headline", 123)
+                    .put("summary", "   ")
+                    .put("keywords", org.json.JSONArray().put(JSONObject.NULL).put("a".repeat(30)))
+                    .put(
+                        "observations",
+                        org.json
+                            .JSONArray()
+                            .put(observation("标题", "正文", 2).put("tag", "t".repeat(30))),
+                    )
+                    .toString(),
+                twoSources,
+            )
+        assertNull(degraded.headline)
+        assertNull(degraded.summary)
+        assertTrue(degraded.keywords.isEmpty())
+        assertNull(degraded.observations.single().tag)
+        assertEquals(1, degraded.observations.size)
     }
 
     @Test

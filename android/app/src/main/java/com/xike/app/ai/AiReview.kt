@@ -19,7 +19,12 @@ internal class AiReviewInput(val json: String, val sources: List<AiSource>) {
     override fun toString() = "AiReviewInput(count=${sources.size})"
 }
 
-internal class AiObservation(val title: String, val text: String, val references: List<Int>) {
+internal class AiObservation(
+    val title: String,
+    val text: String,
+    val references: List<Int>,
+    val tag: String? = null,
+) {
     override fun toString() = "AiObservation(references=${references.size})"
 }
 
@@ -27,6 +32,9 @@ internal class AiReviewResult(
     val observations: List<AiObservation>,
     val questions: List<String>,
     val generatedAt: Instant = Instant.now(),
+    val headline: String? = null,
+    val summary: String? = null,
+    val keywords: List<String> = emptyList(),
 ) {
     override fun toString() = "AiReviewResult(sections=${observations.size})"
 }
@@ -117,23 +125,30 @@ internal fun aiRequest(settings: AiSettings, input: AiReviewInput?): String {
         When notes are present, paraphrase relevant details and keep recorded events distinct from
         tentative interpretations. Do not infer causes, diagnose, predict, or assign personality traits.
 
+        Start with a concise, evocative cover headline (6–18 characters in Chinese or 3–9 words in
+        English) that captures the overall tone of the period without exaggerating, a brief
+        editorial summary (1–2 calm sentences) framing what was recorded, and 2–4 short keywords
+        (2–6 characters in Chinese or 1–3 words in English) drawn from recurring feelings or themes.
+
         Choose observations that add something distinct. With LIMITED evidence, write one factual
         observation about what was recorded. With DEVELOPING evidence, describe the distribution
         or a specific contrast without generalizing. With ESTABLISHED evidence, describe recurring
         feelings or changes across recorded dates only when multiple entries support them. Do not
         treat a single occurrence as a pattern or assume that an activity changed the reader's mood.
-        Use a short, specific title and one brief paragraph for each observation. Cite the actual
-        entries that directly support it using their integer reference values. Keep citations in
-        references, since the app displays the links separately.
+        Give each observation a short category tag (2–6 characters in Chinese or 1–2 words in
+        English, such as a mood rhythm or recurring thread), a short, specific title, and one brief
+        paragraph. Cite the actual entries that directly support it using their integer reference
+        values. Keep citations in references, since the app displays the links separately.
 
         End with 1–3 optional, open-ended questions tied to specific observations. Ask one thing
         per question. Invite the reader to notice or revisit an experience without assuming a cause
         or asking them to justify a feeling.
 
-        Return only one JSON object with the following shape. Include 1–4 observations, each with
-        1–5 distinct supplied references, and 1–3 question strings. Use plain text in the strings and
-        raw JSON without Markdown or surrounding commentary.
-        {"observations":[{"title":"...","text":"...","references":[1]}],"questions":["..."]}
+        Return only one JSON object with the following shape. Include headline, summary, 0–4
+        keywords, 1–4 observations (each with optional tag, title, text, and 1–5 distinct supplied
+        references), and 1–3 question strings. Use plain text in the strings and raw JSON without
+        Markdown or surrounding commentary.
+        {"headline":"...","summary":"...","keywords":["..."],"observations":[{"tag":"...","title":"...","text":"...","references":[1]}],"questions":["..."]}
         """
                 .trimIndent()
         }
@@ -153,6 +168,7 @@ internal fun aiRequest(settings: AiSettings, input: AiReviewInput?): String {
 internal const val AI_MAX_OBSERVATIONS = 4
 internal const val AI_MAX_OBSERVATION_REFERENCES = 5
 internal const val AI_MAX_QUESTIONS = 3
+internal const val AI_MAX_KEYWORDS = 4
 
 /**
  * Strict JSON object parsing with per-item degradation: an observation without valid text or at
@@ -181,8 +197,9 @@ internal fun parseAiReview(content: String, input: AiReviewInput): AiReviewResul
                         .take(AI_MAX_OBSERVATION_REFERENCES)
                 val title = reviewText(row.opt("title"), maxLength = 120)
                 val text = reviewText(row.opt("text"), maxLength = 4000)
+                val tag = reviewText(row.opt("tag"), maxLength = 24)
                 if (valid.isEmpty() || title == null || text == null) null
-                else AiObservation(title, text, valid)
+                else AiObservation(title, text, valid, tag)
             }
             .take(AI_MAX_OBSERVATIONS)
     require(parsed.isNotEmpty())
@@ -193,8 +210,24 @@ internal fun parseAiReview(content: String, input: AiReviewInput): AiReviewResul
             (0 until questions.length())
                 .mapNotNull { reviewText(questions.get(it), maxLength = 1000) }
                 .take(AI_MAX_QUESTIONS)
-    return AiReviewResult(parsed, parsedQuestions)
+    val headline = reviewText(root.opt("headline"), maxLength = 80)
+    val summary = reviewText(root.opt("summary"), maxLength = 360)
+    val keywordsArray = root.optJSONArray("keywords")
+    val parsedKeywords =
+        if (keywordsArray == null) emptyList()
+        else
+            (0 until keywordsArray.length())
+                .mapNotNull { reviewText(keywordsArray.get(it), maxLength = 24) }
+                .distinct()
+                .take(AI_MAX_KEYWORDS)
+    return AiReviewResult(
+        observations = parsed,
+        questions = parsedQuestions,
+        headline = headline,
+        summary = summary,
+        keywords = parsedKeywords,
+    )
 }
 
 private fun reviewText(value: Any?, maxLength: Int): String? =
-    (value as? String)?.takeIf { it.isNotBlank() && it.length <= maxLength }
+    (value as? String)?.trim()?.takeIf { it.isNotBlank() && it.length <= maxLength }

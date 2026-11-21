@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +81,7 @@ fun JournalInsightsScreen(
     readRepository: JournalReadRepository? = null,
     dataRevision: Long = 0,
     onReadError: (String) -> Unit = {},
+    onFullScreenOverlayChange: (Boolean) -> Unit = {},
 ) {
     var selectedPeriodName by rememberSaveable { mutableStateOf(InsightsPeriod.WEEK.name) }
     val selectedPeriod =
@@ -125,6 +127,10 @@ fun JournalInsightsScreen(
     var showAiReview by remember { mutableStateOf(false) }
     val aiTaps = remember { com.xike.app.outdoor.TripleTapGate() }
     LaunchedEffect(selectedPeriod, dataRevision, entries, today, language) { showAiReview = false }
+    DisposableEffect(showAiReview) {
+        onFullScreenOverlayChange(showAiReview)
+        onDispose { onFullScreenOverlayChange(false) }
+    }
     val reviewScrollState =
         rememberSaveable(showReview, saver = ScrollState.Saver) { ScrollState(0) }
     val listState = rememberLazyListState()
@@ -153,180 +159,180 @@ fun JournalInsightsScreen(
     val displayedPeriod = summary.period
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier =
-                Modifier.testTag("insights-list")
-                    .widthIn(max = XikeContentMaxWidth)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter)
-                    .padding(padding),
-            contentPadding =
-                PaddingValues(
-                    horizontal = XikeScreenHorizontalPadding,
-                    vertical = XikeScreenVerticalPadding,
-                ),
-            verticalArrangement = Arrangement.spacedBy(XikeContentGap),
-        ) {
-            item(key = "insights-header") {
-                ScreenHeader(
-                    eyebrow = tr("细小的痕迹", "THE LITTLE TRACES"),
-                    title = localizedText("轨迹"),
-                    titleModifier =
-                        Modifier.testTag("ai-review-entry").clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            if (
-                                aiTaps.tap(SystemClock.elapsedRealtime()) &&
-                                    readError == null &&
-                                    summary.period == selectedPeriod
-                            )
-                                showAiReview = true
-                        },
-                    supporting =
-                        tr(
-                            "${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。",
-                            "${summary.dateRangeLabel()}\nNotice how your mood changes. There is no rush to find causes.",
-                        ),
-                )
-            }
-            item(key = "insights-period") {
-                Column {
-                    InsightsPeriodSelector(
-                        selected = selectedPeriod,
-                        onSelected = { selectedPeriodName = it.name },
+        if (showAiReview) {
+            AiReviewDialog(
+                summary = summary,
+                entries = entries,
+                readRepository = readRepository,
+                onReadError = onReadError,
+                onOpenSource = { source ->
+                    drilldown =
+                        InsightDrilldown(
+                            source.date,
+                            tr("AI 回顾引用的原始记录", "Original entry referenced by AI review"),
+                            listOf(source.entryId),
+                        )
+                },
+                sourceOpen = drilldown != null,
+                onDismiss = { showAiReview = false },
+            )
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier =
+                    Modifier.testTag("insights-list")
+                        .widthIn(max = XikeContentMaxWidth)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                        .padding(padding),
+                contentPadding =
+                    PaddingValues(
+                        horizontal = XikeScreenHorizontalPadding,
+                        vertical = XikeScreenVerticalPadding,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(XikeContentGap),
+            ) {
+                item(key = "insights-header") {
+                    ScreenHeader(
+                        eyebrow = tr("细小的痕迹", "THE LITTLE TRACES"),
+                        title = localizedText("轨迹"),
+                        titleModifier =
+                            Modifier.testTag("ai-review-entry").clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                if (
+                                    aiTaps.tap(SystemClock.elapsedRealtime()) &&
+                                        readError == null &&
+                                        summary.period == selectedPeriod
+                                )
+                                    showAiReview = true
+                            },
+                        supporting =
+                            tr(
+                                "${summary.dateRangeLabel()}\n看看心情怎样变化，不急着寻找原因。",
+                                "${summary.dateRangeLabel()}\nNotice how your mood changes. There is no rush to find causes.",
+                            ),
                     )
-                    if (readError != null) {
-                        TextButton(onClick = { retryRevision++ }, shape = XikeShapes.button) {
-                            Text(tr("读取失败，重试", "Read failed. Retry"))
+                }
+                item(key = "insights-period") {
+                    Column {
+                        InsightsPeriodSelector(
+                            selected = selectedPeriod,
+                            onSelected = { selectedPeriodName = it.name },
+                        )
+                        if (readError != null) {
+                            TextButton(onClick = { retryRevision++ }, shape = XikeShapes.button) {
+                                Text(tr("读取失败，重试", "Read failed. Retry"))
+                            }
                         }
                     }
                 }
-            }
-            item(key = "insights-overview") {
-                InsightsOverviewCard(
-                    summary = summary,
-                    onClick = {
+                item(key = "insights-overview") {
+                    InsightsOverviewCard(
+                        summary = summary,
+                        onClick = {
+                            drilldown =
+                                InsightDrilldown(
+                                    title =
+                                        tr(
+                                            "${displayedPeriod.contextName}的记录",
+                                            "Entries: ${displayedPeriod.contextName}",
+                                        ),
+                                    subtitle = summary.dateRangeLabel(),
+                                    entryIds = summary.entryIds,
+                                )
+                        },
+                    )
+                }
+                item(key = "insights-section-label") {
+                    InsightsSectionLabel(
+                        title = localizedText("细看这段时间"),
+                        supporting = localizedText("每一项都可以回到原始记录"),
+                    )
+                }
+                item(key = "insights-trend") {
+                    TrendCard(summary = summary, today = today) { point ->
                         drilldown =
                             InsightDrilldown(
                                 title =
                                     tr(
-                                        "${displayedPeriod.contextName}的记录",
-                                        "Entries: ${displayedPeriod.contextName}",
+                                        "${point.label} · ${point.entryCount} 条",
+                                        "${point.label} · ${point.entryCount} entries",
                                     ),
-                                subtitle = summary.dateRangeLabel(),
-                                entryIds = summary.entryIds,
+                                subtitle = point.dateRangeLabel(),
+                                entryIds = point.entryIds,
                             )
-                    },
-                )
-            }
-            item(key = "insights-section-label") {
-                InsightsSectionLabel(
-                    title = localizedText("细看这段时间"),
-                    supporting = localizedText("每一项都可以回到原始记录"),
-                )
-            }
-            item(key = "insights-trend") {
-                TrendCard(summary = summary, today = today) { point ->
-                    drilldown =
-                        InsightDrilldown(
-                            title =
-                                tr(
-                                    "${point.label} · ${point.entryCount} 条",
-                                    "${point.label} · ${point.entryCount} entries",
-                                ),
-                            subtitle = point.dateRangeLabel(),
-                            entryIds = point.entryIds,
-                        )
+                    }
                 }
-            }
-            item(key = "insights-distribution") {
-                MoodDistributionCard(summary.moodDistribution) { item ->
-                    drilldown =
-                        InsightDrilldown(
-                            title =
-                                tr(
-                                    "${item.mood.label} · ${item.entryCount} 条",
-                                    "${item.mood.label} · ${item.entryCount} entries",
-                                ),
-                            subtitle =
-                                tr(
-                                    "${displayedPeriod.contextName}的心情分布",
-                                    "Mood distribution: ${displayedPeriod.contextName}",
-                                ),
-                            entryIds = item.entryIds,
-                        )
-                }
-            }
-            item(key = "insights-comparison") {
-                PeriodComparisonCard(summary.comparison) { previous ->
-                    drilldown =
-                        InsightDrilldown(
-                            title =
-                                if (previous) localizedText("前一周期的记录")
-                                else
-                                    tr(
-                                        "${displayedPeriod.contextName}的记录",
-                                        "Entries: ${displayedPeriod.contextName}",
-                                    ),
-                            subtitle =
-                                if (previous) summary.comparison.dateRangeLabel()
-                                else summary.dateRangeLabel(),
-                            entryIds =
-                                if (previous) summary.comparison.entryIds else summary.entryIds,
-                        )
-                }
-            }
-            item(key = "insights-day-type") {
-                DayTypeCard(
-                    weekday = summary.weekdayInsight,
-                    weekend = summary.weekendInsight,
-                    onClick = { insight ->
+                item(key = "insights-distribution") {
+                    MoodDistributionCard(summary.moodDistribution) { item ->
                         drilldown =
                             InsightDrilldown(
                                 title =
                                     tr(
-                                        "${insight.type.label} · ${insight.entryCount} 条",
-                                        "${insight.type.label} · ${insight.entryCount} entries",
+                                        "${item.mood.label} · ${item.entryCount} 条",
+                                        "${item.mood.label} · ${item.entryCount} entries",
                                     ),
                                 subtitle =
                                     tr(
-                                        "${displayedPeriod.contextName}的记录",
-                                        "Entries: ${displayedPeriod.contextName}",
+                                        "${displayedPeriod.contextName}的心情分布",
+                                        "Mood distribution: ${displayedPeriod.contextName}",
                                     ),
-                                entryIds = insight.entryIds,
+                                entryIds = item.entryIds,
                             )
-                    },
-                )
-            }
-            item(key = "insights-review") {
-                LocalReviewCard(
-                    enabled = summary.entryCount > 0,
-                    periodName = displayedPeriod.contextName,
-                    onOpen = { showReview = true },
-                )
+                    }
+                }
+                item(key = "insights-comparison") {
+                    PeriodComparisonCard(summary.comparison) { previous ->
+                        drilldown =
+                            InsightDrilldown(
+                                title =
+                                    if (previous) localizedText("前一周期的记录")
+                                    else
+                                        tr(
+                                            "${displayedPeriod.contextName}的记录",
+                                            "Entries: ${displayedPeriod.contextName}",
+                                        ),
+                                subtitle =
+                                    if (previous) summary.comparison.dateRangeLabel()
+                                    else summary.dateRangeLabel(),
+                                entryIds =
+                                    if (previous) summary.comparison.entryIds else summary.entryIds,
+                            )
+                    }
+                }
+                item(key = "insights-day-type") {
+                    DayTypeCard(
+                        weekday = summary.weekdayInsight,
+                        weekend = summary.weekendInsight,
+                        onClick = { insight ->
+                            drilldown =
+                                InsightDrilldown(
+                                    title =
+                                        tr(
+                                            "${insight.type.label} · ${insight.entryCount} 条",
+                                            "${insight.type.label} · ${insight.entryCount} entries",
+                                        ),
+                                    subtitle =
+                                        tr(
+                                            "${displayedPeriod.contextName}的记录",
+                                            "Entries: ${displayedPeriod.contextName}",
+                                        ),
+                                    entryIds = insight.entryIds,
+                                )
+                        },
+                    )
+                }
+                item(key = "insights-review") {
+                    LocalReviewCard(
+                        enabled = summary.entryCount > 0,
+                        periodName = displayedPeriod.contextName,
+                        onOpen = { showReview = true },
+                    )
+                }
             }
         }
-    }
-
-    if (showAiReview) {
-        AiReviewDialog(
-            summary = summary,
-            entries = entries,
-            readRepository = readRepository,
-            onReadError = onReadError,
-            onOpenSource = { source ->
-                drilldown =
-                    InsightDrilldown(
-                        source.date,
-                        tr("AI 回顾引用的原始记录", "Original entry referenced by AI review"),
-                        listOf(source.entryId),
-                    )
-            },
-            sourceOpen = drilldown != null,
-            onDismiss = { showAiReview = false },
-        )
     }
 
     drilldown?.let { request ->

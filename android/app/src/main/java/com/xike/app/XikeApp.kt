@@ -109,6 +109,7 @@ internal fun XikeApp(
     val context = LocalContext.current
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var isVoiceCaptureActive by remember { mutableStateOf(false) }
+    var hideBottomBar by remember { mutableStateOf(false) }
     val screenStateHolder = rememberSaveableStateHolder()
 
     LaunchedEffect(quickRecordRequest) {
@@ -129,21 +130,23 @@ internal fun XikeApp(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             bottomBar = {
-                XikeNavigationBar(
-                    selected = screen,
-                    onSelected = { selected ->
-                        if (isVoiceCaptureActive && selected != AppScreen.HOME) {
-                            XikeNotice.makeText(
-                                    context,
-                                    localizedText("请先完成或取消录音"),
-                                    XikeNotice.LENGTH_SHORT,
-                                )
-                                .show()
-                        } else {
-                            screen = selected
-                        }
-                    },
-                )
+                if (!hideBottomBar) {
+                    XikeNavigationBar(
+                        selected = screen,
+                        onSelected = { selected ->
+                            if (isVoiceCaptureActive && selected != AppScreen.HOME) {
+                                XikeNotice.makeText(
+                                        context,
+                                        localizedText("请先完成或取消录音"),
+                                        XikeNotice.LENGTH_SHORT,
+                                    )
+                                    .show()
+                            } else {
+                                screen = selected
+                            }
+                        },
+                    )
+                }
             },
         ) { innerPadding ->
             screenStateHolder.SaveableStateProvider(screen.name) {
@@ -193,6 +196,7 @@ internal fun XikeApp(
                             readRepository,
                             libraryState.revision,
                             onReadError,
+                            onFullScreenOverlayChange = { hideBottomBar = it },
                         )
                     AppScreen.ARCHIVE ->
                         JournalArchiveScreen(

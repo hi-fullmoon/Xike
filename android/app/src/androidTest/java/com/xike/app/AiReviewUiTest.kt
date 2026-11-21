@@ -212,14 +212,14 @@ class AiReviewUiTest {
                     .performScrollTo()
                     .assertIsDisplayed()
                 rule.waitForIdle()
-                captureAiDialogWindow(
+                captureAiPageWindow(
                     File(
                         context.getExternalFilesDir(null),
                         "ai-review-service-${language.name}-${configuration.screenWidthDp}-${configuration.fontScale}.png",
                     )
                 )
                 assertReviewNotesAlignment()
-                captureAiDialogWindow(
+                captureAiPageWindow(
                     File(
                         context.getExternalFilesDir(null),
                         "ai-review-notes-${language.name}-${configuration.screenWidthDp}-${configuration.fontScale}.png",

@@ -79,7 +79,8 @@ class AiReviewHeightUiTest {
                 save.performClick()
                 val notes = rule.onNodeWithTag("ai-include-notes")
                 rule.waitUntil(15_000) { runCatching { notes.assertIsOff() }.isSuccess }
-                val initialWindow = rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow
+                val initialWindow =
+                    rule.onNodeWithTag("ai-review-page").fetchSemanticsNode().boundsInWindow
                 val initialClose =
                     rule
                         .onNodeWithContentDescription(tr("关闭", "Close"))
@@ -129,7 +130,10 @@ class AiReviewHeightUiTest {
 
     private fun assertStableBounds(window: Rect, close: Rect) {
         rule.waitForIdle()
-        assertEquals(window, rule.onNode(isDialog()).fetchSemanticsNode().boundsInWindow)
+        assertEquals(
+            window,
+            rule.onNodeWithTag("ai-review-page").fetchSemanticsNode().boundsInWindow,
+        )
         assertEquals(
             close,
             rule
@@ -166,7 +170,7 @@ class AiReviewHeightUiTest {
     private fun capture(state: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val config = context.resources.configuration
-        captureAiDialogWindow(
+        captureAiPageWindow(
             File(
                 context.getExternalFilesDir(null),
                 "ai-height-${AppLocale.language.name}-${config.screenWidthDp}-${config.fontScale}-${config.uiMode}-$state.png",
