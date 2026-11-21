@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
@@ -36,6 +37,8 @@ import java.io.InputStream
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.delay
+
+private const val MEMORY_INLINE_ENTRY_LIMIT = 10
 
 @Composable
 internal fun JournalMemoriesDialog(
@@ -104,7 +107,13 @@ internal fun JournalMemoriesDialog(
     }
     LaunchedEffect(clock, refresh, revision) {
         loading = true
-        journalReadResult { repository.memories(clock.first, clock.second) }
+        journalReadResult {
+                repository.memories(
+                    clock.first,
+                    clock.second,
+                    inlineEntryLimit = MEMORY_INLINE_ENTRY_LIMIT,
+                )
+            }
             .onSuccess {
                 if (
                     snapshot?.let { old -> old.today != it.today || old.zoneId != it.zoneId } ==
@@ -138,6 +147,12 @@ internal fun JournalMemoriesDialog(
     val current = snapshot
     val date = selectedDate?.let { LocalDate.parse(it) }
     val closePage: () -> Unit = { if (date != null) selectedDate = null else onDismiss() }
+    val openEntry: (JournalEntry) -> Unit = { entry ->
+        notice = null
+        detailError = null
+        detail = entry
+        detailId = entry.id
+    }
     Dialog(
         onDismissRequest = closePage,
         properties =
@@ -180,12 +195,7 @@ internal fun JournalMemoriesDialog(
                     )
                 }
                 if (date != null && current != null) {
-                    MemoryEntries(repository, date, current.zoneId, openImage) { entry ->
-                        notice = null
-                        detailError = null
-                        detail = entry
-                        detailId = entry.id
-                    }
+                    MemoryEntries(repository, date, current.zoneId, openImage, openEntry)
                 } else {
                     LazyColumn(
                         Modifier.weight(1f).testTag("memories-dates"),
@@ -197,7 +207,7 @@ internal fun JournalMemoriesDialog(
                             ),
                         verticalArrangement = Arrangement.spacedBy(XikeContentGap),
                     ) {
-                        if (loading)
+                        if (loading && current == null)
                             item {
                                 CircularProgressIndicator(
                                     Modifier.size(XikeScreenHorizontalPadding)
@@ -220,30 +230,40 @@ internal fun JournalMemoriesDialog(
                                         Text(tr("这些日子还没有留下记录", "No entries from these dates yet"))
                                     }
                                 }
-                            items(current.days, key = { "${it.kind}:${it.date}" }) { day ->
-                                PaperCard(Modifier.testTag("memory-day:${day.date}")) {
-                                    Text(
-                                        if (day.kind == MemoryKind.MONTH_AGO)
-                                            tr("一个月前", "One month ago")
-                                        else tr("往年今天", "On this day"),
-                                        style = XikeSectionTitleStyle,
+                            current.days.forEachIndexed { dayIndex, day ->
+                                item(key = "${day.kind}:${day.date}:header") {
+                                    MemoryDayHeader(
+                                        day = day,
+                                        modifier =
+                                            Modifier.padding(top = if (dayIndex == 0) 2.dp else 8.dp),
                                     )
-                                    Text(
-                                        day.date.asMemoryDate(),
-                                        style = MaterialTheme.typography.titleSmall,
+                                }
+                                items(day.entries, key = { "${day.kind}:${day.date}:${it.id}" }) {
+                                    entry ->
+                                    JournalEntryCard(
+                                        entry,
+                                        modifier = Modifier.testTag("memory-entry:${entry.id}"),
+                                        openImage = openImage,
+                                        onImageClick = { openEntry(entry) },
+                                        onClick = { openEntry(entry) },
+                                        compactMedia = true,
+                                        wrapMoodLabel = true,
                                     )
-                                    Text(
-                                        tr(
-                                            "${day.count} 条记录",
-                                            "${day.count} ${if (day.count == 1) "entry" else "entries"}",
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    TextButton(
-                                        onClick = { selectedDate = day.date.toString() },
-                                        shape = XikeShapes.button,
-                                    ) {
-                                        Text(tr("查看记录", "View entries"))
+                                }
+                                if (day.count > day.entries.size) {
+                                    item(key = "${day.kind}:${day.date}:more") {
+                                        TextButton(
+                                            onClick = { selectedDate = day.date.toString() },
+                                            shape = XikeShapes.button,
+                                            modifier = Modifier.testTag("memory-day-more:${day.date}"),
+                                        ) {
+                                            Text(
+                                                tr(
+                                                    "查看当天全部 ${day.count} 条记录",
+                                                    "View all ${day.count} entries",
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -265,6 +285,29 @@ internal fun JournalMemoriesDialog(
             onSetFavorite = onSetFavorite,
             readError = detailError,
             onRetryRead = { refresh++ },
+        )
+    }
+}
+
+@Composable
+private fun MemoryDayHeader(day: MemoryDay, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth().testTag("memory-day:${day.date}"),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            if (day.kind == MemoryKind.MONTH_AGO) tr("一个月前", "One month ago")
+            else tr("往年今天", "On this day"),
+            style = XikeSectionTitleStyle,
+        )
+        Text(
+            "${day.date.asMemoryDate()} · " +
+                tr(
+                    "${day.count} 条记录",
+                    "${day.count} ${if (day.count == 1) "entry" else "entries"}",
+                ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

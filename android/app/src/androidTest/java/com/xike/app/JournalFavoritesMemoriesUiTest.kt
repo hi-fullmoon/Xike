@@ -78,6 +78,12 @@ class JournalFavoritesMemoriesUiTest {
                 .performScrollTo()
                 .performClick()
             val monthDate = LocalDate.now().minusMonths(1)
+            val entry =
+                store.entries().single {
+                    java.time.Instant.ofEpochMilli(it.createdAt)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate() == monthDate
+                }
             rule.waitUntil(10_000) {
                 rule.onAllNodesWithTag("memory-day:$monthDate").fetchSemanticsNodes().isNotEmpty()
             }
@@ -88,24 +94,8 @@ class JournalFavoritesMemoriesUiTest {
             rule.onNodeWithText(if (english) "On this day" else "往年今天").assertIsDisplayed()
             capture(context, "${phase}-dates")
             rule
-                .onNode(
-                    hasText(if (english) "View entries" else "查看记录") and
-                        hasAnyAncestor(hasTestTag("memory-day:$monthDate"))
-                )
-                .performScrollTo()
-                .performClick()
-            val entry =
-                store.entries().single {
-                    java.time.Instant.ofEpochMilli(it.createdAt)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate() == monthDate
-                }
-            rule.waitUntil(10_000) {
-                rule
-                    .onAllNodesWithTag("memory-entry:${entry.id}")
-                    .fetchSemanticsNodes()
-                    .isNotEmpty()
-            }
+                .onNodeWithTag("memories-dates")
+                .performScrollToNode(hasTestTag("memory-entry:${entry.id}"))
             rule.onNodeWithTag("memory-entry:${entry.id}").performClick()
             if (phase == "write") {
                 rule.onNodeWithContentDescription("收藏这一刻").performClick()
@@ -122,9 +112,6 @@ class JournalFavoritesMemoriesUiTest {
             capture(context, "${phase}-detail")
             rule
                 .onNodeWithContentDescription(if (english) "Close entry details" else "关闭记录详情")
-                .performClick()
-            rule
-                .onNodeWithContentDescription(if (english) "Back to memory dates" else "返回往日日期")
                 .performClick()
             rule
                 .onNodeWithContentDescription(if (english) "Close memories" else "关闭往日回望")
@@ -320,8 +307,9 @@ class JournalFavoritesMemoriesUiTest {
                 rule.onAllNodesWithTag("memory-day:$date").fetchSemanticsNodes().isNotEmpty()
             }
             rule
-                .onNode(hasText("查看记录") and hasAnyAncestor(hasTestTag("memory-day:$date")))
-                .performClick()
+                .onNodeWithTag("memories-dates")
+                .performScrollToNode(hasTestTag("memory-day-more:$date"))
+            rule.onNodeWithTag("memory-day-more:$date").performClick()
             val list = rule.onNodeWithTag("memories-entries")
             rule.waitUntil(10_000) {
                 rule
@@ -375,8 +363,9 @@ class JournalFavoritesMemoriesUiTest {
                 rule.onAllNodesWithTag("memory-day:$date").fetchSemanticsNodes().isNotEmpty()
             }
             rule
-                .onNode(hasText("View entries") and hasAnyAncestor(hasTestTag("memory-day:$date")))
-                .performClick()
+                .onNodeWithTag("memories-dates")
+                .performScrollToNode(hasTestTag("memory-day-more:$date"))
+            rule.onNodeWithTag("memory-day-more:$date").performClick()
             val list = rule.onNodeWithTag("memories-entries")
             rule.waitUntil(10_000) {
                 rule

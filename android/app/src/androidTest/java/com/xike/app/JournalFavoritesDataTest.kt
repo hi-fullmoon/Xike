@@ -165,9 +165,18 @@ class JournalFavoritesDataTest {
                 result.days.map { it.date },
             )
             assertEquals(listOf(2, 1, 1), result.days.map { it.count })
+            assertTrue(result.days.all { it.entries.isEmpty() })
             assertEquals(MemoryKind.MONTH_AGO, result.days.first().kind)
             assertEquals(today, result.today)
             assertEquals(zone, result.zoneId)
+            val inlineLimited = repository.memories(today, zone, inlineEntryLimit = 1)
+            assertEquals(listOf("month-last"), inlineLimited.days.first().entries.map { it.id })
+            assertEquals(2, inlineLimited.days.first().count)
+            val inlineFull = repository.memories(today, zone, inlineEntryLimit = 10)
+            assertEquals(
+                listOf("month-last", "month-first"),
+                inlineFull.days.first().entries.map { it.id },
+            )
             assertTrue(repository.memories(LocalDate.of(2025, 7, 8), zone).days.isEmpty())
         }
     }

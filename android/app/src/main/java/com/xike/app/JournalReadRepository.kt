@@ -153,22 +153,33 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
     internal suspend fun memories(
         today: LocalDate,
         zoneId: ZoneId,
+        inlineEntryLimit: Int = 0,
     ): com.xike.app.feature.archive.JournalMemories = read {
         val coroutineContext = kotlin.coroutines.coroutineContext
         val days =
             database.runInTransaction<List<com.xike.app.feature.archive.MemoryDay>> {
                 val result = mutableListOf<com.xike.app.feature.archive.MemoryDay>()
                 fun countDay(date: LocalDate, kind: com.xike.app.feature.archive.MemoryKind) {
-                    val count =
-                        dao.queryCount(
-                            sql(
-                                JournalSearchQuery(startDate = date, endDate = date),
-                                "COUNT(*)",
-                                zoneId = zoneId,
-                            )
-                        )
-                    if (count > 0)
-                        result += com.xike.app.feature.archive.MemoryDay(date, kind, count)
+                    val dayQuery = JournalSearchQuery(startDate = date, endDate = date)
+                    val count = dao.queryCount(sql(dayQuery, "COUNT(*)", zoneId = zoneId))
+                    if (count > 0) {
+                        val entries =
+                            if (inlineEntryLimit > 0)
+                                dao.recordsForQuery(
+                                        sql(
+                                            dayQuery,
+                                            "e.*",
+                                            ordered = true,
+                                            offset = 0,
+                                            zoneId = zoneId,
+                                            pageSize = inlineEntryLimit,
+                                        )
+                                    )
+                                    .map { it.toJournalEntry() }
+                            else emptyList()
+                        result +=
+                            com.xike.app.feature.archive.MemoryDay(date, kind, count, entries)
+                    }
                 }
                 countDay(
                     com.xike.app.feature.archive.monthAgo(today),

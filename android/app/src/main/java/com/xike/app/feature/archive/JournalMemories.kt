@@ -1,5 +1,6 @@
 package com.xike.app.feature.archive
 
+import com.xike.app.data.JournalEntry
 import java.time.LocalDate
 import java.time.MonthDay
 import java.time.ZoneId
@@ -9,7 +10,12 @@ internal enum class MemoryKind {
     PREVIOUS_YEAR,
 }
 
-internal data class MemoryDay(val date: LocalDate, val kind: MemoryKind, val count: Int)
+internal data class MemoryDay(
+    val date: LocalDate,
+    val kind: MemoryKind,
+    val count: Int,
+    val entries: List<JournalEntry> = emptyList(),
+)
 
 internal data class JournalMemories(
     val today: LocalDate,
