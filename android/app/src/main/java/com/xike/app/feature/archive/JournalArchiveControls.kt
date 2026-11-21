@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.xike.app.localizedText
 import com.xike.app.tr
 import com.xike.app.ui.theme.XikeCardPadding
+import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.XikeShapes
 import java.time.LocalDate
 
@@ -88,7 +89,7 @@ internal fun ArchiveToolbox(
     onViewModeChange: (ArchiveViewMode) -> Unit,
     onToggleFilters: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(XikeContentGap)) {
         ArchiveSearchBar(
             value = queryText,
             onValueChange = onQueryChange,
@@ -323,8 +324,9 @@ internal fun ArchiveControls(
         } else {
             var modeGroupHeightPx by remember { mutableIntStateOf(0) }
             val matchedHeight = maxOf(48.dp, with(density) { modeGroupHeightPx.toDp() })
+            val visualFilterSize = maxOf(40.dp, matchedHeight - 8.dp)
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ArchiveModeGroup(
@@ -337,7 +339,8 @@ internal fun ArchiveControls(
                     activeFilterCount,
                     showFilters,
                     onToggleFilters,
-                    Modifier.sizeIn(minWidth = matchedHeight, minHeight = matchedHeight),
+                    visualSize = visualFilterSize,
+                    modifier = Modifier.heightIn(min = matchedHeight),
                 )
             }
         }
@@ -407,46 +410,56 @@ private fun ArchiveFilterToggle(
     showFilters: Boolean,
     onToggleFilters: () -> Unit,
     modifier: Modifier = Modifier,
+    visualSize: Dp = 40.dp,
 ) {
-    Surface(
+    Box(
         modifier =
             modifier
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                 .clickable(onClick = onToggleFilters),
-        shape = XikeShapes.inner,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-        color =
-            if (showFilters || activeFilterCount > 0) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            },
+        contentAlignment = Alignment.CenterEnd,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            modifier = Modifier.sizeIn(minWidth = visualSize, minHeight = visualSize),
+            shape = XikeShapes.button,
+            border =
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+            color =
+                if (showFilters || activeFilterCount > 0) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
         ) {
-            Icon(
-                Icons.Outlined.Tune,
-                contentDescription =
-                    if (activeFilterCount == 0) {
-                        localizedText("打开筛选")
-                    } else {
-                        tr("筛选，已启用 $activeFilterCount 个条件", "Filters: $activeFilterCount active")
-                    },
-                modifier = Modifier.size(18.dp),
-                tint =
-                    if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (activeFilterCount > 0) {
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    activeFilterCount.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Outlined.Tune,
+                    contentDescription =
+                        if (activeFilterCount == 0) {
+                            localizedText("打开筛选")
+                        } else {
+                            tr(
+                                "筛选，已启用 $activeFilterCount 个条件",
+                                "Filters: $activeFilterCount active",
+                            )
+                        },
+                    modifier = Modifier.size(16.dp),
+                    tint =
+                        if (showFilters || activeFilterCount > 0) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (activeFilterCount > 0) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        activeFilterCount.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
