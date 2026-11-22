@@ -189,14 +189,13 @@ internal class OutdoorContextRepository(
                 runCatching { fetchRawWeatherWithRetry(location.latitude, location.longitude) }
             }
             val place = geocodeDeferred.await()
-            val partial =
-                place?.let {
-                    placeOnlySnapshot(
-                        placeName = it.label,
-                        fullPlaceName = it.fullLabel,
-                        locationSource = LocationSource.SYSTEM,
-                    )
-                }
+            val partial = place?.let {
+                placeOnlySnapshot(
+                    placeName = it.label,
+                    fullPlaceName = it.fullLabel,
+                    locationSource = LocationSource.SYSTEM,
+                )
+            }
             if (partial != null) onPlaceReady(partial)
             val weatherResult = weatherDeferred.await()
             weatherResult.fold(
@@ -523,8 +522,7 @@ internal class OutdoorContextRepository(
                 weatherCode = weather.weatherCode,
                 capturedAt = System.currentTimeMillis(),
             )
-            .normalizedOrNull()
-            ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
+            .normalizedOrNull() ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
     }
 
     private suspend fun fetchRawWeatherWithRetry(

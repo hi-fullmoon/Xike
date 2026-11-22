@@ -63,8 +63,7 @@ data class OutdoorSnapshot(
 
     companion object {
         fun fromJson(json: JSONObject?): OutdoorSnapshot? = json?.let {
-            val hasTemperature =
-                it.has("temperatureCelsius") && !it.isNull("temperatureCelsius")
+            val hasTemperature = it.has("temperatureCelsius") && !it.isNull("temperatureCelsius")
             val hasWeatherCode = it.has("weatherCode") && !it.isNull("weatherCode")
             val temperature =
                 if (hasTemperature) it.optDouble("temperatureCelsius", Double.NaN) else null

@@ -177,8 +177,7 @@ class JournalReadRepository internal constructor(databaseProvider: () -> Journal
                                     )
                                     .map { it.toJournalEntry() }
                             else emptyList()
-                        result +=
-                            com.xike.app.feature.archive.MemoryDay(date, kind, count, entries)
+                        result += com.xike.app.feature.archive.MemoryDay(date, kind, count, entries)
                     }
                 }
                 countDay(

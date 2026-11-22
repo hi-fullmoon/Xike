@@ -259,8 +259,7 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
                         temperatureCelsius = entry.outdoorTemperatureCelsius,
                         weatherCode = entry.outdoorWeatherCode,
                         capturedAt = entry.outdoorCapturedAt ?: return@let null,
-                        source =
-                            if (hasWeather) entry.outdoorSource ?: OPEN_METEO_SOURCE else null,
+                        source = if (hasWeather) entry.outdoorSource ?: OPEN_METEO_SOURCE else null,
                         fullPlaceName = entry.outdoorFullPlaceName,
                         locationSource = LocationSource.fromId(entry.outdoorLocationSource),
                     )

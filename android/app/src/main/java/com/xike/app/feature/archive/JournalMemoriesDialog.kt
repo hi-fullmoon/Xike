@@ -108,12 +108,12 @@ internal fun JournalMemoriesDialog(
     LaunchedEffect(clock, refresh, revision) {
         loading = true
         journalReadResult {
-                repository.memories(
-                    clock.first,
-                    clock.second,
-                    inlineEntryLimit = MEMORY_INLINE_ENTRY_LIMIT,
-                )
-            }
+            repository.memories(
+                clock.first,
+                clock.second,
+                inlineEntryLimit = MEMORY_INLINE_ENTRY_LIMIT,
+            )
+        }
             .onSuccess {
                 if (
                     snapshot?.let { old -> old.today != it.today || old.zoneId != it.zoneId } ==
@@ -235,7 +235,9 @@ internal fun JournalMemoriesDialog(
                                     MemoryDayHeader(
                                         day = day,
                                         modifier =
-                                            Modifier.padding(top = if (dayIndex == 0) 2.dp else 8.dp),
+                                            Modifier.padding(
+                                                top = if (dayIndex == 0) 2.dp else 8.dp
+                                            ),
                                     )
                                 }
                                 items(day.entries, key = { "${day.kind}:${day.date}:${it.id}" }) {
@@ -255,7 +257,8 @@ internal fun JournalMemoriesDialog(
                                         TextButton(
                                             onClick = { selectedDate = day.date.toString() },
                                             shape = XikeShapes.button,
-                                            modifier = Modifier.testTag("memory-day-more:${day.date}"),
+                                            modifier =
+                                                Modifier.testTag("memory-day-more:${day.date}"),
                                         ) {
                                             Text(
                                                 tr(

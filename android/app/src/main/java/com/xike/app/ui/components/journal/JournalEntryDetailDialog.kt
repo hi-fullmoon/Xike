@@ -319,7 +319,10 @@ internal fun JournalEntryDetailDialog(
                                         ) {
                                             Text(
                                                 "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}" +
-                                                    if (showLocationSource || outdoor.source == null) ""
+                                                    if (
+                                                        showLocationSource || outdoor.source == null
+                                                    )
+                                                        ""
                                                     else " · ${outdoor.source}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
