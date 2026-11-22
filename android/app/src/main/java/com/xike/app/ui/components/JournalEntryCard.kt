@@ -154,8 +154,18 @@ internal fun JournalEntryCard(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.width(4.dp))
+                            val weatherSummary =
+                                if (
+                                    outdoor.hasWeather &&
+                                        outdoor.temperatureCelsius != null &&
+                                        outdoor.weatherCode != null
+                                ) {
+                                    "${outdoor.placeName} · ${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}"
+                                } else {
+                                    outdoor.placeName
+                                }
                             Text(
-                                "${outdoor.placeName} · ${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}",
+                                weatherSummary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelSmall,

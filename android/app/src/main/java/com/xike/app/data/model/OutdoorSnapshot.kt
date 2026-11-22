@@ -6,50 +6,81 @@ import org.json.JSONObject
 
 data class OutdoorSnapshot(
     val placeName: String,
-    val temperatureCelsius: Double,
-    val weatherCode: Int,
+    val temperatureCelsius: Double? = null,
+    val weatherCode: Int? = null,
     val capturedAt: Long,
-    val source: String = OPEN_METEO_SOURCE,
+    val source: String? = OPEN_METEO_SOURCE,
     val fullPlaceName: String? = null,
     val locationSource: LocationSource? = null,
 ) {
+    val hasWeather: Boolean
+        get() = temperatureCelsius != null && weatherCode != null
+
     fun normalizedOrNull(): OutdoorSnapshot? {
         val normalizedPlace = placeName.trim().take(MAX_PLACE_NAME_LENGTH)
-        val normalizedSource = source.trim().take(MAX_WEATHER_SOURCE_LENGTH)
+        if (normalizedPlace.isBlank() || capturedAt <= 0L) return null
+        val normalizedFullPlace =
+            fullPlaceName?.trim()?.take(MAX_PLACE_NAME_LENGTH)?.takeIf(String::isNotBlank)
+        if (temperatureCelsius == null && weatherCode == null) {
+            return copy(
+                placeName = normalizedPlace,
+                temperatureCelsius = null,
+                weatherCode = null,
+                source = null,
+                fullPlaceName = normalizedFullPlace,
+            )
+        }
+        val temp = temperatureCelsius ?: return null
+        val code = weatherCode ?: return null
+        val normalizedSource =
+            source?.trim()?.take(MAX_WEATHER_SOURCE_LENGTH)?.takeIf(String::isNotBlank)
+                ?: return null
         return takeIf {
-                normalizedPlace.isNotBlank() &&
-                    temperatureCelsius.isFinite() &&
-                    temperatureCelsius in MIN_TEMPERATURE_CELSIUS..MAX_TEMPERATURE_CELSIUS &&
-                    weatherCode in MIN_WEATHER_CODE..MAX_WEATHER_CODE &&
-                    capturedAt > 0L &&
-                    normalizedSource.isNotBlank()
+                temp.isFinite() &&
+                    temp in MIN_TEMPERATURE_CELSIUS..MAX_TEMPERATURE_CELSIUS &&
+                    code in MIN_WEATHER_CODE..MAX_WEATHER_CODE
             }
             ?.copy(
                 placeName = normalizedPlace,
                 source = normalizedSource,
-                fullPlaceName =
-                    fullPlaceName?.trim()?.take(MAX_PLACE_NAME_LENGTH)?.takeIf(String::isNotBlank),
+                fullPlaceName = normalizedFullPlace,
             )
     }
 
     fun toJson(): JSONObject =
         JSONObject()
             .put("placeName", placeName)
-            .put("temperatureCelsius", temperatureCelsius)
-            .put("weatherCode", weatherCode)
+            .apply {
+                if (temperatureCelsius != null && weatherCode != null) {
+                    put("temperatureCelsius", temperatureCelsius)
+                    put("weatherCode", weatherCode)
+                }
+            }
             .put("capturedAt", capturedAt)
-            .put("source", source)
+            .apply { source?.let { put("source", it) } }
             .apply { fullPlaceName?.let { put("fullPlaceName", it) } }
             .apply { locationSource?.let { put("locationSource", it.id) } }
 
     companion object {
         fun fromJson(json: JSONObject?): OutdoorSnapshot? = json?.let {
+            val hasTemperature =
+                it.has("temperatureCelsius") && !it.isNull("temperatureCelsius")
+            val hasWeatherCode = it.has("weatherCode") && !it.isNull("weatherCode")
+            val temperature =
+                if (hasTemperature) it.optDouble("temperatureCelsius", Double.NaN) else null
+            val weatherCode = if (hasWeatherCode) it.optInt("weatherCode", -1) else null
+            val source =
+                if (temperature != null || weatherCode != null) {
+                    it.optString("source", OPEN_METEO_SOURCE)
+                } else {
+                    null
+                }
             OutdoorSnapshot(
                     placeName = it.optString("placeName"),
-                    temperatureCelsius = it.optDouble("temperatureCelsius", Double.NaN),
-                    weatherCode = it.optInt("weatherCode", -1),
+                    temperatureCelsius = temperature,
+                    weatherCode = weatherCode,
                     capturedAt = it.optLong("capturedAt"),
-                    source = it.optString("source", OPEN_METEO_SOURCE),
+                    source = source,
                     fullPlaceName = it.optString("fullPlaceName").takeIf(String::isNotBlank),
                     locationSource = LocationSource.fromId(it.optString("locationSource")),
                 )

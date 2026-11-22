@@ -256,6 +256,8 @@ class MainActivity : FragmentActivity() {
                             onAttachCurrentOutdoor = journalViewModel::attachCurrentOutdoor,
                             isDraftOutdoorLoading = journalViewModel.isDraftOutdoorLoading,
                             onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
+                            onAttachManualOutdoorPlace = journalViewModel::attachManualOutdoorPlace,
+                            onRetryOutdoorWeather = journalViewModel::retryDraftOutdoorWeather,
                             onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
                             onDraftImagesAdded = journalViewModel::addDraftImages,
                             onDraftImageResultPending =

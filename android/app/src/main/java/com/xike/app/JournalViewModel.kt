@@ -15,6 +15,7 @@ import com.xike.app.data.Mood
 import com.xike.app.data.draft.JournalDraftStore
 import com.xike.app.data.model.JournalDraft
 import com.xike.app.data.model.JournalVideo
+import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.VideoEditDraft
@@ -24,6 +25,8 @@ import com.xike.app.media.pruneVoiceTemporaryFiles
 import com.xike.app.outdoor.AmapSettingsOperations
 import com.xike.app.outdoor.AmapSettingsStore
 import com.xike.app.outdoor.OutdoorContextRepository
+import com.xike.app.outdoor.OutdoorFetchResult
+import com.xike.app.outdoor.OutdoorRetryCoordinates
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
 import java.io.File
@@ -90,6 +93,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     private var draftGeneration = 0L
     private var outdoorRequestGeneration = 0L
     private var outdoorRequestJob: Job? = null
+    private var outdoorWeatherRetrySession: OutdoorWeatherRetrySession? = null
     val isDraftImageResultPending: Boolean
         get() = draftMediaOperations.isDraftImageResultPending
 
@@ -97,6 +101,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         draftMediaOperations.setDraftImageResultPending(key, pending)
 
     var isDraftOutdoorLoading by mutableStateOf(false)
+        private set
+
+    var draftOutdoorWeatherError by mutableStateOf<String?>(null)
         private set
 
     private var noteSaveJob: Job? = null
@@ -496,6 +503,8 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         outdoorRequestGeneration++
         val request = outdoorRequestJob
         outdoorRequestJob = null
+        outdoorWeatherRetrySession = null
+        draftOutdoorWeatherError = null
         isDraftOutdoorLoading = false
         request?.cancel()
     }
@@ -503,18 +512,70 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     suspend fun attachCurrentOutdoor(): Result<Unit> =
         attachOutdoor(
             saveError = localizedText("地点与天气已取得，但草稿保存失败。"),
-            request = outdoorRepository::current,
+            request = { onPlaceReady -> outdoorRepository.currentWithFallback(onPlaceReady) },
         )
 
     suspend fun attachOutdoorForCity(city: String): Result<Unit> =
         attachOutdoor(
             saveError = localizedText("城市天气已取得，但草稿保存失败。"),
-            request = { outdoorRepository.city(city) },
+            request = { onPlaceReady -> outdoorRepository.cityWithFallback(city, onPlaceReady) },
         )
+
+    suspend fun attachManualOutdoorPlace(placeName: String): Result<Unit> =
+        withContext(Dispatchers.Main.immediate) {
+            if (!requireDraftReady()) {
+                return@withContext Result.failure(IllegalStateException(dataError))
+            }
+            if (isDraftSaving || isDraftOutdoorLoading) {
+                return@withContext Result.failure(
+                    IllegalStateException(
+                        tr("请等待当前操作完成。", "Please wait for the current operation to finish.")
+                    )
+                )
+            }
+            if (draft.recordedAt != null) {
+                return@withContext Result.failure(
+                    IllegalStateException(localizedText("补记过去时不会附加今天的天气。"))
+                )
+            }
+            runCatching {
+                val snapshot = outdoorRepository.manualPlace(placeName)
+                outdoorWeatherRetrySession = null
+                draftOutdoorWeatherError = null
+                check(persistDraft(draft.copy(outdoor = snapshot)) && awaitDraftPersistence()) {
+                    tr("地点已记录，但草稿保存失败。", "Location recorded, but saving the draft failed.")
+                }
+            }
+        }
+
+    suspend fun retryDraftOutdoorWeather(): Result<Unit> {
+        val currentOutdoor = draft.outdoor
+        val session = outdoorWeatherRetrySession
+        if (
+            currentOutdoor != null &&
+                !currentOutdoor.hasWeather &&
+                session != null &&
+                session.draftGeneration == draftGeneration &&
+                session.placeName == currentOutdoor.placeName
+        ) {
+            return attachOutdoor(
+                saveError = localizedText("天气已取得，但草稿保存失败。"),
+                request = { outdoorRepository.retryWeather(currentOutdoor, session.coordinates) },
+            )
+        }
+        if (
+            currentOutdoor != null &&
+                !currentOutdoor.hasWeather &&
+                currentOutdoor.locationSource == LocationSource.MANUAL
+        ) {
+            return attachOutdoorForCity(currentOutdoor.placeName)
+        }
+        return attachCurrentOutdoor()
+    }
 
     private suspend fun attachOutdoor(
         saveError: String,
-        request: suspend () -> OutdoorSnapshot,
+        request: suspend (onPlaceReady: suspend (OutdoorSnapshot) -> Unit) -> OutdoorFetchResult,
     ): Result<Unit> =
         withContext(Dispatchers.Main.immediate) {
             if (!requireDraftReady()) {
@@ -534,8 +595,24 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             }
             val requestDraftGeneration = draftGeneration
             val requestGeneration = ++outdoorRequestGeneration
+            draftOutdoorWeatherError = null
+            val onPlaceReady: suspend (OutdoorSnapshot) -> Unit = { partial ->
+                withContext(Dispatchers.Main.immediate) {
+                    if (
+                        requestDraftGeneration == draftGeneration &&
+                            requestGeneration == outdoorRequestGeneration &&
+                            !isDraftSaving &&
+                            draft.recordedAt == null
+                    ) {
+                        persistDraft(draft.copy(outdoor = partial))
+                    }
+                }
+            }
             coroutineScope {
-                val operation = async(start = CoroutineStart.LAZY) { runOutdoorRequest(request) }
+                val operation =
+                    async(start = CoroutineStart.LAZY) {
+                        runOutdoorRequest { request(onPlaceReady) }
+                    }
                 outdoorRequestJob = operation
                 isDraftOutdoorLoading = true
                 try {
@@ -546,8 +623,18 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     ) {
                         return@coroutineScope Result.success(Unit)
                     }
-                    result.mapCatching { snapshot ->
+                    result.mapCatching { fetchResult ->
                         check(draft.recordedAt == null) { localizedText("补记过去时不会附加今天的天气。") }
+                        val snapshot = fetchResult.snapshot
+                        outdoorWeatherRetrySession =
+                            fetchResult.retryCoordinates?.let { coordinates ->
+                                OutdoorWeatherRetrySession(
+                                    draftGeneration = requestDraftGeneration,
+                                    placeName = snapshot.placeName,
+                                    coordinates = coordinates,
+                                )
+                            }
+                        draftOutdoorWeatherError = fetchResult.weatherError
                         check(
                             persistDraft(draft.copy(outdoor = snapshot)) && awaitDraftPersistence()
                         ) {
@@ -902,6 +989,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         }
         return false
     }
+
+    private data class OutdoorWeatherRetrySession(
+        val draftGeneration: Long,
+        val placeName: String,
+        val coordinates: OutdoorRetryCoordinates,
+    )
 
     private suspend fun <T> runOutdoorRequest(request: suspend () -> T): Result<T> =
         try {

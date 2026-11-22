@@ -29,7 +29,7 @@ internal class AmapPlace(
     val latitude: Double,
     val longitude: Double,
     val wgs84: Boolean,
-    val labels: PlaceLabels,
+    val labels: PlaceLabels?,
     val systemAddressCompleted: Boolean,
 )
 
@@ -120,6 +120,7 @@ internal class AmapLocator(context: Context) {
 
     suspend fun current(
         settings: AmapSettings,
+        allowMissingAddress: Boolean = false,
         completeSystemAddress: suspend (Location) -> PlaceLabels?,
     ): AmapPlace {
         require(settings.canUseAmap)
@@ -173,7 +174,7 @@ internal class AmapLocator(context: Context) {
                                 activeClient.startLocation()
                             }
                         } ?: throw amapFailure(-2)
-                    asPlace(result, locale, completeSystemAddress)
+                    asPlace(result, locale, allowMissingAddress, completeSystemAddress)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: OutdoorContextException) {
@@ -195,6 +196,7 @@ internal class AmapLocator(context: Context) {
     private suspend fun asPlace(
         location: AMapLocation,
         locale: Locale,
+        allowMissingAddress: Boolean,
         completeSystemAddress: suspend (Location) -> PlaceLabels?,
     ): AmapPlace =
         withContext(Dispatchers.Default) {
@@ -235,16 +237,18 @@ internal class AmapLocator(context: Context) {
             val labels =
                 sdkLabels
                     ?: (if (wgs84) completeSystemAddress(location) else null)
-                    ?: throw amapFailure(-4)
+                    ?: if (allowMissingAddress) null else throw amapFailure(-4)
             AmapPlace(
                 location.latitude,
                 location.longitude,
                 wgs84,
-                PlaceLabels(
-                    localizePlaceName(labels.label, locale),
-                    localizePlaceName(labels.fullLabel, locale),
-                ),
-                systemAddressCompleted = sdkLabels == null,
+                labels?.let {
+                    PlaceLabels(
+                        localizePlaceName(it.label, locale),
+                        localizePlaceName(it.fullLabel, locale),
+                    )
+                },
+                systemAddressCompleted = sdkLabels == null && labels != null,
             )
         }
 

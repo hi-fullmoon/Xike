@@ -29,10 +29,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.resume
+import kotlin.math.roundToLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -88,6 +92,44 @@ internal class OutdoorContextException(
     val amapDiagnostic: AmapNetworkDiagnostic? = null,
 ) : IllegalStateException(message, cause)
 
+/**
+ * Coarse WGS84 coordinates kept strictly in memory for single-tap weather retry within the active
+ * editor session. Never written to drafts, database, or backups.
+ */
+internal data class OutdoorRetryCoordinates(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+internal data class OutdoorFetchResult(
+    val snapshot: OutdoorSnapshot,
+    val weatherError: String? = null,
+    val retryCoordinates: OutdoorRetryCoordinates? = null,
+)
+
+internal fun coarseRetryCoordinates(latitude: Double, longitude: Double): OutdoorRetryCoordinates =
+    OutdoorRetryCoordinates(
+        latitude = (latitude * 1_000.0).roundToLong() / 1_000.0,
+        longitude = (longitude * 1_000.0).roundToLong() / 1_000.0,
+    )
+
+internal fun placeOnlySnapshot(
+    placeName: String,
+    fullPlaceName: String?,
+    locationSource: LocationSource,
+    capturedAt: Long = System.currentTimeMillis(),
+): OutdoorSnapshot? =
+    OutdoorSnapshot(
+            placeName = placeName,
+            temperatureCelsius = null,
+            weatherCode = null,
+            capturedAt = capturedAt,
+            source = null,
+            fullPlaceName = fullPlaceName,
+            locationSource = locationSource,
+        )
+        .normalizedOrNull()
+
 internal class OutdoorContextRepository(
     context: Context,
     private val amapSettings: AmapSettingsStore = AmapSettingsStore(context),
@@ -96,22 +138,97 @@ internal class OutdoorContextRepository(
     private val locationManager =
         appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
-    suspend fun current(): OutdoorSnapshot {
+    suspend fun current(): OutdoorSnapshot = currentWithFallback().snapshot
+
+    suspend fun currentWithFallback(
+        onPlaceReady: suspend (OutdoorSnapshot) -> Unit = {}
+    ): OutdoorFetchResult {
         val settings = withContext(Dispatchers.IO) { amapSettings.read() }
         if (settings.enabled) {
             if (!settings.canUseAmap) throw amapFailure(-5)
-            val place = currentAmapPlace(settings)
-            return weatherAt(place.latitude, place.longitude, place.wgs84, place.labels)
+            val place = currentAmapPlace(settings, allowMissingAddress = true)
+            val coordinates = weatherCoordinates(place.latitude, place.longitude, place.wgs84)
+            val partial =
+                place.labels?.let { labels ->
+                    placeOnlySnapshot(
+                        placeName = labels.label,
+                        fullPlaceName = labels.fullLabel,
+                        locationSource = LocationSource.AMAP,
+                    )
+                }
+            if (partial != null) onPlaceReady(partial)
+            return try {
+                val weather =
+                    fetchWeatherWithRetry(
+                        coordinates.latitude,
+                        coordinates.longitude,
+                        place.labels?.label ?: localizedText("当前位置"),
+                        place.labels?.fullLabel,
+                        LocationSource.AMAP,
+                    )
+                OutdoorFetchResult(weather)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (partial != null) {
+                    OutdoorFetchResult(
+                        snapshot = partial,
+                        weatherError = error.message ?: localizedText("天气暂未获取到"),
+                        retryCoordinates =
+                            coarseRetryCoordinates(coordinates.latitude, coordinates.longitude),
+                    )
+                } else {
+                    throw amapFailure(-4)
+                }
+            }
         }
         val location = currentLocation()
-        val place = reverseGeocode(location)
-        return fetchWeather(
-            location.latitude,
-            location.longitude,
-            place?.label ?: localizedText("当前位置"),
-            place?.fullLabel,
-            LocationSource.SYSTEM,
-        )
+        return coroutineScope {
+            val geocodeDeferred = async { reverseGeocode(location) }
+            val weatherDeferred = async {
+                runCatching { fetchRawWeatherWithRetry(location.latitude, location.longitude) }
+            }
+            val place = geocodeDeferred.await()
+            val partial =
+                place?.let {
+                    placeOnlySnapshot(
+                        placeName = it.label,
+                        fullPlaceName = it.fullLabel,
+                        locationSource = LocationSource.SYSTEM,
+                    )
+                }
+            if (partial != null) onPlaceReady(partial)
+            val weatherResult = weatherDeferred.await()
+            weatherResult.fold(
+                onSuccess = { weather ->
+                    val snapshot =
+                        OutdoorSnapshot(
+                                placeName = place?.label ?: localizedText("当前位置"),
+                                fullPlaceName = place?.fullLabel,
+                                locationSource = LocationSource.SYSTEM,
+                                temperatureCelsius = weather.temperatureCelsius,
+                                weatherCode = weather.weatherCode,
+                                capturedAt = System.currentTimeMillis(),
+                            )
+                            .normalizedOrNull()
+                            ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
+                    OutdoorFetchResult(snapshot)
+                },
+                onFailure = { error ->
+                    if (error is CancellationException) throw error
+                    if (partial != null) {
+                        OutdoorFetchResult(
+                            snapshot = partial,
+                            weatherError = error.message ?: localizedText("天气暂未获取到"),
+                            retryCoordinates =
+                                coarseRetryCoordinates(location.latitude, location.longitude),
+                        )
+                    } else {
+                        throw error
+                    }
+                },
+            )
+        }
     }
 
     internal suspend fun weatherAt(
@@ -121,7 +238,7 @@ internal class OutdoorContextRepository(
         labels: PlaceLabels,
     ): OutdoorSnapshot {
         val coordinates = weatherCoordinates(latitude, longitude, wgs84)
-        return fetchWeather(
+        return fetchWeatherWithRetry(
             coordinates.latitude,
             coordinates.longitude,
             labels.label,
@@ -130,30 +247,96 @@ internal class OutdoorContextRepository(
         )
     }
 
-    private suspend fun currentAmapPlace(settings: AmapSettings): AmapPlace =
-        AmapLocator(appContext).current(settings) { location ->
+    suspend fun retryWeather(
+        snapshot: OutdoorSnapshot,
+        coordinates: OutdoorRetryCoordinates,
+    ): OutdoorFetchResult =
+        try {
+            val updated =
+                fetchWeatherWithRetry(
+                    latitude = coordinates.latitude,
+                    longitude = coordinates.longitude,
+                    placeName = snapshot.placeName,
+                    fullPlaceName = snapshot.fullPlaceName,
+                    locationSource = snapshot.locationSource ?: LocationSource.SYSTEM,
+                )
+            OutdoorFetchResult(updated)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            OutdoorFetchResult(
+                snapshot = snapshot,
+                weatherError = error.message ?: localizedText("天气暂未获取到"),
+                retryCoordinates = coordinates,
+            )
+        }
+
+    private suspend fun currentAmapPlace(
+        settings: AmapSettings,
+        allowMissingAddress: Boolean = false,
+    ): AmapPlace =
+        AmapLocator(appContext).current(settings, allowMissingAddress) { location ->
             reverseGeocode(location)?.let { PlaceLabels(it.label, it.fullLabel) }
         }
 
     internal suspend fun testAmapLocation(settings: AmapSettings): String {
-        val place = currentAmapPlace(settings)
-        return place.labels.fullLabel +
+        val place = currentAmapPlace(settings, allowMissingAddress = false)
+        val labels = place.labels ?: throw amapFailure(-4)
+        return labels.fullLabel +
             if (place.systemAddressCompleted) {
                 com.xike.app.tr("（系统地址服务补全）", " (completed by system address service)")
             } else ""
     }
 
-    suspend fun city(query: String): OutdoorSnapshot {
+    suspend fun city(query: String): OutdoorSnapshot = cityWithFallback(query).snapshot
+
+    suspend fun cityWithFallback(
+        query: String,
+        onPlaceReady: suspend (OutdoorSnapshot) -> Unit = {},
+    ): OutdoorFetchResult {
         val normalizedQuery = query.trim()
         require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
-        return fetchWeather(
-            city.latitude,
-            city.longitude,
-            city.name,
-            city.label,
-            LocationSource.MANUAL,
-        )
+        val partial =
+            placeOnlySnapshot(
+                placeName = city.name,
+                fullPlaceName = city.label,
+                locationSource = LocationSource.MANUAL,
+            )
+        if (partial != null) onPlaceReady(partial)
+        return try {
+            val weather =
+                fetchWeatherWithRetry(
+                    city.latitude,
+                    city.longitude,
+                    city.name,
+                    city.label,
+                    LocationSource.MANUAL,
+                )
+            OutdoorFetchResult(weather)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (partial != null) {
+                OutdoorFetchResult(
+                    snapshot = partial,
+                    weatherError = error.message ?: localizedText("天气暂未获取到"),
+                    retryCoordinates = coarseRetryCoordinates(city.latitude, city.longitude),
+                )
+            } else {
+                throw error
+            }
+        }
+    }
+
+    fun manualPlace(placeName: String): OutdoorSnapshot {
+        val normalized = placeName.trim()
+        require(normalized.isNotBlank()) { localizedText("请输入地点名称。") }
+        return placeOnlySnapshot(
+            placeName = normalized,
+            fullPlaceName = null,
+            locationSource = LocationSource.MANUAL,
+        ) ?: throw OutdoorContextException(localizedText("请输入地点名称。"))
     }
 
     private suspend fun currentLocation(): Location {
@@ -324,13 +507,50 @@ internal class OutdoorContextRepository(
         return address
     }
 
-    private suspend fun fetchWeather(
+    private suspend fun fetchWeatherWithRetry(
         latitude: Double,
         longitude: Double,
         placeName: String,
         fullPlaceName: String? = null,
         locationSource: LocationSource,
-    ): OutdoorSnapshot =
+    ): OutdoorSnapshot {
+        val weather = fetchRawWeatherWithRetry(latitude, longitude)
+        return OutdoorSnapshot(
+                placeName = placeName,
+                fullPlaceName = fullPlaceName,
+                locationSource = locationSource,
+                temperatureCelsius = weather.temperatureCelsius,
+                weatherCode = weather.weatherCode,
+                capturedAt = System.currentTimeMillis(),
+            )
+            .normalizedOrNull()
+            ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
+    }
+
+    private suspend fun fetchRawWeatherWithRetry(
+        latitude: Double,
+        longitude: Double,
+    ): RawWeather {
+        var lastError: Exception? = null
+        repeat(WEATHER_MAX_ATTEMPTS) { attempt ->
+            try {
+                return fetchRawWeather(latitude, longitude)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                lastError = error
+                if (attempt + 1 < WEATHER_MAX_ATTEMPTS) {
+                    delay(WEATHER_RETRY_DELAY_MILLIS)
+                }
+            }
+        }
+        throw lastError ?: OutdoorContextException(localizedText("无法连接天气服务，请检查网络后重试。"))
+    }
+
+    private suspend fun fetchRawWeather(
+        latitude: Double,
+        longitude: Double,
+    ): RawWeather =
         withContext(Dispatchers.IO) {
             // Weather models do not benefit from street-level coordinates. Rounding here keeps
             // the outgoing request coarse even if a device provider supplies more precision.
@@ -345,16 +565,12 @@ internal class OutdoorContextRepository(
             val current =
                 requestJson(url).optJSONObject("current")
                     ?: throw OutdoorContextException(localizedText("天气服务暂时没有返回当前天气。"))
-            OutdoorSnapshot(
-                    placeName = placeName,
-                    fullPlaceName = fullPlaceName,
-                    locationSource = locationSource,
-                    temperatureCelsius = current.optDouble("temperature_2m", Double.NaN),
-                    weatherCode = current.optInt("weather_code", -1),
-                    capturedAt = System.currentTimeMillis(),
-                )
-                .normalizedOrNull()
-                ?: throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
+            val temperature = current.optDouble("temperature_2m", Double.NaN)
+            val weatherCode = current.optInt("weather_code", -1)
+            if (!temperature.isFinite() || weatherCode < 0) {
+                throw OutdoorContextException(localizedText("天气服务返回了无法识别的数据。"))
+            }
+            RawWeather(temperatureCelsius = temperature, weatherCode = weatherCode)
         }
 
     private fun searchCity(query: String): CityCoordinate {
@@ -417,11 +633,18 @@ internal class OutdoorContextRepository(
         val longitude: Double,
     )
 
+    private data class RawWeather(
+        val temperatureCelsius: Double,
+        val weatherCode: Int,
+    )
+
     private data class PlaceLabel(val label: String, val fullLabel: String)
 
     private companion object {
         const val LOCATION_TIMEOUT_MILLIS = 12_000L
         const val NETWORK_TIMEOUT_MILLIS = 10_000
+        const val WEATHER_MAX_ATTEMPTS = 2
+        const val WEATHER_RETRY_DELAY_MILLIS = 800L
         const val MAX_LOCATION_AGE_NANOS = 120_000_000_000L
         const val PREFERRED_ACCURACY_METERS = 100f
         val legacyGeocoderExecutor =

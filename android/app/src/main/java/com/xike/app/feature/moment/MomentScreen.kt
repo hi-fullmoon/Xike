@@ -171,6 +171,10 @@ fun MomentScreen(
     onAttachOutdoorForCity: suspend (String) -> Result<Unit> = {
         Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
     },
+    onAttachManualOutdoorPlace: suspend (String) -> Result<Unit> = {
+        Result.failure(IllegalStateException(localizedText("暂时无法记录地点。")))
+    },
+    onRetryOutdoorWeather: suspend () -> Result<Unit> = onAttachCurrentOutdoor,
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
     hasResumedDraft: Boolean = false,
@@ -287,6 +291,35 @@ fun MomentScreen(
                         .onSuccess { outdoorPermissionDenied = false }
                         .onFailure { error ->
                             outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。")
+                        }
+                } finally {
+                    isOutdoorLoading = false
+                }
+            }
+        }
+    }
+    val saveManualPlace: (String) -> Unit = { placeName ->
+        if (!outdoorLoading && !isSaving && draft.recordedAt == null && placeName.isNotBlank()) {
+            outdoorError = null
+            scope.launch {
+                onAttachManualOutdoorPlace(placeName)
+                    .onSuccess { outdoorPermissionDenied = false }
+                    .onFailure { error ->
+                        outdoorError = error.message ?: localizedText("暂时无法记录地点。")
+                    }
+            }
+        }
+    }
+    val retryOutdoorWeather: () -> Unit = {
+        if (!outdoorLoading && !isSaving && draft.recordedAt == null) {
+            isOutdoorLoading = true
+            outdoorError = null
+            scope.launch {
+                try {
+                    onRetryOutdoorWeather()
+                        .onSuccess { outdoorPermissionDenied = false }
+                        .onFailure { error ->
+                            outdoorError = error.message ?: localizedText("暂时无法获取地点与天气。")
                         }
                 } finally {
                     isOutdoorLoading = false
@@ -478,6 +511,7 @@ fun MomentScreen(
                             },
                     enabled = !isSaving,
                     onAdd = requestCurrentOutdoor,
+                    onRetryWeather = retryOutdoorWeather,
                     showRefresh = draft.recordedAt == null,
                     onChooseCity = { showOutdoorCityDialog = true },
                     onRemove = {
@@ -955,6 +989,10 @@ fun MomentScreen(
             onConfirm = { city ->
                 showOutdoorCityDialog = false
                 loadCityOutdoor(city)
+            },
+            onConfirmPlaceOnly = { place ->
+                showOutdoorCityDialog = false
+                saveManualPlace(place)
             },
         )
     }

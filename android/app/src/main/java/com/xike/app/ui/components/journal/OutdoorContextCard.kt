@@ -86,6 +86,7 @@ internal fun OutdoorContextCard(
     onAdd: () -> Unit,
     onChooseCity: () -> Unit,
     onRemove: () -> Unit,
+    onRetryWeather: (() -> Unit)? = null,
     showRefresh: Boolean = true,
     contentPadding: Dp = XikeCardPadding,
     minContentHeight: Dp = 0.dp,
@@ -121,8 +122,13 @@ internal fun OutdoorContextCard(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
+                                val weatherCode = snapshot.weatherCode
                                 Icon(
-                                    weatherConditionIcon(snapshot.weatherCode),
+                                    if (snapshot.hasWeather && weatherCode != null) {
+                                        weatherConditionIcon(weatherCode)
+                                    } else {
+                                        Icons.Outlined.LocationOn
+                                    },
                                     contentDescription = null,
                                     modifier = Modifier.size(26.dp),
                                     tint = MaterialTheme.colorScheme.primary,
@@ -145,22 +151,64 @@ internal fun OutdoorContextCard(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                itemVerticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "${snapshot.temperatureCelsius.roundToInt()}°",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(
-                                    weatherConditionLabel(snapshot.weatherCode),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            if (snapshot.hasWeather) {
+                                val temperature = snapshot.temperatureCelsius
+                                val weatherCode = snapshot.weatherCode
+                                if (temperature != null && weatherCode != null) {
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        itemVerticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            "${temperature.roundToInt()}°",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            weatherConditionLabel(weatherCode),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            } else if (isLoading) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 1.8.dp,
+                                    )
+                                    Text(
+                                        tr("正在获取天气…", "Getting weather…"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else if (showRefresh) {
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    itemVerticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        tr("天气暂未获取到", "Weather unavailable"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (onRetryWeather != null) {
+                                        OutdoorCardAction(
+                                            label = tr("重试天气", "Retry weather"),
+                                            enabled = enabled,
+                                            onClick = onRetryWeather,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -177,17 +225,21 @@ internal fun OutdoorContextCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        tr(
-                            "天气来源：${snapshot.source} · 获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()}",
-                            "Weather source: ${snapshot.source} · Fetched at ${snapshot.capturedAt.asOutdoorCapturedTime()}",
-                        ),
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .padding(top = if (snapshot.locationSource != null) 2.dp else 8.dp),
-                        style = sourceTextStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (snapshot.hasWeather && snapshot.source != null) {
+                        Text(
+                            tr(
+                                "天气来源：${snapshot.source} · 获取于 ${snapshot.capturedAt.asOutdoorCapturedTime()}",
+                                "Weather source: ${snapshot.source} · Fetched at ${snapshot.capturedAt.asOutdoorCapturedTime()}",
+                            ),
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .padding(
+                                        top = if (snapshot.locationSource != null) 2.dp else 8.dp
+                                    ),
+                            style = sourceTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (!isLoading && errorMessage != null) {
                         Text(
                             errorMessage,
@@ -250,7 +302,7 @@ internal fun OutdoorContextCard(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 when {
-                                    isLoading -> localizedText("正在获取地点与天气")
+                                    isLoading -> tr("正在获取位置", "Getting location")
                                     isBackdated -> localizedText("补记不使用今天的天气")
                                     errorMessage != null -> localizedText("暂时无法添加地点与天气")
                                     else -> tr("地点与天气", "Location and weather")
@@ -353,6 +405,15 @@ internal fun OutdoorContextCard(
                                     onClick = {
                                         showActions = false
                                         if (enabled && !isLoading) onAdd()
+                                    },
+                                )
+                            if (showRefresh)
+                                DropdownMenuItem(
+                                    text = { Text(localizedText("手动选城市")) },
+                                    enabled = enabled && !isLoading,
+                                    onClick = {
+                                        showActions = false
+                                        if (enabled && !isLoading) onChooseCity()
                                     },
                                 )
                             DropdownMenuItem(

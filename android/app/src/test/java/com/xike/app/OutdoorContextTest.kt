@@ -6,8 +6,10 @@ import com.xike.app.data.model.JournalDraft
 import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.retainOutdoorForEditedTime
+import com.xike.app.outdoor.coarseRetryCoordinates
 import com.xike.app.outdoor.firstNonNullResult
 import com.xike.app.outdoor.locationSourceName
+import com.xike.app.outdoor.placeOnlySnapshot
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -16,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,7 +87,51 @@ class OutdoorContextTest {
         assertNull(OutdoorSnapshot("", 27.0, 2, 100L).normalizedOrNull())
         assertNull(OutdoorSnapshot("上海", Double.NaN, 2, 100L).normalizedOrNull())
         assertNull(OutdoorSnapshot("上海", 27.0, -1, 100L).normalizedOrNull())
+        assertNull(OutdoorSnapshot("上海", 27.0, null, 100L).normalizedOrNull())
+        assertNull(OutdoorSnapshot("上海", null, 2, 100L).normalizedOrNull())
         assertNull(OutdoorSnapshot("上海", 27.0, 2, 0L).normalizedOrNull())
+    }
+
+    @Test
+    fun `place only snapshot survives draft entry and json round trip without weather`() {
+        val snapshot =
+            placeOnlySnapshot(
+                placeName = "杭州 · 西湖区",
+                fullPlaceName = "中国 · 浙江省 · 杭州市 · 西湖区",
+                locationSource = LocationSource.SYSTEM,
+                capturedAt = 1_700_000_000_000L,
+            )!!
+        assertFalse(snapshot.hasWeather)
+        assertNull(snapshot.temperatureCelsius)
+        assertNull(snapshot.weatherCode)
+        assertNull(snapshot.source)
+
+        val json = snapshot.toJson()
+        assertEquals(
+            setOf("placeName", "capturedAt", "fullPlaceName", "locationSource"),
+            json.keys().asSequence().toSet(),
+        )
+        assertEquals(snapshot, OutdoorSnapshot.fromJson(json))
+
+        val draft = JournalDraft(outdoor = snapshot, updatedAt = 1_700_000_000_000L)
+        assertEquals(snapshot, JournalDraft.fromJson(draft.toJson()).outdoor)
+
+        val entry =
+            JournalEntry(
+                id = "place-only-round-trip",
+                mood = Mood.CALM,
+                tags = emptyList(),
+                note = "",
+                outdoor = snapshot,
+            )
+        assertEquals(snapshot, JournalEntry.fromJson(entry.toJson()).outdoor)
+    }
+
+    @Test
+    fun `coarse retry coordinates round to three decimal places`() {
+        val coarse = coarseRetryCoordinates(30.293654, 120.161421)
+        assertEquals(30.294, coarse.latitude, 0.000001)
+        assertEquals(120.161, coarse.longitude, 0.000001)
     }
 
     @Test

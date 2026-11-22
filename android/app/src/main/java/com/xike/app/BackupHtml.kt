@@ -114,10 +114,16 @@ internal object BackupHtml {
             entry.outdoor?.let { outdoor ->
                 append("<p class=\"weather\">${localizedText("此刻窗外")} · ")
                 append(escape(outdoor.fullPlaceName ?: outdoor.placeName))
-                append(" · ")
-                append(outdoor.temperatureCelsius.toInt())
-                append("° · ")
-                append(escape(weatherConditionLabel(outdoor.weatherCode)))
+                if (
+                    outdoor.hasWeather &&
+                        outdoor.temperatureCelsius != null &&
+                        outdoor.weatherCode != null
+                ) {
+                    append(" · ")
+                    append(outdoor.temperatureCelsius.toInt())
+                    append("° · ")
+                    append(escape(weatherConditionLabel(outdoor.weatherCode)))
+                }
                 append("</p>")
             }
             if (entry.imageFileNames.isNotEmpty()) {

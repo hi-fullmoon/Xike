@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.DialogProperties
 import com.xike.app.localizedText
+import com.xike.app.tr
 import com.xike.app.ui.theme.XikeDialogContentGap
 import com.xike.app.ui.theme.XikeShapes
 
@@ -28,6 +29,7 @@ import com.xike.app.ui.theme.XikeShapes
 internal fun OutdoorCityDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    onConfirmPlaceOnly: ((String) -> Unit)? = null,
 ) {
     var city by rememberSaveable { mutableStateOf("") }
     AlertDialog(
@@ -54,6 +56,15 @@ internal fun OutdoorCityDialog(
                     placeholder = { Text(localizedText("例如：上海、杭州")) },
                     shape = XikeShapes.inner,
                 )
+                if (onConfirmPlaceOnly != null) {
+                    TextButton(
+                        onClick = { onConfirmPlaceOnly(city.trim()) },
+                        enabled = city.isNotBlank(),
+                        shape = XikeShapes.button,
+                    ) {
+                        Text(tr("仅记录此地点（不查天气）", "Save place only (without weather)"))
+                    }
+                }
             }
         },
         dismissButton = {

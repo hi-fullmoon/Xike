@@ -252,12 +252,15 @@ internal fun JournalEntryRecord.toJournalEntry(): JournalEntry =
             },
         outdoor =
             entry.outdoorPlaceName?.let { placeName ->
+                val hasWeather =
+                    entry.outdoorTemperatureCelsius != null || entry.outdoorWeatherCode != null
                 OutdoorSnapshot(
                         placeName = placeName,
-                        temperatureCelsius = entry.outdoorTemperatureCelsius ?: return@let null,
-                        weatherCode = entry.outdoorWeatherCode ?: return@let null,
+                        temperatureCelsius = entry.outdoorTemperatureCelsius,
+                        weatherCode = entry.outdoorWeatherCode,
                         capturedAt = entry.outdoorCapturedAt ?: return@let null,
-                        source = entry.outdoorSource ?: OPEN_METEO_SOURCE,
+                        source =
+                            if (hasWeather) entry.outdoorSource ?: OPEN_METEO_SOURCE else null,
                         fullPlaceName = entry.outdoorFullPlaceName,
                         locationSource = LocationSource.fromId(entry.outdoorLocationSource),
                     )

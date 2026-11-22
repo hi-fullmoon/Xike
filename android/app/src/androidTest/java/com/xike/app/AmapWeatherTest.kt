@@ -32,7 +32,7 @@ class AmapWeatherTest {
         assertEquals(LocationSource.AMAP, beijing.locationSource)
         assertEquals("Open-Meteo", beijing.source)
         assertEquals("中国 · 北京市", beijing.fullPlaceName)
-        assertTrue(beijing.temperatureCelsius.isFinite())
+        assertTrue(requireNotNull(beijing.temperatureCelsius).isFinite())
         val hangzhouGcj = CoordinateUtil.wgs84ToGcj02(120.16142, 30.29365)
         val hangzhou =
             repository.weatherAt(
@@ -42,7 +42,7 @@ class AmapWeatherTest {
                 PlaceLabels("杭州市", "中国 · 浙江省 · 杭州市"),
             )
         assertEquals("杭州市", hangzhou.placeName)
-        assertTrue(hangzhou.temperatureCelsius.isFinite())
+        assertTrue(requireNotNull(hangzhou.temperatureCelsius).isFinite())
     }
 
     @Test
@@ -59,6 +59,6 @@ class AmapWeatherTest {
         assertEquals("Hangzhou", weather.placeName)
         assertEquals(LocationSource.AMAP, weather.locationSource)
         assertEquals("Zhejiang · Hangzhou", weather.fullPlaceName)
-        assertTrue(weather.temperatureCelsius.isFinite())
+        assertTrue(requireNotNull(weather.temperatureCelsius).isFinite())
     }
 }

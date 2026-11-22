@@ -312,23 +312,30 @@ internal fun JournalEntryDetailDialog(
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
                                         )
-                                        Text(
-                                            "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}" +
-                                                if (showLocationSource) ""
-                                                else " · ${outdoor.source}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        if (showLocationSource) {
+                                        if (
+                                            outdoor.hasWeather &&
+                                                outdoor.temperatureCelsius != null &&
+                                                outdoor.weatherCode != null
+                                        ) {
                                             Text(
-                                                tr(
-                                                    "天气来源：${outdoor.source}",
-                                                    "Weather source: ${outdoor.source}",
-                                                ),
-                                                modifier = Modifier.padding(top = 2.dp),
+                                                "${outdoor.temperatureCelsius.roundToInt()}° · ${weatherConditionLabel(outdoor.weatherCode)}" +
+                                                    if (showLocationSource || outdoor.source == null) ""
+                                                    else " · ${outdoor.source}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
+                                            if (showLocationSource && outdoor.source != null) {
+                                                Text(
+                                                    tr(
+                                                        "天气来源：${outdoor.source}",
+                                                        "Weather source: ${outdoor.source}",
+                                                    ),
+                                                    modifier = Modifier.padding(top = 2.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color =
+                                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
                                         }
                                         outdoor.locationSource
                                             ?.takeIf { showLocationSource }
