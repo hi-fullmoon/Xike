@@ -409,7 +409,7 @@ internal fun OutdoorContextCard(
                                 )
                             if (showRefresh)
                                 DropdownMenuItem(
-                                    text = { Text(localizedText("手动选城市")) },
+                                    text = { Text(tr("按城市获取天气", "Get weather by city")) },
                                     enabled = enabled && !isLoading,
                                     onClick = {
                                         showActions = false

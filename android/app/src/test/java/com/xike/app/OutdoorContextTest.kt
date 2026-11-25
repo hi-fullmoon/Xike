@@ -6,6 +6,7 @@ import com.xike.app.data.model.JournalDraft
 import com.xike.app.data.model.LocationSource
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.retainOutdoorForEditedTime
+import com.xike.app.feature.moment.suggestedCityQuery
 import com.xike.app.outdoor.coarseRetryCoordinates
 import com.xike.app.outdoor.firstNonNullResult
 import com.xike.app.outdoor.locationSourceName
@@ -132,6 +133,17 @@ class OutdoorContextTest {
         val coarse = coarseRetryCoordinates(30.293654, 120.161421)
         assertEquals(30.294, coarse.latitude, 0.000001)
         assertEquals(120.161, coarse.longitude, 0.000001)
+    }
+
+    @Test
+    fun `suggested city query extracts leading city segment and skips fallback placeholders`() {
+        assertEquals("上海", suggestedCityQuery("上海 · 浦东新区 · 世纪大道"))
+        assertEquals("杭州", suggestedCityQuery("杭州"))
+        assertEquals("Hangzhou", suggestedCityQuery("Hangzhou · Xihu District"))
+        assertEquals("", suggestedCityQuery("当前位置"))
+        assertEquals("", suggestedCityQuery("Current location"))
+        assertEquals("", suggestedCityQuery("   "))
+        assertEquals("", suggestedCityQuery(null))
     }
 
     @Test

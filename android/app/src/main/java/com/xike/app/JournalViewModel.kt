@@ -20,6 +20,7 @@ import com.xike.app.data.model.MAX_DRAFT_NOTE_LENGTH
 import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.data.model.VideoEditDraft
 import com.xike.app.data.model.retainOutdoorForEditedTime
+import com.xike.app.feature.moment.suggestedCityQuery
 import com.xike.app.media.JournalVideoStore
 import com.xike.app.media.pruneVoiceTemporaryFiles
 import com.xike.app.outdoor.AmapSettingsOperations
@@ -515,11 +516,26 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
             request = { onPlaceReady -> outdoorRepository.currentWithFallback(onPlaceReady) },
         )
 
-    suspend fun attachOutdoorForCity(city: String): Result<Unit> =
-        attachOutdoor(
+    suspend fun attachOutdoorForCity(city: String): Result<Unit> {
+        val currentOutdoor = draft.outdoor
+        val preservePlace =
+            currentOutdoor?.takeIf {
+                !it.hasWeather &&
+                    suggestedCityQuery(it.placeName).let { suggested ->
+                        suggested.isNotBlank() && suggested.equals(city.trim(), ignoreCase = true)
+                    }
+            }
+        return attachOutdoor(
             saveError = localizedText("城市天气已取得，但草稿保存失败。"),
-            request = { onPlaceReady -> outdoorRepository.cityWithFallback(city, onPlaceReady) },
+            request = { onPlaceReady ->
+                outdoorRepository.cityWithFallback(
+                    query = city,
+                    preservePlace = preservePlace,
+                    onPlaceReady = onPlaceReady,
+                )
+            },
         )
+    }
 
     suspend fun attachManualOutdoorPlace(placeName: String): Result<Unit> =
         withContext(Dispatchers.Main.immediate) {

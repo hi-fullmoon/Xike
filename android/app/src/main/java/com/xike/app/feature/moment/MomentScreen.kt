@@ -985,6 +985,7 @@ fun MomentScreen(
 
     if (showOutdoorCityDialog) {
         OutdoorCityDialog(
+            initialCity = suggestedCityQuery(draft.outdoor?.placeName),
             onDismiss = { showOutdoorCityDialog = false },
             onConfirm = { city ->
                 showOutdoorCityDialog = false

@@ -25,13 +25,31 @@ import com.xike.app.tr
 import com.xike.app.ui.theme.XikeDialogContentGap
 import com.xike.app.ui.theme.XikeShapes
 
+internal fun suggestedCityQuery(placeName: String?): String {
+    val normalized = placeName?.trim().orEmpty()
+    if (
+        normalized.isBlank() ||
+            normalized == "当前位置" ||
+            normalized.equals("Current location", ignoreCase = true)
+    ) {
+        return ""
+    }
+    return normalized
+        .split('·')
+        .firstOrNull { it.trim().isNotBlank() }
+        ?.trim()
+        ?.take(40)
+        .orEmpty()
+}
+
 @Composable
 internal fun OutdoorCityDialog(
+    initialCity: String = "",
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     onConfirmPlaceOnly: ((String) -> Unit)? = null,
 ) {
-    var city by rememberSaveable { mutableStateOf("") }
+    var city by rememberSaveable(initialCity) { mutableStateOf(initialCity.take(40)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),

@@ -291,26 +291,32 @@ internal class OutdoorContextRepository(
 
     suspend fun cityWithFallback(
         query: String,
+        preservePlace: OutdoorSnapshot? = null,
         onPlaceReady: suspend (OutdoorSnapshot) -> Unit = {},
     ): OutdoorFetchResult {
         val normalizedQuery = query.trim()
         require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
+        val targetPlaceName = preservePlace?.placeName ?: city.name
+        val targetFullPlaceName =
+            if (preservePlace != null) preservePlace.fullPlaceName else city.label
+        val targetSource = preservePlace?.locationSource ?: LocationSource.MANUAL
         val partial =
-            placeOnlySnapshot(
-                placeName = city.name,
-                fullPlaceName = city.label,
-                locationSource = LocationSource.MANUAL,
-            )
-        if (partial != null) onPlaceReady(partial)
+            preservePlace
+                ?: placeOnlySnapshot(
+                    placeName = targetPlaceName,
+                    fullPlaceName = targetFullPlaceName,
+                    locationSource = targetSource,
+                )
+        if (partial != null && preservePlace == null) onPlaceReady(partial)
         return try {
             val weather =
                 fetchWeatherWithRetry(
                     city.latitude,
                     city.longitude,
-                    city.name,
-                    city.label,
-                    LocationSource.MANUAL,
+                    targetPlaceName,
+                    targetFullPlaceName,
+                    targetSource,
                 )
             OutdoorFetchResult(weather)
         } catch (error: CancellationException) {
