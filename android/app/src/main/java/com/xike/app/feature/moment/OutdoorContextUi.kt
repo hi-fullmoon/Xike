@@ -34,12 +34,7 @@ internal fun suggestedCityQuery(placeName: String?): String {
     ) {
         return ""
     }
-    return normalized
-        .split('·')
-        .firstOrNull { it.trim().isNotBlank() }
-        ?.trim()
-        ?.take(40)
-        .orEmpty()
+    return normalized.split('·').firstOrNull { it.trim().isNotBlank() }?.trim()?.take(40).orEmpty()
 }
 
 @Composable

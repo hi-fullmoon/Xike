@@ -518,13 +518,12 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun attachOutdoorForCity(city: String): Result<Unit> {
         val currentOutdoor = draft.outdoor
-        val preservePlace =
-            currentOutdoor?.takeIf {
-                !it.hasWeather &&
-                    suggestedCityQuery(it.placeName).let { suggested ->
-                        suggested.isNotBlank() && suggested.equals(city.trim(), ignoreCase = true)
-                    }
-            }
+        val preservePlace = currentOutdoor?.takeIf {
+            !it.hasWeather &&
+                suggestedCityQuery(it.placeName).let { suggested ->
+                    suggested.isNotBlank() && suggested.equals(city.trim(), ignoreCase = true)
+                }
+        }
         return attachOutdoor(
             saveError = localizedText("城市天气已取得，但草稿保存失败。"),
             request = { onPlaceReady ->
