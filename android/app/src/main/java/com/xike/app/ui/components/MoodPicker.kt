@@ -350,9 +350,9 @@ internal fun MoodChoice(
     modifier: Modifier = Modifier,
     quietStyle: Boolean = false,
 ) {
-    val visual = mood.visualStyle()
     val dark = isSystemInDarkTheme()
-    val ink = if (dark) visual.container else visual.accent
+    val palette = moodVisualPalette(mood.score, dark)
+    val ink = palette.accent
     Column(
         modifier
             .selectable(
@@ -367,10 +367,7 @@ internal fun MoodChoice(
         Surface(
             modifier = Modifier.size(48.dp),
             shape = XikeShapes.inner,
-            color =
-                if (selected) {
-                    if (dark) visual.accent.copy(alpha = .35f) else visual.container
-                } else Color.Transparent,
+            color = if (selected) palette.container else Color.Transparent,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 MoodEmoji(mood, size = 34.dp, emphasized = selected)
@@ -456,19 +453,3 @@ internal fun MoodChoices(
         }
     }
 }
-
-private data class MoodVisualStyle(val accent: Color, val container: Color)
-
-private fun Mood.visualStyle(): MoodVisualStyle =
-    when (this) {
-        Mood.LOW,
-        Mood.VERY_LOW -> MoodVisualStyle(Color(0xFF506881), Color(0xFFE6EDF5))
-        Mood.TIRED,
-        Mood.BELOW_AVERAGE -> MoodVisualStyle(Color(0xFF766084), Color(0xFFEEE8F3))
-        Mood.CALM,
-        Mood.NEUTRAL -> MoodVisualStyle(Color(0xFF626C65), Color(0xFFEDF0ED))
-        Mood.GOOD,
-        Mood.ABOVE_AVERAGE -> MoodVisualStyle(Color(0xFF427461), Color(0xFFE0EEE8))
-        Mood.JOYFUL,
-        Mood.VERY_GOOD -> MoodVisualStyle(Color(0xFF8B6A2C), Color(0xFFFAF0DA))
-    }

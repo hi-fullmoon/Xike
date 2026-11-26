@@ -49,7 +49,7 @@ internal fun MoodEmoji(
     }
 
     val dark = isSystemInDarkTheme()
-    val semanticColor = moodIconAccentColor(mood.score, dark)
+    val semanticColor = moodVisualPalette(mood.score, dark).accent
     val neutralLineColor = MaterialTheme.colorScheme.onSurfaceVariant
     Canvas(modifier = modifier.size(size).clearAndSetSemantics {}) {
         when (style) {
@@ -58,7 +58,7 @@ internal fun MoodEmoji(
                 drawFaceMoodIcon(
                     score = mood.score,
                     color = semanticColor,
-                    fillAlpha = if (emphasized) 0.22f else 0.14f,
+                    fillAlpha = if (emphasized) 0.16f else 0.12f,
                     strokeScale = 1.65f,
                 )
             MoodIconStyle.LINE ->
@@ -78,13 +78,84 @@ internal fun MoodEmoji(
     }
 }
 
-private fun moodIconAccentColor(score: Int, dark: Boolean): Color =
+internal data class MoodVisualPalette(
+    val accent: Color,
+    val container: Color,
+    val border: Color,
+)
+
+internal fun moodVisualPalette(score: Int, dark: Boolean): MoodVisualPalette =
     when (score) {
-        1 -> if (dark) Color(0xFFAEC4DD) else Color(0xFF506881)
-        2 -> if (dark) Color(0xFFCAB5D7) else Color(0xFF766084)
-        3 -> if (dark) Color(0xFFB5C0B8) else Color(0xFF626C65)
-        4 -> if (dark) Color(0xFF99CBB6) else Color(0xFF427461)
-        else -> if (dark) Color(0xFFE4C282) else Color(0xFF8B6A2C)
+        1 ->
+            if (dark) {
+                MoodVisualPalette(
+                    accent = Color(0xFF8ABBF0),
+                    container = Color(0xFF4A8AD2).copy(alpha = 0.24f),
+                    border = Color(0xFF8ABBF0).copy(alpha = 0.16f),
+                )
+            } else {
+                MoodVisualPalette(
+                    accent = Color(0xFF36689E),
+                    container = Color(0xFFE1EEF9),
+                    border = Color(0xFF36689E).copy(alpha = 0.16f),
+                )
+            }
+        2 ->
+            if (dark) {
+                MoodVisualPalette(
+                    accent = Color(0xFFD4A1E6),
+                    container = Color(0xFFA566BC).copy(alpha = 0.24f),
+                    border = Color(0xFFD4A1E6).copy(alpha = 0.16f),
+                )
+            } else {
+                MoodVisualPalette(
+                    accent = Color(0xFF854D96),
+                    container = Color(0xFFF2E6F7),
+                    border = Color(0xFF854D96).copy(alpha = 0.16f),
+                )
+            }
+        3 ->
+            if (dark) {
+                MoodVisualPalette(
+                    accent = Color(0xFFBDB8AE),
+                    container = Color(0xFFB0AA9E).copy(alpha = 0.20f),
+                    border = Color(0xFFBDB8AE).copy(alpha = 0.16f),
+                )
+            } else {
+                MoodVisualPalette(
+                    accent = Color(0xFF6E6A63),
+                    container = Color(0xFFEFECE7),
+                    border = Color(0xFF6E6A63).copy(alpha = 0.16f),
+                )
+            }
+        4 ->
+            if (dark) {
+                MoodVisualPalette(
+                    accent = Color(0xFF76D4AE),
+                    container = Color(0xFF3EA87E).copy(alpha = 0.24f),
+                    border = Color(0xFF76D4AE).copy(alpha = 0.16f),
+                )
+            } else {
+                MoodVisualPalette(
+                    accent = Color(0xFF277557),
+                    container = Color(0xFFDCF2E8),
+                    border = Color(0xFF277557).copy(alpha = 0.16f),
+                )
+            }
+        else ->
+            if (dark) {
+                MoodVisualPalette(
+                    accent = Color(0xFFF4C16A),
+                    container = Color(0xFFDE9C30).copy(alpha = 0.24f),
+                    border = Color(0xFFF4C16A).copy(alpha = 0.16f),
+                )
+            } else {
+                MoodVisualPalette(
+                    accent = Color(0xFFA8620E),
+                    container = Color(0xFFFDEFD2),
+                    border = Color(0xFFA8620E).copy(alpha = 0.16f),
+                )
+            }
     }
 
 private fun DrawScope.drawFaceMoodIcon(

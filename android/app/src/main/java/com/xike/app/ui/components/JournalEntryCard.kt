@@ -1,6 +1,8 @@
 package com.xike.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -68,6 +70,7 @@ internal fun JournalEntryCard(
 ) {
     val moodBadgeSize = 48.dp
     val moodContentSpacing = 14.dp
+    val moodPalette = moodVisualPalette(entry.mood.score, isSystemInDarkTheme())
     val mediaStartIndent =
         if (alignCompactMediaWithContent) moodBadgeSize + moodContentSpacing else 0.dp
     val constrainMoodLabel = wrapMoodLabel || entry.isFavorite
@@ -101,7 +104,8 @@ internal fun JournalEntryCard(
                 Surface(
                     modifier = Modifier.size(moodBadgeSize),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.76f),
+                    color = moodPalette.container,
+                    border = BorderStroke(1.dp, moodPalette.border),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         MoodEmoji(entry.mood, size = moodIconSize)
@@ -114,6 +118,7 @@ internal fun JournalEntryCard(
                             entry.displayMoodLabel,
                             modifier = if (constrainMoodLabel) Modifier.weight(1f) else Modifier,
                             style = MaterialTheme.typography.titleSmall,
+                            color = moodPalette.accent,
                         )
                         if (!constrainMoodLabel) Spacer(Modifier.weight(1f))
                         if (entry.isFavorite) {
