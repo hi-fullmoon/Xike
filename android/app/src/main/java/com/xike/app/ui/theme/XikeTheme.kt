@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.xike.app.R
 import com.xike.app.localizedText
+import com.xike.app.tr
 import com.xike.app.ui.components.LocalPreviewBitmapCache
 import com.xike.app.ui.components.PreviewBitmapCache
 import com.xike.app.ui.components.XikeNoticeHost
@@ -73,6 +74,44 @@ enum class AppStyle(
 
     val subtitle: String
         get() = localizedText(sourceSubtitle)
+}
+
+enum class MoodIconStyle(
+    private val chineseTitle: String,
+    private val englishTitle: String,
+    private val chineseSubtitle: String,
+    private val englishSubtitle: String,
+) {
+    CLASSIC(
+        "经典样式",
+        "Classic",
+        "原有表情、纯文字感受与系统天气图标",
+        "Original emoji, text-only feelings, and system weather icons",
+    ),
+    DUOTONE(
+        "柔和双色",
+        "Soft duotone",
+        "心情、感受与天气统一采用低饱和双色与圆润细线",
+        "Muted duotone tint with smooth strokes across moods, feelings, and weather",
+    ),
+    LINE(
+        "极简细线",
+        "Minimal line",
+        "与界面图标同源的克制单色线条，统一心情、感受与天气",
+        "Quiet single-color lines matching app icons across moods, feelings, and weather",
+    ),
+    RING(
+        "抽象光环",
+        "Breathing rings",
+        "去人脸化的静谧同心圆环，搭配轻柔感受与微光天气",
+        "Face-free concentric rings paired with subtle feeling marks and soft weather",
+    );
+
+    val title: String
+        get() = tr(chineseTitle, englishTitle)
+
+    val subtitle: String
+        get() = tr(chineseSubtitle, englishSubtitle)
 }
 
 internal enum class XikeNavigationTreatment {
@@ -221,6 +260,7 @@ private fun AppStyle.spec(): XikeStyleSpec =
     }
 
 private val LocalXikeStyle = staticCompositionLocalOf { BreatheStyleSpec }
+private val LocalMoodIconStyle = staticCompositionLocalOf { MoodIconStyle.CLASSIC }
 
 private class XikePickerContext(
     context: Context,
@@ -485,6 +525,7 @@ private fun typographyFor(style: AppStyle): Typography =
 fun XikeTheme(
     theme: AppTheme,
     style: AppStyle = AppStyle.BREATHE,
+    moodIconStyle: MoodIconStyle = MoodIconStyle.CLASSIC,
     content: @Composable () -> Unit,
 ) {
     val styleSpec = style.spec()
@@ -708,6 +749,7 @@ fun XikeTheme(
         }
     CompositionLocalProvider(
         LocalXikeStyle provides styleSpec,
+        LocalMoodIconStyle provides moodIconStyle,
         LocalRecordedAtPickerContext provides pickerContext,
         LocalPreviewBitmapCache provides previewBitmapCache,
     ) {
@@ -745,6 +787,9 @@ internal fun xikeSwitchColors(): SwitchColors =
 
 internal val XikeCurrentStyle: AppStyle
     @Composable get() = LocalXikeStyle.current.style
+
+internal val XikeCurrentMoodIconStyle: MoodIconStyle
+    @Composable get() = LocalMoodIconStyle.current
 
 internal val XikeNavigationTreatmentValue: XikeNavigationTreatment
     @Composable get() = LocalXikeStyle.current.navigationTreatment

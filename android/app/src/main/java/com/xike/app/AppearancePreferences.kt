@@ -3,10 +3,12 @@ package com.xike.app
 import android.content.Context
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.MoodIconStyle
 
 internal data class AppearanceSettings(
     val theme: AppTheme,
     val style: AppStyle,
+    val moodIconStyle: MoodIconStyle = MoodIconStyle.CLASSIC,
 )
 
 /**
@@ -28,6 +30,10 @@ internal class AppearancePreferences(context: Context) {
             style =
                 AppStyle.entries.firstOrNull { it.name == preferences.getString(STYLE_KEY, null) }
                     ?: AppStyle.BREATHE,
+            moodIconStyle =
+                MoodIconStyle.entries.firstOrNull {
+                    it.name == preferences.getString(MOOD_ICON_STYLE_KEY, null)
+                } ?: MoodIconStyle.CLASSIC,
         )
 
     fun saveTheme(theme: AppTheme) {
@@ -36,6 +42,10 @@ internal class AppearancePreferences(context: Context) {
 
     fun saveStyle(style: AppStyle) {
         preferences.edit().putString(STYLE_KEY, style.name).apply()
+    }
+
+    fun saveMoodIconStyle(moodIconStyle: MoodIconStyle) {
+        preferences.edit().putString(MOOD_ICON_STYLE_KEY, moodIconStyle.name).apply()
     }
 
     fun migrateFromDatabase(themeName: String?, styleName: String?): AppearanceSettings {
@@ -58,5 +68,6 @@ internal class AppearancePreferences(context: Context) {
         const val PREFERENCES_NAME = "xike-appearance"
         const val THEME_KEY = "theme"
         const val STYLE_KEY = "style"
+        const val MOOD_ICON_STYLE_KEY = "mood_icon_style"
     }
 }

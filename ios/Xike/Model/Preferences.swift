@@ -49,6 +49,27 @@ enum AppStyle: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum MoodIconStyle: String, CaseIterable, Codable, Identifiable {
+    case classic, duotone, line, ring
+    var id: String { rawValue }
+    func label(_ language: XikeLanguage) -> String {
+        switch self {
+        case .classic: language.text("经典样式", "Classic")
+        case .duotone: language.text("柔和双色", "Soft duotone")
+        case .line: language.text("极简细线", "Minimal line")
+        case .ring: language.text("抽象光环", "Breathing rings")
+        }
+    }
+    func description(_ language: XikeLanguage) -> String {
+        switch self {
+        case .classic: language.text("原有表情、纯文字感受与系统天气图标", "Original emoji, text-only feelings, and system weather icons")
+        case .duotone: language.text("心情、感受与天气统一采用低饱和双色与圆润细线", "Muted duotone tint with smooth strokes across moods, feelings, and weather")
+        case .line: language.text("与界面图标同源的克制单色线条，统一心情、感受与天气", "Quiet single-color lines matching app icons across moods, feelings, and weather")
+        case .ring: language.text("去人脸化的静谧同心圆环，搭配轻柔感受与微光天气", "Face-free concentric rings paired with subtle feeling marks and soft weather")
+        }
+    }
+}
+
 struct ReminderOptions: Codable, Equatable {
     var enabled = false
     var weekdays = Set(1...7)
@@ -121,6 +142,7 @@ struct LocalPreferences: Codable, Equatable {
     static let lockDelays = [0, 60, 300, 1_800]
     var accent = Accent.ocean
     var style = AppStyle.breathe
+    var moodIconStyle = MoodIconStyle.classic
     var languageName = XikeLanguage.automatic.rawValue
     var lock = false
     var lockDelay = 0
@@ -128,6 +150,22 @@ struct LocalPreferences: Codable, Equatable {
     var promptStyle = 0
     var reminder = ReminderOptions()
     var backup = AutoBackupOptions()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accent = try container.decodeIfPresent(Accent.self, forKey: .accent) ?? .ocean
+        style = try container.decodeIfPresent(AppStyle.self, forKey: .style) ?? .breathe
+        moodIconStyle = try container.decodeIfPresent(MoodIconStyle.self, forKey: .moodIconStyle) ?? .classic
+        languageName = try container.decodeIfPresent(String.self, forKey: .languageName) ?? XikeLanguage.automatic.rawValue
+        lock = try container.decodeIfPresent(Bool.self, forKey: .lock) ?? false
+        lockDelay = try container.decodeIfPresent(Int.self, forKey: .lockDelay) ?? 0
+        dailyQuestion = try container.decodeIfPresent(Bool.self, forKey: .dailyQuestion) ?? false
+        promptStyle = try container.decodeIfPresent(Int.self, forKey: .promptStyle) ?? 0
+        reminder = try container.decodeIfPresent(ReminderOptions.self, forKey: .reminder) ?? ReminderOptions()
+        backup = try container.decodeIfPresent(AutoBackupOptions.self, forKey: .backup) ?? AutoBackupOptions()
+    }
 
     var language: XikeLanguage { XikeLanguage(rawValue: languageName) ?? .automatic }
 

@@ -106,7 +106,12 @@ private struct XikeRoot: View {
     @Bindable var model: JournalAppModel
 
     private var palette: XikePalette {
-        XikePalette(accent: model.preferences.accent, style: model.preferences.style, dark: colorScheme == .dark)
+        XikePalette(
+            accent: model.preferences.accent,
+            style: model.preferences.style,
+            moodIconStyle: model.preferences.moodIconStyle,
+            dark: colorScheme == .dark
+        )
     }
 
     var body: some View {

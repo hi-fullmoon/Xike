@@ -67,6 +67,7 @@ import com.xike.app.data.model.OutdoorSnapshot
 import com.xike.app.localizedText
 import com.xike.app.outdoor.locationSourceName
 import com.xike.app.tr
+import com.xike.app.ui.components.OutdoorWeatherIcon
 import com.xike.app.ui.components.PaperCard
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeShapes
@@ -123,16 +124,20 @@ internal fun OutdoorContextCard(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 val weatherCode = snapshot.weatherCode
-                                Icon(
-                                    if (snapshot.hasWeather && weatherCode != null) {
-                                        weatherConditionIcon(weatherCode)
-                                    } else {
-                                        Icons.Outlined.LocationOn
-                                    },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(26.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                                if (snapshot.hasWeather && weatherCode != null) {
+                                    OutdoorWeatherIcon(
+                                        weatherCode = weatherCode,
+                                        size = 26.dp,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Outlined.LocationOn,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(26.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
                         Column(Modifier.weight(1f)) {

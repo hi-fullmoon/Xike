@@ -36,7 +36,9 @@ import com.xike.app.data.feelingLabel
 import com.xike.app.data.overallLabel
 import com.xike.app.localizedText
 import com.xike.app.tr
+import com.xike.app.ui.theme.MoodIconStyle
 import com.xike.app.ui.theme.XikeContentCardPadding
+import com.xike.app.ui.theme.XikeCurrentMoodIconStyle
 import com.xike.app.ui.theme.XikeShapes
 
 @Composable
@@ -201,6 +203,7 @@ internal fun FeelingChip(
 ) {
     val feeling = Feeling.entries.find { it.name == key }
     val dark = isSystemInDarkTheme()
+    val iconStyle = XikeCurrentMoodIconStyle
     val label = feelingLabel(key)
     val ink = feeling?.labelColor(dark)
     val selectedInk = feeling?.selectedLabelColor(dark)
@@ -224,6 +227,15 @@ internal fun FeelingChip(
                         .padding(horizontal = compactHorizontalPadding, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (feeling != null && iconStyle != MoodIconStyle.CLASSIC) {
+                    FeelingIcon(
+                        feeling = feeling,
+                        size = 12.dp,
+                        color = selectedInk ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = iconStyle,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
                 Text(
                     label,
                     style = compactTextStyle,
@@ -258,6 +270,19 @@ internal fun FeelingChip(
             if (onClick == null) Modifier.clearAndSetSemantics { text = AnnotatedString(label) }
             else Modifier,
         label = { Text(label) },
+        leadingIcon =
+            if (feeling != null && iconStyle != MoodIconStyle.CLASSIC) {
+                {
+                    FeelingIcon(
+                        feeling = feeling,
+                        size = 16.dp,
+                        color =
+                            (if (selected) selectedInk else ink)
+                                ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = iconStyle,
+                    )
+                }
+            } else null,
         shape = if (feeling != null) XikeShapes.button else FilterChipDefaults.shape,
         colors =
             if (filled) colors
@@ -347,7 +372,9 @@ internal fun MoodChoice(
                     if (dark) visual.accent.copy(alpha = .35f) else visual.container
                 } else Color.Transparent,
         ) {
-            Box(contentAlignment = Alignment.Center) { MoodEmoji(mood, size = 34.dp) }
+            Box(contentAlignment = Alignment.Center) {
+                MoodEmoji(mood, size = 34.dp, emphasized = selected)
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(

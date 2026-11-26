@@ -329,9 +329,14 @@ struct JournalComposer: View {
             }
             XikeCard {
                 HStack(spacing: 12) {
-                    Image(systemName: draft.outdoor?.weatherIcon ?? "cloud.sun").font(.title2)
-                        .foregroundStyle(palette.primary)
-                        .frame(width: 42, height: 42).background(palette.quiet, in: Circle())
+                    Group {
+                        if let weather = draft.outdoor {
+                            WeatherArtwork(weatherCode: weather.weatherCode, fallbackSymbol: weather.weatherIcon, size: 22)
+                        } else {
+                            WeatherArtwork(weatherCode: 1, fallbackSymbol: "cloud.sun", size: 22)
+                        }
+                    }
+                    .frame(width: 42, height: 42).background(palette.quiet, in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text(draft.outdoor?.placeName ?? language.text("地点和天气", "Location and weather")).font(.subheadline.weight(.medium))
                         if let weather = draft.outdoor {
@@ -494,7 +499,7 @@ struct MoodSelector: View {
             let active = selected.contains(mood.score)
             Button { action(mood) } label: {
                 VStack(spacing: 4) {
-                    MoodArtwork(mood: mood, size: 31)
+                    MoodArtwork(mood: mood, size: 31, emphasized: active)
                         .frame(width: 47, height: 47)
                         .background(active ? palette.accentSurface : palette.quiet, in: Circle())
                         .overlay { Circle().strokeBorder(active ? palette.primary : palette.outline, lineWidth: active ? 2 : 1) }
@@ -542,9 +547,15 @@ private struct FeelingsPanel: View {
                         if active { selection.removeAll { $0 == feeling.rawValue } }
                         else { selection.append(feeling.rawValue) }
                     } label: {
-                        Text(feeling.label(language)).font(.callout).frame(maxWidth: .infinity, minHeight: 44)
-                            .background(active ? palette.accentSurface : palette.surface,
-                                        in: RoundedRectangle(cornerRadius: palette.buttonRadius))
+                        HStack(spacing: 5) {
+                            if palette.moodIconStyle != .classic {
+                                FeelingArtwork(feeling: feeling, size: 14, color: active ? palette.primary : palette.muted)
+                            }
+                            Text(feeling.label(language)).font(.callout)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(active ? palette.accentSurface : palette.surface,
+                                    in: RoundedRectangle(cornerRadius: palette.buttonRadius))
                     }.buttonStyle(.plain)
                       .accessibilityAddTraits(active ? .isSelected : [])
                 }

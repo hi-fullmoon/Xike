@@ -82,14 +82,20 @@ import com.xike.app.DailyPromptStyle
 import com.xike.app.LocalLanguageChange
 import com.xike.app.R
 import com.xike.app.ReminderSettings
+import com.xike.app.data.Feeling
+import com.xike.app.data.Mood
 import com.xike.app.displayName
 import com.xike.app.feature.lock.AppLockTimeout
 import com.xike.app.localizedText
 import com.xike.app.tr
+import com.xike.app.ui.components.FeelingIcon
+import com.xike.app.ui.components.MoodEmoji
+import com.xike.app.ui.components.OutdoorWeatherIcon
 import com.xike.app.ui.components.ScreenHeader
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
 import com.xike.app.ui.theme.LocalRecordedAtPickerContext
+import com.xike.app.ui.theme.MoodIconStyle
 import com.xike.app.ui.theme.XikeCardPadding
 import com.xike.app.ui.theme.XikeContentGap
 import com.xike.app.ui.theme.XikeContentMaxWidth
@@ -115,6 +121,7 @@ fun ProfileSettingsScreen(
     padding: PaddingValues,
     selectedTheme: AppTheme,
     selectedStyle: AppStyle,
+    selectedMoodIconStyle: MoodIconStyle = MoodIconStyle.CLASSIC,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
@@ -123,6 +130,7 @@ fun ProfileSettingsScreen(
     notificationPermissionGranted: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onStyleChange: (AppStyle) -> Unit,
+    onMoodIconStyleChange: (MoodIconStyle) -> Unit = {},
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
@@ -382,6 +390,24 @@ fun ProfileSettingsScreen(
                         }
                     }
                 }
+            }
+        }
+
+        Column(
+            modifier = Modifier.selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SectionTitle(
+                index = tr("图标", "Icons"),
+                title = tr("状态图标", "Status icons"),
+                trailing = tr("心情 · 感受 · 天气", "Mood · Feelings · Weather"),
+            )
+            MoodIconStyle.entries.forEach { iconStyle ->
+                MoodIconStyleTile(
+                    iconStyle = iconStyle,
+                    selected = selectedMoodIconStyle == iconStyle,
+                    onClick = { onMoodIconStyleChange(iconStyle) },
+                )
             }
         }
 
@@ -987,6 +1013,96 @@ private fun ThemeTile(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun MoodIconStyleTile(
+    iconStyle: MoodIconStyle,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier =
+            Modifier.fillMaxWidth()
+                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        shape = XikeShapes.card,
+        color = MaterialTheme.colorScheme.surface,
+        border =
+            BorderStroke(
+                if (selected) 1.5.dp else 1.dp,
+                if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outlineVariant,
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(XikeCardPadding),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        iconStyle.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (selected) {
+                        Icon(
+                            Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    iconStyle.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = XikeShapes.inner,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            ) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Mood.overallChoices.forEach { mood ->
+                        MoodEmoji(
+                            mood = mood,
+                            size = 24.dp,
+                            style = iconStyle,
+                            emphasized = true,
+                        )
+                    }
+                    Box(
+                        Modifier.width(1.dp)
+                            .height(16.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+                    if (iconStyle != MoodIconStyle.CLASSIC) {
+                        FeelingIcon(
+                            feeling = Feeling.PEACEFUL,
+                            size = 18.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = iconStyle,
+                        )
+                    }
+                    OutdoorWeatherIcon(
+                        weatherCode = 1,
+                        size = 22.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        style = iconStyle,
+                    )
+                }
+            }
         }
     }
 }

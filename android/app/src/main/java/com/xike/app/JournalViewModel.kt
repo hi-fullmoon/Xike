@@ -30,6 +30,7 @@ import com.xike.app.outdoor.OutdoorFetchResult
 import com.xike.app.outdoor.OutdoorRetryCoordinates
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.MoodIconStyle
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
@@ -127,6 +128,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     var selectedStyle by mutableStateOf(appearancePreferences.current().style)
+        private set
+
+    var selectedMoodIconStyle by mutableStateOf(appearancePreferences.current().moodIconStyle)
         private set
 
     var draft by mutableStateOf(JournalDraft())
@@ -252,6 +256,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     libraryState = initialState.copy(revision = libraryState.revision + 1)
                     selectedTheme = appearance.theme
                     selectedStyle = appearance.style
+                    selectedMoodIconStyle = appearance.moodIconStyle
                     canUndoRestore =
                         withContext(Dispatchers.IO) {
                             runCatching(store::canUndoLastRestore).getOrDefault(false)
@@ -409,6 +414,11 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     dataError = error.message ?: localizedText("界面风格保存失败，请重试。")
                 }
         }
+    }
+
+    fun selectMoodIconStyle(style: MoodIconStyle) {
+        selectedMoodIconStyle = style
+        appearancePreferences.saveMoodIconStyle(style)
     }
 
     fun selectDraftMood(mood: Mood?) {

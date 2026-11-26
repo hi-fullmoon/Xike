@@ -236,6 +236,7 @@ class MainActivity : FragmentActivity() {
                             draft = journalViewModel.draft,
                             selectedTheme = journalViewModel.selectedTheme,
                             selectedStyle = journalViewModel.selectedStyle,
+                            selectedMoodIconStyle = journalViewModel.selectedMoodIconStyle,
                             appLockEnabled = appLockEnabled,
                             appLockTimeout = appLockTimeout,
                             authenticationAvailable = authenticationAvailable,
@@ -245,6 +246,7 @@ class MainActivity : FragmentActivity() {
                             quickRecordRequest = quickRecordRequest,
                             onThemeChange = journalViewModel::selectTheme,
                             onStyleChange = journalViewModel::selectStyle,
+                            onMoodIconStyleChange = journalViewModel::selectMoodIconStyle,
                             onAppLockChange = ::changeAppLock,
                             onAppLockTimeoutChange = ::changeAppLockTimeout,
                             onLockNow = ::lockNow,
@@ -664,6 +666,11 @@ private fun JournalTheme(
     CompositionLocalProvider(
         LocalRetainedNotice provides retainedNotice.takeUnless { noticesBlocked }
     ) {
-        XikeTheme(journal.selectedTheme, journal.selectedStyle, content = content)
+        XikeTheme(
+            journal.selectedTheme,
+            journal.selectedStyle,
+            journal.selectedMoodIconStyle,
+            content = content,
+        )
     }
 }

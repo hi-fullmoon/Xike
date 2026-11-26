@@ -64,6 +64,7 @@ import com.xike.app.tr
 import com.xike.app.ui.components.FeelingChip
 import com.xike.app.ui.components.JournalPhotoMosaic
 import com.xike.app.ui.components.MoodEmoji
+import com.xike.app.ui.components.OutdoorWeatherIcon
 import com.xike.app.ui.components.PhotoGalleryDialog
 import com.xike.app.ui.components.SecondaryPageHeader
 import com.xike.app.ui.components.VoicePlaybackCard
@@ -291,11 +292,20 @@ internal fun JournalEntryDetailDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Icon(
-                                        Icons.Outlined.LocationOn,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
+                                    val detailWeatherCode = outdoor.weatherCode
+                                    if (outdoor.hasWeather && detailWeatherCode != null) {
+                                        OutdoorWeatherIcon(
+                                            weatherCode = detailWeatherCode,
+                                            size = 24.dp,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Outlined.LocationOn,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(

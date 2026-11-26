@@ -4,6 +4,7 @@ import UIKit
 struct XikePalette {
     var accent: Accent = .ocean
     var style: AppStyle = .breathe
+    var moodIconStyle: MoodIconStyle = .classic
     var dark = false
 
     var primary: Color { dark ? Self.swatches[accent]!.1 : Self.swatches[accent]!.0 }
@@ -210,8 +211,11 @@ struct BrandMark: View {
 }
 
 struct MoodArtwork: View {
+    @Environment(\.palette) private var palette
     var mood: Mood
     var size: CGFloat = 32
+    var style: MoodIconStyle? = nil
+    var emphasized = true
 
     private static let images: [String: UIImage] = Dictionary(uniqueKeysWithValues: Mood.choices.compactMap { mood in
         guard let url = Bundle.main.url(forResource: mood.emojiFile, withExtension: "png", subdirectory: "drawable-nodpi"),
@@ -219,13 +223,363 @@ struct MoodArtwork: View {
         return (mood.emojiFile, image)
     })
 
+    private var activeStyle: MoodIconStyle { style ?? palette.moodIconStyle }
+
+    private var semanticColor: Color {
+        switch mood.score {
+        case 1: Color(hex: palette.dark ? 0xAEC4DD : 0x506881)
+        case 2: Color(hex: palette.dark ? 0xCAB5D7 : 0x766084)
+        case 3: Color(hex: palette.dark ? 0xB5C0B8 : 0x626C65)
+        case 4: Color(hex: palette.dark ? 0x99CBB6 : 0x427461)
+        default: Color(hex: palette.dark ? 0xE4C282 : 0x8B6A2C)
+        }
+    }
+
     var body: some View {
         Group {
-            if let image = Self.images[mood.emojiFile] { Image(uiImage: image).resizable().scaledToFit() }
-            else { Image(systemName: "face.smiling").resizable().scaledToFit() }
+            switch activeStyle {
+            case .classic:
+                if let image = Self.images[mood.emojiFile] { Image(uiImage: image).resizable().scaledToFit() }
+                else { Image(systemName: "face.smiling").resizable().scaledToFit() }
+            case .duotone:
+                Canvas { context, canvasSize in
+                    drawFace(context: &context, canvasSize: canvasSize, color: semanticColor,
+                             fillAlpha: emphasized ? 0.22 : 0.14, strokeScale: 1.65)
+                }
+            case .line:
+                Canvas { context, canvasSize in
+                    drawFace(context: &context, canvasSize: canvasSize,
+                             color: emphasized ? semanticColor : palette.muted,
+                             fillAlpha: 0, strokeScale: 1.6)
+                }
+            case .ring:
+                Canvas { context, canvasSize in
+                    drawRing(context: &context, canvasSize: canvasSize, color: semanticColor)
+                }
+            }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+
+    private func drawFace(
+        context: inout GraphicsContext,
+        canvasSize: CGSize,
+        color: Color,
+        fillAlpha: Double,
+        strokeScale: CGFloat
+    ) {
+        let u = min(canvasSize.width, canvasSize.height) / 24
+        let stroke = StrokeStyle(lineWidth: strokeScale * u, lineCap: .round, lineJoin: .round)
+        let circleRect = CGRect(x: (12 - 9.15) * u, y: (12 - 9.15) * u, width: 18.3 * u, height: 18.3 * u)
+        let circle = Path(ellipseIn: circleRect)
+        if fillAlpha > 0 { context.fill(circle, with: .color(color.opacity(fillAlpha))) }
+        context.stroke(circle, with: .color(color), style: stroke)
+
+        func quad(_ x0: CGFloat, _ y0: CGFloat, _ cx: CGFloat, _ cy: CGFloat, _ x1: CGFloat, _ y1: CGFloat) {
+            var p = Path()
+            p.move(to: CGPoint(x: x0 * u, y: y0 * u))
+            p.addQuadCurve(to: CGPoint(x: x1 * u, y: y1 * u), control: CGPoint(x: cx * u, y: cy * u))
+            context.stroke(p, with: .color(color), style: stroke)
+        }
+        func dot(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat = 1.05) {
+            let rect = CGRect(x: (x - r) * u, y: (y - r) * u, width: r * 2 * u, height: r * 2 * u)
+            context.fill(Path(ellipseIn: rect), with: .color(color))
+        }
+
+        switch mood.score {
+        case 1:
+            quad(8.2, 10.6, 9.3, 11.75, 10.4, 10.9)
+            quad(15.8, 10.6, 14.7, 11.75, 13.6, 10.9)
+            quad(9.3, 16.2, 12, 13.9, 14.7, 16.2)
+        case 2:
+            dot(9.2, 10.4); dot(14.8, 10.4)
+            quad(9.5, 15.7, 12, 14.3, 14.5, 15.7)
+        case 3:
+            dot(9.2, 10.4); dot(14.8, 10.4)
+            var line = Path()
+            line.move(to: CGPoint(x: 9.3 * u, y: 15 * u))
+            line.addLine(to: CGPoint(x: 14.7 * u, y: 15 * u))
+            context.stroke(line, with: .color(color), style: stroke)
+        case 4:
+            dot(9.2, 10.2); dot(14.8, 10.2)
+            quad(9.2, 14.3, 12, 16.5, 14.8, 14.3)
+        default:
+            quad(8.1, 10.8, 9.5, 9.1, 10.9, 10.8)
+            quad(13.1, 10.8, 14.5, 9.1, 15.9, 10.8)
+            quad(8.7, 14.1, 12, 17.4, 15.3, 14.1)
+        }
+    }
+
+    private func drawRing(context: inout GraphicsContext, canvasSize: CGSize, color: Color) {
+        let u = min(canvasSize.width, canvasSize.height) / 24
+        let glowAlpha = emphasized ? 0.18 : 0.11
+
+        func circlePath(_ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: (12 - r) * u, y: (12 - r) * u, width: r * 2 * u, height: r * 2 * u))
+        }
+
+        switch mood.score {
+        case 1:
+            context.stroke(circlePath(4.6), with: .color(color), style: StrokeStyle(lineWidth: 1.65 * u, lineCap: .round))
+        case 2:
+            context.stroke(circlePath(8.4), with: .color(color), lineWidth: 1.55 * u)
+            context.stroke(circlePath(5.4), with: .color(color.opacity(0.55)), lineWidth: 1.25 * u)
+            context.fill(circlePath(2.4), with: .color(color.opacity(0.72)))
+        case 3:
+            context.stroke(circlePath(8.4), with: .color(color), lineWidth: 1.55 * u)
+            context.stroke(circlePath(5.4), with: .color(color.opacity(0.65)), lineWidth: 1.35 * u)
+            context.fill(circlePath(2.6), with: .color(color.opacity(0.82)))
+        case 4:
+            context.fill(circlePath(8.6), with: .color(color.opacity(glowAlpha)))
+            context.stroke(circlePath(8.4), with: .color(color), lineWidth: 1.6 * u)
+            context.stroke(circlePath(5.4), with: .color(color.opacity(0.75)), lineWidth: 1.4 * u)
+            context.fill(circlePath(2.8), with: .color(color))
+        default:
+            context.fill(circlePath(10.6), with: .color(color.opacity(glowAlpha + 0.04)))
+            context.stroke(circlePath(8.4), with: .color(color), lineWidth: 1.65 * u)
+            context.stroke(circlePath(5.4), with: .color(color.opacity(0.78)), lineWidth: 1.45 * u)
+            context.fill(circlePath(2.6), with: .color(color))
+        }
+    }
+}
+
+struct FeelingArtwork: View {
+    @Environment(\.palette) private var palette
+    var feeling: Feeling
+    var size: CGFloat = 15
+    var color: Color? = nil
+    var style: MoodIconStyle? = nil
+
+    private var activeStyle: MoodIconStyle { style ?? palette.moodIconStyle }
+    private var ink: Color { color ?? palette.primary }
+
+    var body: some View {
+        if activeStyle != .classic {
+            Canvas { context, canvasSize in
+                let u = min(canvasSize.width, canvasSize.height) / 24
+                let fillAlpha: Double = activeStyle == .duotone ? 0.22 : (activeStyle == .ring ? 0.16 : 0)
+                let stroke = StrokeStyle(lineWidth: (activeStyle == .line ? 1.75 : 1.7) * u, lineCap: .round, lineJoin: .round)
+
+                if activeStyle == .ring {
+                    drawRingGlyph(context: &context, u: u, fillAlpha: fillAlpha)
+                    return
+                }
+                switch feeling {
+                case .happy, .excited, .hopeful, .energetic:
+                    var path = Path()
+                    path.move(to: CGPoint(x: 12 * u, y: 3.8 * u))
+                    path.addQuadCurve(to: CGPoint(x: 20.2 * u, y: 12 * u), control: CGPoint(x: 13.2 * u, y: 10.8 * u))
+                    path.addQuadCurve(to: CGPoint(x: 12 * u, y: 20.2 * u), control: CGPoint(x: 13.2 * u, y: 13.2 * u))
+                    path.addQuadCurve(to: CGPoint(x: 3.8 * u, y: 12 * u), control: CGPoint(x: 10.8 * u, y: 13.2 * u))
+                    path.addQuadCurve(to: CGPoint(x: 12 * u, y: 3.8 * u), control: CGPoint(x: 10.8 * u, y: 10.8 * u))
+                    path.closeSubpath()
+                    if fillAlpha > 0 { context.fill(path, with: .color(ink.opacity(fillAlpha))) }
+                    context.stroke(path, with: .color(ink), style: stroke)
+                case .peaceful, .relaxed, .safe, .content, .grateful:
+                    var path = Path()
+                    path.move(to: CGPoint(x: 19 * u, y: 5 * u))
+                    path.addCurve(to: CGPoint(x: 6 * u, y: 17.5 * u), control1: CGPoint(x: 11 * u, y: 5 * u), control2: CGPoint(x: 6 * u, y: 9.5 * u))
+                    path.addCurve(to: CGPoint(x: 19 * u, y: 5 * u), control1: CGPoint(x: 14 * u, y: 17.5 * u), control2: CGPoint(x: 19 * u, y: 13 * u))
+                    path.closeSubpath()
+                    if fillAlpha > 0 { context.fill(path, with: .color(ink.opacity(fillAlpha))) }
+                    context.stroke(path, with: .color(ink), style: stroke)
+                    var stem = Path()
+                    stem.move(to: CGPoint(x: 5.5 * u, y: 18.5 * u))
+                    stem.addLine(to: CGPoint(x: 13.5 * u, y: 10.5 * u))
+                    context.stroke(stem, with: .color(ink), style: stroke)
+                case .sad, .disappointed, .hurt, .lonely:
+                    var path = Path()
+                    path.move(to: CGPoint(x: 12 * u, y: 4.2 * u))
+                    path.addCurve(to: CGPoint(x: 6.2 * u, y: 14.6 * u), control1: CGPoint(x: 12 * u, y: 4.2 * u), control2: CGPoint(x: 6.2 * u, y: 10.8 * u))
+                    path.addCurve(to: CGPoint(x: 12 * u, y: 20 * u), control1: CGPoint(x: 6.2 * u, y: 17.8 * u), control2: CGPoint(x: 8.8 * u, y: 20 * u))
+                    path.addCurve(to: CGPoint(x: 17.8 * u, y: 14.6 * u), control1: CGPoint(x: 15.2 * u, y: 20 * u), control2: CGPoint(x: 17.8 * u, y: 17.8 * u))
+                    path.addCurve(to: CGPoint(x: 12 * u, y: 4.2 * u), control1: CGPoint(x: 17.8 * u, y: 10.8 * u), control2: CGPoint(x: 12 * u, y: 4.2 * u))
+                    path.closeSubpath()
+                    if fillAlpha > 0 { context.fill(path, with: .color(ink.opacity(fillAlpha))) }
+                    context.stroke(path, with: .color(ink), style: stroke)
+                case .anxious, .irritated, .angry:
+                    var path = Path()
+                    path.move(to: CGPoint(x: 12 * u, y: 4.5 * u))
+                    path.addLine(to: CGPoint(x: 19.5 * u, y: 12 * u))
+                    path.addLine(to: CGPoint(x: 12 * u, y: 19.5 * u))
+                    path.addLine(to: CGPoint(x: 4.5 * u, y: 12 * u))
+                    path.closeSubpath()
+                    if fillAlpha > 0 { context.fill(path, with: .color(ink.opacity(fillAlpha))) }
+                    context.stroke(path, with: .color(ink), style: stroke)
+                    context.fill(Path(ellipseIn: CGRect(x: 10.4 * u, y: 10.4 * u, width: 3.2 * u, height: 3.2 * u)), with: .color(ink))
+                case .tired, .bored:
+                    var path = Path()
+                    path.move(to: CGPoint(x: 18.2 * u, y: 14.8 * u))
+                    path.addCurve(to: CGPoint(x: 9.6 * u, y: 18.2 * u), control1: CGPoint(x: 16.6 * u, y: 17.8 * u), control2: CGPoint(x: 13 * u, y: 19.4 * u))
+                    path.addCurve(to: CGPoint(x: 5.8 * u, y: 9.6 * u), control1: CGPoint(x: 6.1 * u, y: 17 * u), control2: CGPoint(x: 4.5 * u, y: 13.1 * u))
+                    path.addCurve(to: CGPoint(x: 11 * u, y: 5.3 * u), control1: CGPoint(x: 6.6 * u, y: 7.3 * u), control2: CGPoint(x: 8.6 * u, y: 5.7 * u))
+                    path.addCurve(to: CGPoint(x: 12.9 * u, y: 13.8 * u), control1: CGPoint(x: 9.4 * u, y: 8.2 * u), control2: CGPoint(x: 10.2 * u, y: 11.9 * u))
+                    path.addCurve(to: CGPoint(x: 18.2 * u, y: 14.8 * u), control1: CGPoint(x: 14.5 * u, y: 14.9 * u), control2: CGPoint(x: 16.4 * u, y: 15.2 * u))
+                    path.closeSubpath()
+                    if fillAlpha > 0 { context.fill(path, with: .color(ink.opacity(fillAlpha))) }
+                    context.stroke(path, with: .color(ink), style: stroke)
+                }
+            }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func drawRingGlyph(context: inout GraphicsContext, u: CGFloat, fillAlpha: Double) {
+        func circle(_ r: CGFloat, cy: CGFloat = 12) -> Path {
+            Path(ellipseIn: CGRect(x: (12 - r) * u, y: (cy - r) * u, width: r * 2 * u, height: r * 2 * u))
+        }
+        switch feeling {
+        case .happy, .excited, .hopeful, .energetic:
+            context.fill(circle(9.2), with: .color(ink.opacity(fillAlpha)))
+            context.stroke(circle(6.2), with: .color(ink), lineWidth: 1.6 * u)
+            context.fill(circle(2.4), with: .color(ink))
+        case .peaceful, .relaxed, .safe, .content, .grateful:
+            context.fill(circle(8.4), with: .color(ink.opacity(fillAlpha)))
+            context.stroke(circle(8.0), with: .color(ink), lineWidth: 1.6 * u)
+            context.fill(circle(3.8), with: .color(ink.opacity(0.65)))
+        case .sad, .disappointed, .hurt, .lonely:
+            context.stroke(circle(5.2, cy: 14), with: .color(ink), lineWidth: 1.65 * u)
+        case .anxious, .irritated, .angry:
+            context.stroke(circle(8.0), with: .color(ink), lineWidth: 1.6 * u)
+            context.stroke(circle(4.5), with: .color(ink.opacity(0.72)), lineWidth: 1.4 * u)
+        case .tired, .bored:
+            context.fill(circle(7.4), with: .color(ink.opacity(fillAlpha)))
+            context.stroke(circle(7.4), with: .color(ink.opacity(0.8)), lineWidth: 1.55 * u)
+            var line = Path()
+            line.move(to: CGPoint(x: 8.5 * u, y: 12 * u))
+            line.addLine(to: CGPoint(x: 15.5 * u, y: 12 * u))
+            context.stroke(line, with: .color(ink), style: StrokeStyle(lineWidth: 1.6 * u, lineCap: .round))
+        }
+    }
+}
+
+struct WeatherArtwork: View {
+    @Environment(\.palette) private var palette
+    var weatherCode: Int
+    var fallbackSymbol: String = "cloud.sun"
+    var size: CGFloat = 22
+    var color: Color? = nil
+    var style: MoodIconStyle? = nil
+
+    private var activeStyle: MoodIconStyle { style ?? palette.moodIconStyle }
+    private var ink: Color { color ?? palette.primary }
+
+    var body: some View {
+        Group {
+            if activeStyle == .classic {
+                Image(systemName: fallbackSymbol)
+                    .font(.system(size: size * 0.9, weight: .regular))
+                    .foregroundStyle(ink)
+            } else {
+                Canvas { context, canvasSize in
+                    drawWeather(context: &context, canvasSize: canvasSize)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    private func drawWeather(context: inout GraphicsContext, canvasSize: CGSize) {
+        let u = min(canvasSize.width, canvasSize.height) / 24
+        let fillAlpha: Double = activeStyle == .duotone ? 0.20 : (activeStyle == .ring ? 0.14 : 0)
+        let stroke = StrokeStyle(lineWidth: (activeStyle == .line ? 1.6 : 1.65) * u, lineCap: .round, lineJoin: .round)
+
+        func cloud(offsetY: CGFloat = 0, scale: CGFloat = 1) -> Path {
+            func x(_ v: CGFloat) -> CGFloat { (12 + (v - 12) * scale) * u }
+            func y(_ v: CGFloat) -> CGFloat { (12 + (v - 12) * scale + offsetY) * u }
+            var p = Path()
+            p.move(to: CGPoint(x: x(7.4), y: y(17.5)))
+            p.addLine(to: CGPoint(x: x(16.6), y: y(17.5)))
+            p.addCurve(to: CGPoint(x: x(20.4), y: y(13.4)), control1: CGPoint(x: x(19.2), y: y(17.5)), control2: CGPoint(x: x(20.6), y: y(15.6)))
+            p.addCurve(to: CGPoint(x: x(16.4), y: y(10.1)), control1: CGPoint(x: x(20.2), y: y(11.3)), control2: CGPoint(x: x(18.5), y: y(10.0)))
+            p.addCurve(to: CGPoint(x: x(10.8), y: y(6.4)), control1: CGPoint(x: x(15.7), y: y(7.5)), control2: CGPoint(x: x(13.4), y: y(6.0)))
+            p.addCurve(to: CGPoint(x: x(6.8), y: y(11.0)), control1: CGPoint(x: x(8.4), y: y(6.8)), control2: CGPoint(x: x(6.8), y: y(8.7)))
+            p.addCurve(to: CGPoint(x: x(3.9), y: y(14.7)), control1: CGPoint(x: x(4.9), y: y(11.3)), control2: CGPoint(x: x(3.7), y: y(12.8)))
+            p.addCurve(to: CGPoint(x: x(7.4), y: y(17.5)), control1: CGPoint(x: x(4.1), y: y(16.4)), control2: CGPoint(x: x(5.5), y: y(17.5)))
+            p.closeSubpath()
+            return p
+        }
+
+        switch weatherCode {
+        case 0:
+            if activeStyle == .ring {
+                context.fill(Path(ellipseIn: CGRect(x: 2.4 * u, y: 2.4 * u, width: 19.2 * u, height: 19.2 * u)), with: .color(ink.opacity(0.14)))
+            }
+            let sun = Path(ellipseIn: CGRect(x: 7.4 * u, y: 7.4 * u, width: 9.2 * u, height: 9.2 * u))
+            if fillAlpha > 0 { context.fill(sun, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(sun, with: .color(ink), style: stroke)
+            for i in 0..<8 {
+                let angle = Double(i) * .pi / 4
+                let dx = CGFloat(cos(angle)), dy = CGFloat(sin(angle))
+                var ray = Path()
+                ray.move(to: CGPoint(x: (12 + dx * 7.2) * u, y: (12 + dy * 7.2) * u))
+                ray.addLine(to: CGPoint(x: (12 + dx * 9.3) * u, y: (12 + dy * 9.3) * u))
+                context.stroke(ray, with: .color(ink), style: stroke)
+            }
+        case 1, 2:
+            let sun = Path(ellipseIn: CGRect(x: 12.6 * u, y: 5.2 * u, width: 6.4 * u, height: 6.4 * u))
+            if fillAlpha > 0 { context.fill(sun, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(sun, with: .color(ink), style: stroke)
+            for deg in [-135.0, -90.0, -45.0, 0.0] {
+                let rad = deg * .pi / 180
+                let dx = CGFloat(cos(rad)), dy = CGFloat(sin(rad))
+                var ray = Path()
+                ray.move(to: CGPoint(x: (15.8 + dx * 5.0) * u, y: (8.4 + dy * 5.0) * u))
+                ray.addLine(to: CGPoint(x: (15.8 + dx * 6.3) * u, y: (8.4 + dy * 6.3) * u))
+                context.stroke(ray, with: .color(ink), style: StrokeStyle(lineWidth: stroke.lineWidth * 0.9, lineCap: .round))
+            }
+            let c = cloud(offsetY: 2.0, scale: 0.88)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+        case 3:
+            let c = cloud(offsetY: 0.5, scale: 0.96)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+        case 45, 48:
+            let c = cloud(offsetY: -2.2, scale: 0.82)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+            var l1 = Path(); l1.move(to: CGPoint(x: 5.5 * u, y: 17.5 * u)); l1.addLine(to: CGPoint(x: 18.5 * u, y: 17.5 * u))
+            var l2 = Path(); l2.move(to: CGPoint(x: 7.5 * u, y: 20.3 * u)); l2.addLine(to: CGPoint(x: 16.5 * u, y: 20.3 * u))
+            context.stroke(l1, with: .color(ink.opacity(0.85)), style: stroke)
+            context.stroke(l2, with: .color(ink.opacity(0.6)), style: stroke)
+        case 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82:
+            let c = cloud(offsetY: -2.4, scale: 0.84)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+            for (idx, x) in [CGFloat(8.6), 12.2, 15.8].enumerated() {
+                let top: CGFloat = idx == 1 ? 17.2 : 16.4
+                var drop = Path()
+                drop.move(to: CGPoint(x: x * u, y: top * u))
+                drop.addLine(to: CGPoint(x: (x - 1.1) * u, y: (top + 3.2) * u))
+                context.stroke(drop, with: .color(ink), style: stroke)
+            }
+        case 71, 73, 75, 77, 85, 86:
+            let c = cloud(offsetY: -2.4, scale: 0.84)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+            for pt in [(CGFloat(8.4), CGFloat(18.0)), (12.0, 19.6), (15.6, 18.0)] {
+                let r = 1.15 * u
+                context.fill(Path(ellipseIn: CGRect(x: pt.0 * u - r, y: pt.1 * u - r, width: r * 2, height: r * 2)), with: .color(ink))
+            }
+        case 95, 96, 99:
+            let c = cloud(offsetY: -2.4, scale: 0.84)
+            if fillAlpha > 0 { context.fill(c, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(c, with: .color(ink), style: stroke)
+            var bolt = Path()
+            bolt.move(to: CGPoint(x: 12.6 * u, y: 14.5 * u))
+            bolt.addLine(to: CGPoint(x: 10.0 * u, y: 18.2 * u))
+            bolt.addLine(to: CGPoint(x: 12.8 * u, y: 18.2 * u))
+            bolt.addLine(to: CGPoint(x: 11.0 * u, y: 21.4 * u))
+            context.stroke(bolt, with: .color(ink), style: stroke)
+        default:
+            let ring = Path(ellipseIn: CGRect(x: 3.6 * u, y: 3.6 * u, width: 16.8 * u, height: 16.8 * u))
+            if fillAlpha > 0 { context.fill(ring, with: .color(ink.opacity(fillAlpha))) }
+            context.stroke(ring, with: .color(ink), style: stroke)
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.MoodIconStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -51,6 +52,22 @@ class AppearancePreferencesTest {
             AppearanceSettings(AppTheme.AMBER, AppStyle.FOCUS),
             preferences.migrateFromDatabase(AppTheme.PINE.name, AppStyle.BREATHE.name),
         )
+    }
+
+    @Test
+    fun moodIconStylePersistsAndFallsBackToClassicOnUnknownValue() {
+        val preferences = AppearancePreferences(context)
+        assertEquals(MoodIconStyle.CLASSIC, preferences.current().moodIconStyle)
+
+        preferences.saveMoodIconStyle(MoodIconStyle.DUOTONE)
+        assertEquals(MoodIconStyle.DUOTONE, AppearancePreferences(context).current().moodIconStyle)
+
+        context
+            .getSharedPreferences(AppearancePreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(AppearancePreferences.MOOD_ICON_STYLE_KEY, "UNKNOWN")
+            .commit()
+        assertEquals(MoodIconStyle.CLASSIC, AppearancePreferences(context).current().moodIconStyle)
     }
 
     private fun clearPreferences() {

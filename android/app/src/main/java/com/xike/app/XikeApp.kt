@@ -30,6 +30,7 @@ import com.xike.app.ui.components.XikeNavigationBar
 import com.xike.app.ui.components.XikeNotice
 import com.xike.app.ui.theme.AppStyle
 import com.xike.app.ui.theme.AppTheme
+import com.xike.app.ui.theme.MoodIconStyle
 import java.io.File
 import java.io.InputStream
 
@@ -81,6 +82,7 @@ internal fun XikeApp(
     // Appearance, security and reminders.
     selectedTheme: AppTheme,
     selectedStyle: AppStyle,
+    selectedMoodIconStyle: MoodIconStyle = MoodIconStyle.CLASSIC,
     appLockEnabled: Boolean,
     appLockTimeout: AppLockTimeout,
     authenticationAvailable: Boolean,
@@ -89,6 +91,7 @@ internal fun XikeApp(
     notificationPermissionGranted: Boolean,
     onThemeChange: (AppTheme) -> Unit,
     onStyleChange: (AppStyle) -> Unit,
+    onMoodIconStyleChange: (MoodIconStyle) -> Unit = {},
     onAppLockChange: (Boolean) -> Unit,
     onAppLockTimeoutChange: (AppLockTimeout) -> Unit,
     onLockNow: () -> Unit,
@@ -224,6 +227,7 @@ internal fun XikeApp(
                             padding = innerPadding,
                             selectedTheme = selectedTheme,
                             selectedStyle = selectedStyle,
+                            selectedMoodIconStyle = selectedMoodIconStyle,
                             appLockEnabled = appLockEnabled,
                             appLockTimeout = appLockTimeout,
                             authenticationAvailable = authenticationAvailable,
@@ -232,6 +236,7 @@ internal fun XikeApp(
                             notificationPermissionGranted = notificationPermissionGranted,
                             onThemeChange = onThemeChange,
                             onStyleChange = onStyleChange,
+                            onMoodIconStyleChange = onMoodIconStyleChange,
                             onAppLockChange = onAppLockChange,
                             onAppLockTimeoutChange = onAppLockTimeoutChange,
                             onLockNow = onLockNow,

@@ -131,6 +131,48 @@ struct SettingsScreen: View {
                     }.buttonStyle(.plain).accessibilityAddTraits(active ? .isSelected : [])
                 }
             }
+            XikeTitle(title: language.text("状态图标", "Status icons"), large: false).padding(.top, 7)
+            ForEach(MoodIconStyle.allCases) { iconStyle in
+                let active = model.preferences.moodIconStyle == iconStyle
+                Button {
+                    model.preferences.moodIconStyle = iconStyle
+                } label: {
+                    XikeCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(iconStyle.label(language)).font(.headline)
+                                    Spacer(minLength: 0)
+                                    if active { Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.primary) }
+                                }
+                                Text(iconStyle.description(language)).font(.footnote).foregroundStyle(palette.muted)
+                            }
+                            HStack(spacing: 6) {
+                                ForEach(Mood.choices) { mood in
+                                    MoodArtwork(mood: mood, size: 22, style: iconStyle)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                Rectangle().fill(palette.outline).frame(width: 1, height: 16)
+                                if iconStyle != .classic {
+                                    FeelingArtwork(feeling: .peaceful, size: 17, color: palette.primary, style: iconStyle)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                WeatherArtwork(weatherCode: 1, fallbackSymbol: "cloud.sun", size: 21, color: palette.primary, style: iconStyle)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 6)
+                            .background(palette.quiet, in: RoundedRectangle(cornerRadius: palette.buttonRadius))
+                        }
+                    }
+                    .overlay {
+                        if active {
+                            RoundedRectangle(cornerRadius: palette.radius)
+                                .strokeBorder(palette.primary, lineWidth: 1.5)
+                        }
+                    }
+                }.buttonStyle(.plain).accessibilityAddTraits(active ? .isSelected : [])
+            }
         }
     }
 
