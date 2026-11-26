@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -412,15 +414,20 @@ private fun ArchiveFilterToggle(
     modifier: Modifier = Modifier,
     visualSize: Dp = 40.dp,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
             modifier
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                .clickable(onClick = onToggleFilters),
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onToggleFilters,
+                ),
         contentAlignment = Alignment.CenterEnd,
     ) {
         Surface(
-            modifier = Modifier.sizeIn(minWidth = visualSize, minHeight = visualSize),
             shape = XikeShapes.button,
             border =
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
@@ -432,7 +439,10 @@ private fun ArchiveFilterToggle(
                 },
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier =
+                    Modifier.sizeIn(minWidth = visualSize, minHeight = visualSize)
+                        .indication(interactionSource, ripple())
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -473,12 +483,15 @@ private fun ArchiveModeButton(
     onClick: () -> Unit,
 ) {
     val labelStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
             modifier
                 .sizeIn(minHeight = 48.dp)
                 .selectable(
                     selected = selected,
+                    interactionSource = interactionSource,
+                    indication = null,
                     role = Role.Tab,
                     onClick = onClick,
                 )
@@ -486,12 +499,15 @@ private fun ArchiveModeButton(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+            modifier = Modifier.fillMaxWidth(),
             shape = XikeShapes.button,
             color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         ) {
             Box(
-                Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth()
+                    .heightIn(min = 40.dp)
+                    .indication(interactionSource, ripple())
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
