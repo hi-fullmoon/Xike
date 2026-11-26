@@ -257,9 +257,14 @@ class MainActivity : FragmentActivity() {
                             onDraftRecordedAtChange = journalViewModel::updateDraftRecordedAt,
                             onAttachCurrentOutdoor = journalViewModel::attachCurrentOutdoor,
                             isDraftOutdoorLoading = journalViewModel.isDraftOutdoorLoading,
+                            draftOutdoorWeatherError = journalViewModel.draftOutdoorWeatherError,
+                            onSearchOutdoorCities = journalViewModel::searchOutdoorCities,
+                            onAttachOutdoorCityCandidate =
+                                journalViewModel::attachOutdoorForCityCandidate,
                             onAttachOutdoorForCity = journalViewModel::attachOutdoorForCity,
                             onAttachManualOutdoorPlace = journalViewModel::attachManualOutdoorPlace,
                             onRetryOutdoorWeather = journalViewModel::retryDraftOutdoorWeather,
+                            onCancelOutdoorRequest = journalViewModel::cancelDraftOutdoorRequest,
                             onClearDraftOutdoor = journalViewModel::clearDraftOutdoor,
                             onDraftImagesAdded = journalViewModel::addDraftImages,
                             onDraftImageResultPending =

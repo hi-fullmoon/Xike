@@ -101,6 +101,15 @@ internal data class OutdoorRetryCoordinates(
     val longitude: Double,
 )
 
+/** In-memory geocoding candidate for city selection; coordinates are never persisted. */
+data class OutdoorCityCandidate(
+    val name: String,
+    val subtitle: String,
+    val fullLabel: String,
+    val latitude: Double,
+    val longitude: Double,
+)
+
 internal data class OutdoorFetchResult(
     val snapshot: OutdoorSnapshot,
     val weatherError: String? = null,
@@ -289,6 +298,55 @@ internal class OutdoorContextRepository(
 
     suspend fun city(query: String): OutdoorSnapshot = cityWithFallback(query).snapshot
 
+    suspend fun searchCities(query: String): List<OutdoorCityCandidate> {
+        val normalizedQuery = query.trim()
+        require(normalizedQuery.isNotBlank()) { localizedText("请输入城市名称。") }
+        return withContext(Dispatchers.IO) { fetchCityCandidates(normalizedQuery) }
+    }
+
+    suspend fun cityCandidateWithFallback(
+        candidate: OutdoorCityCandidate,
+        preservePlace: OutdoorSnapshot? = null,
+        onPlaceReady: suspend (OutdoorSnapshot) -> Unit = {},
+    ): OutdoorFetchResult {
+        val targetPlaceName = preservePlace?.placeName ?: candidate.name
+        val targetFullPlaceName =
+            if (preservePlace != null) preservePlace.fullPlaceName else candidate.fullLabel
+        val targetSource = preservePlace?.locationSource ?: LocationSource.MANUAL
+        val partial =
+            preservePlace
+                ?: placeOnlySnapshot(
+                    placeName = targetPlaceName,
+                    fullPlaceName = targetFullPlaceName,
+                    locationSource = targetSource,
+                )
+        if (partial != null && preservePlace == null) onPlaceReady(partial)
+        return try {
+            val weather =
+                fetchWeatherWithRetry(
+                    candidate.latitude,
+                    candidate.longitude,
+                    targetPlaceName,
+                    targetFullPlaceName,
+                    targetSource,
+                )
+            OutdoorFetchResult(weather)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (partial != null) {
+                OutdoorFetchResult(
+                    snapshot = partial,
+                    weatherError = error.message ?: localizedText("天气暂未获取到"),
+                    retryCoordinates =
+                        coarseRetryCoordinates(candidate.latitude, candidate.longitude),
+                )
+            } else {
+                throw error
+            }
+        }
+    }
+
     suspend fun cityWithFallback(
         query: String,
         preservePlace: OutdoorSnapshot? = null,
@@ -299,7 +357,7 @@ internal class OutdoorContextRepository(
         val city = withContext(Dispatchers.IO) { searchCity(normalizedQuery) }
         val targetPlaceName = preservePlace?.placeName ?: city.name
         val targetFullPlaceName =
-            if (preservePlace != null) preservePlace.fullPlaceName else city.label
+            if (preservePlace != null) preservePlace.fullPlaceName else city.fullLabel
         val targetSource = preservePlace?.locationSource ?: LocationSource.MANUAL
         val partial =
             preservePlace
@@ -334,13 +392,17 @@ internal class OutdoorContextRepository(
         }
     }
 
-    fun manualPlace(placeName: String): OutdoorSnapshot {
+    fun manualPlace(
+        placeName: String,
+        capturedAt: Long = System.currentTimeMillis(),
+    ): OutdoorSnapshot {
         val normalized = placeName.trim()
         require(normalized.isNotBlank()) { localizedText("请输入地点名称。") }
         return placeOnlySnapshot(
             placeName = normalized,
             fullPlaceName = null,
             locationSource = LocationSource.MANUAL,
+            capturedAt = capturedAt,
         ) ?: throw OutdoorContextException(localizedText("请输入地点名称。"))
     }
 
@@ -577,31 +639,18 @@ internal class OutdoorContextRepository(
             RawWeather(temperatureCelsius = temperature, weatherCode = weatherCode)
         }
 
-    private fun searchCity(query: String): CityCoordinate {
+    private fun searchCity(query: String): OutdoorCityCandidate =
+        fetchCityCandidates(query).firstOrNull()
+            ?: throw OutdoorContextException(localizedText("没有找到这个城市，请换一种写法。"))
+
+    private fun fetchCityCandidates(query: String): List<OutdoorCityCandidate> {
         val locale = AppLocale.locale
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
         val response =
             requestJson(
-                "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=${locale.language}&format=json"
+                "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=5&language=${locale.language}&format=json"
             )
-        val result =
-            response.optJSONArray("results")?.optJSONObject(0)
-                ?: throw OutdoorContextException(localizedText("没有找到这个城市，请换一种写法。"))
-        val name = result.optString("name").trim()
-        val admin = result.optString("admin1").trim()
-        val label =
-            listOf(admin, name).filter(String::isNotBlank).distinct().joinToString(" · ").ifBlank {
-                query
-            }
-        return CityCoordinate(
-                label = localizePlaceName(label, locale).take(MAX_PLACE_NAME_LENGTH),
-                name =
-                    localizePlaceName(name.ifBlank { query }, locale).take(MAX_PLACE_NAME_LENGTH),
-                latitude = result.optDouble("latitude", Double.NaN),
-                longitude = result.optDouble("longitude", Double.NaN),
-            )
-            .takeIf { it.latitude.isFinite() && it.longitude.isFinite() }
-            ?: throw OutdoorContextException(localizedText("城市服务返回了无法识别的位置。"))
+        return parseOutdoorCityCandidates(response, query, locale)
     }
 
     private fun requestJson(url: String): JSONObject {
@@ -629,13 +678,6 @@ internal class OutdoorContextRepository(
             connection.disconnect()
         }
     }
-
-    private data class CityCoordinate(
-        val label: String,
-        val name: String,
-        val latitude: Double,
-        val longitude: Double,
-    )
 
     private data class RawWeather(
         val temperatureCelsius: Double,
@@ -692,4 +734,49 @@ private fun Address.asPlaceLabel(includeStreet: Boolean): String? {
         .distinct()
         .joinToString(" · ")
         .takeIf(String::isNotBlank)
+}
+
+internal fun parseOutdoorCityCandidates(
+    response: JSONObject,
+    fallbackQuery: String,
+    locale: Locale,
+): List<OutdoorCityCandidate> {
+    val results = response.optJSONArray("results") ?: return emptyList()
+    return buildList {
+        for (index in 0 until results.length()) {
+            val item = results.optJSONObject(index) ?: continue
+            val latitude = item.optDouble("latitude", Double.NaN)
+            val longitude = item.optDouble("longitude", Double.NaN)
+            if (!latitude.isFinite() || !longitude.isFinite()) continue
+            val rawName = item.optString("name").trim().ifBlank { fallbackQuery.trim() }
+            if (rawName.isBlank()) continue
+            val admin = item.optString("admin1").trim()
+            val country = item.optString("country").trim()
+            val localizedName = localizePlaceName(rawName, locale).take(MAX_PLACE_NAME_LENGTH)
+            val fullParts =
+                listOf(admin, rawName)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .joinToString(" · ")
+                    .ifBlank { rawName }
+            val fullLabel = localizePlaceName(fullParts, locale).take(MAX_PLACE_NAME_LENGTH)
+            val subtitleParts =
+                listOf(admin, country).filter(String::isNotBlank).distinct().joinToString(" · ")
+            val subtitle =
+                if (subtitleParts.isNotBlank()) {
+                    localizePlaceName(subtitleParts, locale).take(MAX_PLACE_NAME_LENGTH)
+                } else {
+                    ""
+                }
+            add(
+                OutdoorCityCandidate(
+                    name = localizedName,
+                    subtitle = subtitle,
+                    fullLabel = fullLabel,
+                    latitude = latitude,
+                    longitude = longitude,
+                )
+            )
+        }
+    }
 }

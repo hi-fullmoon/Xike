@@ -113,6 +113,7 @@ internal fun retainOutdoorForEditedTime(
     editedCreatedAt: Long,
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): OutdoorSnapshot? = snapshot?.takeIf {
-    Instant.ofEpochMilli(originalCreatedAt).atZone(zoneId).toLocalDate() ==
-        Instant.ofEpochMilli(editedCreatedAt).atZone(zoneId).toLocalDate()
+    !it.hasWeather ||
+        Instant.ofEpochMilli(originalCreatedAt).atZone(zoneId).toLocalDate() ==
+            Instant.ofEpochMilli(editedCreatedAt).atZone(zoneId).toLocalDate()
 }

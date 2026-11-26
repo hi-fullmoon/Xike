@@ -92,6 +92,7 @@ import com.xike.app.data.model.JournalDraft
 import com.xike.app.data.model.retainOutdoorForEditedTime
 import com.xike.app.feature.insights.entriesOnDate
 import com.xike.app.localizedText
+import com.xike.app.outdoor.OutdoorCityCandidate
 import com.xike.app.rememberJournalImagePickers
 import com.xike.app.rememberVideoChooser
 import com.xike.app.tr
@@ -109,12 +110,10 @@ import com.xike.app.ui.components.VoicePlaybackCard
 import com.xike.app.ui.components.XikeIcons
 import com.xike.app.ui.components.XikeNotice
 import com.xike.app.ui.components.journal.OutdoorCardAction
-import com.xike.app.ui.components.journal.OutdoorContextCard
 import com.xike.app.ui.components.rememberPreviewBitmap
 import com.xike.app.ui.components.showRecordedAtPicker
 import com.xike.app.ui.theme.LocalRecordedAtPickerContext
 import com.xike.app.ui.theme.XikeCardPadding
-import com.xike.app.ui.theme.XikeContentCardPadding
 import com.xike.app.ui.theme.XikeContentMaxWidth
 import com.xike.app.ui.theme.XikeDialogCompactGap
 import com.xike.app.ui.theme.XikeEyebrowStyle
@@ -131,6 +130,7 @@ import java.io.InputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 private const val ADD_PHOTO_TILE = "__add_photo__"
@@ -160,6 +160,7 @@ fun MomentScreen(
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     isDraftSaving: Boolean = false,
     isDraftOutdoorLoading: Boolean? = null,
+    draftOutdoorWeatherError: String? = null,
     isDraftImageResultPending: Boolean = false,
     draftImageResultsReady: Boolean = true,
     onDraftImageResultPending: (String, Boolean) -> Unit = { _, _ -> },
@@ -168,6 +169,12 @@ fun MomentScreen(
     onAttachCurrentOutdoor: suspend () -> Result<Unit> = {
         Result.failure(IllegalStateException(localizedText("窗外天气暂时不可用。")))
     },
+    onSearchOutdoorCities: suspend (String) -> Result<List<OutdoorCityCandidate>> = {
+        Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
+    },
+    onAttachOutdoorCityCandidate: suspend (OutdoorCityCandidate) -> Result<Unit> = {
+        Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
+    },
     onAttachOutdoorForCity: suspend (String) -> Result<Unit> = {
         Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
     },
@@ -175,6 +182,7 @@ fun MomentScreen(
         Result.failure(IllegalStateException(localizedText("暂时无法记录地点。")))
     },
     onRetryOutdoorWeather: suspend () -> Result<Unit> = onAttachCurrentOutdoor,
+    onCancelOutdoorRequest: () -> Unit = {},
     onClearDraftOutdoor: () -> Unit = {},
     onDraftDiscard: () -> Unit = {},
     hasResumedDraft: Boolean = false,
@@ -230,8 +238,9 @@ fun MomentScreen(
         mutableStateOf(locationPreferences.getBoolean("permission_requested", false))
     }
     var outdoorError by rememberSaveable { mutableStateOf<String?>(null) }
-    var showOutdoorDisclosure by rememberSaveable { mutableStateOf(false) }
-    var showOutdoorCityDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(draft.recordedAt) { outdoorError = null }
+    var showOutdoorSheet by rememberSaveable { mutableStateOf(false) }
+    var outdoorJob by remember { mutableStateOf<Job?>(null) }
     var showVoiceCapture by remember { mutableStateOf(false) }
     val pickerContext = LocalRecordedAtPickerContext.current
     val focusManager = LocalFocusManager.current
@@ -241,7 +250,7 @@ fun MomentScreen(
         if (!outdoorLoading && !isSaving && draft.recordedAt == null) {
             isOutdoorLoading = true
             outdoorError = null
-            scope.launch {
+            outdoorJob = scope.launch {
                 try {
                     onAttachCurrentOutdoor()
                         .onSuccess { outdoorPermissionDenied = false }
@@ -278,16 +287,22 @@ fun MomentScreen(
         ) {
             loadCurrentOutdoor()
         } else {
-            showOutdoorDisclosure = true
+            locationPermissionRequested = true
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
         }
     }
-    val loadCityOutdoor: (String) -> Unit = { city ->
-        if (!outdoorLoading && !isSaving && draft.recordedAt == null && city.isNotBlank()) {
+    val loadCityCandidate: (OutdoorCityCandidate) -> Unit = { candidate ->
+        if (!outdoorLoading && !isSaving && draft.recordedAt == null) {
             isOutdoorLoading = true
             outdoorError = null
-            scope.launch {
+            outdoorJob = scope.launch {
                 try {
-                    onAttachOutdoorForCity(city)
+                    onAttachOutdoorCityCandidate(candidate)
                         .onSuccess { outdoorPermissionDenied = false }
                         .onFailure { error ->
                             outdoorError = error.message ?: localizedText("暂时无法获取这个城市的天气。")
@@ -299,7 +314,7 @@ fun MomentScreen(
         }
     }
     val saveManualPlace: (String) -> Unit = { placeName ->
-        if (!outdoorLoading && !isSaving && draft.recordedAt == null && placeName.isNotBlank()) {
+        if (!outdoorLoading && !isSaving && placeName.isNotBlank()) {
             outdoorError = null
             scope.launch {
                 onAttachManualOutdoorPlace(placeName)
@@ -314,7 +329,7 @@ fun MomentScreen(
         if (!outdoorLoading && !isSaving && draft.recordedAt == null) {
             isOutdoorLoading = true
             outdoorError = null
-            scope.launch {
+            outdoorJob = scope.launch {
                 try {
                     onRetryOutdoorWeather()
                         .onSuccess { outdoorPermissionDenied = false }
@@ -326,6 +341,13 @@ fun MomentScreen(
                 }
             }
         }
+    }
+    val cancelOutdoorLoading: () -> Unit = {
+        outdoorJob?.cancel()
+        outdoorJob = null
+        isOutdoorLoading = false
+        outdoorError = null
+        onCancelOutdoorRequest()
     }
     val dismissKeyboard: () -> Unit = {
         focusManager.clearFocus()
@@ -494,26 +516,30 @@ fun MomentScreen(
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutdoorSettingsTitle()
-                OutdoorContextCard(
+                OutdoorContextBar(
                     snapshot = draft.outdoor,
-                    contentPadding = XikeContentCardPadding,
-                    minContentHeight = 42.dp,
-                    showLocationIconBackground = true,
-                    placeTextStyle = MaterialTheme.typography.titleSmall,
                     isBackdated = draft.recordedAt != null,
                     isLoading = outdoorLoading,
                     errorMessage =
-                        outdoorError
-                            ?: if (outdoorPermissionDenied) {
-                                localizedText("没有位置权限，也可以只选择城市。")
-                            } else {
-                                null
-                            },
+                        if (draft.recordedAt != null) {
+                            outdoorError
+                        } else {
+                            outdoorError
+                                ?: draftOutdoorWeatherError
+                                ?: if (outdoorPermissionDenied) {
+                                    localizedText("没有位置权限，也可以只选择城市。")
+                                } else {
+                                    null
+                                }
+                        },
                     enabled = !isSaving,
-                    onAdd = requestCurrentOutdoor,
+                    onOpenSheet = {
+                        dismissKeyboard()
+                        showOutdoorSheet = true
+                    },
+                    onRetryLocate = requestCurrentOutdoor,
                     onRetryWeather = retryOutdoorWeather,
-                    showRefresh = draft.recordedAt == null,
-                    onChooseCity = { showOutdoorCityDialog = true },
+                    onCancelLoading = cancelOutdoorLoading,
                     onRemove = {
                         outdoorError = null
                         onClearDraftOutdoor()
@@ -937,63 +963,22 @@ fun MomentScreen(
         )
     }
 
-    if (showOutdoorDisclosure) {
-        AlertDialog(
-            onDismissRequest = { showOutdoorDisclosure = false },
-            shape = XikeShapes.dialog,
-            title = { Text(localizedText("添加此刻窗外？")) },
-            text = {
-                Text(
-                    tr(
-                        "息刻只会在你点击后获取一次位置，用于显示区、街道；也可以只允许粗略定位。所选定位服务用于查询地点，粗略经纬度会发送给 Open-Meteo 查询天气。",
-                        "Xike requests your location once after you tap to show the district and street. You can also allow only approximate location. The selected location service looks up the place, and approximate coordinates are sent to Open-Meteo for weather.",
-                    ) + localizedText("经纬度不会保存，也不会上传日记内容；地点和天气快照会随草稿与日记加密保存在本机。"),
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    shape = XikeShapes.button,
-                    onClick = {
-                        showOutdoorDisclosure = false
-                        showOutdoorCityDialog = true
-                    },
-                ) {
-                    Text(localizedText("手动选城市"))
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    shape = XikeShapes.button,
-                    onClick = {
-                        showOutdoorDisclosure = false
-                        locationPermissionRequested = true
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            )
-                        )
-                    },
-                ) {
-                    Text(localizedText("允许定位"))
-                }
-            },
-        )
-    }
-
-    if (showOutdoorCityDialog) {
-        OutdoorCityDialog(
-            initialCity = suggestedCityQuery(draft.outdoor?.placeName),
-            onDismiss = { showOutdoorCityDialog = false },
-            onConfirm = { city ->
-                showOutdoorCityDialog = false
-                loadCityOutdoor(city)
-            },
-            onConfirmPlaceOnly = { place ->
-                showOutdoorCityDialog = false
-                saveManualPlace(place)
+    if (showOutdoorSheet) {
+        OutdoorContextSheet(
+            snapshot = draft.outdoor,
+            isBackdated = draft.recordedAt != null,
+            isLoading = outdoorLoading,
+            permissionDenied = outdoorPermissionDenied,
+            enabled = !isSaving,
+            onDismiss = { showOutdoorSheet = false },
+            onRequestCurrentLocation = requestCurrentOutdoor,
+            onSearchCities = onSearchOutdoorCities,
+            onSelectCityCandidate = loadCityCandidate,
+            onSaveManualPlace = saveManualPlace,
+            onRetryWeather = retryOutdoorWeather,
+            onRemove = {
+                outdoorError = null
+                onClearDraftOutdoor()
             },
         )
     }

@@ -25,6 +25,7 @@ import com.xike.app.media.JournalVideoStore
 import com.xike.app.media.pruneVoiceTemporaryFiles
 import com.xike.app.outdoor.AmapSettingsOperations
 import com.xike.app.outdoor.AmapSettingsStore
+import com.xike.app.outdoor.OutdoorCityCandidate
 import com.xike.app.outdoor.OutdoorContextRepository
 import com.xike.app.outdoor.OutdoorFetchResult
 import com.xike.app.outdoor.OutdoorRetryCoordinates
@@ -510,6 +511,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (persistDraft(draft.copy(outdoor = null))) cancelOutdoorRequest()
     }
 
+    fun cancelDraftOutdoorRequest() {
+        cancelOutdoorRequest()
+    }
+
     private fun cancelOutdoorRequest() {
         outdoorRequestGeneration++
         val request = outdoorRequestJob
@@ -520,11 +525,41 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         request?.cancel()
     }
 
+    suspend fun searchOutdoorCities(query: String): Result<List<OutdoorCityCandidate>> =
+        runOutdoorRequest {
+            outdoorRepository.searchCities(query)
+        }
+
     suspend fun attachCurrentOutdoor(): Result<Unit> =
         attachOutdoor(
             saveError = localizedText("地点与天气已取得，但草稿保存失败。"),
             request = { onPlaceReady -> outdoorRepository.currentWithFallback(onPlaceReady) },
         )
+
+    suspend fun attachOutdoorForCityCandidate(candidate: OutdoorCityCandidate): Result<Unit> {
+        val currentOutdoor = draft.outdoor
+        val preservePlace = currentOutdoor?.takeIf {
+            !it.hasWeather &&
+                suggestedCityQuery(it.placeName).let { suggested ->
+                    suggested.isNotBlank() &&
+                        (suggested.equals(candidate.name.trim(), ignoreCase = true) ||
+                            candidate.name
+                                .trim()
+                                .removeSuffix("市")
+                                .equals(suggested.removeSuffix("市"), ignoreCase = true))
+                }
+        }
+        return attachOutdoor(
+            saveError = localizedText("城市天气已取得，但草稿保存失败。"),
+            request = { onPlaceReady ->
+                outdoorRepository.cityCandidateWithFallback(
+                    candidate = candidate,
+                    preservePlace = preservePlace,
+                    onPlaceReady = onPlaceReady,
+                )
+            },
+        )
+    }
 
     suspend fun attachOutdoorForCity(city: String): Result<Unit> {
         val currentOutdoor = draft.outdoor
@@ -558,13 +593,9 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     )
                 )
             }
-            if (draft.recordedAt != null) {
-                return@withContext Result.failure(
-                    IllegalStateException(localizedText("补记过去时不会附加今天的天气。"))
-                )
-            }
             runCatching {
-                val snapshot = outdoorRepository.manualPlace(placeName)
+                val capturedAt = draft.recordedAt ?: System.currentTimeMillis()
+                val snapshot = outdoorRepository.manualPlace(placeName, capturedAt = capturedAt)
                 outdoorWeatherRetrySession = null
                 draftOutdoorWeatherError = null
                 check(persistDraft(draft.copy(outdoor = snapshot)) && awaitDraftPersistence()) {

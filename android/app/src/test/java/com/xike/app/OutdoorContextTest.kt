@@ -10,6 +10,7 @@ import com.xike.app.feature.moment.suggestedCityQuery
 import com.xike.app.outdoor.coarseRetryCoordinates
 import com.xike.app.outdoor.firstNonNullResult
 import com.xike.app.outdoor.locationSourceName
+import com.xike.app.outdoor.parseOutdoorCityCandidates
 import com.xike.app.outdoor.placeOnlySnapshot
 import java.time.LocalDate
 import java.time.ZoneId
@@ -18,6 +19,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -228,5 +230,78 @@ class OutdoorContextTest {
 
         assertEquals(snapshot, retainOutdoorForEditedTime(snapshot, original, sameDate, zone))
         assertNull(retainOutdoorForEditedTime(snapshot, original, nextDate, zone))
+
+        val placeOnly =
+            placeOnlySnapshot(
+                placeName = "京都 · 鸭川",
+                fullPlaceName = null,
+                locationSource = LocationSource.MANUAL,
+                capturedAt = original,
+            )!!
+        assertEquals(placeOnly, retainOutdoorForEditedTime(placeOnly, original, nextDate, zone))
+    }
+
+    @Test
+    fun `backdated draft retains manual place without weather`() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val yesterday =
+            LocalDate.of(2026, 8, 25).atTime(20, 0).atZone(zone).toInstant().toEpochMilli()
+        val today = LocalDate.of(2026, 8, 26).atTime(10, 0).atZone(zone).toInstant().toEpochMilli()
+        val placeOnly =
+            placeOnlySnapshot(
+                placeName = "家里书房",
+                fullPlaceName = null,
+                locationSource = LocationSource.MANUAL,
+                capturedAt = yesterday,
+            )!!
+        val weatherToday = OutdoorSnapshot("上海", 26.0, 1, today)
+
+        val backdatedPlaceDraft =
+            JournalDraft(recordedAt = yesterday, outdoor = placeOnly, updatedAt = today)
+                .normalized()
+        assertEquals(placeOnly, backdatedPlaceDraft.outdoor)
+
+        val backdatedWeatherDraft =
+            JournalDraft(recordedAt = yesterday, outdoor = weatherToday, updatedAt = today)
+                .normalized()
+        assertNull(backdatedWeatherDraft.outdoor)
+    }
+
+    @Test
+    fun `city candidate parser returns multiple matches and skips invalid coordinates`() {
+        val payload =
+            JSONObject(
+                """
+                {
+                  "results": [
+                    {
+                      "name": "Chaoyang",
+                      "admin1": "Beijing",
+                      "country": "China",
+                      "latitude": 39.9219,
+                      "longitude": 116.4436
+                    },
+                    {
+                      "name": "Chaoyang",
+                      "admin1": "Liaoning",
+                      "country": "China",
+                      "latitude": 41.5737,
+                      "longitude": 120.4508
+                    },
+                    {
+                      "name": "Broken",
+                      "admin1": "Nowhere"
+                    }
+                  ]
+                }
+                """
+                    .trimIndent()
+            )
+        val candidates = parseOutdoorCityCandidates(payload, "Chaoyang", Locale.ENGLISH)
+        assertEquals(2, candidates.size)
+        assertEquals("Chaoyang", candidates[0].name)
+        assertEquals("Beijing · China", candidates[0].subtitle)
+        assertEquals("Beijing · Chaoyang", candidates[0].fullLabel)
+        assertEquals("Liaoning · China", candidates[1].subtitle)
     }
 }

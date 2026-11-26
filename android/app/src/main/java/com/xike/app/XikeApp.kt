@@ -25,6 +25,7 @@ import com.xike.app.feature.insights.JournalInsightsScreen
 import com.xike.app.feature.lock.AppLockTimeout
 import com.xike.app.feature.moment.MomentScreen
 import com.xike.app.feature.settings.ProfileSettingsScreen
+import com.xike.app.outdoor.OutdoorCityCandidate
 import com.xike.app.ui.components.AppScreen
 import com.xike.app.ui.components.XikeNavigationBar
 import com.xike.app.ui.components.XikeNotice
@@ -55,10 +56,18 @@ internal fun XikeApp(
     onSave: suspend (JournalEntry, List<Uri>) -> Result<Unit>,
     // Outdoor and system media results.
     isDraftOutdoorLoading: Boolean,
+    draftOutdoorWeatherError: String? = null,
     onAttachCurrentOutdoor: suspend () -> Result<Unit>,
+    onSearchOutdoorCities: suspend (String) -> Result<List<OutdoorCityCandidate>> = {
+        Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
+    },
+    onAttachOutdoorCityCandidate: suspend (OutdoorCityCandidate) -> Result<Unit> = {
+        Result.failure(IllegalStateException(localizedText("城市天气暂时不可用。")))
+    },
     onAttachOutdoorForCity: suspend (String) -> Result<Unit>,
     onAttachManualOutdoorPlace: suspend (String) -> Result<Unit>,
     onRetryOutdoorWeather: suspend () -> Result<Unit>,
+    onCancelOutdoorRequest: () -> Unit = {},
     onClearDraftOutdoor: () -> Unit,
     onDraftImagesAdded: (List<Uri>) -> Boolean,
     onDraftImageResultPending: (String, Boolean) -> Unit,
@@ -170,9 +179,13 @@ internal fun XikeApp(
                             onDraftRecordedAtChange = onDraftRecordedAtChange,
                             onAttachCurrentOutdoor = onAttachCurrentOutdoor,
                             isDraftOutdoorLoading = isDraftOutdoorLoading,
+                            draftOutdoorWeatherError = draftOutdoorWeatherError,
+                            onSearchOutdoorCities = onSearchOutdoorCities,
+                            onAttachOutdoorCityCandidate = onAttachOutdoorCityCandidate,
                             onAttachOutdoorForCity = onAttachOutdoorForCity,
                             onAttachManualOutdoorPlace = onAttachManualOutdoorPlace,
                             onRetryOutdoorWeather = onRetryOutdoorWeather,
+                            onCancelOutdoorRequest = onCancelOutdoorRequest,
                             onClearDraftOutdoor = onClearDraftOutdoor,
                             onDraftImagesAdded = onDraftImagesAdded,
                             onDraftImageResultPending = onDraftImageResultPending,
